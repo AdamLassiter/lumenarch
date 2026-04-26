@@ -2,6 +2,8 @@ use bevy::prelude::*;
 
 use crate::ship::ModuleKind;
 
+use super::helpers::{FixedVec2, Fx};
+
 #[derive(Component)]
 pub(crate) struct PlayerShip;
 
@@ -13,6 +15,7 @@ pub(crate) struct ShipRoot;
 pub(crate) struct RuntimeShipModule {
     pub(crate) module_id: u64,
     pub(crate) kind: ModuleKind,
+    pub(crate) local_position: FixedVec2,
 }
 
 #[derive(Component)]
@@ -42,8 +45,8 @@ pub(crate) struct WeaponModule;
 
 #[derive(Component)]
 pub(crate) struct Projectile {
-    pub(crate) velocity: Vec2,
-    pub(crate) remaining_life: f32,
+    pub(crate) velocity: FixedVec2,
+    pub(crate) remaining_life: Fx,
     pub(crate) damage: i32,
     pub(crate) faction: ProjectileFaction,
 }
@@ -56,8 +59,8 @@ pub(crate) struct HostileTurretPlatform;
 
 #[derive(Component)]
 pub(crate) struct HostileWeaponState {
-    pub(crate) cooldown_remaining: f32,
-    pub(crate) cooldown_duration: f32,
+    pub(crate) cooldown_remaining: Fx,
+    pub(crate) cooldown_duration: Fx,
 }
 
 #[derive(Component)]
@@ -76,40 +79,50 @@ pub(crate) struct DestroyedModule;
 
 #[derive(Component)]
 pub(crate) struct LinearVelocity {
-    pub(crate) value: Vec2,
+    pub(crate) value: FixedVec2,
 }
 
 #[derive(Component)]
 pub(crate) struct AngularVelocity {
-    pub(crate) radians_per_second: f32,
+    pub(crate) radians_per_second: Fx,
+}
+
+#[derive(Component)]
+pub(crate) struct SimPosition {
+    pub(crate) value: FixedVec2,
+}
+
+#[derive(Component)]
+pub(crate) struct SimRotation {
+    pub(crate) radians: Fx,
 }
 
 #[derive(Component)]
 pub(crate) struct ShipMovementModel {
     pub(crate) engine_count: u32,
-    pub(crate) thrust_acceleration: f32,
-    pub(crate) turn_speed: f32,
-    pub(crate) max_speed: f32,
-    pub(crate) linear_damping: f32,
-    pub(crate) angular_damping: f32,
+    pub(crate) thrust_acceleration: Fx,
+    pub(crate) turn_speed: Fx,
+    pub(crate) max_speed: Fx,
+    pub(crate) linear_damping: Fx,
+    pub(crate) angular_damping: Fx,
 }
 
 #[derive(Component)]
 pub(crate) struct ShipPowerModel {
-    pub(crate) reactor_output: f32,
-    pub(crate) battery_capacity: f32,
-    pub(crate) passive_draw: f32,
-    pub(crate) engine_draw: f32,
-    pub(crate) weapon_draw: f32,
+    pub(crate) reactor_output: Fx,
+    pub(crate) battery_capacity: Fx,
+    pub(crate) passive_draw: Fx,
+    pub(crate) engine_draw: Fx,
+    pub(crate) weapon_draw: Fx,
 }
 
 #[derive(Component)]
 pub(crate) struct ShipPowerState {
-    pub(crate) stored_energy: f32,
-    pub(crate) generation: f32,
-    pub(crate) draw: f32,
-    pub(crate) surplus: f32,
-    pub(crate) engine_power_ratio: f32,
+    pub(crate) stored_energy: Fx,
+    pub(crate) generation: Fx,
+    pub(crate) draw: Fx,
+    pub(crate) surplus: Fx,
+    pub(crate) engine_power_ratio: Fx,
     pub(crate) weapons_powered: bool,
     pub(crate) engines_powered: bool,
 }
@@ -117,26 +130,27 @@ pub(crate) struct ShipPowerState {
 #[derive(Component, Default)]
 pub(crate) struct ShipControlState {
     pub(crate) thrust_active: bool,
-    pub(crate) turn_input: f32,
+    pub(crate) turn_input: Fx,
     pub(crate) fire_pressed: bool,
 }
 
 #[derive(Component)]
 pub(crate) struct ShipWeaponState {
     pub(crate) turret_count: u32,
-    pub(crate) cooldown_remaining: f32,
-    pub(crate) cooldown_duration: f32,
+    pub(crate) cooldown_remaining: Fx,
+    pub(crate) cooldown_duration: Fx,
 }
 
 #[derive(Component)]
 pub(crate) struct MissionState {
     pub(crate) failed: bool,
     pub(crate) failure_reason: Option<String>,
+    pub(crate) encounter_cleared: bool,
     pub(crate) completed: bool,
     pub(crate) completion_reason: Option<String>,
     pub(crate) salvage_collected: bool,
     pub(crate) salvage_scrap_awarded: u32,
-    pub(crate) return_delay_remaining: Option<f32>,
+    pub(crate) return_delay_remaining: Option<Fx>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

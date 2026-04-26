@@ -7,6 +7,7 @@ use bevy::{
 };
 
 use crate::ship::{ModuleKind, ShipDefinition, ShipModule};
+use crate::ship::storage::{load_default_ship, save_default_ship};
 
 use super::{
     GRID_COLOR, HALF_TILE_SIZE, HOVERED_BUTTON, NORMAL_BUTTON, PRESSED_BUTTON, SELECTED_BUTTON,
@@ -26,10 +27,30 @@ pub(crate) fn initialize_editor_ship(
     mut editor_ship: ResMut<EditorShip>,
     mut tool_state: ResMut<EditorToolState>,
 ) {
-    if let Some(snapshot) = status.active_snapshot.as_ref() {
-        editor_ship.ship = snapshot.clone();
-    } else {
-        editor_ship.ship = ShipDefinition::empty("Untitled Knot");
+    let has_existing_ship =
+        !editor_ship.ship.name.is_empty() || !editor_ship.ship.modules.is_empty();
+
+    if !has_existing_ship {
+        match load_default_ship() {
+            Ok(Some(saved_ship)) => {
+                editor_ship.ship = saved_ship;
+            }
+            Ok(None) => {
+                if let Some(snapshot) = status.active_snapshot.as_ref() {
+                    editor_ship.ship = snapshot.clone();
+                } else {
+                    editor_ship.ship = ShipDefinition::empty("Untitled Knot");
+                }
+            }
+            Err(error) => {
+                eprintln!("editor: failed to load saved ship: {error}");
+                if let Some(snapshot) = status.active_snapshot.as_ref() {
+                    editor_ship.ship = snapshot.clone();
+                } else {
+                    editor_ship.ship = ShipDefinition::empty("Untitled Knot");
+                }
+            }
+        }
     }
 
     tool_state.selected_kind = ModuleKind::Hull;
@@ -85,7 +106,7 @@ pub(crate) fn spawn_editor_ui(
 
                 toolbox.spawn((
                     Text::new(
-                        "Click a component, then place it on the grid.\nLeft click: place/replace\nRight click: erase\nQ/E: rotate\nL or Launch: runtime scene",
+                        "Click a component, then place it on the grid.\nLeft click: place/replace\nRight click: erase\nQ/E: rotate\nF5: save ship\nF9: reload saved ship\nL or Launch: runtime scene",
                     ),
                     TextFont {
                         font: mono_font.clone(),
@@ -195,7 +216,7 @@ pub(crate) fn spawn_editor_ui(
             .with_children(|panel| {
                 panel.spawn((
                     Text::new(
-                        "Editor Controls\nLeft click: place or replace\nRight click: erase\nQ / E: rotate selected part\nL: launch mission\nCosts are shown in [scrap]",
+                        "Editor Controls\nLeft click: place or replace\nRight click: erase\nQ / E: rotate selected part\nF5: save current ship\nF9: reload saved ship\nL: launch mission\nCosts are shown in [scrap]",
                     ),
                     TextFont {
                         font: mono_font.clone(),
@@ -359,6 +380,50 @@ pub(crate) fn place_or_remove_tile(
             progression.scrap += module_kind_cost(existing.kind);
         }
         editor_ship.ship.remove_module_at(grid_x, grid_y);
+    }
+}
+
+pub(crate) fn save_editor_ship_shortcut(
+    keys: Res<ButtonInput<KeyCode>>,
+    editor_ship: Res<EditorShip>,
+) {
+    if !keys.just_pressed(KeyCode::F5) {
+        return;
+    }
+
+    if let Err(error) = save_default_ship(&editor_ship.ship) {
+        eprintln!("editor: failed to save ship: {error}");
+    }
+}
+
+pub(crate) fn load_editor_ship_shortcut(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut editor_ship: ResMut<EditorShip>,
+) {
+    if !keys.just_pressed(KeyCode::F9) {
+        return;
+    }
+
+    match load_default_ship() {
+        Ok(Some(saved_ship)) => {
+            editor_ship.ship = saved_ship;
+        }
+        Ok(None) => {
+            eprintln!("editor: no saved ship file was found to load");
+        }
+        Err(error) => {
+            eprintln!("editor: failed to load ship: {error}");
+        }
+    }
+}
+
+pub(crate) fn persist_editor_ship(editor_ship: Res<EditorShip>) {
+    if !editor_ship.is_changed() {
+        return;
+    }
+
+    if let Err(error) = save_default_ship(&editor_ship.ship) {
+        eprintln!("editor: failed to autosave ship: {error}");
     }
 }
 

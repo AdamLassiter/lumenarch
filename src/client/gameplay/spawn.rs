@@ -9,12 +9,12 @@ use super::{
         AngularVelocity, EngineModule, HostileTarget, HostileTurretPlatform, HostileWeaponState,
         Integrity, LinearVelocity, MissionState, PlayerShip, PowerConsumer, PowerProducer,
         RuntimeShipModule, SalvagePickup, SalvageWreck, ShipControlState, ShipPowerState, ShipRoot,
-        ShipWeaponState,
+        ShipWeaponState, SimPosition, SimRotation,
         WeaponModule,
     },
     helpers::{
-        count_modules, gameplay_status_line, module_integrity, module_local_translation,
-        ship_movement_model, ship_power_model, sprite_path_for_kind,
+        FixedVec2, count_modules, gameplay_status_line, module_integrity, module_local_position,
+        module_local_translation, ship_movement_model, ship_power_model, sprite_path_for_kind,
     },
     ARENA_HEIGHT_TILES, ARENA_WIDTH_TILES, HOSTILE_FIRE_COOLDOWN, RUNTIME_SHIP_ORIGIN,
 };
@@ -196,9 +196,12 @@ fn spawn_test_arena(commands: &mut Commands) {
             Transform::from_translation(translation),
             HostileTarget,
             HostileTurretPlatform,
+            SimPosition {
+                value: FixedVec2::from_vec2(translation.truncate()),
+            },
             HostileWeaponState {
-                cooldown_remaining: HOSTILE_FIRE_COOLDOWN * 0.5,
-                cooldown_duration: HOSTILE_FIRE_COOLDOWN,
+                cooldown_remaining: super::helpers::Fx::from_num(HOSTILE_FIRE_COOLDOWN * 0.5),
+                cooldown_duration: super::helpers::Fx::from_num(HOSTILE_FIRE_COOLDOWN),
             },
             Integrity { current: 6, max: 6 },
             PlayingCleanup,
@@ -210,6 +213,9 @@ fn spawn_salvage_wreck(commands: &mut Commands) {
     commands.spawn((
         Sprite::from_color(Color::srgb(0.34, 0.72, 0.62), Vec2::new(26.0, 26.0)),
         Transform::from_xyz(0.0, -220.0, -4.0),
+        SimPosition {
+            value: FixedVec2::from_num(0, -220),
+        },
         SalvageWreck,
         SalvagePickup { scrap_value: 6 },
         PlayingCleanup,
@@ -246,9 +252,17 @@ fn spawn_runtime_ship(
             PlayingCleanup,
         ))
         .insert((
-            LinearVelocity { value: Vec2::ZERO },
+            LinearVelocity {
+                value: FixedVec2::zero(),
+            },
             AngularVelocity {
-                radians_per_second: 0.0,
+                radians_per_second: super::helpers::Fx::from_num(0),
+            },
+            SimPosition {
+                value: FixedVec2::from_vec2(RUNTIME_SHIP_ORIGIN.truncate()),
+            },
+            SimRotation {
+                radians: super::helpers::Fx::from_num(0),
             },
             movement_model,
             ShipPowerState {
@@ -256,20 +270,29 @@ fn spawn_runtime_ship(
                 generation: power_model.reactor_output,
                 draw: power_model.passive_draw,
                 surplus: power_model.reactor_output - power_model.passive_draw,
-                engine_power_ratio: if engine_count > 0 { 1.0 } else { 0.0 },
-                weapons_powered: turret_count == 0,
+                engine_power_ratio: if engine_count > 0 {
+                    super::helpers::Fx::from_num(1)
+                } else {
+                    super::helpers::Fx::from_num(0)
+                },
+                weapons_powered: turret_count > 0,
                 engines_powered: engine_count > 0,
             },
             power_model,
             ShipControlState::default(),
             ShipWeaponState {
                 turret_count,
-                cooldown_remaining: 0.0,
-                cooldown_duration: if turret_count > 0 { 0.3 } else { 0.0 },
+                cooldown_remaining: super::helpers::Fx::from_num(0),
+                cooldown_duration: if turret_count > 0 {
+                    super::helpers::Fx::from_num(0.3)
+                } else {
+                    super::helpers::Fx::from_num(0)
+                },
             },
             MissionState {
                 failed: false,
                 failure_reason: None,
+                encounter_cleared: false,
                 completed: false,
                 completion_reason: None,
                 salvage_collected: false,
@@ -282,11 +305,23 @@ fn spawn_runtime_ship(
     let (min_x, max_x, min_y, max_y) = ship.bounds().unwrap_or((0, 0, 0, 0));
     let center_x = (min_x + max_x) as f32 * 0.5;
     let center_y = (min_y + max_y) as f32 * 0.5;
+    let center_x_fixed = super::helpers::Fx::from_num(center_x);
+    let center_y_fixed = super::helpers::Fx::from_num(center_y);
 
     let child_entities: Vec<_> = ship
         .modules
         .iter()
-        .map(|module| spawn_runtime_module(commands, asset_server, module, center_x, center_y))
+        .map(|module| {
+            spawn_runtime_module(
+                commands,
+                asset_server,
+                module,
+                center_x,
+                center_y,
+                center_x_fixed,
+                center_y_fixed,
+            )
+        })
         .collect();
 
     commands.entity(root_entity).add_children(&child_entities);
@@ -298,9 +333,12 @@ fn spawn_runtime_module(
     module: &ShipModule,
     center_x: f32,
     center_y: f32,
+    center_x_fixed: super::helpers::Fx,
+    center_y_fixed: super::helpers::Fx,
 ) -> Entity {
+    let local_position = module_local_position(module, center_x_fixed, center_y_fixed);
     let mut entity = commands.spawn((
-        Sprite::from_image(asset_server.load(sprite_path_for_kind(module.kind))),
+        Sprite::from_image(asset_server.load(sprite_path_for_kind(&module.kind))),
         Transform {
             translation: module_local_translation(module, center_x, center_y),
             rotation: Quat::from_rotation_z(-(module.rotation_quadrants as f32) * FRAC_PI_2),
@@ -309,6 +347,7 @@ fn spawn_runtime_module(
         RuntimeShipModule {
             module_id: module.id,
             kind: module.kind,
+            local_position,
         },
         Integrity {
             current: module_integrity(module.kind),

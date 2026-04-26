@@ -7,12 +7,15 @@ use super::{
         AngularVelocity, CollectedSalvage, DestroyedModule, HostileTarget, HostileTurretPlatform,
         HostileWeaponState, Integrity, LinearVelocity, MissionState, PlayerShip, Projectile,
         ProjectileFaction, RuntimeShipModule, SalvagePickup, SalvageWreck, ShipControlState,
-        ShipMovementModel, ShipPowerModel, ShipPowerState, ShipRoot, ShipWeaponState, WeaponModule,
+        ShipMovementModel, ShipPowerModel, ShipPowerState, ShipRoot, ShipWeaponState, SimPosition,
+        SimRotation, WeaponModule,
     },
     helpers::{
-        clamp_ship_to_arena, damp_scalar, damp_vec2, is_inside_arena, mission_status_line,
-        mission_return_line, salvage_status_line, ship_movement_model, ship_power_model,
-        spawn_player_projectile, spawn_projectile_entity, update_ship_power_state,
+        Fx, angle_from_vector, clamp_position_to_arena, damp_scalar, damp_vec2, facing_vector,
+        fixed_radius_sq, format_fx0, format_fx1, format_fx2, fx_from_time_delta, is_inside_arena,
+        mission_return_line, mission_status_line, render_translation, salvage_status_line,
+        ship_movement_model, ship_power_model, spawn_player_projectile, spawn_projectile_entity,
+        update_ship_power_state,
     },
     CAMERA_FOLLOW_LERP_RATE, HOSTILE_PROJECTILE_SPEED, HOSTILE_TARGET_RADIUS, MODULE_HIT_RADIUS,
     PROJECTILE_RADIUS, PROJECTILE_SPEED, SALVAGE_PICKUP_RADIUS,
@@ -56,21 +59,20 @@ pub(crate) fn return_keyboard_shortcut(
 
 pub(crate) fn camera_follow_player_ship(
     time: Res<Time>,
-    player_ship_query: Single<&GlobalTransform, (With<PlayerShip>, With<ShipRoot>)>,
+    player_ship_query: Single<&SimPosition, (With<PlayerShip>, With<ShipRoot>)>,
     camera_query: Single<&mut Transform, (With<Camera2d>, With<MainCamera>)>,
 ) {
-    let ship_transform = player_ship_query.into_inner();
+    let ship_position = player_ship_query.into_inner().value.to_vec2();
     let mut camera_transform = camera_query.into_inner();
-    let target = ship_transform.translation();
     let blend = 1.0 - (-CAMERA_FOLLOW_LERP_RATE * time.delta_secs()).exp();
-    camera_transform.translation.x += (target.x - camera_transform.translation.x) * blend;
-    camera_transform.translation.y += (target.y - camera_transform.translation.y) * blend;
+    camera_transform.translation.x += (ship_position.x - camera_transform.translation.x) * blend;
+    camera_transform.translation.y += (ship_position.y - camera_transform.translation.y) * blend;
 }
 
 pub(crate) fn update_gameplay_status_text(
     player_ship_query: Single<
         (
-            &Transform,
+            &SimPosition,
             &Children,
             &LinearVelocity,
             &AngularVelocity,
@@ -83,13 +85,14 @@ pub(crate) fn update_gameplay_status_text(
     >,
     hostile_query: Query<Entity, With<HostileTarget>>,
     projectile_query: Query<Entity, With<Projectile>>,
-    salvage_query: Query<(&Transform, &SalvagePickup), (With<SalvageWreck>, Without<CollectedSalvage>)>,
+    module_integrity_query: Query<(&Integrity, Option<&DestroyedModule>), With<RuntimeShipModule>>,
+    salvage_query: Query<(&SimPosition, &SalvagePickup), (With<SalvageWreck>, Without<CollectedSalvage>)>,
     progression: Res<DemoProgression>,
     mut status_query: Query<&mut Text, With<GameplayStatusText>>,
 ) {
     let (
-        ship_transform,
-        _children,
+        ship_position,
+        children,
         linear_velocity,
         angular_velocity,
         movement_model,
@@ -97,11 +100,20 @@ pub(crate) fn update_gameplay_status_text(
         weapon_state,
         mission_state,
     ) = player_ship_query.into_inner();
-    let salvage_line = salvage_status_line(
-        ship_transform.translation.truncate(),
-        mission_state,
-        &salvage_query,
-    );
+    let salvage_line = salvage_status_line(ship_position.value, mission_state, &salvage_query);
+    let mut current_integrity = 0i32;
+    let mut max_integrity = 0i32;
+    let mut active_modules = 0usize;
+    for child in children.iter() {
+        let Ok((integrity, destroyed)) = module_integrity_query.get(*child) else {
+            continue;
+        };
+        max_integrity += integrity.max;
+        if destroyed.is_none() && integrity.current > 0 {
+            current_integrity += integrity.current;
+            active_modules += 1;
+        }
+    }
 
     for mut text in &mut status_query {
         let status_line = match mission_return_line(mission_state) {
@@ -109,20 +121,23 @@ pub(crate) fn update_gameplay_status_text(
             None => mission_status_line(mission_state).to_string(),
         };
         **text = format!(
-            "Mission Status\nOutcome: {}\nPosition: {:.0}, {:.0}\nVelocity: {:.1}\nTurn Rate: {:.2}\nPower\nEngine Output: {} ({:.0}%)\nGeneration / Draw: {:.1} / {:.1}\nBattery Reserve: {:.1}\nWeapons Online: {}\nCombat\nTurrets: {}  Cooldown: {:.2}\nProjectiles: {}  Hostiles: {}\nSalvage: {}\nScrap Total: {}",
+            "Mission Status\nOutcome: {}\nPosition: {}, {}\nVelocity: {}\nTurn Rate: {}\nIntegrity\nHull / Systems: {} / {}\nActive Modules: {}\nPower\nEngine Output: {} ({}%)\nGeneration / Draw: {} / {}\nBattery Reserve: {}\nWeapons Online: {}\nCombat\nTurrets: {}  Cooldown: {}\nProjectiles: {}  Hostiles: {}\nSalvage: {}\nScrap Total: {}",
             status_line,
-            ship_transform.translation.x,
-            ship_transform.translation.y,
-            linear_velocity.value.length(),
-            angular_velocity.radians_per_second,
+            format_fx0(ship_position.value.x),
+            format_fx0(ship_position.value.y),
+            format_fx1(linear_velocity.value.length()),
+            format_fx2(angular_velocity.radians_per_second),
+            current_integrity,
+            max_integrity,
+            active_modules,
             movement_model.engine_count,
-            power_state.engine_power_ratio * 100.0,
-            power_state.generation,
-            power_state.draw,
-            power_state.stored_energy,
+            format_fx0(power_state.engine_power_ratio * Fx::from_num(100)),
+            format_fx1(power_state.generation),
+            format_fx1(power_state.draw),
+            format_fx1(power_state.stored_energy),
             if power_state.weapons_powered { "yes" } else { "no" },
             weapon_state.turret_count,
-            weapon_state.cooldown_remaining.max(0.0),
+            format_fx2(weapon_state.cooldown_remaining.max(Fx::from_num(0))),
             projectile_query.iter().len(),
             hostile_query.iter().len(),
             salvage_line,
@@ -137,18 +152,25 @@ pub(crate) fn update_mission_state(
 ) {
     let mut mission_state = player_ship_query.into_inner();
     if mission_state.failed {
+        mission_state.encounter_cleared = false;
         mission_state.completed = false;
-        mission_state.return_delay_remaining.get_or_insert(2.5);
+        mission_state.return_delay_remaining.get_or_insert(Fx::from_num(2.5));
         return;
     }
 
     if hostile_query.is_empty() {
-        mission_state.completed = true;
+        mission_state.encounter_cleared = true;
+        mission_state.completed = mission_state.salvage_collected;
         if mission_state.completion_reason.is_none() {
             mission_state.completion_reason = Some("Encounter cleared".to_string());
         }
-        mission_state.return_delay_remaining.get_or_insert(2.5);
+        if mission_state.completed {
+            mission_state.return_delay_remaining.get_or_insert(Fx::from_num(2.5));
+        } else {
+            mission_state.return_delay_remaining = None;
+        }
     } else {
+        mission_state.encounter_cleared = false;
         mission_state.completed = false;
         mission_state.completion_reason = None;
         mission_state.return_delay_remaining = None;
@@ -158,24 +180,27 @@ pub(crate) fn update_mission_state(
 pub(crate) fn collect_salvage(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
-    player_ship_query: Single<(&GlobalTransform, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,
-    salvage_query: Query<(Entity, &Transform, &SalvagePickup), (With<SalvageWreck>, Without<CollectedSalvage>)>,
+    player_ship_query: Single<(&SimPosition, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,
+    salvage_query: Query<(Entity, &SimPosition, &SalvagePickup), (With<SalvageWreck>, Without<CollectedSalvage>)>,
     mut progression: ResMut<DemoProgression>,
 ) {
-    let (ship_transform, mut mission_state) = player_ship_query.into_inner();
-    if !mission_state.completed || mission_state.failed || mission_state.salvage_collected {
+    let (ship_position, mut mission_state) = player_ship_query.into_inner();
+    if !mission_state.encounter_cleared || mission_state.failed || mission_state.salvage_collected {
         return;
     }
     if !keys.just_pressed(KeyCode::KeyF) {
         return;
     }
 
-    let ship_position = ship_transform.translation().truncate();
-    for (entity, salvage_transform, salvage_pickup) in &salvage_query {
-        if ship_position.distance(salvage_transform.translation.truncate()) <= SALVAGE_PICKUP_RADIUS {
+    let pickup_radius_sq = fixed_radius_sq(SALVAGE_PICKUP_RADIUS);
+    for (entity, salvage_position, salvage_pickup) in &salvage_query {
+        if ship_position.value.distance_sq(salvage_position.value) <= pickup_radius_sq {
             progression.scrap += salvage_pickup.scrap_value;
             mission_state.salvage_collected = true;
             mission_state.salvage_scrap_awarded = salvage_pickup.scrap_value;
+            mission_state.completed = true;
+            mission_state.completion_reason = Some("Salvage recovered".to_string());
+            mission_state.return_delay_remaining = Some(Fx::from_num(2.5));
             commands.entity(entity).insert(CollectedSalvage);
             commands.entity(entity).despawn_recursive();
             break;
@@ -235,14 +260,15 @@ pub(crate) fn sync_runtime_ship_state(
     );
     weapon_state.turret_count = turret_count;
     if turret_count == 0 {
-        weapon_state.cooldown_remaining = 0.0;
+        weapon_state.cooldown_remaining = Fx::from_num(0);
     }
 
     if !core_alive {
         mission_state.failed = true;
         mission_state.failure_reason = Some("Core destroyed".to_string());
+        mission_state.encounter_cleared = false;
         mission_state.completed = false;
-        mission_state.return_delay_remaining.get_or_insert(2.5);
+        mission_state.return_delay_remaining.get_or_insert(Fx::from_num(2.5));
     }
 }
 
@@ -258,8 +284,8 @@ pub(crate) fn return_after_mission_resolution(
         return;
     };
 
-    *delay = (*delay - time.delta_secs()).max(0.0);
-    if *delay > 0.0 {
+    *delay = (*delay - fx_from_time_delta(&time)).max(Fx::from_num(0));
+    if *delay > Fx::from_num(0) {
         return;
     }
 
@@ -293,7 +319,7 @@ pub(crate) fn apply_player_ship_controls(
     keys: Res<ButtonInput<KeyCode>>,
     player_ship_query: Single<
         (
-            &Transform,
+            &SimRotation,
             &mut LinearVelocity,
             &mut AngularVelocity,
             &ShipMovementModel,
@@ -307,7 +333,7 @@ pub(crate) fn apply_player_ship_controls(
     >,
 ) {
     let (
-        transform,
+        ship_rotation,
         mut linear_velocity,
         mut angular_velocity,
         movement_model,
@@ -317,26 +343,26 @@ pub(crate) fn apply_player_ship_controls(
         mut weapon_state,
         mission_state,
     ) = player_ship_query.into_inner();
-    let dt = time.delta_secs();
+    let dt = fx_from_time_delta(&time);
     let thrust_active = keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp);
     let fire_pressed = keys.pressed(KeyCode::Space);
 
-    let mut turn_input: f32 = 0.0;
+    let mut turn_input = Fx::from_num(0);
     if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
-        turn_input += 1.0;
+        turn_input += Fx::from_num(1);
     }
     if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
-        turn_input -= 1.0;
+        turn_input -= Fx::from_num(1);
     }
 
     if mission_state.failed || mission_state.completed {
-        turn_input = 0.0;
+        turn_input = Fx::from_num(0);
     }
 
     control_state.thrust_active = thrust_active && !mission_state.failed && !mission_state.completed;
     control_state.turn_input = turn_input;
     control_state.fire_pressed = fire_pressed && !mission_state.failed && !mission_state.completed;
-    weapon_state.cooldown_remaining = (weapon_state.cooldown_remaining - dt).max(0.0);
+    weapon_state.cooldown_remaining = (weapon_state.cooldown_remaining - dt).max(Fx::from_num(0));
 
     update_ship_power_state(
         dt,
@@ -347,7 +373,7 @@ pub(crate) fn apply_player_ship_controls(
     );
 
     let effective_turn_input = turn_input * power_state.engine_power_ratio;
-    if effective_turn_input.abs() > f32::EPSILON && power_state.engines_powered {
+    if effective_turn_input != Fx::from_num(0) && power_state.engines_powered {
         angular_velocity.radians_per_second = effective_turn_input * movement_model.turn_speed;
     } else {
         angular_velocity.radians_per_second = damp_scalar(
@@ -358,7 +384,7 @@ pub(crate) fn apply_player_ship_controls(
     }
 
     if control_state.thrust_active && power_state.engines_powered {
-        let forward = (transform.rotation * Vec3::Y).truncate();
+        let forward = facing_vector(ship_rotation.radians);
         linear_velocity.value +=
             forward * movement_model.thrust_acceleration * power_state.engine_power_ratio * dt;
     }
@@ -368,11 +394,7 @@ pub(crate) fn apply_player_ship_controls(
         movement_model.linear_damping,
         dt,
     );
-
-    let speed = linear_velocity.value.length();
-    if speed > movement_model.max_speed {
-        linear_velocity.value = linear_velocity.value.normalize() * movement_model.max_speed;
-    }
+    linear_velocity.value = linear_velocity.value.clamp_length(movement_model.max_speed);
 }
 
 pub(crate) fn fire_player_weapons(
@@ -380,38 +402,44 @@ pub(crate) fn fire_player_weapons(
     player_ship_query: Single<
         (
             &Children,
-            &GlobalTransform,
+            &SimPosition,
+            &SimRotation,
             &ShipControlState,
             &ShipPowerState,
             &mut ShipWeaponState,
         ),
         (With<PlayerShip>, With<ShipRoot>),
     >,
-    weapon_query: Query<&GlobalTransform, With<WeaponModule>>,
+    weapon_query: Query<(&RuntimeShipModule, Option<&DestroyedModule>), With<WeaponModule>>,
 ) {
-    let (children, ship_transform, control_state, power_state, mut weapon_state) =
+    let (children, ship_position, ship_rotation, control_state, power_state, mut weapon_state) =
         player_ship_query.into_inner();
 
     if !control_state.fire_pressed
         || !power_state.weapons_powered
         || weapon_state.turret_count == 0
-        || weapon_state.cooldown_remaining > 0.0
+        || weapon_state.cooldown_remaining > Fx::from_num(0)
     {
         return;
     }
 
-    let ship_forward = (ship_transform.compute_transform().rotation * Vec3::Y).truncate();
-    let projectile_velocity = ship_forward.normalize_or_zero() * PROJECTILE_SPEED;
-    if projectile_velocity.length_squared() <= f32::EPSILON {
+    let ship_forward = facing_vector(ship_rotation.radians);
+    let projectile_velocity = ship_forward * Fx::from_num(PROJECTILE_SPEED);
+    if projectile_velocity.is_near_zero() {
         return;
     }
 
+    let muzzle_offset = ship_forward * Fx::from_num(TILE_SIZE * 0.35);
     let mut fired_any = false;
     for child in children.iter() {
-        let Ok(weapon_transform) = weapon_query.get(*child) else {
+        let Ok((weapon_module, destroyed)) = weapon_query.get(*child) else {
             continue;
         };
-        let origin = weapon_transform.translation().truncate() + ship_forward * (TILE_SIZE * 0.35);
+        if destroyed.is_some() {
+            continue;
+        }
+        let origin =
+            ship_position.value + weapon_module.local_position.rotate(ship_rotation.radians) + muzzle_offset;
         spawn_player_projectile(&mut commands, origin, projectile_velocity);
         fired_any = true;
     }
@@ -424,34 +452,34 @@ pub(crate) fn fire_player_weapons(
 pub(crate) fn fire_hostile_targets(
     mut commands: Commands,
     time: Res<Time>,
-    player_ship_query: Single<&GlobalTransform, (With<PlayerShip>, With<ShipRoot>)>,
+    player_ship_query: Single<&SimPosition, (With<PlayerShip>, With<ShipRoot>)>,
     mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
-    mut hostile_query: Query<(&GlobalTransform, &mut HostileWeaponState), With<HostileTarget>>,
+    mut hostile_query: Query<(&SimPosition, &mut HostileWeaponState), With<HostileTarget>>,
 ) {
     let mission_state = mission_query.into_inner();
     if mission_state.failed || mission_state.completed {
         return;
     }
 
-    let player_position = player_ship_query.into_inner().translation().truncate();
-    let dt = time.delta_secs();
+    let player_position = player_ship_query.into_inner().value;
+    let dt = fx_from_time_delta(&time);
 
-    for (hostile_transform, mut weapon_state) in &mut hostile_query {
-        weapon_state.cooldown_remaining = (weapon_state.cooldown_remaining - dt).max(0.0);
-        if weapon_state.cooldown_remaining > 0.0 {
+    for (hostile_position, mut weapon_state) in &mut hostile_query {
+        weapon_state.cooldown_remaining = (weapon_state.cooldown_remaining - dt).max(Fx::from_num(0));
+        if weapon_state.cooldown_remaining > Fx::from_num(0) {
             continue;
         }
 
-        let origin = hostile_transform.translation().truncate();
-        let direction = (player_position - origin).normalize_or_zero();
-        if direction.length_squared() <= f32::EPSILON {
+        let origin = hostile_position.value;
+        let direction = (player_position - origin).normalized_or_zero();
+        if direction.is_near_zero() {
             continue;
         }
 
         spawn_projectile_entity(
             &mut commands,
             origin,
-            direction * HOSTILE_PROJECTILE_SPEED,
+            direction * Fx::from_num(HOSTILE_PROJECTILE_SPEED),
             ProjectileFaction::Hostile,
             3,
             Color::srgb(0.96, 0.38, 0.24),
@@ -461,34 +489,35 @@ pub(crate) fn fire_hostile_targets(
 }
 
 pub(crate) fn aim_hostile_turrets(
-    player_ship_query: Single<&GlobalTransform, (With<PlayerShip>, With<ShipRoot>)>,
-    mut hostile_query: Query<&mut Transform, (With<HostileTarget>, With<HostileTurretPlatform>)>,
+    player_ship_query: Single<&SimPosition, (With<PlayerShip>, With<ShipRoot>)>,
+    mut hostile_query: Query<(&SimPosition, &mut Transform), (With<HostileTarget>, With<HostileTurretPlatform>)>,
 ) {
-    let player_position = player_ship_query.into_inner().translation().truncate();
+    let player_position = player_ship_query.into_inner().value;
 
-    for mut hostile_transform in &mut hostile_query {
-        let to_player = player_position - hostile_transform.translation.truncate();
-        if to_player.length_squared() <= f32::EPSILON {
+    for (hostile_position, mut hostile_transform) in &mut hostile_query {
+        let to_player = player_position - hostile_position.value;
+        if to_player.is_near_zero() {
             continue;
         }
 
-        let angle = to_player.to_angle() - std::f32::consts::FRAC_PI_2;
-        hostile_transform.rotation = Quat::from_rotation_z(angle);
+        let angle = angle_from_vector(to_player) - Fx::from_num(std::f32::consts::FRAC_PI_2);
+        hostile_transform.rotation = Quat::from_rotation_z(angle.to_num::<f32>());
     }
 }
 
 pub(crate) fn advance_projectiles(
     mut commands: Commands,
     time: Res<Time>,
-    mut projectile_query: Query<(Entity, &mut Transform, &mut Projectile)>,
+    mut projectile_query: Query<(Entity, &mut Transform, &mut SimPosition, &mut Projectile)>,
 ) {
-    let dt = time.delta_secs();
+    let dt = fx_from_time_delta(&time);
 
-    for (entity, mut transform, mut projectile) in &mut projectile_query {
+    for (entity, mut transform, mut position, mut projectile) in &mut projectile_query {
         projectile.remaining_life -= dt;
-        transform.translation += projectile.velocity.extend(0.0) * dt;
+        position.value += projectile.velocity * dt;
+        transform.translation = render_translation(position.value, transform.translation.z);
 
-        if projectile.remaining_life <= 0.0 || !is_inside_arena(transform.translation) {
+        if projectile.remaining_life <= Fx::from_num(0) || !is_inside_arena(position.value) {
             commands.entity(entity).despawn();
         }
     }
@@ -496,25 +525,26 @@ pub(crate) fn advance_projectiles(
 
 pub(crate) fn handle_projectile_hits(
     mut commands: Commands,
-    projectile_query: Query<(Entity, &Transform, &Projectile)>,
-    mut hostile_query: Query<(Entity, &Transform, &mut Integrity), With<HostileTarget>>,
+    projectile_query: Query<(Entity, &SimPosition, &Projectile)>,
+    mut hostile_query: Query<(Entity, &SimPosition, &mut Integrity), With<HostileTarget>>,
     mut player_module_query: Query<
-        (Entity, &GlobalTransform, &RuntimeShipModule, &mut Integrity, Option<&DestroyedModule>),
+        (Entity, &RuntimeShipModule, &mut Integrity, Option<&DestroyedModule>),
         Without<HostileTarget>,
     >,
-    player_ship_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
+    player_ship_query: Single<(&SimPosition, &SimRotation, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,
 ) {
-    let mut mission_state = player_ship_query.into_inner();
-    for (projectile_entity, projectile_transform, projectile) in &projectile_query {
-        let projectile_pos = projectile_transform.translation.truncate();
+    let (ship_position, ship_rotation, mut mission_state) = player_ship_query.into_inner();
+    let hostile_hit_distance_sq = fixed_radius_sq(HOSTILE_TARGET_RADIUS + PROJECTILE_RADIUS);
+    let module_hit_distance_sq = fixed_radius_sq(MODULE_HIT_RADIUS + PROJECTILE_RADIUS);
+
+    for (projectile_entity, projectile_position, projectile) in &projectile_query {
+        let projectile_pos = projectile_position.value;
         match projectile.faction {
             ProjectileFaction::Player => {
                 let mut hit_target = None;
 
-                for (hostile_entity, hostile_transform, hostile_integrity) in &mut hostile_query {
-                    let hostile_pos = hostile_transform.translation.truncate();
-                    let hit_distance = HOSTILE_TARGET_RADIUS + PROJECTILE_RADIUS;
-                    if projectile_pos.distance(hostile_pos) <= hit_distance {
+                for (hostile_entity, hostile_position, hostile_integrity) in &mut hostile_query {
+                    if projectile_pos.distance_sq(hostile_position.value) <= hostile_hit_distance_sq {
                         hit_target =
                             Some((hostile_entity, hostile_integrity.current - projectile.damage));
                         break;
@@ -534,15 +564,14 @@ pub(crate) fn handle_projectile_hits(
             ProjectileFaction::Hostile => {
                 let mut hit_module = None;
 
-                for (module_entity, module_transform, runtime_module, integrity, destroyed) in
-                    &mut player_module_query
-                {
+                for (module_entity, runtime_module, integrity, destroyed) in &mut player_module_query {
                     if destroyed.is_some() || integrity.current <= 0 {
                         continue;
                     }
 
-                    let module_pos = module_transform.translation().truncate();
-                    if projectile_pos.distance(module_pos) <= MODULE_HIT_RADIUS + PROJECTILE_RADIUS {
+                    let module_pos =
+                        ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians);
+                    if projectile_pos.distance_sq(module_pos) <= module_hit_distance_sq {
                         hit_module = Some((
                             module_entity,
                             runtime_module.kind,
@@ -553,7 +582,7 @@ pub(crate) fn handle_projectile_hits(
                 }
 
                 if let Some((module_entity, module_kind, remaining_integrity)) = hit_module {
-                    if let Ok((_, _, _, mut integrity, destroyed)) =
+                    if let Ok((_, _, mut integrity, destroyed)) =
                         player_module_query.get_mut(module_entity)
                     {
                         integrity.current = remaining_integrity;
@@ -564,9 +593,10 @@ pub(crate) fn handle_projectile_hits(
                                 mission_state.failed = true;
                                 mission_state.failure_reason =
                                     Some("Core destroyed".to_string());
+                                mission_state.encounter_cleared = false;
                                 mission_state.completed = false;
                                 mission_state.completion_reason = None;
-                                mission_state.return_delay_remaining.get_or_insert(2.5);
+                                mission_state.return_delay_remaining.get_or_insert(Fx::from_num(2.5));
                             }
                         }
                     }
@@ -579,14 +609,21 @@ pub(crate) fn handle_projectile_hits(
 
 pub(crate) fn integrate_player_ship_motion(
     time: Res<Time>,
-    player_ship_query: Single<(&mut Transform, &LinearVelocity, &AngularVelocity), (With<PlayerShip>, With<ShipRoot>)>,
+    player_ship_query: Single<
+        (&mut Transform, &mut SimPosition, &mut SimRotation, &LinearVelocity, &AngularVelocity),
+        (With<PlayerShip>, With<ShipRoot>),
+    >,
 ) {
-    let (mut transform, linear_velocity, angular_velocity) = player_ship_query.into_inner();
-    let dt = time.delta_secs();
+    let (mut transform, mut position, mut rotation, linear_velocity, angular_velocity) =
+        player_ship_query.into_inner();
+    let dt = fx_from_time_delta(&time);
 
-    transform.rotate_z(angular_velocity.radians_per_second * dt);
-    transform.translation += linear_velocity.value.extend(0.0) * dt;
-    clamp_ship_to_arena(&mut transform);
+    rotation.radians += angular_velocity.radians_per_second * dt;
+    position.value += linear_velocity.value * dt;
+    clamp_position_to_arena(&mut position.value);
+
+    transform.translation = render_translation(position.value, transform.translation.z);
+    transform.rotation = Quat::from_rotation_z(rotation.radians.to_num::<f32>());
 }
 
 pub(crate) fn update_destroyed_module_visuals(

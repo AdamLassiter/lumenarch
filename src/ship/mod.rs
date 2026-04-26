@@ -1,3 +1,5 @@
+pub mod storage;
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};

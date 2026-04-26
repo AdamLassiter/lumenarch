@@ -1,0 +1,348 @@
+{
+  "name": "Untitled Knot",
+  "modules": [
+    {
+      "id": 1,
+      "kind": "Interior",
+      "grid_x": 1,
+      "grid_y": -1,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 2,
+      "kind": "Interior",
+      "grid_x": -1,
+      "grid_y": -2,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 3,
+      "kind": "Interior",
+      "grid_x": 0,
+      "grid_y": -2,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 4,
+      "kind": "Cockpit",
+      "grid_x": 1,
+      "grid_y": -2,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 5,
+      "kind": "Interior",
+      "grid_x": 2,
+      "grid_y": -2,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 6,
+      "kind": "Interior",
+      "grid_x": 3,
+      "grid_y": -2,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 7,
+      "kind": "Interior",
+      "grid_x": 3,
+      "grid_y": -1,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 8,
+      "kind": "Interior",
+      "grid_x": 2,
+      "grid_y": -1,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 9,
+      "kind": "Interior",
+      "grid_x": 3,
+      "grid_y": 0,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 10,
+      "kind": "Interior",
+      "grid_x": 2,
+      "grid_y": 0,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 11,
+      "kind": "Core",
+      "grid_x": 1,
+      "grid_y": 0,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 12,
+      "kind": "Interior",
+      "grid_x": 0,
+      "grid_y": 0,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 13,
+      "kind": "Interior",
+      "grid_x": 0,
+      "grid_y": -1,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 14,
+      "kind": "Interior",
+      "grid_x": -1,
+      "grid_y": -1,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 15,
+      "kind": "Interior",
+      "grid_x": -1,
+      "grid_y": 0,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 16,
+      "kind": "Cargo",
+      "grid_x": -1,
+      "grid_y": 1,
+      "rotation_quadrants": 2
+    },
+    {
+      "id": 17,
+      "kind": "Cargo",
+      "grid_x": -1,
+      "grid_y": 2,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 18,
+      "kind": "Interior",
+      "grid_x": 0,
+      "grid_y": 1,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 19,
+      "kind": "Reactor",
+      "grid_x": 0,
+      "grid_y": 2,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 20,
+      "kind": "Interior",
+      "grid_x": 1,
+      "grid_y": 1,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 21,
+      "kind": "Interior",
+      "grid_x": 1,
+      "grid_y": 2,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 22,
+      "kind": "Interior",
+      "grid_x": 2,
+      "grid_y": 1,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 23,
+      "kind": "Reactor",
+      "grid_x": 2,
+      "grid_y": 2,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 24,
+      "kind": "Battery",
+      "grid_x": 3,
+      "grid_y": 1,
+      "rotation_quadrants": 2
+    },
+    {
+      "id": 25,
+      "kind": "Battery",
+      "grid_x": 3,
+      "grid_y": 2,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 26,
+      "kind": "Engine",
+      "grid_x": 0,
+      "grid_y": 3,
+      "rotation_quadrants": 2
+    },
+    {
+      "id": 27,
+      "kind": "Engine",
+      "grid_x": 2,
+      "grid_y": 3,
+      "rotation_quadrants": 2
+    },
+    {
+      "id": 28,
+      "kind": "Airlock",
+      "grid_x": 4,
+      "grid_y": 0,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 29,
+      "kind": "Turret",
+      "grid_x": 4,
+      "grid_y": -2,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 30,
+      "kind": "Turret",
+      "grid_x": -2,
+      "grid_y": -2,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 31,
+      "kind": "Hull",
+      "grid_x": -2,
+      "grid_y": -1,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 32,
+      "kind": "Hull",
+      "grid_x": -2,
+      "grid_y": 0,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 33,
+      "kind": "Hull",
+      "grid_x": -2,
+      "grid_y": 1,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 34,
+      "kind": "Hull",
+      "grid_x": -2,
+      "grid_y": 2,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 35,
+      "kind": "Hull",
+      "grid_x": -1,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 36,
+      "kind": "Hull",
+      "grid_x": 0,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 37,
+      "kind": "Hull",
+      "grid_x": 1,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 38,
+      "kind": "Hull",
+      "grid_x": 2,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 39,
+      "kind": "Hull",
+      "grid_x": 3,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 40,
+      "kind": "Hull",
+      "grid_x": 4,
+      "grid_y": -1,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 41,
+      "kind": "Hull",
+      "grid_x": 4,
+      "grid_y": 1,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 42,
+      "kind": "Hull",
+      "grid_x": 4,
+      "grid_y": 2,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 43,
+      "kind": "Hull",
+      "grid_x": 3,
+      "grid_y": 3,
+      "rotation_quadrants": 2
+    },
+    {
+      "id": 44,
+      "kind": "Engine",
+      "grid_x": 1,
+      "grid_y": 3,
+      "rotation_quadrants": 2
+    },
+    {
+      "id": 45,
+      "kind": "Hull",
+      "grid_x": -1,
+      "grid_y": 3,
+      "rotation_quadrants": 2
+    },
+    {
+      "id": 46,
+      "kind": "HullCorner",
+      "grid_x": -2,
+      "grid_y": 3,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 47,
+      "kind": "HullCorner",
+      "grid_x": -2,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 48,
+      "kind": "HullCorner",
+      "grid_x": 4,
+      "grid_y": -3,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 49,
+      "kind": "HullCorner",
+      "grid_x": 4,
+      "grid_y": 3,
+      "rotation_quadrants": 2
+    }
+  ]
+}

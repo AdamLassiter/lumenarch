@@ -414,7 +414,7 @@ Make the slice understandable enough to playtest.
 ### Tasks
 
 - [x] Add clear HUD labels for:
-  - [ ] hull/integrity
+  - [x] hull/integrity
   - [x] power
   - [x] selected tool in editor
   - [x] mission outcome
@@ -508,11 +508,3 @@ If we want the fastest route to a playable demo, do work in this order:
 ### Stage G Done
 
 * loop is replayable without manual developer setup
-
-## Immediate Next Task
-
-The best next implementation task is:
-
-- [ ] Create the shared ship model module and refactor the editor to use it as the authoritative ship representation
-
-That is the bridge between the current utility and the playable runtime slice.

@@ -3,7 +3,7 @@ use std::net::{TcpListener, TcpStream};
 
 use crate::{
     protocol::{ClientHello, ServerMessage, ShipSnapshot},
-    ship::{ModuleKind, ShipModule},
+    ship::{ModuleKind, ShipModule, storage::load_default_ship},
 };
 
 const DEFAULT_HOST_ADDR: &str = "127.0.0.1:5000";
@@ -54,7 +54,7 @@ fn handle_client(stream: TcpStream) -> Result<(), String> {
         .map_err(|error| format!("failed to decode client hello: {error}"))?;
     println!("host: client role is `{}`", hello.client_role);
 
-    let response = ServerMessage::ShipSnapshot(sample_ship_snapshot());
+    let response = ServerMessage::ShipSnapshot(load_host_ship_snapshot());
     let encoded = serde_json::to_string(&response)
         .map_err(|error| format!("failed to encode ship snapshot: {error}"))?;
 
@@ -65,6 +65,17 @@ fn handle_client(stream: TcpStream) -> Result<(), String> {
         .map_err(|error| format!("failed to send ship snapshot: {error}"))?;
 
     Ok(())
+}
+
+fn load_host_ship_snapshot() -> ShipSnapshot {
+    match load_default_ship() {
+        Ok(Some(ship)) => ship,
+        Ok(None) => sample_ship_snapshot(),
+        Err(error) => {
+            eprintln!("host: failed to load saved ship, using sample snapshot: {error}");
+            sample_ship_snapshot()
+        }
+    }
 }
 
 fn sample_ship_snapshot() -> ShipSnapshot {

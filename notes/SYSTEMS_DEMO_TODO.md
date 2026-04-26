@@ -56,8 +56,6 @@ Represent the player as an entity or controllable presence within the ship durin
   - [ ] `InternalPosition`
   - [ ] `CurrentStation`
 - [ ] Decide on the first movement model:
-  - [ ] tile-to-tile movement
-  - [ ] node-based movement between module anchors
   - [ ] free local movement within ship bounds
 - [ ] Add a runtime concept of walkable or reachable interior spaces.
 - [ ] Define how the player position is derived from ship layout:
