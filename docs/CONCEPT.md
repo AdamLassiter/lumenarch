@@ -143,7 +143,7 @@ Many actions must be performed manually early on:
 
 ### Field-Based Simulation
 
-All environmental interactions are modeled as **fields** emitted by components.
+Most environmental interactions are modeled as **fields** emitted by components.
 
 #### Field Types
 
@@ -151,11 +151,15 @@ All environmental interactions are modeled as **fields** emitted by components.
 
   * Heat
   * Radiation
-  * Oxygen
 
 * **Vector Fields**
 
   * Thrust / force
+
+* **Tile Volumes**
+
+  * Oxygen
+  * Ambient heat
 
 #### Field Properties
 
@@ -169,7 +173,7 @@ All environmental interactions are modeled as **fields** emitted by components.
 
   * Primarily additive
 
-Fields:
+Fields and tile volumes:
 
 * Affect components (efficiency, damage)
 * Affect player (status effects)
@@ -197,6 +201,7 @@ Fields:
 * Maintained within enclosed spaces
 * Lost through hull breaches
 * Not conducted through most solid components
+* Simulated per tile inside ship interiors
 
 ### Mass & Thrust
 
@@ -248,19 +253,20 @@ LUMEN is an advanced alien-derived system that augments control through **system
 
 ---
 
-## ⚙️ Core Mechanic — OPT Instruction
+## ⚙️ Core Mechanic — BUFF / NERF
 
-LUMEN introduces a special instruction within the ARCH framework:
+LUMEN introduces optimization instructions that modify nearby component behaviour without issuing direct commands.
 
 ```plaintext
-OPT <target> <value>
+BUFF <register> <condition>
+NERF <register> <condition>
 ```
 
 Examples:
 
 ```plaintext
-OPT OSRI0 60   // Maintain shield integrity at 60%
-OPT OWTP1 50   // Maintain turret power usage at 50W
+BUFF RRP9 GP01   // Improve reactor output when condition is true
+NERF WTF0 GP07   // Disrupt nearby turret fire logic when condition is true
 ```
 
 ---
@@ -269,19 +275,19 @@ OPT OWTP1 50   // Maintain turret power usage at 50W
 
 * Each LUMEN computer has:
 
-  * **Optimization budget**
-  * **De-optimization budget**
+  * **BUFF budget**
+  * **NERF budget**
 
-* For each OPT instruction:
+* For each active BUFF / NERF instruction:
 
-  * Components matching the target are evaluated
+  * Components in range with matching registers are evaluated
   * Their properties are adjusted via:
 
     * Efficiency buffs
     * Output modifiers
     * Consumption modifiers
 
-* Adjustments are proportional to deviation from the target
+* Adjustments are bounded by range, falloff, and budget
 
 ---
 
@@ -292,13 +298,14 @@ OPT OWTP1 50   // Maintain turret power usage at 50W
 * Enables large-scale balancing across systems
 * Reduces need for micromanagement
 * Scales with ship complexity
+* Enables register-based electronic warfare
 
 ### Limitations
 
 * Cannot directly control components
-* Limited by optimization budget
+* Limited by BUFF / NERF budgets
 * Less precise than ARCH
-* Effects may conflict across multiple OPT directives
+* Can accidentally affect friendly systems sharing channels
 
 ---
 
@@ -310,7 +317,7 @@ OPT OWTP1 50   // Maintain turret power usage at 50W
 Together:
 
 * ARCH handles discrete actions (fire weapon, route power)
-* LUMEN nudges systems toward desired states
+* LUMEN modifies how efficiently nearby systems perform those actions
 
 ---
 

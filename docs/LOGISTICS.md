@@ -58,20 +58,20 @@ Consumed by ship systems.
 
 ---
 
-# 📦 Storage Components (`ST`)
+# 📦 Storage Components (`LS`)
 
 ---
 
 ## Subtypes
 
-| Code | Type            |
-| ---- | --------------- |
-| `SS` | Scrap Storage   |
-| `SM` | Metal Storage   |
-| `SF` | Fuel Storage    |
-| `SO` | Oxygen Tank     |
-| `SA` | Ammo Storage    |
-| `SG` | General Storage |
+These are content variants, not distinct register prefixes:
+
+* Scrap storage
+* Metal storage
+* Fuel storage
+* Oxygen tank
+* Ammo storage
+* General storage
 
 ---
 
@@ -79,13 +79,13 @@ Consumed by ship systems.
 
 | Register | Access | Description     |
 | -------- | ------ | --------------- |
-| `STF0`   | Read   | Fill level (%)  |
-| `STC0`   | Read   | Capacity        |
-| `STM0`   | Read   | Stored mass     |
-| `STT0`   | Read   | Resource type   |
-| `STR0`   | Read   | Reserved amount |
-| `STI0`   | Read   | Input rate      |
-| `STO0`   | Read   | Output rate     |
+| `LSF0`   | Read   | Fill level (%)  |
+| `LSC0`   | Read   | Capacity        |
+| `LSM0`   | Read   | Stored mass     |
+| `LST0`   | Read   | Resource type   |
+| `LSR0`   | Read   | Reserved amount |
+| `LSI0`   | Read   | Input rate      |
+| `LSO0`   | Read   | Output rate     |
 
 ---
 
@@ -93,7 +93,7 @@ Consumed by ship systems.
 
 All resource usage follows:
 
-1. **Reserve** → `STR`
+1. **Reserve** → `LSR`
 2. **Transport**
 3. **Consume**
 
@@ -105,17 +105,17 @@ Prevents:
 
 ---
 
-# 🦾 Manipulators (`MA`)
+# 🦾 Manipulators (`LM`)
 
 ---
 
 ## Subtypes
 
-| Code | Type                        |
-| ---- | --------------------------- |
-| `MG` | Grabber Arm                 |
-| `MC` | Conveyor (optional upgrade) |
-| `ML` | Loader                      |
+These are content variants, not distinct register prefixes:
+
+* Grabber arm
+* Conveyor (optional upgrade)
+* Loader
 
 ---
 
@@ -133,13 +133,13 @@ Manipulators:
 
 | Register | Access | Description      |
 | -------- | ------ | ---------------- |
-| `MAE0`   | Write  | Extend           |
-| `MAR0`   | Write  | Retract          |
-| `MAG0`   | Write  | Grip (0/1)       |
-| `MAT0`   | Write  | Target direction |
-| `MAL0`   | Read   | Load held        |
-| `MAS0`   | Read   | Status           |
-| `MAP0`   | Read   | Power usage      |
+| `LME0`   | Write  | Extend           |
+| `LMR0`   | Write  | Retract          |
+| `LMG0`   | Write  | Grip (0/1)       |
+| `LMD0`   | Write  | Target direction |
+| `LML0`   | Read   | Load held        |
+| `LMS0`   | Read   | Status           |
+| `LMP0`   | Read   | Power usage      |
 
 ---
 
@@ -147,30 +147,30 @@ Manipulators:
 
 ```arch
 # Extend arm
-MOV 1 MAE0
+MOV 1 LME0
 
 # Grip resource
-MOV 1 MAG0
+MOV 1 LMG0
 
 # Retract
-MOV 1 MAR0
+MOV 1 LMR0
 ```
 
 ---
 
-# 🏭 Processing Components (`PR`)
+# 🏭 Processing Components (`LP`)
 
 ---
 
 ## Subtypes
 
-| Code | Type                 |
-| ---- | -------------------- |
-| `PS` | Scrapper             |
-| `PR` | Refiner              |
-| `PF` | Fuel Processor       |
-| `PA` | Ammo Fabricator      |
-| `PP` | Equipment Fabricator |
+These are content variants, not distinct register prefixes:
+
+* Scrapper
+* Refiner
+* Fuel processor
+* Ammo fabricator
+* Equipment fabricator
 
 ---
 
@@ -188,12 +188,12 @@ Processors:
 
 | Register | Access | Description    |
 | -------- | ------ | -------------- |
-| `PRI0`   | Read   | Input rate     |
-| `PRO0`   | Read   | Output rate    |
-| `PRP0`   | Read   | Power usage    |
-| `PRS0`   | Read   | Status         |
-| `PRT0`   | Write  | Recipe ID      |
-| `PRC0`   | Read   | Craft progress |
+| `LPI0`   | Read   | Input rate     |
+| `LPO0`   | Read   | Output rate    |
+| `LPP0`   | Read   | Power usage    |
+| `LPS0`   | Read   | Status         |
+| `LPY0`   | Write  | Recipe ID      |
+| `LPQ0`   | Read   | Craft progress |
 
 ---
 
@@ -212,8 +212,8 @@ Processors:
 
 ```arch
 # If scrap storage > 20%, run scrapper
-GT STF0 20 GP00
-MOV GP00 PRS0
+GT LSF0 20 GP00
+MOV GP00 LPS0
 ```
 
 ---
@@ -379,7 +379,7 @@ Prevents:
 ## Enable Drones When Storage High
 
 ```arch
-GT STF0 80 GP00
+GT LSF0 80 GP00
 MOV GP00 DRC0
 ```
 

@@ -290,6 +290,36 @@ WTR0
 
 ---
 
+## 📦 Logistics (`L`)
+
+### Subtypes
+
+* `LS` Storage
+* `LM` Manipulator
+* `LP` Processor
+
+### Registers
+
+| Code | Meaning           |
+| ---- | ----------------- |
+| `F`  | Fill level        |
+| `C`  | Capacity          |
+| `M`  | Stored mass       |
+| `T`  | Resource type     |
+| `R`  | Reserved amount   |
+| `I`  | Input rate        |
+| `O`  | Output rate       |
+| `E`  | Extend command    |
+| `G`  | Grip command      |
+| `L`  | Load held         |
+| `S`  | Status            |
+| `D`  | Target direction  |
+| `Y`  | Recipe id         |
+| `Q`  | Craft progress    |
+| `P`  | Power usage       |
+
+---
+
 ## 🤖 Drones (`DR`)
 
 ### Registers
@@ -297,33 +327,15 @@ WTR0
 | Code | Meaning        |
 | ---- | -------------- |
 | `C`  | Command (mode) |
+| `N`  | Active drones  |
+| `M`  | Max drones     |
+| `R`  | Control range  |
+| `L`  | Active tasks   |
+| `Q`  | Task queue     |
 | `T`  | Target ID      |
 | `S`  | Status         |
 | `P`  | Power usage    |
 | `H`  | Health         |
-
----
-
-## 🦾 Manipulators (`MA`)
-
-* Salvage arms, grabbers
-
-| Code | Meaning |
-| ---- | ------- |
-| `E`  | Extend  |
-| `R`  | Retract |
-| `G`  | Grip    |
-| `L`  | Load    |
-
----
-
-## 📦 Cargo (`C`)
-
-| Code | Meaning    |
-| ---- | ---------- |
-| `F`  | Fill level |
-| `M`  | Mass       |
-| `C`  | Capacity   |
 
 ---
 
@@ -334,19 +346,6 @@ MB00 … MB99
 ```
 
 Persistent storage between ticks.
-
----
-
-## 🧪 Processing (`P`)
-
-* Refiners, fabricators
-
-| Code | Meaning     |
-| ---- | ----------- |
-| `I`  | Input rate  |
-| `O`  | Output rate |
-| `P`  | Power       |
-| `S`  | Status      |
 
 ---
 
