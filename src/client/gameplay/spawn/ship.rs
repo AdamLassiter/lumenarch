@@ -301,31 +301,39 @@ fn module_field_emitter(kind: ModuleKind) -> ModuleFieldEmitter {
             heat_output: Fx::from_num(5),
             cooling_output: Fx::from_num(0),
             electrical_output: Fx::from_num(2),
+            grounding_output: Fx::from_num(0.2),
         },
         ModuleKind::Engine => ModuleFieldEmitter {
             heat_output: Fx::from_num(3),
             cooling_output: Fx::from_num(0),
             electrical_output: Fx::from_num(1),
+            grounding_output: Fx::from_num(0.2),
         },
         ModuleKind::Turret => ModuleFieldEmitter {
             heat_output: Fx::from_num(2),
             cooling_output: Fx::from_num(0),
             electrical_output: Fx::from_num(1),
+            grounding_output: Fx::from_num(0.2),
         },
         ModuleKind::Battery => ModuleFieldEmitter {
             heat_output: Fx::from_num(1),
             cooling_output: Fx::from_num(0),
             electrical_output: Fx::from_num(2),
+            grounding_output: Fx::from_num(1.4),
         },
         ModuleKind::Hull | ModuleKind::HullCorner | ModuleKind::Airlock => ModuleFieldEmitter {
             heat_output: Fx::from_num(0),
             cooling_output: Fx::from_num(2),
             electrical_output: Fx::from_num(0),
+            grounding_output: Fx::from_num(2.8),
         },
-        _ => ModuleFieldEmitter {
-            heat_output: Fx::from_num(0),
-            cooling_output: Fx::from_num(0),
-            electrical_output: Fx::from_num(0),
-        },
+        ModuleKind::Core | ModuleKind::Cockpit | ModuleKind::Cargo | ModuleKind::Interior => {
+            ModuleFieldEmitter {
+                heat_output: Fx::from_num(0),
+                cooling_output: Fx::from_num(0),
+                electrical_output: Fx::from_num(0),
+                grounding_output: Fx::from_num(0.8),
+            }
+        }
     }
 }

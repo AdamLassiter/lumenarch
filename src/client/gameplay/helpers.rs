@@ -35,6 +35,14 @@ pub(crate) type Fx = FixedI32<U16>;
 pub(crate) type WideFx = FixedI64<U16>;
 
 #[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct FieldOutput {
+    pub(crate) heat: Fx,
+    pub(crate) cooling: Fx,
+    pub(crate) electrical: Fx,
+    pub(crate) grounding: Fx,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct FixedVec2 {
     pub(crate) x: Fx,
     pub(crate) y: Fx,
@@ -657,24 +665,38 @@ pub(super) fn dynamic_field_output(
     runtime_state: &ModuleRuntimeState,
     integrity: &Integrity,
     destroyed: bool,
-) -> (Fx, Fx, Fx) {
+) -> FieldOutput {
     if destroyed || integrity.current <= 0 {
-        return (Fx::from_num(0), Fx::from_num(0), Fx::from_num(0));
+        return FieldOutput::default();
     }
 
     let damage_factor = Fx::from_num(1)
         - Fx::from_num(integrity.current.max(0)) / Fx::from_num(integrity.max.max(1));
-    let attention_bonus = if runtime_state.needs_attention {
+    let heat_attention_bonus = if runtime_state.needs_attention {
         Fx::from_num(1.5)
     } else {
         Fx::from_num(1)
     };
-    let heat = emitter.heat_output * attention_bonus + damage_factor * Fx::from_num(3);
+    let grounding_penalty = if runtime_state.needs_attention {
+        Fx::from_num(0.2)
+    } else {
+        Fx::from_num(0)
+    };
+    let heat = emitter.heat_output * heat_attention_bonus + damage_factor * Fx::from_num(3);
     let cooling = emitter.cooling_output;
-    let electrical = emitter.electrical_output * attention_bonus
-        + runtime_state.electrical_instability * fx_ratio(1, 6);
+    let electrical = emitter.electrical_output
+        + damage_factor * Fx::from_num(0.6)
+        + runtime_state.electrical_instability * fx_ratio(1, 24);
+    let grounding =
+        (emitter.grounding_output - damage_factor * Fx::from_num(0.4) - grounding_penalty)
+            .max(Fx::from_num(0));
 
-    (heat, cooling, electrical)
+    FieldOutput {
+        heat,
+        cooling,
+        electrical,
+        grounding,
+    }
 }
 
 pub(super) fn local_field_distance(a: FixedVec2, b: FixedVec2) -> Fx {

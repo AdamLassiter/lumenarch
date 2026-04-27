@@ -162,6 +162,7 @@ pub(crate) struct ModuleFieldEmitter {
     pub(crate) heat_output: Fx,
     pub(crate) cooling_output: Fx,
     pub(crate) electrical_output: Fx,
+    pub(crate) grounding_output: Fx,
 }
 
 #[derive(Component)]

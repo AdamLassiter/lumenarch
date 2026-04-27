@@ -78,14 +78,15 @@ pub(crate) fn sample_ship_fields(
         .iter()
         .map(
             |(entity, runtime_module, emitter, integrity, runtime_state, destroyed)| {
-                let outputs =
+                let output =
                     dynamic_field_output(emitter, runtime_state, integrity, destroyed.is_some());
                 (
                     entity,
                     runtime_module.local_position,
-                    outputs.0,
-                    outputs.1,
-                    outputs.2,
+                    output.heat,
+                    output.cooling,
+                    output.electrical,
+                    output.grounding,
                     destroyed.is_some(),
                 )
             },
@@ -107,6 +108,7 @@ pub(crate) fn sample_ship_fields(
             source_heat,
             source_cooling,
             source_electrical,
+            source_grounding,
             source_destroyed,
         ) in &module_samples
         {
@@ -121,7 +123,7 @@ pub(crate) fn sample_ship_fields(
                 continue;
             }
             heat += (*source_heat - *source_cooling) * attenuation;
-            electrical += *source_electrical * attenuation;
+            electrical += (*source_electrical - *source_grounding) * attenuation;
         }
         runtime_state.sampled_heat = heat.max(Fx::from_num(0));
         runtime_state.sampled_electrical = electrical.max(Fx::from_num(0));
@@ -138,8 +140,15 @@ pub(crate) fn sample_ship_fields(
 
     let mut heat = Fx::from_num(0);
     let mut electrical = Fx::from_num(0);
-    for (_, source_pos, source_heat, source_cooling, source_electrical, source_destroyed) in
-        &module_samples
+    for (
+        _,
+        source_pos,
+        source_heat,
+        source_cooling,
+        source_electrical,
+        source_grounding,
+        source_destroyed,
+    ) in &module_samples
     {
         if *source_destroyed {
             continue;
@@ -149,7 +158,7 @@ pub(crate) fn sample_ship_fields(
             continue;
         }
         heat += (*source_heat - *source_cooling) * attenuation;
-        electrical += *source_electrical * attenuation;
+        electrical += (*source_electrical - *source_grounding) * attenuation;
     }
 
     player_fields.local_heat = heat.max(Fx::from_num(0));
@@ -190,10 +199,10 @@ pub(crate) fn update_module_runtime_state(
             - Fx::from_num(0.55) * dt)
             .max(Fx::from_num(0));
         runtime_state.electrical_instability = (runtime_state.electrical_instability
-            + (runtime_state.sampled_electrical * Fx::from_num(0.22)
-                + damage_factor * Fx::from_num(0.8))
+            + (runtime_state.sampled_electrical * Fx::from_num(0.08)
+                + damage_factor * Fx::from_num(0.45))
                 * dt
-            - Fx::from_num(0.35) * dt)
+            - Fx::from_num(0.5) * dt)
             .max(Fx::from_num(0));
 
         runtime_state.needs_attention = runtime_state.current_heat >= Fx::from_num(9)
