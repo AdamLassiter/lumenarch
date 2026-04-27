@@ -19,8 +19,32 @@ pub(super) fn editor_status_line(
     };
     let mission_summary = match (&last_mission_report.headline, &last_mission_report.detail) {
         (Some(headline), Some(detail)) => format!(
-            "\nLast Mission: {headline}\n{detail}\nScrap Awarded: {}\nTotal Scrap: {}",
-            last_mission_report.scrap_awarded, last_mission_report.total_scrap,
+            "\nLast Mission: {headline}\n{detail}\nScrap Awarded: {}\nTotal Scrap: {}\nHottest Module: {}\nFirst Disabled: {}\nRepairs / Stabilizations: {} / {}\nAutomation Used: {}{}",
+            last_mission_report.scrap_awarded,
+            last_mission_report.total_scrap,
+            last_mission_report
+                .hottest_module
+                .as_deref()
+                .unwrap_or("n/a"),
+            last_mission_report
+                .first_disabled_module
+                .as_deref()
+                .unwrap_or("n/a"),
+            last_mission_report.repairs_performed,
+            last_mission_report.stabilizations_performed,
+            if last_mission_report.automation_used {
+                "yes"
+            } else {
+                "no"
+            },
+            if last_mission_report.redesign_hints.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "\nHints:\n- {}",
+                    last_mission_report.redesign_hints.join("\n- ")
+                )
+            }
         ),
         (Some(headline), None) => format!(
             "\nLast Mission: {headline}\nScrap Awarded: {}\nTotal Scrap: {}",
@@ -40,7 +64,7 @@ pub(super) fn module_kind_cost(kind: ModuleKind) -> u32 {
         ModuleKind::Hull | ModuleKind::HullCorner => 1,
         ModuleKind::Battery | ModuleKind::Cargo | ModuleKind::Airlock => 2,
         ModuleKind::Engine => 3,
-        ModuleKind::Cockpit | ModuleKind::Turret => 4,
+        ModuleKind::Cockpit | ModuleKind::Computer | ModuleKind::Turret => 4,
         ModuleKind::Reactor => 5,
         ModuleKind::Core => 6,
     }
@@ -70,5 +94,8 @@ pub(super) fn is_cursor_over_toolbox(window: &Window) -> bool {
 }
 
 pub(super) fn sprite_path_for_kind(kind: &ModuleKind) -> String {
-    format!("tiles/{}.png", kind.as_str())
+    match kind {
+        ModuleKind::Computer => "tiles/battery.png".to_string(),
+        _ => format!("tiles/{}.png", kind.as_str()),
+    }
 }

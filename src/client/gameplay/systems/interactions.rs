@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use super::super::{
     components::{
+        ArchComputerModule,
         BeginHeldInteraction,
         CompleteHeldInteraction,
         CurrentStation,
@@ -10,10 +11,14 @@ use super::super::{
         Integrity,
         InteractWithModule,
         InteractionKind,
+        MissionState,
         ModuleRuntimeState,
         NearbyInteraction,
+        PlayerFieldState,
         PlayerShip,
         RuntimeShipModule,
+        ShipAutomationMode,
+        ShipAutomationState,
         ShipRoot,
         ShipboardPlayer,
     },
@@ -101,17 +106,26 @@ pub(crate) fn begin_held_interactions(
 pub(crate) fn complete_held_interactions(
     time: Res<Time>,
     keys: Res<ButtonInput<KeyCode>>,
+    mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     nearby_query: Single<&NearbyInteraction, With<ShipboardPlayer>>,
-    player_query: Single<&mut HeldInteraction, With<ShipboardPlayer>>,
+    player_query: Single<(&PlayerFieldState, &mut HeldInteraction), With<ShipboardPlayer>>,
     mut complete_events: EventWriter<CompleteHeldInteraction>,
 ) {
+    let mission_state = mission_query.into_inner();
     let nearby = nearby_query.into_inner();
-    let mut held = player_query.into_inner();
+    let (player_fields, mut held) = player_query.into_inner();
     let Some(target) = held.target else {
         return;
     };
 
-    if !keys.pressed(KeyCode::KeyE) || nearby.target != Some(target) || nearby.kind != held.kind {
+    if mission_state.failed
+        || mission_state.completed
+        || player_fields.local_heat >= Fx::from_num(15)
+        || player_fields.local_electrical >= Fx::from_num(13)
+        || !keys.pressed(KeyCode::KeyE)
+        || nearby.target != Some(target)
+        || nearby.kind != held.kind
+    {
         *held = HeldInteraction::default();
         return;
     }
@@ -129,31 +143,76 @@ pub(crate) fn apply_module_interactions(
     mut instant_events: EventReader<InteractWithModule>,
     mut complete_events: EventReader<CompleteHeldInteraction>,
     ship_query: Single<
-        &mut super::super::components::ShipboardControlState,
+        (
+            &mut super::super::components::ShipboardControlState,
+            &mut ShipAutomationState,
+            &mut MissionState,
+        ),
         (With<PlayerShip>, With<ShipRoot>),
     >,
     mut module_query: Query<(
+        &RuntimeShipModule,
         &mut Integrity,
         &mut ModuleRuntimeState,
+        Option<&ArchComputerModule>,
         Option<&DestroyedModule>,
     )>,
 ) {
-    let mut ship_control = ship_query.into_inner();
+    let (mut ship_control, mut automation_state, mut mission_state) = ship_query.into_inner();
     for event in instant_events.read() {
         match event.kind {
             InteractionKind::Cockpit => {
                 ship_control.mode = super::super::components::ShipControlMode::ShipFlight;
+                mission_state.recent_action = Some("Returned to cockpit control".to_string());
+                mission_state.recent_action_timer = Fx::from_num(1.5);
+            }
+            InteractionKind::Computer => {
+                if let Ok((_, _, _, computer, destroyed)) = module_query.get_mut(event.target)
+                    && computer.is_some()
+                    && destroyed.is_none()
+                {
+                    automation_state.mode = match automation_state.mode {
+                        ShipAutomationMode::Off => ShipAutomationMode::ReactorGuard,
+                        ShipAutomationMode::ReactorGuard => ShipAutomationMode::Off,
+                    };
+                    let label = match automation_state.mode {
+                        ShipAutomationMode::Off => "Automation offline",
+                        ShipAutomationMode::ReactorGuard => "Automation set: reactor guard",
+                    };
+                    mission_state.recent_action = Some(label.to_string());
+                    mission_state.recent_action_timer = Fx::from_num(1.8);
+                }
             }
             InteractionKind::Turret => {
-                if let Ok((_, mut runtime_state, destroyed)) = module_query.get_mut(event.target) {
-                    if destroyed.is_none() {
-                        runtime_state.is_disabled = false;
-                        runtime_state.needs_attention = false;
-                        runtime_state.electrical_instability =
-                            (runtime_state.electrical_instability - Fx::from_num(4))
-                                .max(Fx::from_num(0));
-                        runtime_state.last_interaction_age = Fx::from_num(0);
-                    }
+                if let Ok((_, _, mut runtime_state, _, destroyed)) =
+                    module_query.get_mut(event.target)
+                    && destroyed.is_none()
+                {
+                    runtime_state.is_disabled = false;
+                    runtime_state.needs_attention = false;
+                    runtime_state.electrical_instability = (runtime_state.electrical_instability
+                        - Fx::from_num(4))
+                    .max(Fx::from_num(0));
+                    runtime_state.last_interaction_age = Fx::from_num(0);
+                    mission_state.recent_action = Some("Turret reset complete".to_string());
+                    mission_state.recent_action_timer = Fx::from_num(1.5);
+                }
+            }
+            InteractionKind::Engine => {
+                if let Ok((_, _, mut runtime_state, _, destroyed)) =
+                    module_query.get_mut(event.target)
+                    && destroyed.is_none()
+                {
+                    runtime_state.current_heat =
+                        (runtime_state.current_heat - Fx::from_num(3)).max(Fx::from_num(0));
+                    runtime_state.electrical_instability = (runtime_state.electrical_instability
+                        - Fx::from_num(2))
+                    .max(Fx::from_num(0));
+                    runtime_state.is_disabled = false;
+                    runtime_state.needs_attention = false;
+                    runtime_state.last_interaction_age = Fx::from_num(0);
+                    mission_state.recent_action = Some("Engine reset complete".to_string());
+                    mission_state.recent_action_timer = Fx::from_num(1.5);
                 }
             }
             _ => {}
@@ -161,7 +220,7 @@ pub(crate) fn apply_module_interactions(
     }
 
     for event in complete_events.read() {
-        if let Ok((mut integrity, mut runtime_state, destroyed)) =
+        if let Ok((runtime_module, mut integrity, mut runtime_state, _, destroyed)) =
             module_query.get_mut(event.target)
         {
             if destroyed.is_some() {
@@ -176,6 +235,9 @@ pub(crate) fn apply_module_interactions(
                     .max(Fx::from_num(0));
                     runtime_state.needs_attention = false;
                     runtime_state.is_disabled = false;
+                    mission_state.stabilizations_performed += 1;
+                    mission_state.recent_action = Some("Reactor stabilized".to_string());
+                    mission_state.recent_action_timer = Fx::from_num(2);
                 }
                 InteractionKind::Repair => {
                     integrity.current = (integrity.current + 3).min(integrity.max);
@@ -186,6 +248,10 @@ pub(crate) fn apply_module_interactions(
                     .max(Fx::from_num(0));
                     runtime_state.needs_attention = integrity.current < integrity.max;
                     runtime_state.is_disabled = false;
+                    mission_state.repairs_performed += 1;
+                    mission_state.recent_action =
+                        Some(format!("{} repaired", runtime_module.kind.as_str()));
+                    mission_state.recent_action_timer = Fx::from_num(2);
                 }
                 _ => {}
             }

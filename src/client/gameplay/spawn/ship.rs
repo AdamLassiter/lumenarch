@@ -7,6 +7,7 @@ use super::super::{
     RUNTIME_SHIP_ORIGIN,
     components::{
         AngularVelocity,
+        ArchComputerModule,
         CurrentStation,
         EngineModule,
         HeldInteraction,
@@ -24,6 +25,8 @@ use super::super::{
         PowerConsumer,
         PowerProducer,
         RuntimeShipModule,
+        ShipAutomationMode,
+        ShipAutomationState,
         ShipControlMode,
         ShipControlState,
         ShipInteriorMap,
@@ -61,6 +64,7 @@ pub(super) fn spawn_runtime_ship(
     let reactor_count = count_modules(ship, ModuleKind::Reactor);
     let battery_count = count_modules(ship, ModuleKind::Battery);
     let turret_count = count_modules(ship, ModuleKind::Turret);
+    let computer_count = count_modules(ship, ModuleKind::Computer);
     let movement_model = ship_movement_model(ship.modules.len(), engine_count);
     let power_model = ship_power_model(
         ship.modules.len(),
@@ -122,6 +126,16 @@ pub(super) fn spawn_runtime_ship(
                     Fx::from_num(0)
                 },
             },
+            ShipAutomationState {
+                mode: if computer_count > 0 {
+                    ShipAutomationMode::ReactorGuard
+                } else {
+                    ShipAutomationMode::Off
+                },
+                active: false,
+                output_scale: Fx::from_num(1),
+                trigger_count: 0,
+            },
             MissionState {
                 failed: false,
                 failure_reason: None,
@@ -131,6 +145,15 @@ pub(super) fn spawn_runtime_ship(
                 salvage_collected: false,
                 salvage_scrap_awarded: 0,
                 return_delay_remaining: None,
+                repairs_performed: 0,
+                stabilizations_performed: 0,
+                automation_used: false,
+                automation_trigger_count: 0,
+                highest_heat: Fx::from_num(0),
+                hottest_module_kind: None,
+                first_disabled_module_kind: None,
+                recent_action: None,
+                recent_action_timer: Fx::from_num(0),
             },
         ))
         .id();
@@ -268,6 +291,7 @@ fn spawn_runtime_module(
             sampled_heat: Fx::from_num(0),
             sampled_electrical: Fx::from_num(0),
             is_disabled: false,
+            was_disabled_last_frame: false,
             needs_attention: false,
             last_interaction_age: Fx::from_num(0),
         },
@@ -286,6 +310,9 @@ fn spawn_runtime_module(
         ModuleKind::Engine => {
             entity.insert((PowerConsumer { draw: 3 }, EngineModule));
         }
+        ModuleKind::Computer => {
+            entity.insert(ArchComputerModule);
+        }
         ModuleKind::Turret => {
             entity.insert((PowerConsumer { draw: 2 }, WeaponModule));
         }
@@ -298,15 +325,15 @@ fn spawn_runtime_module(
 fn module_field_emitter(kind: ModuleKind) -> ModuleFieldEmitter {
     match kind {
         ModuleKind::Reactor => ModuleFieldEmitter {
-            heat_output: Fx::from_num(5),
+            heat_output: Fx::from_num(1),
             cooling_output: Fx::from_num(0),
-            electrical_output: Fx::from_num(2),
+            electrical_output: Fx::from_num(0.5),
             grounding_output: Fx::from_num(0.2),
         },
         ModuleKind::Engine => ModuleFieldEmitter {
-            heat_output: Fx::from_num(3),
+            heat_output: Fx::from_num(1),
             cooling_output: Fx::from_num(0),
-            electrical_output: Fx::from_num(1),
+            electrical_output: Fx::from_num(0.5),
             grounding_output: Fx::from_num(0.2),
         },
         ModuleKind::Turret => ModuleFieldEmitter {
@@ -316,10 +343,16 @@ fn module_field_emitter(kind: ModuleKind) -> ModuleFieldEmitter {
             grounding_output: Fx::from_num(0.2),
         },
         ModuleKind::Battery => ModuleFieldEmitter {
-            heat_output: Fx::from_num(1),
+            heat_output: Fx::from_num(0.5),
             cooling_output: Fx::from_num(0),
             electrical_output: Fx::from_num(2),
             grounding_output: Fx::from_num(1.4),
+        },
+        ModuleKind::Computer => ModuleFieldEmitter {
+            heat_output: Fx::from_num(0.3),
+            cooling_output: Fx::from_num(0),
+            electrical_output: Fx::from_num(0.4),
+            grounding_output: Fx::from_num(1.6),
         },
         ModuleKind::Hull | ModuleKind::HullCorner | ModuleKind::Airlock => ModuleFieldEmitter {
             heat_output: Fx::from_num(0),

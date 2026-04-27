@@ -22,15 +22,18 @@ pub(crate) use systems::{
     return_after_mission_resolution,
     return_button_system,
     return_keyboard_shortcut,
+    run_arch_automation,
     run_shipboard_interaction_input,
     sample_ship_fields,
     sync_runtime_ship_state,
     sync_shipboard_player_visual,
+    tick_recent_action_feedback,
     toggle_shipboard_control_mode,
     update_destroyed_module_visuals,
     update_gameplay_status_text,
     update_inspection_and_alerts_text,
     update_mission_state,
+    update_mission_telemetry,
     update_module_runtime_state,
 };
 

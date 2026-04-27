@@ -29,10 +29,13 @@ pub(crate) use simulation::{
     fire_player_weapons,
     handle_projectile_hits,
     return_after_mission_resolution,
+    run_arch_automation,
     sample_ship_fields,
     sync_runtime_ship_state,
+    tick_recent_action_feedback,
     update_destroyed_module_visuals,
     update_mission_state,
+    update_mission_telemetry,
     update_module_runtime_state,
 };
 pub(crate) use ui::{update_gameplay_status_text, update_inspection_and_alerts_text};

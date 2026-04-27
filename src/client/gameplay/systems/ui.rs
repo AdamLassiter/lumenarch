@@ -19,6 +19,7 @@ use super::{
             PlayerFieldState,
             PlayerShip,
             RuntimeShipModule,
+            ShipAutomationState,
             ShipRoot,
             ShipWeaponState,
             ShipboardControlState,
@@ -32,6 +33,7 @@ use super::{
             format_fx0,
             format_fx1,
             format_fx2,
+            meter_bar,
             mission_return_line,
             mission_status_line,
             module_condition,
@@ -49,6 +51,7 @@ pub(crate) fn update_gameplay_status_text(
             &Children,
             &super::super::components::LinearVelocity,
             &super::super::components::AngularVelocity,
+            &ShipAutomationState,
             &super::super::components::ShipMovementModel,
             &super::super::components::ShipPowerState,
             &ShipWeaponState,
@@ -84,6 +87,7 @@ pub(crate) fn update_gameplay_status_text(
         children,
         linear_velocity,
         angular_velocity,
+        automation_state,
         movement_model,
         power_state,
         weapon_state,
@@ -122,7 +126,7 @@ pub(crate) fn update_gameplay_status_text(
             None => mission_status_line(mission_state).to_string(),
         };
         **text = format!(
-            "Mission Status\nOutcome: {}\nMode: {:?}\nStation: {}\nPosition: {}, {}\nVelocity: {}\nTurn Rate: {}\nIntegrity\nHull / Systems: {} / {}\nActive Modules: {}\nDegraded / Disabled: {} / {}\nPower\nEngine Output: {} ({}%)\nGeneration / Draw: {} / {}\nBattery Reserve: {}\nWeapons Online: {}\nCombat\nTurrets: {}  Cooldown: {}\nProjectiles: {}  Hostiles: {}\nInterior\nLocal Heat: {} ({})\nLocal Electrical: {} ({})\nSalvage: {}\nScrap Total: {}",
+            "Mission Status\nOutcome: {}\nMode: {:?}\nStation: {}\nPosition: {}, {}\nVelocity: {}\nTurn Rate: {}\nIntegrity\nHull / Systems: {} / {}\nActive Modules: {}\nDegraded / Disabled: {} / {}\nPower\nEngine Output: {} ({}%)\nGeneration / Draw: {} / {}\nBattery Reserve: {}\nWeapons Online: {}\nARCH\nMode: {:?}\nStatus: {}\nCombat\nTurrets: {}  Cooldown: {}\nProjectiles: {}  Hostiles: {}\nInterventions\nRepairs / Stabilizations: {} / {}\nRecent: {}\nInterior\nLocal Heat: {} {} ({})\nLocal Electrical: {} {} ({})\nSalvage: {}\nScrap Total: {}",
             status_line,
             control_mode.mode,
             module_display_name(current_station.kind),
@@ -145,13 +149,24 @@ pub(crate) fn update_gameplay_status_text(
             } else {
                 "no"
             },
+            automation_state.mode,
+            if automation_state.active {
+                "engaged"
+            } else {
+                "standby"
+            },
             weapon_state.turret_count,
             format_fx2(weapon_state.cooldown_remaining.max(Fx::from_num(0))),
             projectile_query.iter().len(),
             hostile_query.iter().len(),
+            mission_state.repairs_performed,
+            mission_state.stabilizations_performed,
+            mission_state.recent_action.as_deref().unwrap_or("none"),
             format_fx1(player_fields.local_heat),
+            meter_bar(player_fields.local_heat, Fx::from_num(16), 12),
             danger_level(player_fields.local_heat, Fx::from_num(8), Fx::from_num(14)),
             format_fx1(player_fields.local_electrical),
+            meter_bar(player_fields.local_electrical, Fx::from_num(14), 12),
             danger_level(
                 player_fields.local_electrical,
                 Fx::from_num(7),
@@ -173,6 +188,7 @@ pub(crate) fn update_inspection_and_alerts_text(
         ),
         With<ShipboardPlayer>,
     >,
+    ship_query: Single<(&ShipAutomationState, &MissionState), (With<PlayerShip>, With<ShipRoot>)>,
     module_query: Query<(
         &RuntimeShipModule,
         &Integrity,
@@ -186,6 +202,7 @@ pub(crate) fn update_inspection_and_alerts_text(
     mut alerts_query: Query<&mut Text, (With<GameplayAlertsText>, Without<GameplayInspectionText>)>,
 ) {
     let (station, nearby, held, player_fields) = player_query.into_inner();
+    let (automation_state, mission_state) = ship_query.into_inner();
     let current_module = module_query
         .iter()
         .find(|(runtime_module, _, _, _)| runtime_module.module_id == station.module_id);
@@ -206,7 +223,7 @@ pub(crate) fn update_inspection_and_alerts_text(
                     .unwrap_or_else(|| "Action: none".to_string()),
             };
             **text = format!(
-                "Module: {}\nGrid: {}, {}\nIntegrity: {} / {}\nCondition: {}\nHeat: {}\nElectrical: {}\nField Heat: {}\nField Electrical: {}\nNeeds Attention: {}\n{}",
+                "Module: {}\nGrid: {}, {}\nIntegrity: {} / {}\nCondition: {}\nHeat: {} {}\nElectrical: {} {}\nField Heat: {}\nField Electrical: {}\nNeeds Attention: {}\nARCH: {:?} ({})\n{}",
                 module_display_name(runtime_module.kind),
                 runtime_module.grid_x,
                 runtime_module.grid_y,
@@ -214,13 +231,21 @@ pub(crate) fn update_inspection_and_alerts_text(
                 integrity.max,
                 module_condition_label(condition),
                 format_fx1(runtime_state.current_heat),
+                meter_bar(runtime_state.current_heat, Fx::from_num(16), 10),
                 format_fx1(runtime_state.electrical_instability),
+                meter_bar(runtime_state.electrical_instability, Fx::from_num(14), 10),
                 format_fx1(runtime_state.sampled_heat),
                 format_fx1(runtime_state.sampled_electrical),
                 if runtime_state.needs_attention {
                     "yes"
                 } else {
                     "no"
+                },
+                automation_state.mode,
+                if automation_state.active {
+                    "active"
+                } else {
+                    "standby"
                 },
                 interaction_line,
             );
@@ -246,7 +271,7 @@ pub(crate) fn update_inspection_and_alerts_text(
             })
         })
         .collect();
-    issues.sort_by(|a, b| b.0.cmp(&a.0));
+    issues.sort_by_key(|a| std::cmp::Reverse(a.0));
     issues.truncate(3);
 
     for mut text in &mut alerts_query {
@@ -263,7 +288,7 @@ pub(crate) fn update_inspection_and_alerts_text(
             )
         };
         **text = format!(
-            "Local Heat: {} ({})\nLocal Electrical: {} ({})\n{}\nPrompt: {}",
+            "Local Heat: {} ({})\nLocal Electrical: {} ({})\n{}\nPrompt: {}\nHottest: {}\nFirst Disabled: {}\nRecent: {}",
             format_fx1(player_fields.local_heat),
             danger_level(player_fields.local_heat, Fx::from_num(8), Fx::from_num(14)),
             format_fx1(player_fields.local_electrical),
@@ -278,6 +303,15 @@ pub(crate) fn update_inspection_and_alerts_text(
                 .clone()
                 .or_else(|| nearby.unavailable_reason.clone())
                 .unwrap_or_else(|| "none".to_string()),
+            mission_state
+                .hottest_module_kind
+                .map(|kind| kind.as_str())
+                .unwrap_or("n/a"),
+            mission_state
+                .first_disabled_module_kind
+                .map(|kind| kind.as_str())
+                .unwrap_or("n/a"),
+            mission_state.recent_action.as_deref().unwrap_or("none"),
         );
     }
 }

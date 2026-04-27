@@ -28,7 +28,7 @@ pub(crate) const HOVERED_BUTTON: Color = Color::srgb(0.30, 0.55, 0.88);
 pub(crate) const PRESSED_BUTTON: Color = Color::srgb(0.18, 0.36, 0.62);
 pub(crate) const SELECTED_BUTTON: Color = Color::srgb(0.78, 0.48, 0.20);
 pub(crate) const GRID_COLOR: Color = Color::srgba(0.38, 0.45, 0.56, 0.28);
-pub(crate) const TOOLBOX_COMPONENTS: [ModuleKind; 11] = ModuleKind::ALL;
+pub(crate) const TOOLBOX_COMPONENTS: [ModuleKind; 12] = ModuleKind::ALL;
 
 pub fn run_client() {
     App::new()
@@ -120,6 +120,9 @@ pub fn run_client() {
                     gameplay::apply_module_interactions,
                     gameplay::sample_ship_fields,
                     gameplay::update_module_runtime_state,
+                    gameplay::run_arch_automation,
+                    gameplay::update_mission_telemetry,
+                    gameplay::tick_recent_action_feedback,
                 )
                     .chain()
                     .run_if(in_state(ClientAppState::Playing)),

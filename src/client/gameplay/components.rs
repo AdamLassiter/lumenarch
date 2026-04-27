@@ -78,8 +78,10 @@ pub(crate) struct HeldInteraction {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum InteractionKind {
     Cockpit,
+    Computer,
     Reactor,
     Turret,
+    Engine,
     Repair,
 }
 
@@ -138,6 +140,9 @@ pub(crate) struct EngineModule;
 #[derive(Component)]
 pub(crate) struct WeaponModule;
 
+#[derive(Component)]
+pub(crate) struct ArchComputerModule;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ModuleCondition {
     Healthy,
@@ -153,6 +158,7 @@ pub(crate) struct ModuleRuntimeState {
     pub(crate) sampled_heat: Fx,
     pub(crate) sampled_electrical: Fx,
     pub(crate) is_disabled: bool,
+    pub(crate) was_disabled_last_frame: bool,
     pub(crate) needs_attention: bool,
     pub(crate) last_interaction_age: Fx,
 }
@@ -179,6 +185,8 @@ pub(crate) struct Projectile {
     pub(crate) remaining_life: Fx,
     pub(crate) damage: i32,
     pub(crate) faction: ProjectileFaction,
+    pub(crate) heat_damage: Fx,
+    pub(crate) electrical_damage: Fx,
 }
 
 #[derive(Component)]
@@ -191,6 +199,8 @@ pub(crate) struct HostileTurretPlatform;
 pub(crate) struct HostileWeaponState {
     pub(crate) cooldown_remaining: Fx,
     pub(crate) cooldown_duration: Fx,
+    pub(crate) heat_damage: Fx,
+    pub(crate) electrical_damage: Fx,
 }
 
 #[derive(Component)]
@@ -271,6 +281,20 @@ pub(crate) struct ShipWeaponState {
     pub(crate) cooldown_duration: Fx,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ShipAutomationMode {
+    Off,
+    ReactorGuard,
+}
+
+#[derive(Component)]
+pub(crate) struct ShipAutomationState {
+    pub(crate) mode: ShipAutomationMode,
+    pub(crate) active: bool,
+    pub(crate) output_scale: Fx,
+    pub(crate) trigger_count: u32,
+}
+
 #[derive(Component)]
 pub(crate) struct MissionState {
     pub(crate) failed: bool,
@@ -281,6 +305,15 @@ pub(crate) struct MissionState {
     pub(crate) salvage_collected: bool,
     pub(crate) salvage_scrap_awarded: u32,
     pub(crate) return_delay_remaining: Option<Fx>,
+    pub(crate) repairs_performed: u32,
+    pub(crate) stabilizations_performed: u32,
+    pub(crate) automation_used: bool,
+    pub(crate) automation_trigger_count: u32,
+    pub(crate) highest_heat: Fx,
+    pub(crate) hottest_module_kind: Option<ModuleKind>,
+    pub(crate) first_disabled_module_kind: Option<ModuleKind>,
+    pub(crate) recent_action: Option<String>,
+    pub(crate) recent_action_timer: Fx,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

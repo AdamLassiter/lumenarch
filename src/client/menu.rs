@@ -156,10 +156,8 @@ pub(crate) fn edit_host_address(
             Key::Backspace => {
                 config.server_addr.pop();
             }
-            Key::Character(chars) => {
-                if chars.chars().all(is_host_address_character) {
-                    config.server_addr.push_str(chars);
-                }
+            Key::Character(chars) if chars.chars().all(is_host_address_character) => {
+                config.server_addr.push_str(chars);
             }
             _ => {}
         }

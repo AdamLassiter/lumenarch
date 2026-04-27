@@ -76,6 +76,13 @@ pub(crate) struct LastMissionReport {
     pub(crate) detail: Option<String>,
     pub(crate) scrap_awarded: u32,
     pub(crate) total_scrap: u32,
+    pub(crate) hottest_module: Option<String>,
+    pub(crate) first_disabled_module: Option<String>,
+    pub(crate) repairs_performed: u32,
+    pub(crate) stabilizations_performed: u32,
+    pub(crate) automation_used: bool,
+    pub(crate) automation_triggers: u32,
+    pub(crate) redesign_hints: Vec<String>,
 }
 
 #[derive(Resource)]

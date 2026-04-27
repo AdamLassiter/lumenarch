@@ -192,7 +192,7 @@ pub(crate) fn spawn_runtime_scene(
             .with_children(|panel| {
                 panel.spawn((
                     Text::new(
-                        "Controls\nW / A / S / D or Arrows: flight or internal movement\nC: toggle flight/internal control\nE: interact / hold to work\nSpace: fire turrets\nF: collect salvage after encounter\nTab: return to editor",
+                        "Controls\nW / A / S / D or Arrows: flight or internal movement\nC: toggle flight/internal control\nE: interact / hold to work\nComputer: cycle ARCH reactor guard\nSpace: fire turrets\nF: collect salvage after encounter\nTab: return to editor",
                     ),
                     TextFont {
                         font: mono_font,
@@ -261,13 +261,31 @@ fn spawn_test_arena(commands: &mut Commands) {
         ));
     }
 
-    for translation in [
-        Vec3::new(220.0, 150.0, -5.0),
-        Vec3::new(-260.0, 40.0, -5.0),
-        Vec3::new(180.0, -170.0, -5.0),
+    for (translation, color, cooldown, heat_damage, electrical_damage) in [
+        (
+            Vec3::new(210.0, 130.0, -5.0),
+            Color::srgb(0.92, 0.42, 0.24),
+            HOSTILE_FIRE_COOLDOWN * 0.8,
+            Fx::from_num(4),
+            Fx::from_num(1),
+        ),
+        (
+            Vec3::new(-220.0, 20.0, -5.0),
+            Color::srgb(0.36, 0.72, 0.96),
+            HOSTILE_FIRE_COOLDOWN * 0.7,
+            Fx::from_num(1),
+            Fx::from_num(4),
+        ),
+        (
+            Vec3::new(160.0, -150.0, -5.0),
+            Color::srgb(0.88, 0.34, 0.56),
+            HOSTILE_FIRE_COOLDOWN,
+            Fx::from_num(3),
+            Fx::from_num(3),
+        ),
     ] {
         commands.spawn((
-            Sprite::from_color(Color::srgb(0.76, 0.24, 0.20), Vec2::splat(28.0)),
+            Sprite::from_color(color, Vec2::splat(28.0)),
             Transform::from_translation(translation),
             HostileTarget,
             HostileTurretPlatform,
@@ -275,8 +293,10 @@ fn spawn_test_arena(commands: &mut Commands) {
                 value: FixedVec2::from_vec2(translation.truncate()),
             },
             HostileWeaponState {
-                cooldown_remaining: Fx::from_num(HOSTILE_FIRE_COOLDOWN * 0.5),
-                cooldown_duration: Fx::from_num(HOSTILE_FIRE_COOLDOWN),
+                cooldown_remaining: Fx::from_num(cooldown * 0.5),
+                cooldown_duration: Fx::from_num(cooldown),
+                heat_damage,
+                electrical_damage,
             },
             Integrity { current: 6, max: 6 },
             PlayingCleanup,

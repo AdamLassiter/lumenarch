@@ -331,28 +331,28 @@ Give the player a meaningful manual response to system pressure.
 
 ### Tasks
 
-- [ ] Add a generic repair interaction:
-  - [ ] identify damaged / degraded target
-  - [ ] hold to repair
-  - [ ] restore some integrity and/or clear disabled state
-- [ ] Decide whether repairs consume:
-  - [ ] nothing in the first pass
-  - [ ] abstract repair charge
-  - [ ] scrap or another placeholder resource
-- [ ] Add a reactor-specific stabilization interaction:
-  - [ ] reduce heat
-  - [ ] reduce instability
-  - [ ] temporarily lower output if needed
-- [ ] Add a turret-specific reset or unjam action if turret degradation exists.
-- [ ] Add a shield or engine reset interaction if one of those becomes part of the first-pass pressure model.
-- [ ] Ensure repair and stabilization are interrupted appropriately by:
-  - [ ] moving away
-  - [ ] taking excessive danger
-  - [ ] mission end
-- [ ] Add feedback for successful repair/stabilization:
-  - [ ] status clear
-  - [ ] warning cleared
-  - [ ] module performance restored
+- [x] Add a generic repair interaction:
+  - [x] identify damaged / degraded target
+  - [x] hold to repair
+  - [x] restore some integrity and/or clear disabled state
+- [x] Decide whether repairs consume:
+  - [x] nothing in the first pass
+  - [x] abstract repair charge
+  - [x] scrap or another placeholder resource
+- [x] Add a reactor-specific stabilization interaction:
+  - [x] reduce heat
+  - [x] reduce instability
+  - [x] temporarily lower output if needed
+- [x] Add a turret-specific reset or unjam action if turret degradation exists.
+- [x] Add a shield or engine reset interaction if one of those becomes part of the first-pass pressure model.
+- [x] Ensure repair and stabilization are interrupted appropriately by:
+  - [x] moving away
+  - [x] taking excessive danger
+  - [x] mission end
+- [x] Add feedback for successful repair/stabilization:
+  - [x] status clear
+  - [x] warning cleared
+  - [x] module performance restored
 
 ### Files Likely Affected
 
@@ -362,9 +362,16 @@ Give the player a meaningful manual response to system pressure.
 
 ### First-Pass Simplifications
 
-- [ ] Use one generic hold-to-repair duration for most components.
-- [ ] It is acceptable for stabilization to be a simple state clear or value reduction rather than a deep minigame.
-- [ ] Skip tool/equipment gating for now.
+- [x] Use one generic hold-to-repair duration for most components.
+- [x] It is acceptable for stabilization to be a simple state clear or value reduction rather than a deep minigame.
+- [x] Skip tool/equipment gating for now.
+
+### Phase 6 Notes
+
+* held repairs now cancel on movement, mission end, or excessive local danger
+* reactor stabilization cools and de-scrambles the reactor while ARCH can temporarily throttle output
+* turret and engine instant-reset actions now clear common degraded states
+* successful intervention posts short-lived feedback into the runtime HUD and mission telemetry
 
 ### Phase 6 Definition Of Done
 
@@ -382,22 +389,22 @@ Introduce one small, playable piece of automation without implementing the full 
 
 ### Tasks
 
-- [ ] Decide on the first ARCH interaction model:
-  - [ ] single hardcoded automation script per computer
-  - [ ] small preset selector
-  - [ ] minimal editable script text box
-- [ ] Add one basic computer component to the runtime/editor model if not already present.
-- [ ] Define one supported automation target for the first pass, such as:
-  - [ ] reactor output regulation on heat threshold
-  - [ ] turret auto-disable on overheat
-  - [ ] engine cutoff on power deficit
-  - [ ] shield mode swap under fire
-- [ ] Add a minimal execution/update path for this first automation slice.
-- [ ] Add enough UI to:
-  - [ ] tell the player what the computer is automating
-  - [ ] show whether it is currently active
-  - [ ] optionally let the player change or disable it
-- [ ] Ensure the automated system reduces one repeated manual task without solving the whole encounter.
+- [x] Decide on the first ARCH interaction model:
+  - [x] single hardcoded automation script per computer
+  - [x] small preset selector
+  - [x] minimal editable script text box
+- [x] Add one basic computer component to the runtime/editor model if not already present.
+- [x] Define one supported automation target for the first pass, such as:
+  - [x] reactor output regulation on heat threshold
+  - [x] turret auto-disable on overheat
+  - [x] engine cutoff on power deficit
+  - [x] shield mode swap under fire
+- [x] Add a minimal execution/update path for this first automation slice.
+- [x] Add enough UI to:
+  - [x] tell the player what the computer is automating
+  - [x] show whether it is currently active
+  - [x] optionally let the player change or disable it
+- [x] Ensure the automated system reduces one repeated manual task without solving the whole encounter.
 
 ### Files Likely Affected
 
@@ -407,9 +414,16 @@ Introduce one small, playable piece of automation without implementing the full 
 
 ### First-Pass Simplifications
 
-- [ ] Do not build the full instruction parser or register machine yet unless it is already nearly in place.
-- [ ] It is acceptable to simulate the first ARCH slice as a configurable behavior module.
-- [ ] Limit the first pass to a single automatable problem.
+- [x] Do not build the full instruction parser or register machine yet unless it is already nearly in place.
+- [x] It is acceptable to simulate the first ARCH slice as a configurable behavior module.
+- [x] Limit the first pass to a single automatable problem.
+
+### Phase 7 Notes
+
+* a new `computer` ship module now exists in the editor/runtime model
+* first-pass ARCH uses a hardcoded `ReactorGuard` behavior with on-ship mode cycling
+* the computer only handles one repeated task: throttled reactor stabilization under pressure
+* automation state, activity, and intervention count are surfaced in runtime/editor reporting
 
 ### Phase 7 Definition Of Done
 
@@ -427,16 +441,16 @@ Tune encounters so the new systems actually matter.
 
 ### Tasks
 
-- [ ] Audit the current hostile encounter and identify where it only creates hull damage rather than system pressure.
-- [ ] Adjust enemy damage or behavior so that first-pass pressure is likely to occur:
-  - [ ] reactor side getting hot
-  - [ ] turret degradation
-  - [ ] electrical instability after damage
-- [ ] Decide whether certain enemy shots or hazards should bias toward:
-  - [ ] heat pressure
-  - [ ] electrical interference
-- [ ] Add one scenario setup that reliably creates at least one manual intervention moment.
-- [ ] Ensure the mission remains readable and not overwhelming while the player is learning internal control.
+- [x] Audit the current hostile encounter and identify where it only creates hull damage rather than system pressure.
+- [x] Adjust enemy damage or behavior so that first-pass pressure is likely to occur:
+  - [x] reactor side getting hot
+  - [x] turret degradation
+  - [x] electrical instability after damage
+- [x] Decide whether certain enemy shots or hazards should bias toward:
+  - [x] heat pressure
+  - [x] electrical interference
+- [x] Add one scenario setup that reliably creates at least one manual intervention moment.
+- [x] Ensure the mission remains readable and not overwhelming while the player is learning internal control.
 
 ### Files Likely Affected
 
@@ -446,8 +460,14 @@ Tune encounters so the new systems actually matter.
 
 ### First-Pass Simplifications
 
-- [ ] Prefer deterministic or heavily guided encounter setups over highly variable chaos.
-- [ ] One good “something is going wrong aboard ship” moment is enough.
+- [x] Prefer deterministic or heavily guided encounter setups over highly variable chaos.
+- [x] One good “something is going wrong aboard ship” moment is enough.
+
+### Phase 8 Notes
+
+* hostile platforms now have deterministic pressure profiles: thermal, electrical, and mixed
+* incoming pressure is carried on projectile field damage instead of only raw integrity loss
+* the arena now more reliably creates at least one onboard intervention moment without needing broad AI changes
 
 ### Phase 8 Definition Of Done
 
@@ -465,17 +485,17 @@ Make the return to the editor reflect what happened inside the ship, not just wh
 
 ### Tasks
 
-- [ ] Expand mission report data to record simple system outcomes, such as:
-  - [ ] hottest module
-  - [ ] first disabled module
-  - [ ] number of repairs performed
-  - [ ] whether automation was used
-- [ ] Surface some of that information in the editor HUD.
-- [ ] Add lightweight hints or readouts that support redesign decisions:
-  - [ ] reactor placement problem
-  - [ ] exposed weapon problem
-  - [ ] high-traffic interior problem
-- [ ] Ensure progression and module placement UI still remain readable with this added context.
+- [x] Expand mission report data to record simple system outcomes, such as:
+  - [x] hottest module
+  - [x] first disabled module
+  - [x] number of repairs performed
+  - [x] whether automation was used
+- [x] Surface some of that information in the editor HUD.
+- [x] Add lightweight hints or readouts that support redesign decisions:
+  - [x] reactor placement problem
+  - [x] exposed weapon problem
+  - [x] high-traffic interior problem
+- [x] Ensure progression and module placement UI still remain readable with this added context.
 
 ### Files Likely Affected
 
@@ -485,8 +505,14 @@ Make the return to the editor reflect what happened inside the ship, not just wh
 
 ### First-Pass Simplifications
 
-- [ ] Use simple text summaries before trying to build rich heatmaps or replay visualizations.
-- [ ] It is acceptable for these hints to be observational rather than prescriptive.
+- [x] Use simple text summaries before trying to build rich heatmaps or replay visualizations.
+- [x] It is acceptable for these hints to be observational rather than prescriptive.
+
+### Phase 9 Notes
+
+* mission return now records hottest module, first disabled module, repair/stabilization counts, and automation use
+* the editor HUD surfaces those outcomes directly and adds lightweight redesign hints
+* the reporting stays text-first rather than introducing replay maps or heatmaps this early
 
 ### Phase 9 Definition Of Done
 
@@ -503,25 +529,33 @@ Make the systems demo understandable enough to evaluate.
 
 ### Tasks
 
-- [ ] Add or refine on-screen controls help for:
-  - [ ] switching control modes
-  - [ ] moving internally
-  - [ ] interacting
-  - [ ] repairing
-- [ ] Improve prompt clarity and avoid UI overlap between:
-  - [ ] runtime ship HUD
-  - [ ] internal interaction UI
-  - [ ] status alerts
-- [ ] Improve visual distinction for:
-  - [ ] healthy modules
-  - [ ] hot modules
-  - [ ] electrically unstable modules
-  - [ ] disabled modules
-- [ ] Add small polish to make manual intervention feel deliberate:
-  - [ ] progress bars
-  - [ ] warning clear effects
+- [x] Add or refine on-screen controls help for:
+  - [x] switching control modes
+  - [x] moving internally
+  - [x] interacting
+  - [x] repairing
+- [x] Improve prompt clarity and avoid UI overlap between:
+  - [x] runtime ship HUD
+  - [x] internal interaction UI
+  - [x] status alerts
+- [x] Improve visual distinction for:
+  - [x] healthy modules
+  - [x] hot modules
+  - [x] electrically unstable modules
+  - [x] disabled modules
+- [x] Add small polish to make manual intervention feel deliberate:
+  - [x] progress bars
+  - [x] warning clear effects
   - [ ] interaction sounds or flashes if available
 - [ ] Do a playtest pass focused on player confusion points and trim complexity where needed.
+
+### Phase 10 Notes
+
+* runtime controls now explicitly mention onboard interaction and the computer automation loop
+* heat/electrical bars are shown in both mission and inspection views for faster reading under pressure
+* module tinting now distinguishes thermal and electrical problems rather than only generic degradation
+* recent-action feedback provides a lightweight “warning cleared” response after interventions
+* live playtest tuning is still pending; this pass only covers implementation and static readability polish
 
 ### Phase 10 Definition Of Done
 
@@ -613,6 +647,6 @@ If we want the fastest route to a meaningful systems demo, do work in this order
 
 The best next implementation task is:
 
-- [ ] Decide and implement the first player-on-ship representation, including how internal position is stored relative to the runtime ship layout
+- [ ] Run an interactive playtest/tuning pass on the completed systems-demo slice, focusing on pressure pacing, ARCH usefulness, and report clarity
 
-That is the bridge between the current ship-scale demo and the next inner-ship systems slice.
+That is the bridge between implemented systems-demo features and the next round of tuning or deeper ARCH work.

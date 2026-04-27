@@ -8,8 +8,10 @@ pub(super) fn module_display_name(kind: ModuleKind) -> &'static str {
 pub(super) fn interaction_label(kind: InteractionKind) -> &'static str {
     match kind {
         InteractionKind::Cockpit => "return to cockpit control",
+        InteractionKind::Computer => "cycle automation mode",
         InteractionKind::Reactor => "stabilize reactor",
         InteractionKind::Turret => "reset turret",
+        InteractionKind::Engine => "reset engine",
         InteractionKind::Repair => "repair module",
     }
 }

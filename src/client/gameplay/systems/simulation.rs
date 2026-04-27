@@ -12,6 +12,7 @@ use super::super::{
     PROJECTILE_SPEED,
     SALVAGE_PICKUP_RADIUS,
     components::{
+        ArchComputerModule,
         CollectedSalvage,
         CurrentStation,
         DestroyedModule,
@@ -30,6 +31,8 @@ use super::super::{
         RuntimeShipModule,
         SalvagePickup,
         SalvageWreck,
+        ShipAutomationMode,
+        ShipAutomationState,
         ShipMovementModel,
         ShipPowerModel,
         ShipPowerState,
@@ -179,6 +182,7 @@ pub(crate) fn update_module_runtime_state(
     let dt = fx_from_time_delta(&time);
 
     for (runtime_module, integrity, mut runtime_state, destroyed) in &mut module_query {
+        runtime_state.was_disabled_last_frame = runtime_state.is_disabled;
         if destroyed.is_some() || integrity.current <= 0 {
             runtime_state.is_disabled = true;
             continue;
@@ -189,6 +193,7 @@ pub(crate) fn update_module_runtime_state(
             ModuleKind::Engine => Fx::from_num(0.8),
             ModuleKind::Turret => Fx::from_num(0.6),
             ModuleKind::Battery => Fx::from_num(0.5),
+            ModuleKind::Computer => Fx::from_num(0.35),
             _ => Fx::from_num(0.2),
         };
         let damage_factor = Fx::from_num(1)
@@ -210,6 +215,126 @@ pub(crate) fn update_module_runtime_state(
             || integrity.current < integrity.max;
         runtime_state.is_disabled = runtime_state.current_heat >= Fx::from_num(16)
             || runtime_state.electrical_instability >= Fx::from_num(14);
+    }
+}
+
+pub(crate) fn update_mission_telemetry(
+    mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
+    module_query: Query<(
+        &RuntimeShipModule,
+        &ModuleRuntimeState,
+        Option<&DestroyedModule>,
+    )>,
+) {
+    let mut mission_state = mission_query.into_inner();
+
+    for (runtime_module, runtime_state, destroyed) in &module_query {
+        if destroyed.is_some() {
+            continue;
+        }
+        if runtime_state.current_heat > mission_state.highest_heat {
+            mission_state.highest_heat = runtime_state.current_heat;
+            mission_state.hottest_module_kind = Some(runtime_module.kind);
+        }
+        if mission_state.first_disabled_module_kind.is_none()
+            && !runtime_state.was_disabled_last_frame
+            && runtime_state.is_disabled
+        {
+            mission_state.first_disabled_module_kind = Some(runtime_module.kind);
+        }
+    }
+}
+
+pub(crate) fn run_arch_automation(
+    time: Res<Time>,
+    ship_query: Single<
+        (&Children, &mut ShipAutomationState, &mut MissionState),
+        (With<PlayerShip>, With<ShipRoot>),
+    >,
+    mut module_query: Query<(
+        Entity,
+        &RuntimeShipModule,
+        &mut ModuleRuntimeState,
+        Option<&ArchComputerModule>,
+        Option<&DestroyedModule>,
+    )>,
+) {
+    let dt = fx_from_time_delta(&time);
+    let (children, mut automation_state, mut mission_state) = ship_query.into_inner();
+
+    let has_operational_computer = children.iter().any(|child| {
+        module_query
+            .get(*child)
+            .map(|(_, _, runtime_state, computer, destroyed)| {
+                computer.is_some() && destroyed.is_none() && !runtime_state.is_disabled
+            })
+            .unwrap_or(false)
+    });
+
+    if !has_operational_computer || automation_state.mode == ShipAutomationMode::Off {
+        automation_state.active = false;
+        automation_state.output_scale = Fx::from_num(1);
+        return;
+    }
+
+    let mut guarding_reactor = false;
+    for child in children.iter() {
+        let Ok((_, runtime_module, mut runtime_state, _, destroyed)) = module_query.get_mut(*child)
+        else {
+            continue;
+        };
+        if destroyed.is_some() || runtime_module.kind != ModuleKind::Reactor {
+            continue;
+        }
+
+        let intervention_needed = runtime_state.current_heat >= Fx::from_num(10)
+            || runtime_state.electrical_instability >= Fx::from_num(8)
+            || runtime_state.is_disabled;
+        if !intervention_needed {
+            continue;
+        }
+
+        guarding_reactor = true;
+        runtime_state.current_heat =
+            (runtime_state.current_heat - Fx::from_num(2.2) * dt).max(Fx::from_num(0));
+        runtime_state.electrical_instability =
+            (runtime_state.electrical_instability - Fx::from_num(2.8) * dt).max(Fx::from_num(0));
+        if runtime_state.current_heat <= Fx::from_num(8)
+            && runtime_state.electrical_instability <= Fx::from_num(6)
+        {
+            runtime_state.is_disabled = false;
+            runtime_state.needs_attention = false;
+        }
+    }
+
+    if guarding_reactor && !automation_state.active {
+        automation_state.trigger_count += 1;
+        mission_state.automation_used = true;
+        mission_state.automation_trigger_count = automation_state.trigger_count;
+        mission_state.recent_action = Some("ARCH engaged reactor guard".to_string());
+        mission_state.recent_action_timer = Fx::from_num(1.8);
+    }
+
+    automation_state.active = guarding_reactor;
+    automation_state.output_scale = if guarding_reactor {
+        Fx::from_num(0.72)
+    } else {
+        Fx::from_num(1)
+    };
+}
+
+pub(crate) fn tick_recent_action_feedback(
+    time: Res<Time>,
+    mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
+) {
+    let mut mission_state = mission_query.into_inner();
+    if mission_state.recent_action_timer <= Fx::from_num(0) {
+        return;
+    }
+    mission_state.recent_action_timer =
+        (mission_state.recent_action_timer - fx_from_time_delta(&time)).max(Fx::from_num(0));
+    if mission_state.recent_action_timer == Fx::from_num(0) {
+        mission_state.recent_action = None;
     }
 }
 
@@ -289,6 +414,7 @@ pub(crate) fn sync_runtime_ship_state(
     player_ship_query: Single<
         (
             &Children,
+            &ShipAutomationState,
             &mut ShipMovementModel,
             &mut ShipPowerModel,
             &mut ShipWeaponState,
@@ -304,8 +430,14 @@ pub(crate) fn sync_runtime_ship_state(
         Option<&WeaponModule>,
     )>,
 ) {
-    let (children, mut movement_model, mut power_model, mut weapon_state, mut mission_state) =
-        player_ship_query.into_inner();
+    let (
+        children,
+        automation_state,
+        mut movement_model,
+        mut power_model,
+        mut weapon_state,
+        mut mission_state,
+    ) = player_ship_query.into_inner();
 
     let mut live_modules = 0usize;
     let mut engine_count = 0u32;
@@ -367,6 +499,7 @@ pub(crate) fn sync_runtime_ship_state(
         effective_engines,
         effective_turrets,
     );
+    power_model.reactor_output *= automation_state.output_scale;
     weapon_state.turret_count = effective_turrets.to_num::<u32>();
     if weapon_state.turret_count == 0 {
         weapon_state.cooldown_remaining = Fx::from_num(0);
@@ -424,6 +557,30 @@ pub(crate) fn return_after_mission_resolution(
     last_mission_report.detail = Some(detail);
     last_mission_report.scrap_awarded = mission_state.salvage_scrap_awarded;
     last_mission_report.total_scrap = progression.scrap;
+    last_mission_report.hottest_module = mission_state
+        .hottest_module_kind
+        .map(|kind| kind.as_str().to_string());
+    last_mission_report.first_disabled_module = mission_state
+        .first_disabled_module_kind
+        .map(|kind| kind.as_str().to_string());
+    last_mission_report.repairs_performed = mission_state.repairs_performed;
+    last_mission_report.stabilizations_performed = mission_state.stabilizations_performed;
+    last_mission_report.automation_used = mission_state.automation_used;
+    last_mission_report.automation_triggers = mission_state.automation_trigger_count;
+    let mut hints = Vec::new();
+    if mission_state.hottest_module_kind == Some(ModuleKind::Reactor) {
+        hints.push("Reactor ran hottest. Consider more spacing or cooler hull nearby.".to_string());
+    }
+    if mission_state.first_disabled_module_kind == Some(ModuleKind::Turret) {
+        hints.push("Turret failed first. Consider better protection or easier access.".to_string());
+    }
+    if mission_state.repairs_performed + mission_state.stabilizations_performed >= 3 {
+        hints.push("High intervention count. Interior access may be too awkward.".to_string());
+    }
+    if mission_state.automation_used {
+        hints.push("Automation reduced reactor babysitting during the fight.".to_string());
+    }
+    last_mission_report.redesign_hints = hints;
     mission_state.return_delay_remaining = None;
     next_state.set(ClientAppState::Editing);
 }
@@ -528,6 +685,8 @@ pub(crate) fn fire_hostile_targets(
             direction * Fx::from_num(HOSTILE_PROJECTILE_SPEED),
             ProjectileFaction::Hostile,
             3,
+            weapon_state.heat_damage,
+            weapon_state.electrical_damage,
             Color::srgb(0.96, 0.38, 0.24),
         );
         weapon_state.cooldown_remaining = weapon_state.cooldown_duration;
@@ -649,8 +808,8 @@ pub(crate) fn handle_projectile_hits(
                         player_module_query.get_mut(module_entity)
                     {
                         integrity.current = remaining_integrity.max(0);
-                        runtime_state.current_heat += Fx::from_num(2);
-                        runtime_state.electrical_instability += Fx::from_num(2);
+                        runtime_state.current_heat += projectile.heat_damage;
+                        runtime_state.electrical_instability += projectile.electrical_damage;
                         runtime_state.needs_attention = true;
                         if integrity.current <= 0 && destroyed.is_none() {
                             commands.entity(module_entity).insert(DestroyedModule);
@@ -697,9 +856,17 @@ pub(crate) fn update_destroyed_module_visuals(
         }
 
         *visibility = Visibility::Visible;
+        let hot = runtime_state.current_heat >= Fx::from_num(9);
+        let electrical = runtime_state.electrical_instability >= Fx::from_num(8);
         sprite.color = match condition {
             ModuleCondition::Healthy => Color::WHITE,
+            ModuleCondition::Degraded if hot && electrical => Color::srgb(0.96, 0.52, 0.90),
+            ModuleCondition::Degraded if hot => Color::srgb(1.0, 0.80, 0.34),
+            ModuleCondition::Degraded if electrical => Color::srgb(0.42, 0.86, 1.0),
             ModuleCondition::Degraded => Color::srgb(1.0, 0.88, 0.44),
+            ModuleCondition::Disabled if hot && electrical => Color::srgb(0.88, 0.22, 0.72),
+            ModuleCondition::Disabled if hot => Color::srgb(0.96, 0.50, 0.22),
+            ModuleCondition::Disabled if electrical => Color::srgb(0.18, 0.72, 0.96),
             ModuleCondition::Disabled => Color::srgb(0.96, 0.50, 0.22),
             ModuleCondition::Destroyed => Color::WHITE,
         };
@@ -710,7 +877,9 @@ pub(crate) fn update_destroyed_module_visuals(
         ) {
             sprite.color = match condition {
                 ModuleCondition::Healthy => Color::WHITE,
+                ModuleCondition::Degraded if electrical => Color::srgb(0.62, 0.88, 0.98),
                 ModuleCondition::Degraded => Color::srgb(0.98, 0.78, 0.62),
+                ModuleCondition::Disabled if electrical => Color::srgb(0.44, 0.72, 0.92),
                 ModuleCondition::Disabled => Color::srgb(0.88, 0.48, 0.32),
                 ModuleCondition::Destroyed => Color::WHITE,
             };

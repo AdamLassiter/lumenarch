@@ -309,6 +309,7 @@ pub(super) fn module_integrity(kind: ModuleKind) -> i32 {
         ModuleKind::Hull | ModuleKind::HullCorner => 12,
         ModuleKind::Core => 20,
         ModuleKind::Cockpit => 10,
+        ModuleKind::Computer => 8,
         ModuleKind::Reactor => 14,
         ModuleKind::Engine => 10,
         ModuleKind::Cargo => 10,
@@ -414,7 +415,6 @@ pub(super) fn update_ship_power_state(
         power_draw_for_requested_systems(power_model, thrust_active, turn_input);
     let requested_draw = passive_draw + weapon_draw + engine_draw;
     let mut effective_draw = requested_draw;
-    let weapons_powered;
     let mut engine_power_ratio = if engine_draw > Fx::from_num(0) {
         Fx::from_num(1)
     } else {
@@ -428,12 +428,12 @@ pub(super) fn update_ship_power_state(
     };
     let available_energy = power_model.reactor_output + power_state.stored_energy / safe_dt;
 
-    if effective_draw > available_energy {
+    let weapons_powered  = if effective_draw > available_energy {
         effective_draw -= weapon_draw;
-        weapons_powered = false;
+        false
     } else {
-        weapons_powered = weapon_draw > Fx::from_num(0);
-    }
+        weapon_draw > Fx::from_num(0)
+    };
 
     if effective_draw > available_energy {
         let baseline_draw = effective_draw - engine_draw;
@@ -478,6 +478,8 @@ pub(super) fn spawn_player_projectile(
         velocity,
         ProjectileFaction::Player,
         2,
+        Fx::from_num(0),
+        Fx::from_num(0),
         Color::srgb(0.98, 0.84, 0.30),
     );
 }
@@ -488,6 +490,8 @@ pub(super) fn spawn_projectile_entity(
     velocity: FixedVec2,
     faction: ProjectileFaction,
     damage: i32,
+    heat_damage: Fx,
+    electrical_damage: Fx,
     color: Color,
 ) {
     let velocity_angle = angle_from_vector(velocity);
@@ -505,6 +509,8 @@ pub(super) fn spawn_projectile_entity(
             remaining_life: Fx::from_num(PROJECTILE_LIFETIME),
             damage,
             faction,
+            heat_damage,
+            electrical_damage,
         },
         PlayingCleanup,
     ));
@@ -561,7 +567,10 @@ pub(super) fn fixed_radius_sq(radius: f32) -> WideFx {
 }
 
 pub(super) fn sprite_path_for_kind(kind: &ModuleKind) -> String {
-    format!("tiles/{}.png", kind.as_str())
+    match kind {
+        ModuleKind::Computer => "tiles/battery.png".to_string(),
+        _ => format!("tiles/{}.png", kind.as_str()),
+    }
 }
 
 pub(super) fn interaction_for_module(
@@ -573,6 +582,9 @@ pub(super) fn interaction_for_module(
     if destroyed {
         return None;
     }
+    if kind == ModuleKind::Computer {
+        return Some(InteractionKind::Computer);
+    }
     if kind == ModuleKind::Cockpit {
         return Some(InteractionKind::Cockpit);
     }
@@ -581,6 +593,9 @@ pub(super) fn interaction_for_module(
     }
     if kind == ModuleKind::Turret {
         return Some(InteractionKind::Turret);
+    }
+    if kind == ModuleKind::Engine && (runtime_state.is_disabled || runtime_state.needs_attention) {
+        return Some(InteractionKind::Engine);
     }
     if integrity.current < integrity.max
         || runtime_state.needs_attention
@@ -594,8 +609,10 @@ pub(super) fn interaction_for_module(
 pub(super) fn interaction_prompt(kind: InteractionKind) -> &'static str {
     match kind {
         InteractionKind::Cockpit => "E: return to flight controls",
+        InteractionKind::Computer => "E: cycle automation mode",
         InteractionKind::Reactor => "Hold E: stabilize reactor",
         InteractionKind::Turret => "E: reset turret",
+        InteractionKind::Engine => "E: reset engine",
         InteractionKind::Repair => "Hold E: repair module",
     }
 }
@@ -606,10 +623,23 @@ pub(super) fn is_hold_interaction(kind: InteractionKind) -> bool {
 
 pub(super) fn interaction_hold_duration(kind: InteractionKind) -> Fx {
     match kind {
-        InteractionKind::Cockpit | InteractionKind::Turret => Fx::from_num(0),
+        InteractionKind::Cockpit
+        | InteractionKind::Computer
+        | InteractionKind::Turret
+        | InteractionKind::Engine => Fx::from_num(0),
         InteractionKind::Reactor => Fx::from_num(1.2),
         InteractionKind::Repair => Fx::from_num(1.8),
     }
+}
+
+pub(super) fn meter_bar(value: Fx, max: Fx, width: usize) -> String {
+    let safe_max = max.max(Fx::from_num(1));
+    let fill = ((value / safe_max).clamp(Fx::from_num(0), Fx::from_num(1))
+        * Fx::from_num(width as i32))
+    .to_num::<usize>()
+    .min(width);
+    let empty = width.saturating_sub(fill);
+    format!("[{}{}]", "#".repeat(fill), "-".repeat(empty))
 }
 
 pub(super) fn module_effectiveness(

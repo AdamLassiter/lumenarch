@@ -9,6 +9,7 @@ pub enum ModuleKind {
     Core,
     Interior,
     Cockpit,
+    Computer,
     Reactor,
     Engine,
     Cargo,
@@ -20,10 +21,11 @@ pub enum ModuleKind {
 }
 
 impl ModuleKind {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Core,
         Self::Interior,
         Self::Cockpit,
+        Self::Computer,
         Self::Reactor,
         Self::Engine,
         Self::Cargo,
@@ -39,6 +41,7 @@ impl ModuleKind {
             Self::Core => "core",
             Self::Interior => "interior",
             Self::Cockpit => "cockpit",
+            Self::Computer => "computer",
             Self::Reactor => "reactor",
             Self::Engine => "engine",
             Self::Cargo => "cargo",
