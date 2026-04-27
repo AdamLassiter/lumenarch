@@ -1,15 +1,20 @@
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpStream;
-use std::thread;
-use std::time::Duration;
+use std::{
+    io::{BufRead, BufReader, Write},
+    net::TcpStream,
+    thread,
+    time::Duration,
+};
 
 use bevy::prelude::*;
 
-use crate::protocol::{ClientHello, ServerMessage, ShipSnapshot};
-
 use super::state::{
-    ClientAppState, ConnectionEvent, ConnectionMailbox, ConnectionPhase, ConnectionStatus,
+    ClientAppState,
+    ConnectionEvent,
+    ConnectionMailbox,
+    ConnectionPhase,
+    ConnectionStatus,
 };
+use crate::protocol::{ClientHello, ServerMessage, ShipSnapshot};
 
 pub(crate) fn begin_connection_attempt(
     server_addr: &str,

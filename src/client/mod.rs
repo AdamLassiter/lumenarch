@@ -5,12 +5,19 @@ mod net;
 mod state;
 
 use bevy::{app::AppExit, prelude::*};
-use crate::ship::ModuleKind;
 
 use self::state::{
-    ClientAppState, ConnectionConfig, ConnectionMailbox, ConnectionStatus, DemoProgression,
-    EditorShip, EditorToolState, LastMissionReport, MainCamera,
+    ClientAppState,
+    ConnectionConfig,
+    ConnectionMailbox,
+    ConnectionStatus,
+    DemoProgression,
+    EditorShip,
+    EditorToolState,
+    LastMissionReport,
+    MainCamera,
 };
+use crate::ship::ModuleKind;
 
 pub(crate) const DEFAULT_HOST_ADDR: &str = "127.0.0.1:5000";
 pub(crate) const TILE_SIZE: f32 = 32.0;
@@ -33,14 +40,18 @@ pub fn run_client() {
         .insert_resource(DemoProgression::default())
         .insert_resource(LastMissionReport::default())
         .insert_resource(EditorToolState::default())
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()).set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "LUMEN//ARCH Ship Editor".to_string(),
-                resolution: (1280.0, 720.0).into(),
-                ..default()
-            }),
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "LUMEN//ARCH Ship Editor".to_string(),
+                        resolution: (1280.0, 720.0).into(),
+                        ..default()
+                    }),
+                    ..default()
+                }),
+        )
         .init_state::<ClientAppState>()
         .add_event::<gameplay::components::InteractWithModule>()
         .add_event::<gameplay::components::BeginHeldInteraction>()
@@ -90,7 +101,10 @@ pub fn run_client() {
             OnExit(ClientAppState::Editing),
             editor::cleanup_editor_entities,
         )
-        .add_systems(OnEnter(ClientAppState::Playing), gameplay::spawn_runtime_scene)
+        .add_systems(
+            OnEnter(ClientAppState::Playing),
+            gameplay::spawn_runtime_scene,
+        )
         .add_systems(
             Update,
             (
@@ -131,7 +145,10 @@ pub fn run_client() {
                     .run_if(in_state(ClientAppState::Playing)),
             ),
         )
-        .add_systems(OnExit(ClientAppState::Playing), gameplay::cleanup_runtime_entities)
+        .add_systems(
+            OnExit(ClientAppState::Playing),
+            gameplay::cleanup_runtime_entities,
+        )
         .run();
 }
 

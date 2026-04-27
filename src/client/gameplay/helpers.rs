@@ -5,19 +5,31 @@ use std::{
 
 use bevy::prelude::*;
 use cordic::{atan2, cos, sin};
-use fixed::{types::extra::U16, FixedI32, FixedI64};
-
-use crate::ship::{ModuleKind, ShipDefinition, ShipModule};
+use fixed::{FixedI32, FixedI64, types::extra::U16};
 
 use super::{
+    super::{TILE_SIZE, state::PlayingCleanup},
+    ARENA_HEIGHT_TILES,
+    ARENA_WIDTH_TILES,
+    PROJECTILE_LIFETIME,
     components::{
-        Integrity, InteractionKind, MissionState, ModuleCondition, ModuleFieldEmitter,
-        ModuleRuntimeState, Projectile, ProjectileFaction, SalvagePickup,
-        SalvageWreck, ShipMovementModel, ShipPowerModel, ShipPowerState, SimPosition,
+        Integrity,
+        InteractionKind,
+        MissionState,
+        ModuleCondition,
+        ModuleFieldEmitter,
+        ModuleRuntimeState,
+        Projectile,
+        ProjectileFaction,
+        SalvagePickup,
+        SalvageWreck,
+        ShipMovementModel,
+        ShipPowerModel,
+        ShipPowerState,
+        SimPosition,
     },
-    ARENA_HEIGHT_TILES, ARENA_WIDTH_TILES, PROJECTILE_LIFETIME,
 };
-use super::super::{state::PlayingCleanup, TILE_SIZE};
+use crate::ship::{ModuleKind, ShipDefinition, ShipModule};
 
 pub(crate) type Fx = FixedI32<U16>;
 pub(crate) type WideFx = FixedI64<U16>;
@@ -233,7 +245,10 @@ pub(super) fn mission_status_line(mission_state: &MissionState) -> &str {
 
 pub(super) fn mission_return_line(mission_state: &MissionState) -> Option<String> {
     mission_state.return_delay_remaining.map(|seconds| {
-        format!("returning to editor in {:.1}s", seconds.to_num::<f32>().max(0.0))
+        format!(
+            "returning to editor in {:.1}s",
+            seconds.to_num::<f32>().max(0.0)
+        )
     })
 }
 
@@ -242,7 +257,10 @@ pub(super) fn salvage_status_line(
     mission_state: &MissionState,
     salvage_query: &Query<
         (&SimPosition, &SalvagePickup),
-        (With<SalvageWreck>, Without<super::components::CollectedSalvage>),
+        (
+            With<SalvageWreck>,
+            Without<super::components::CollectedSalvage>,
+        ),
     >,
 ) -> String {
     if mission_state.salvage_collected {
@@ -294,7 +312,11 @@ pub(super) fn module_integrity(kind: ModuleKind) -> i32 {
 }
 
 pub(super) fn ship_movement_model(module_count: usize, engine_count: u32) -> ShipMovementModel {
-    ship_movement_model_with_effective(module_count, engine_count, Fx::from_num(engine_count.max(1)))
+    ship_movement_model_with_effective(
+        module_count,
+        engine_count,
+        Fx::from_num(engine_count.max(1)),
+    )
 }
 
 pub(super) fn ship_movement_model_with_effective(
@@ -366,7 +388,11 @@ fn power_draw_for_requested_systems(
         Fx::from_num(0)
     };
 
-    (power_model.passive_draw, power_model.weapon_draw, engine_requested)
+    (
+        power_model.passive_draw,
+        power_model.weapon_draw,
+        engine_requested,
+    )
 }
 
 pub(super) fn update_ship_power_state(
@@ -414,8 +440,8 @@ pub(super) fn update_ship_power_state(
     }
 
     let net_power = power_model.reactor_output - effective_draw;
-    let new_stored_energy =
-        (power_state.stored_energy + net_power * dt).clamp(Fx::from_num(0), power_model.battery_capacity);
+    let new_stored_energy = (power_state.stored_energy + net_power * dt)
+        .clamp(Fx::from_num(0), power_model.battery_capacity);
 
     power_state.stored_energy = new_stored_energy;
     power_state.generation = power_model.reactor_output;
@@ -433,7 +459,11 @@ pub(super) fn count_modules(ship: &ShipDefinition, kind: ModuleKind) -> u32 {
         .count() as u32
 }
 
-pub(super) fn spawn_player_projectile(commands: &mut Commands, origin: FixedVec2, velocity: FixedVec2) {
+pub(super) fn spawn_player_projectile(
+    commands: &mut Commands,
+    origin: FixedVec2,
+    velocity: FixedVec2,
+) {
     spawn_projectile_entity(
         commands,
         origin,
@@ -544,7 +574,10 @@ pub(super) fn interaction_for_module(
     if kind == ModuleKind::Turret {
         return Some(InteractionKind::Turret);
     }
-    if integrity.current < integrity.max || runtime_state.needs_attention || runtime_state.is_disabled {
+    if integrity.current < integrity.max
+        || runtime_state.needs_attention
+        || runtime_state.is_disabled
+    {
         return Some(InteractionKind::Repair);
     }
     None
@@ -580,7 +613,8 @@ pub(super) fn module_effectiveness(
         return Fx::from_num(0);
     }
 
-    let mut effectiveness = Fx::from_num(integrity.current.max(0)) / Fx::from_num(integrity.max.max(1));
+    let mut effectiveness =
+        Fx::from_num(integrity.current.max(0)) / Fx::from_num(integrity.max.max(1));
     if runtime_state.needs_attention {
         effectiveness *= fx_ratio(3, 4);
     }
@@ -637,8 +671,8 @@ pub(super) fn dynamic_field_output(
     };
     let heat = emitter.heat_output * attention_bonus + damage_factor * Fx::from_num(3);
     let cooling = emitter.cooling_output;
-    let electrical =
-        emitter.electrical_output * attention_bonus + runtime_state.electrical_instability * fx_ratio(1, 6);
+    let electrical = emitter.electrical_output * attention_bonus
+        + runtime_state.electrical_instability * fx_ratio(1, 6);
 
     (heat, cooling, electrical)
 }

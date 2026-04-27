@@ -1,10 +1,7 @@
 use bevy::prelude::*;
 
+use super::super::{HALF_TILE_SIZE, TILE_SIZE, TOOLBOX_WIDTH, state::LastMissionReport};
 use crate::ship::ModuleKind;
-
-use super::super::{
-    state::LastMissionReport, HALF_TILE_SIZE, TILE_SIZE, TOOLBOX_WIDTH,
-};
 
 pub(super) fn editor_status_line(
     ship_name: &str,

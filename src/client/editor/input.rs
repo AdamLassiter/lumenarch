@@ -1,14 +1,23 @@
 use bevy::{input::mouse::MouseButton, prelude::*, window::PrimaryWindow};
 
-use crate::ship::storage::{load_default_ship, save_default_ship};
-use crate::ship::ShipModule;
-
-use super::helpers::{cursor_grid_position, is_cursor_over_toolbox, module_kind_cost};
-use super::super::{
-    state::{
-        ClientAppState, DemoProgression, EditorShip, EditorToolState, LaunchButton, ToolboxButton,
+use super::{
+    super::{
+        HOVERED_BUTTON,
+        PRESSED_BUTTON,
+        state::{
+            ClientAppState,
+            DemoProgression,
+            EditorShip,
+            EditorToolState,
+            LaunchButton,
+            ToolboxButton,
+        },
     },
-    HOVERED_BUTTON, PRESSED_BUTTON,
+    helpers::{cursor_grid_position, is_cursor_over_toolbox, module_kind_cost},
+};
+use crate::ship::{
+    ShipModule,
+    storage::{load_default_ship, save_default_ship},
 };
 
 pub(crate) fn toolbox_button_system(
@@ -143,7 +152,10 @@ pub(crate) fn place_or_remove_tile(
     }
 }
 
-pub(crate) fn save_editor_ship_shortcut(keys: Res<ButtonInput<KeyCode>>, editor_ship: Res<EditorShip>) {
+pub(crate) fn save_editor_ship_shortcut(
+    keys: Res<ButtonInput<KeyCode>>,
+    editor_ship: Res<EditorShip>,
+) {
     if !keys.just_pressed(KeyCode::F5) {
         return;
     }

@@ -2,12 +2,11 @@ use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
 
+use super::DEFAULT_HOST_ADDR;
 use crate::{
     protocol::ShipSnapshot,
     ship::{ModuleKind, ShipDefinition},
 };
-
-use super::DEFAULT_HOST_ADDR;
 
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub(crate) enum ClientAppState {

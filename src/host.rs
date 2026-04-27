@@ -1,5 +1,7 @@
-use std::io::{BufRead, BufReader, Write};
-use std::net::{TcpListener, TcpStream};
+use std::{
+    io::{BufRead, BufReader, Write},
+    net::{TcpListener, TcpStream},
+};
 
 use crate::{
     protocol::{ClientHello, ServerMessage, ShipSnapshot},

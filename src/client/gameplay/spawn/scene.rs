@@ -1,20 +1,33 @@
 use bevy::prelude::*;
 
-use super::ship::spawn_runtime_ship;
-use super::super::{
-    components::{
-        HostileTarget, HostileTurretPlatform, HostileWeaponState, Integrity, SalvagePickup,
-        SalvageWreck, SimPosition,
+use super::{
+    super::{
+        super::{
+            TILE_SIZE,
+            state::{
+                EditorShip,
+                GameplayAlertsText,
+                GameplayInspectionText,
+                GameplayStatusText,
+                PlayingCleanup,
+                ReturnButton,
+            },
+        },
+        ARENA_HEIGHT_TILES,
+        ARENA_WIDTH_TILES,
+        HOSTILE_FIRE_COOLDOWN,
+        components::{
+            HostileTarget,
+            HostileTurretPlatform,
+            HostileWeaponState,
+            Integrity,
+            SalvagePickup,
+            SalvageWreck,
+            SimPosition,
+        },
+        helpers::{FixedVec2, Fx, gameplay_status_line},
     },
-    helpers::{gameplay_status_line, FixedVec2, Fx},
-    ARENA_HEIGHT_TILES, ARENA_WIDTH_TILES, HOSTILE_FIRE_COOLDOWN,
-};
-use super::super::super::{
-    state::{
-        EditorShip, GameplayAlertsText, GameplayInspectionText, GameplayStatusText, PlayingCleanup,
-        ReturnButton,
-    },
-    TILE_SIZE,
+    ship::spawn_runtime_ship,
 };
 
 pub(crate) fn spawn_runtime_scene(

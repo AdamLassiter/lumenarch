@@ -1,2 +1,2 @@
 absolute-paths-max-segments = 0
-type-complexity-threshold = -1
+type-complexity-threshold = 0

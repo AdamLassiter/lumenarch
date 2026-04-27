@@ -1,5 +1,4 @@
-use std::fs;
-use std::path::Path;
+use std::{fs, path::Path};
 
 use super::ShipDefinition;
 
@@ -35,8 +34,12 @@ pub fn save_ship_to_path(path: &Path, ship: &ShipDefinition) -> Result<(), Strin
         })?;
     }
 
-    let encoded = serde_json::to_string_pretty(ship)
-        .map_err(|error| format!("failed to encode ship definition for {}: {error}", path.display()))?;
+    let encoded = serde_json::to_string_pretty(ship).map_err(|error| {
+        format!(
+            "failed to encode ship definition for {}: {error}",
+            path.display()
+        )
+    })?;
     fs::write(path, encoded)
         .map_err(|error| format!("failed to write ship file {}: {error}", path.display()))
 }

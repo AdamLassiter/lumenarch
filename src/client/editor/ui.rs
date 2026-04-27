@@ -1,15 +1,27 @@
 use bevy::prelude::*;
 
-use crate::ship::storage::{load_default_ship, save_default_ship};
-use crate::ship::{ModuleKind, ShipDefinition};
-
-use super::helpers::{editor_status_line, module_kind_cost};
-use super::super::{
-    state::{
-        ConnectionStatus, DemoProgression, EditorRoot, EditorShip, EditorStatusText,
-        EditorToolState, EditingCleanup, LastMissionReport, LaunchButton,
+use super::{
+    super::{
+        TOOLBOX_COMPONENTS,
+        TOOLBOX_WIDTH,
+        state::{
+            ConnectionStatus,
+            DemoProgression,
+            EditingCleanup,
+            EditorRoot,
+            EditorShip,
+            EditorStatusText,
+            EditorToolState,
+            LastMissionReport,
+            LaunchButton,
+        },
     },
-    TOOLBOX_COMPONENTS, TOOLBOX_WIDTH,
+    helpers::{editor_status_line, module_kind_cost},
+};
+use crate::ship::{
+    ModuleKind,
+    ShipDefinition,
+    storage::{load_default_ship, save_default_ship},
 };
 
 pub(crate) fn initialize_editor_ship(

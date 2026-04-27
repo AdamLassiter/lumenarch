@@ -1,6 +1,5 @@
-use crate::ship::ModuleKind;
-
 use super::super::components::{InteractionKind, ModuleCondition};
+use crate::ship::ModuleKind;
 
 pub(super) fn module_display_name(kind: ModuleKind) -> &'static str {
     kind.as_str()

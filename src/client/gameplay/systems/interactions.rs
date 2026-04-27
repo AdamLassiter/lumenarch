@@ -2,26 +2,38 @@ use bevy::prelude::*;
 
 use super::super::{
     components::{
-        BeginHeldInteraction, CompleteHeldInteraction, CurrentStation, DestroyedModule, HeldInteraction,
-        Integrity, InteractWithModule, InteractionKind, ModuleRuntimeState, NearbyInteraction,
-        PlayerShip, RuntimeShipModule, ShipRoot, ShipboardPlayer,
+        BeginHeldInteraction,
+        CompleteHeldInteraction,
+        CurrentStation,
+        DestroyedModule,
+        HeldInteraction,
+        Integrity,
+        InteractWithModule,
+        InteractionKind,
+        ModuleRuntimeState,
+        NearbyInteraction,
+        PlayerShip,
+        RuntimeShipModule,
+        ShipRoot,
+        ShipboardPlayer,
     },
     helpers::{
-        interaction_for_module, interaction_hold_duration, interaction_prompt, is_hold_interaction,
         Fx,
+        interaction_for_module,
+        interaction_hold_duration,
+        interaction_prompt,
+        is_hold_interaction,
     },
 };
 
 pub(crate) fn detect_nearby_interactions(
-    module_query: Query<
-        (
-            Entity,
-            &RuntimeShipModule,
-            &Integrity,
-            &ModuleRuntimeState,
-            Option<&DestroyedModule>,
-        ),
-    >,
+    module_query: Query<(
+        Entity,
+        &RuntimeShipModule,
+        &Integrity,
+        &ModuleRuntimeState,
+        Option<&DestroyedModule>,
+    )>,
     player_query: Single<(&CurrentStation, &mut NearbyInteraction), With<ShipboardPlayer>>,
 ) {
     let (station, mut nearby) = player_query.into_inner();
@@ -38,7 +50,9 @@ pub(crate) fn detect_nearby_interactions(
         return;
     };
 
-    if let Some(kind) = interaction_for_module(station.kind, integrity, runtime_state, destroyed.is_some()) {
+    if let Some(kind) =
+        interaction_for_module(station.kind, integrity, runtime_state, destroyed.is_some())
+    {
         nearby.target = Some(entity);
         nearby.kind = Some(kind);
         nearby.prompt = Some(interaction_prompt(kind).to_string());
@@ -114,8 +128,15 @@ pub(crate) fn complete_held_interactions(
 pub(crate) fn apply_module_interactions(
     mut instant_events: EventReader<InteractWithModule>,
     mut complete_events: EventReader<CompleteHeldInteraction>,
-    ship_query: Single<&mut super::super::components::ShipboardControlState, (With<PlayerShip>, With<ShipRoot>)>,
-    mut module_query: Query<(&mut Integrity, &mut ModuleRuntimeState, Option<&DestroyedModule>)>,
+    ship_query: Single<
+        &mut super::super::components::ShipboardControlState,
+        (With<PlayerShip>, With<ShipRoot>),
+    >,
+    mut module_query: Query<(
+        &mut Integrity,
+        &mut ModuleRuntimeState,
+        Option<&DestroyedModule>,
+    )>,
 ) {
     let mut ship_control = ship_query.into_inner();
     for event in instant_events.read() {
@@ -129,7 +150,8 @@ pub(crate) fn apply_module_interactions(
                         runtime_state.is_disabled = false;
                         runtime_state.needs_attention = false;
                         runtime_state.electrical_instability =
-                            (runtime_state.electrical_instability - Fx::from_num(4)).max(Fx::from_num(0));
+                            (runtime_state.electrical_instability - Fx::from_num(4))
+                                .max(Fx::from_num(0));
                         runtime_state.last_interaction_age = Fx::from_num(0);
                     }
                 }
@@ -139,7 +161,9 @@ pub(crate) fn apply_module_interactions(
     }
 
     for event in complete_events.read() {
-        if let Ok((mut integrity, mut runtime_state, destroyed)) = module_query.get_mut(event.target) {
+        if let Ok((mut integrity, mut runtime_state, destroyed)) =
+            module_query.get_mut(event.target)
+        {
             if destroyed.is_some() {
                 continue;
             }
@@ -147,8 +171,9 @@ pub(crate) fn apply_module_interactions(
                 InteractionKind::Reactor => {
                     runtime_state.current_heat =
                         (runtime_state.current_heat - Fx::from_num(6)).max(Fx::from_num(0));
-                    runtime_state.electrical_instability =
-                        (runtime_state.electrical_instability - Fx::from_num(5)).max(Fx::from_num(0));
+                    runtime_state.electrical_instability = (runtime_state.electrical_instability
+                        - Fx::from_num(5))
+                    .max(Fx::from_num(0));
                     runtime_state.needs_attention = false;
                     runtime_state.is_disabled = false;
                 }
@@ -156,8 +181,9 @@ pub(crate) fn apply_module_interactions(
                     integrity.current = (integrity.current + 3).min(integrity.max);
                     runtime_state.current_heat =
                         (runtime_state.current_heat - Fx::from_num(3)).max(Fx::from_num(0));
-                    runtime_state.electrical_instability =
-                        (runtime_state.electrical_instability - Fx::from_num(3)).max(Fx::from_num(0));
+                    runtime_state.electrical_instability = (runtime_state.electrical_instability
+                        - Fx::from_num(3))
+                    .max(Fx::from_num(0));
                     runtime_state.needs_attention = integrity.current < integrity.max;
                     runtime_state.is_disabled = false;
                 }

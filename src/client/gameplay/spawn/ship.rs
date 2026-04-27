@@ -2,25 +2,55 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
 
-use crate::ship::{ModuleKind, ShipDefinition, ShipModule};
-
 use super::super::{
+    super::state::PlayingCleanup,
+    RUNTIME_SHIP_ORIGIN,
     components::{
-        AngularVelocity, CurrentStation, EngineModule, HeldInteraction, Integrity, Interactable,
-        InternalPosition, LinearVelocity, MissionState, ModuleFieldEmitter, ModuleRuntimeState,
-        NearbyInteraction, PlayerFieldState, PlayerShip, PlayerShipAssignment,
-        PowerConsumer, PowerProducer, RuntimeShipModule, ShipControlMode, ShipControlState,
-        ShipInteriorMap, ShipInteriorNode, ShipPowerState, ShipRoot,
-        ShipWeaponState, ShipboardControlState, ShipboardMarker, ShipboardPlayer, SimPosition,
-        SimRotation, WeaponModule,
+        AngularVelocity,
+        CurrentStation,
+        EngineModule,
+        HeldInteraction,
+        Integrity,
+        Interactable,
+        InternalPosition,
+        LinearVelocity,
+        MissionState,
+        ModuleFieldEmitter,
+        ModuleRuntimeState,
+        NearbyInteraction,
+        PlayerFieldState,
+        PlayerShip,
+        PlayerShipAssignment,
+        PowerConsumer,
+        PowerProducer,
+        RuntimeShipModule,
+        ShipControlMode,
+        ShipControlState,
+        ShipInteriorMap,
+        ShipInteriorNode,
+        ShipPowerState,
+        ShipRoot,
+        ShipWeaponState,
+        ShipboardControlState,
+        ShipboardMarker,
+        ShipboardPlayer,
+        SimPosition,
+        SimRotation,
+        WeaponModule,
     },
     helpers::{
-        count_modules, module_integrity, module_local_position, module_local_translation,
-        ship_movement_model, ship_power_model, sprite_path_for_kind, FixedVec2, Fx,
+        FixedVec2,
+        Fx,
+        count_modules,
+        module_integrity,
+        module_local_position,
+        module_local_translation,
+        ship_movement_model,
+        ship_power_model,
+        sprite_path_for_kind,
     },
-    RUNTIME_SHIP_ORIGIN,
 };
-use super::super::super::state::PlayingCleanup;
+use crate::ship::{ModuleKind, ShipDefinition, ShipModule};
 
 pub(super) fn spawn_runtime_ship(
     commands: &mut Commands,

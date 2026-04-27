@@ -1,20 +1,41 @@
 use bevy::prelude::*;
 
 use super::super::{
+    super::state::{ClientAppState, MainCamera, ReturnButton},
+    CAMERA_FOLLOW_LERP_RATE,
     components::{
-        AngularVelocity, CurrentStation, InternalPosition, LinearVelocity, MissionState,
-        PlayerShip, PlayerShipAssignment, ShipControlMode, ShipControlState,
-        ShipInteriorMap, ShipRoot, ShipMovementModel, ShipPowerModel, ShipPowerState,
-        ShipWeaponState, ShipboardControlState, ShipboardMarker, ShipboardPlayer, SimPosition,
+        AngularVelocity,
+        CurrentStation,
+        InternalPosition,
+        LinearVelocity,
+        MissionState,
+        PlayerShip,
+        PlayerShipAssignment,
+        ShipControlMode,
+        ShipControlState,
+        ShipInteriorMap,
+        ShipMovementModel,
+        ShipPowerModel,
+        ShipPowerState,
+        ShipRoot,
+        ShipWeaponState,
+        ShipboardControlState,
+        ShipboardMarker,
+        ShipboardPlayer,
+        SimPosition,
         SimRotation,
     },
     helpers::{
-        clamp_position_to_arena, damp_scalar, damp_vec2, facing_vector, fx_from_time_delta,
-        render_translation, update_ship_power_state, Fx,
+        Fx,
+        clamp_position_to_arena,
+        damp_scalar,
+        damp_vec2,
+        facing_vector,
+        fx_from_time_delta,
+        render_translation,
+        update_ship_power_state,
     },
-    CAMERA_FOLLOW_LERP_RATE,
 };
-use super::super::super::state::{ClientAppState, MainCamera, ReturnButton};
 
 pub(crate) fn return_button_system(
     mut interaction_query: Query<
@@ -136,7 +157,12 @@ pub(crate) fn move_shipboard_player(
 pub(crate) fn sync_shipboard_player_visual(
     ship_query: Single<&ShipboardControlState, (With<PlayerShip>, With<ShipRoot>)>,
     player_query: Single<
-        (&InternalPosition, &mut Transform, &mut Sprite, &mut Visibility),
+        (
+            &InternalPosition,
+            &mut Transform,
+            &mut Sprite,
+            &mut Visibility,
+        ),
         (With<ShipboardMarker>, With<ShipboardPlayer>),
     >,
 ) {
@@ -182,7 +208,8 @@ pub(crate) fn apply_player_ship_controls(
         mission_state,
     ) = player_ship_query.into_inner();
     let dt = fx_from_time_delta(&time);
-    let thrust_active = flight_mode && (keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp));
+    let thrust_active =
+        flight_mode && (keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp));
     let fire_pressed = flight_mode && keys.pressed(KeyCode::Space);
 
     let mut turn_input = Fx::from_num(0);
@@ -197,7 +224,8 @@ pub(crate) fn apply_player_ship_controls(
         turn_input = Fx::from_num(0);
     }
 
-    control_state.thrust_active = thrust_active && !mission_state.failed && !mission_state.completed;
+    control_state.thrust_active =
+        thrust_active && !mission_state.failed && !mission_state.completed;
     control_state.turn_input = turn_input;
     control_state.fire_pressed = fire_pressed && !mission_state.failed && !mission_state.completed;
     weapon_state.cooldown_remaining = (weapon_state.cooldown_remaining - dt).max(Fx::from_num(0));
@@ -234,7 +262,13 @@ pub(crate) fn apply_player_ship_controls(
 pub(crate) fn integrate_player_ship_motion(
     time: Res<Time>,
     player_ship_query: Single<
-        (&mut Transform, &mut SimPosition, &mut SimRotation, &LinearVelocity, &AngularVelocity),
+        (
+            &mut Transform,
+            &mut SimPosition,
+            &mut SimRotation,
+            &LinearVelocity,
+            &AngularVelocity,
+        ),
         (With<PlayerShip>, With<ShipRoot>),
     >,
 ) {

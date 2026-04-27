@@ -2,13 +2,30 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 
-use super::helpers::{
-    cursor_grid_position, grid_to_world, is_cursor_over_toolbox, module_kind_cost,
-    sprite_path_for_kind,
-};
-use super::super::{
-    state::{DemoProgression, EditorShip, EditorToolState, EditingCleanup, PreviewTile, ShipTileSprite, ToolboxButton},
-    GRID_COLOR, HALF_TILE_SIZE, NORMAL_BUTTON, SELECTED_BUTTON, TILE_SIZE,
+use super::{
+    super::{
+        GRID_COLOR,
+        HALF_TILE_SIZE,
+        NORMAL_BUTTON,
+        SELECTED_BUTTON,
+        TILE_SIZE,
+        state::{
+            DemoProgression,
+            EditingCleanup,
+            EditorShip,
+            EditorToolState,
+            PreviewTile,
+            ShipTileSprite,
+            ToolboxButton,
+        },
+    },
+    helpers::{
+        cursor_grid_position,
+        grid_to_world,
+        is_cursor_over_toolbox,
+        module_kind_cost,
+        sprite_path_for_kind,
+    },
 };
 
 pub(crate) fn spawn_preview_tile(
@@ -19,9 +36,7 @@ pub(crate) fn spawn_preview_tile(
     commands.spawn((
         Sprite {
             color: Color::srgba(1.0, 1.0, 1.0, 0.72),
-            ..Sprite::from_image(asset_server.load(sprite_path_for_kind(
-                &tool_state.selected_kind,
-            )))
+            ..Sprite::from_image(asset_server.load(sprite_path_for_kind(&tool_state.selected_kind)))
         },
         Transform::from_xyz(0.0, 0.0, 5.0),
         Visibility::Hidden,

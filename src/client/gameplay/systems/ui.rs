@@ -1,19 +1,45 @@
 use bevy::prelude::*;
 
-use super::shared::{condition_severity, interaction_label, module_display_name};
-use super::super::{
-    components::{
-        CurrentStation, DestroyedModule, HeldInteraction, Integrity, MissionState, ModuleRuntimeState,
-        NearbyInteraction, PlayerFieldState, PlayerShip, RuntimeShipModule, ShipRoot,
-        ShipWeaponState, ShipboardControlState, ShipboardPlayer, SimPosition, WeaponModule,
+use super::{
+    super::{
+        super::state::{
+            DemoProgression,
+            GameplayAlertsText,
+            GameplayInspectionText,
+            GameplayStatusText,
+        },
+        components::{
+            CurrentStation,
+            DestroyedModule,
+            HeldInteraction,
+            Integrity,
+            MissionState,
+            ModuleRuntimeState,
+            NearbyInteraction,
+            PlayerFieldState,
+            PlayerShip,
+            RuntimeShipModule,
+            ShipRoot,
+            ShipWeaponState,
+            ShipboardControlState,
+            ShipboardPlayer,
+            SimPosition,
+            WeaponModule,
+        },
+        helpers::{
+            Fx,
+            danger_level,
+            format_fx0,
+            format_fx1,
+            format_fx2,
+            mission_return_line,
+            mission_status_line,
+            module_condition,
+            module_condition_label,
+            salvage_status_line,
+        },
     },
-    helpers::{
-        danger_level, format_fx0, format_fx1, format_fx2, mission_return_line, mission_status_line,
-        module_condition, module_condition_label, salvage_status_line, Fx,
-    },
-};
-use super::super::super::state::{
-    DemoProgression, GameplayAlertsText, GameplayInspectionText, GameplayStatusText,
+    shared::{condition_severity, interaction_label, module_display_name},
 };
 
 pub(crate) fn update_gameplay_status_text(
@@ -45,7 +71,10 @@ pub(crate) fn update_gameplay_status_text(
     >,
     salvage_query: Query<
         (&SimPosition, &super::super::components::SalvagePickup),
-        (With<super::super::components::SalvageWreck>, Without<super::super::components::CollectedSalvage>),
+        (
+            With<super::super::components::SalvageWreck>,
+            Without<super::super::components::CollectedSalvage>,
+        ),
     >,
     progression: Res<DemoProgression>,
     mut status_query: Query<&mut Text, With<GameplayStatusText>>,
@@ -111,7 +140,11 @@ pub(crate) fn update_gameplay_status_text(
             format_fx1(power_state.generation),
             format_fx1(power_state.draw),
             format_fx1(power_state.stored_energy),
-            if power_state.weapons_powered { "yes" } else { "no" },
+            if power_state.weapons_powered {
+                "yes"
+            } else {
+                "no"
+            },
             weapon_state.turret_count,
             format_fx2(weapon_state.cooldown_remaining.max(Fx::from_num(0))),
             projectile_query.iter().len(),
@@ -119,7 +152,11 @@ pub(crate) fn update_gameplay_status_text(
             format_fx1(player_fields.local_heat),
             danger_level(player_fields.local_heat, Fx::from_num(8), Fx::from_num(14)),
             format_fx1(player_fields.local_electrical),
-            danger_level(player_fields.local_electrical, Fx::from_num(7), Fx::from_num(12)),
+            danger_level(
+                player_fields.local_electrical,
+                Fx::from_num(7),
+                Fx::from_num(12)
+            ),
             salvage_line,
             progression.scrap,
         );
@@ -136,15 +173,16 @@ pub(crate) fn update_inspection_and_alerts_text(
         ),
         With<ShipboardPlayer>,
     >,
-    module_query: Query<
-        (
-            &RuntimeShipModule,
-            &Integrity,
-            &ModuleRuntimeState,
-            Option<&DestroyedModule>,
-        ),
+    module_query: Query<(
+        &RuntimeShipModule,
+        &Integrity,
+        &ModuleRuntimeState,
+        Option<&DestroyedModule>,
+    )>,
+    mut inspection_query: Query<
+        &mut Text,
+        (With<GameplayInspectionText>, Without<GameplayAlertsText>),
     >,
-    mut inspection_query: Query<&mut Text, (With<GameplayInspectionText>, Without<GameplayAlertsText>)>,
     mut alerts_query: Query<&mut Text, (With<GameplayAlertsText>, Without<GameplayInspectionText>)>,
 ) {
     let (station, nearby, held, player_fields) = player_query.into_inner();
@@ -179,7 +217,11 @@ pub(crate) fn update_inspection_and_alerts_text(
                 format_fx1(runtime_state.electrical_instability),
                 format_fx1(runtime_state.sampled_heat),
                 format_fx1(runtime_state.sampled_electrical),
-                if runtime_state.needs_attention { "yes" } else { "no" },
+                if runtime_state.needs_attention {
+                    "yes"
+                } else {
+                    "no"
+                },
                 interaction_line,
             );
         } else {
@@ -225,7 +267,11 @@ pub(crate) fn update_inspection_and_alerts_text(
             format_fx1(player_fields.local_heat),
             danger_level(player_fields.local_heat, Fx::from_num(8), Fx::from_num(14)),
             format_fx1(player_fields.local_electrical),
-            danger_level(player_fields.local_electrical, Fx::from_num(7), Fx::from_num(12)),
+            danger_level(
+                player_fields.local_electrical,
+                Fx::from_num(7),
+                Fx::from_num(12)
+            ),
             summary,
             nearby
                 .prompt

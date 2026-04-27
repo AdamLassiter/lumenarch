@@ -1,8 +1,7 @@
 use bevy::prelude::*;
 
-use crate::ship::ModuleKind;
-
 use super::helpers::{FixedVec2, Fx};
+use crate::ship::ModuleKind;
 
 #[derive(Component)]
 pub(crate) struct PlayerShip;

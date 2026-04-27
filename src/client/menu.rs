@@ -4,10 +4,19 @@ use bevy::{
 };
 
 use super::{
-    HOVERED_BUTTON, NORMAL_BUTTON, PRESSED_BUTTON, net,
+    HOVERED_BUTTON,
+    NORMAL_BUTTON,
+    PRESSED_BUTTON,
+    net,
     state::{
-        ConnectionConfig, ConnectionMailbox, ConnectionPhase, ConnectionStatus, HostAddressText,
-        JoinButton, MenuRoot, StatusText,
+        ConnectionConfig,
+        ConnectionMailbox,
+        ConnectionPhase,
+        ConnectionStatus,
+        HostAddressText,
+        JoinButton,
+        MenuRoot,
+        StatusText,
     },
 };
 
