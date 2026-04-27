@@ -188,20 +188,21 @@ pub(crate) fn update_module_runtime_state(
             continue;
         }
 
-        let kind_heat = match runtime_module.kind {
-            ModuleKind::Reactor => Fx::from_num(1.4),
-            ModuleKind::Engine => Fx::from_num(0.8),
-            ModuleKind::Turret => Fx::from_num(0.6),
-            ModuleKind::Battery => Fx::from_num(0.5),
-            ModuleKind::Computer => Fx::from_num(0.35),
-            _ => Fx::from_num(0.2),
+        let base_heat = match runtime_module.kind {
+            ModuleKind::Reactor => Fx::from_num(0.9),
+            ModuleKind::Engine => Fx::from_num(0.45),
+            ModuleKind::Turret => Fx::from_num(0.3),
+            ModuleKind::Battery => Fx::from_num(0.2),
+            ModuleKind::Computer => Fx::from_num(0.15),
+            _ => Fx::from_num(0.05),
         };
         let damage_factor = Fx::from_num(1)
             - Fx::from_num(integrity.current.max(0)) / Fx::from_num(integrity.max.max(1));
         runtime_state.last_interaction_age += dt;
+        let target_heat =
+            base_heat + runtime_state.sampled_heat * Fx::from_num(0.45) + damage_factor;
         runtime_state.current_heat = (runtime_state.current_heat
-            + (kind_heat + runtime_state.sampled_heat * Fx::from_num(0.25) + damage_factor) * dt
-            - Fx::from_num(0.55) * dt)
+            + (target_heat - runtime_state.current_heat) * Fx::from_num(1.35) * dt)
             .max(Fx::from_num(0));
         runtime_state.electrical_instability = (runtime_state.electrical_instability
             + (runtime_state.sampled_electrical * Fx::from_num(0.08)
