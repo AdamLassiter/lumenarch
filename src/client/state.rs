@@ -125,6 +125,12 @@ pub(crate) struct EditorStatusText;
 pub(crate) struct GameplayStatusText;
 
 #[derive(Component)]
+pub(crate) struct GameplayInspectionText;
+
+#[derive(Component)]
+pub(crate) struct GameplayAlertsText;
+
+#[derive(Component)]
 pub(crate) struct ToolboxButton {
     pub(crate) kind: ModuleKind,
 }

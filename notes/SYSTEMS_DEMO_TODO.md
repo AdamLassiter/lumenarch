@@ -31,13 +31,7 @@ Already in place from the first playable demo:
 
 Not yet in place for this milestone:
 
-* player embodiment inside the ship
-* manual module interaction
-* degraded module states beyond destruction
-* field-based onboard hazards
-* repair and stabilization actions
 * first playable ARCH interaction
-* ship-interior readability and status tooling
 
 ---
 
@@ -49,24 +43,24 @@ Represent the player as an entity or controllable presence within the ship durin
 
 ### Tasks
 
-- [ ] Audit the current gameplay module structure and decide where the internal player representation should live.
-- [ ] Add a dedicated internal player component/resource, likely something like:
-  - [ ] `ShipboardPlayer`
-  - [ ] `PlayerShipAssignment`
-  - [ ] `InternalPosition`
-  - [ ] `CurrentStation`
-- [ ] Decide on the first movement model:
-  - [ ] free local movement within ship bounds
-- [ ] Add a runtime concept of walkable or reachable interior spaces.
-- [ ] Define how the player position is derived from ship layout:
-  - [ ] hull / corridor tiles
-  - [ ] adjacency graph
-  - [ ] module interaction anchor points
-- [ ] Add a mode switch between:
-  - [ ] ship control
-  - [ ] internal control
-- [ ] Add a simple visual or marker for current player location inside the ship.
-- [ ] Ensure internal player state persists cleanly during a mission and resets cleanly on mission return.
+- [x] Audit the current gameplay module structure and decide where the internal player representation should live.
+- [x] Add a dedicated internal player component/resource, likely something like:
+  - [x] `ShipboardPlayer`
+  - [x] `PlayerShipAssignment`
+  - [x] `InternalPosition`
+  - [x] `CurrentStation`
+- [x] Decide on the first movement model:
+  - [x] free local movement within ship bounds
+- [x] Add a runtime concept of walkable or reachable interior spaces.
+- [x] Define how the player position is derived from ship layout:
+  - [x] hull / corridor tiles
+  - [x] adjacency graph
+  - [x] module interaction anchor points
+- [x] Add a mode switch between:
+  - [x] ship control
+  - [x] internal control
+- [x] Add a simple visual or marker for current player location inside the ship.
+- [x] Ensure internal player state persists cleanly during a mission and resets cleanly on mission return.
 
 ### Files Likely Affected
 
@@ -77,9 +71,15 @@ Represent the player as an entity or controllable presence within the ship durin
 
 ### First-Pass Simplifications
 
-- [ ] Do not implement full collision-rich character movement.
-- [ ] It is acceptable for the first pass to snap between tiles or interaction nodes.
-- [ ] It is acceptable for the player to be constrained to a simplified “interior overlay” representation rather than literal room geometry.
+- [x] Do not implement full collision-rich character movement.
+- [x] It is acceptable for the first pass to snap between tiles or interaction nodes.
+- [x] It is acceptable for the player to be constrained to a simplified “interior overlay” representation rather than literal room geometry.
+
+### Phase 1 Notes
+
+* ship-local `ShipboardPlayer` marker is childed to the runtime ship root
+* movement snaps between module-derived interior nodes
+* `C` toggles flight/internal control mode and the runtime HUD reports the current station
 
 ### Phase 1 Definition Of Done
 
@@ -97,29 +97,29 @@ Allow the player to interact with nearby ship systems in a generic and extensibl
 
 ### Tasks
 
-- [ ] Add an `Interactable` marker or equivalent component for runtime modules that support shipboard actions.
-- [ ] Add interaction range / adjacency detection from the internal player position.
-- [ ] Add a generic interaction prompt pipeline:
-  - [ ] current nearby target
-  - [ ] prompt text
-  - [ ] unavailable / blocked reason if needed
-- [ ] Add a generic interaction event or command flow, likely something like:
-  - [ ] `InteractWithModule`
-  - [ ] `BeginHeldInteraction`
-  - [ ] `CompleteHeldInteraction`
-- [ ] Support at least two interaction forms:
-  - [ ] instant interaction
-  - [ ] hold-to-interact
-- [ ] Add module-type-specific dispatch for:
-  - [ ] cockpit
-  - [ ] reactor
-  - [ ] turret
-  - [ ] shield emitter if present
-  - [ ] damaged module / repair target
-- [ ] Ensure interactions are cancelled cleanly if:
-  - [ ] the player moves away
-  - [ ] the module is destroyed
-  - [ ] the mission ends
+- [x] Add an `Interactable` marker or equivalent component for runtime modules that support shipboard actions.
+- [x] Add interaction range / adjacency detection from the internal player position.
+- [x] Add a generic interaction prompt pipeline:
+  - [x] current nearby target
+  - [x] prompt text
+  - [x] unavailable / blocked reason if needed
+- [x] Add a generic interaction event or command flow, likely something like:
+  - [x] `InteractWithModule`
+  - [x] `BeginHeldInteraction`
+  - [x] `CompleteHeldInteraction`
+- [x] Support at least two interaction forms:
+  - [x] instant interaction
+  - [x] hold-to-interact
+- [x] Add module-type-specific dispatch for:
+  - [x] cockpit
+  - [x] reactor
+  - [x] turret
+  - [x] shield emitter if present
+  - [x] damaged module / repair target
+- [x] Ensure interactions are cancelled cleanly if:
+  - [x] the player moves away
+  - [x] the module is destroyed
+  - [x] the mission ends
 
 ### Files Likely Affected
 
@@ -129,9 +129,16 @@ Allow the player to interact with nearby ship systems in a generic and extensibl
 
 ### First-Pass Simplifications
 
-- [ ] Only one interaction target may be active at once.
-- [ ] Prioritize nearest interactable rather than building a complex selection system.
-- [ ] Use generic hold durations before tuning per-component timings.
+- [x] Only one interaction target may be active at once.
+- [x] Prioritize nearest interactable rather than building a complex selection system.
+- [x] Use generic hold durations before tuning per-component timings.
+
+### Phase 2 Notes
+
+* interaction is station-based rather than freeform radius targeting
+* `E` supports both instant and held interactions through gameplay events
+* `cockpit`, `reactor`, `turret`, and damaged-module repair actions are hooked up
+* no shield-emitter module exists yet, but the interaction pipeline is ready for more module actions
 
 ### Phase 2 Definition Of Done
 
@@ -149,29 +156,29 @@ Make modules behave like systems under stress rather than binary alive/dead tile
 
 ### Tasks
 
-- [ ] Audit current runtime module data and decide where additional live state should live.
-- [ ] Add per-module state fields, likely including:
-  - [ ] `current_heat`
-  - [ ] `electrical_instability`
-  - [ ] `is_disabled`
-  - [ ] `needs_attention`
-  - [ ] `last_interaction_time` if needed
-- [ ] Decide whether state is attached directly to module entities or mirrored in a ship-level cache.
-- [ ] Define degraded behavior for first supported module types:
-  - [ ] reactor
-  - [ ] engine
-  - [ ] turret
-  - [ ] battery
-  - [ ] shield if present
-- [ ] Add systems that recalculate ship capability from both:
-  - [ ] installed modules
-  - [ ] live module state
-- [ ] Ensure degraded modules remain visible and inspectable.
-- [ ] Distinguish:
-  - [ ] healthy
-  - [ ] degraded
-  - [ ] disabled
-  - [ ] destroyed
+- [x] Audit current runtime module data and decide where additional live state should live.
+- [x] Add per-module state fields, likely including:
+  - [x] `current_heat`
+  - [x] `electrical_instability`
+  - [x] `is_disabled`
+  - [x] `needs_attention`
+  - [x] `last_interaction_time` if needed
+- [x] Decide whether state is attached directly to module entities or mirrored in a ship-level cache.
+- [x] Define degraded behavior for first supported module types:
+  - [x] reactor
+  - [x] engine
+  - [x] turret
+  - [x] battery
+  - [x] shield if present
+- [x] Add systems that recalculate ship capability from both:
+  - [x] installed modules
+  - [x] live module state
+- [x] Ensure degraded modules remain visible and inspectable.
+- [x] Distinguish:
+  - [x] healthy
+  - [x] degraded
+  - [x] disabled
+  - [x] destroyed
 
 ### Files Likely Affected
 
@@ -181,9 +188,16 @@ Make modules behave like systems under stress rather than binary alive/dead tile
 
 ### First-Pass Simplifications
 
-- [ ] Avoid building full register-level simulation here.
-- [ ] Use a small number of well-defined degraded states.
-- [ ] It is acceptable to support only a subset of installed module kinds at first.
+- [x] Avoid building full register-level simulation here.
+- [x] Use a small number of well-defined degraded states.
+- [x] It is acceptable to support only a subset of installed module kinds at first.
+
+### Phase 3 Notes
+
+* `ModuleRuntimeState` is attached directly to runtime module entities
+* the first-pass live state includes heat, electrical instability, disabled state, needs-attention, and interaction age
+* reactor, engine, turret, and battery effectiveness now feed back into runtime ship power and handling
+* shield-specific behavior is still deferred until that module exists in the playable slice
 
 ### Phase 3 Definition Of Done
 
@@ -201,28 +215,28 @@ Introduce a narrow and readable field layer that creates local onboard pressure.
 
 ### Tasks
 
-- [ ] Decide how the first field implementation will be represented in code:
-  - [ ] ad-hoc per-module overlap checks
-  - [ ] shared field emitter component
-  - [ ] ship-local sampled values
-- [ ] Add first-pass field emitter definitions for:
-  - [ ] heat
-  - [ ] cooling
-  - [ ] electrical interference
-- [ ] Define which module types emit which first-pass fields:
-  - [ ] reactor emits heat
-  - [ ] radiator or cooler emits negative heat if present
-  - [ ] damaged systems emit electrical instability
-  - [ ] engines and turrets optionally emit heat under use
-- [ ] Add sampling logic for:
-  - [ ] player position
-  - [ ] module positions
-- [ ] Add threshold-based effects for first-pass interpretation:
-  - [ ] player heat danger
-  - [ ] module heat damage or degradation
-  - [ ] module electrical unreliability or disable chance
-- [ ] Decide how these values update relative to existing runtime systems.
-- [ ] Add debug tooling for field visualization if needed.
+- [x] Decide how the first field implementation will be represented in code:
+  - [x] ad-hoc per-module overlap checks
+  - [x] shared field emitter component
+  - [x] ship-local sampled values
+- [x] Add first-pass field emitter definitions for:
+  - [x] heat
+  - [x] cooling
+  - [x] electrical interference
+- [x] Define which module types emit which first-pass fields:
+  - [x] reactor emits heat
+  - [x] radiator or cooler emits negative heat if present
+  - [x] damaged systems emit electrical instability
+  - [x] engines and turrets optionally emit heat under use
+- [x] Add sampling logic for:
+  - [x] player position
+  - [x] module positions
+- [x] Add threshold-based effects for first-pass interpretation:
+  - [x] player heat danger
+  - [x] module heat damage or degradation
+  - [x] module electrical unreliability or disable chance
+- [x] Decide how these values update relative to existing runtime systems.
+- [x] Add debug tooling for field visualization if needed.
 
 ### Files Likely Affected
 
@@ -233,9 +247,17 @@ Introduce a narrow and readable field layer that creates local onboard pressure.
 
 ### First-Pass Simplifications
 
-- [ ] Only simulate heat and electrical fields.
-- [ ] Use simple shapes and distance checks rather than a fully generalized field framework if that gets to visible results faster.
-- [ ] It is acceptable to skip complex dissipation and only model local emitters at first.
+- [x] Only simulate heat and electrical fields.
+- [x] Use simple shapes and distance checks rather than a fully generalized field framework if that gets to visible results faster.
+- [x] It is acceptable to skip complex dissipation and only model local emitters at first.
+
+### Phase 4 Notes
+
+* the first implementation uses ship-local sampled values driven by `ModuleFieldEmitter`
+* emitters are currently shaped by module kind, damage pressure, and degraded state
+* both the shipboard player and runtime modules sample heat and electrical pressure each frame
+* hull, hull-corner, and airlock tiles currently act as first-pass cooling surfaces
+* dedicated field debug visualization is still deferred
 
 ### Phase 4 Definition Of Done
 
@@ -253,25 +275,25 @@ Make system pressure legible enough to playtest.
 
 ### Tasks
 
-- [ ] Add local player readouts for:
-  - [ ] heat
-  - [ ] electrical danger
-- [ ] Add thresholded warnings:
-  - [ ] safe
-  - [ ] warning
-  - [ ] critical
-- [ ] Add a component inspection panel showing at least:
-  - [ ] module type
-  - [ ] integrity
-  - [ ] heat
-  - [ ] electrical instability
-  - [ ] status (healthy / degraded / disabled / destroyed)
-- [ ] Add a ship-level alert list or summary panel for major problems.
-- [ ] Add a simple way to surface which module currently needs attention most.
-- [ ] Optionally add a ship overlay or tinting for overheated / unstable modules.
-- [ ] Ensure the UI is visible in both:
-  - [ ] direct ship control mode
-  - [ ] internal control mode
+- [x] Add local player readouts for:
+  - [x] heat
+  - [x] electrical danger
+- [x] Add thresholded warnings:
+  - [x] safe
+  - [x] warning
+  - [x] critical
+- [x] Add a component inspection panel showing at least:
+  - [x] module type
+  - [x] integrity
+  - [x] heat
+  - [x] electrical instability
+  - [x] status (healthy / degraded / disabled / destroyed)
+- [x] Add a ship-level alert list or summary panel for major problems.
+- [x] Add a simple way to surface which module currently needs attention most.
+- [x] Optionally add a ship overlay or tinting for overheated / unstable modules.
+- [x] Ensure the UI is visible in both:
+  - [x] direct ship control mode
+  - [x] internal control mode
 
 ### Files Likely Affected
 
@@ -281,9 +303,17 @@ Make system pressure legible enough to playtest.
 
 ### First-Pass Simplifications
 
-- [ ] Prefer text and tints over complex custom widgets.
-- [ ] Avoid building a giant engineering dashboard for the first pass.
-- [ ] Field visualization can start as a debug toggle.
+- [x] Prefer text and tints over complex custom widgets.
+- [x] Avoid building a giant engineering dashboard for the first pass.
+- [x] Field visualization can start as a debug toggle.
+
+### Phase 5 Notes
+
+* runtime readability is now split into mission summary, current-station inspection, and alerts panels
+* local heat/electrical readouts use `safe` / `warning` / `critical` thresholds
+* the inspection panel shows type, integrity, condition, live heat, live electrical, sampled field input, and current action context
+* the alerts panel surfaces local player danger plus the most urgent shipwide module issues
+* the first pass stays text-first and keeps tint-based module feedback instead of adding a separate overlay
 
 ### Phase 5 Definition Of Done
 

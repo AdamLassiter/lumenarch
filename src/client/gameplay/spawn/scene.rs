@@ -1,25 +1,19 @@
-use std::f32::consts::FRAC_PI_2;
-
 use bevy::prelude::*;
 
-use crate::ship::{ModuleKind, ShipDefinition, ShipModule};
-
-use super::{
-    components::{
-        AngularVelocity, EngineModule, HostileTarget, HostileTurretPlatform, HostileWeaponState,
-        Integrity, LinearVelocity, MissionState, PlayerShip, PowerConsumer, PowerProducer,
-        RuntimeShipModule, SalvagePickup, SalvageWreck, ShipControlState, ShipPowerState, ShipRoot,
-        ShipWeaponState, SimPosition, SimRotation,
-        WeaponModule,
-    },
-    helpers::{
-        FixedVec2, count_modules, gameplay_status_line, module_integrity, module_local_position,
-        module_local_translation, ship_movement_model, ship_power_model, sprite_path_for_kind,
-    },
-    ARENA_HEIGHT_TILES, ARENA_WIDTH_TILES, HOSTILE_FIRE_COOLDOWN, RUNTIME_SHIP_ORIGIN,
-};
+use super::ship::spawn_runtime_ship;
 use super::super::{
-    state::{EditorShip, GameplayStatusText, PlayingCleanup, ReturnButton},
+    components::{
+        HostileTarget, HostileTurretPlatform, HostileWeaponState, Integrity, SalvagePickup,
+        SalvageWreck, SimPosition,
+    },
+    helpers::{gameplay_status_line, FixedVec2, Fx},
+    ARENA_HEIGHT_TILES, ARENA_WIDTH_TILES, HOSTILE_FIRE_COOLDOWN,
+};
+use super::super::super::{
+    state::{
+        EditorShip, GameplayAlertsText, GameplayInspectionText, GameplayStatusText, PlayingCleanup,
+        ReturnButton,
+    },
     TILE_SIZE,
 };
 
@@ -106,9 +100,77 @@ pub(crate) fn spawn_runtime_scene(
                 Node {
                     position_type: PositionType::Absolute,
                     right: Val::Px(20.0),
+                    top: Val::Px(20.0),
+                    padding: UiRect::all(Val::Px(14.0)),
+                    max_width: Val::Px(340.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
+                BorderRadius::all(Val::Px(10.0)),
+            ))
+            .with_children(|panel| {
+                panel.spawn((
+                    Text::new("Current Station"),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: 16.0,
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                ));
+                panel.spawn((
+                    Text::new("Station data pending"),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: 14.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.86, 0.90, 0.96)),
+                    GameplayInspectionText,
+                ));
+            });
+
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    right: Val::Px(20.0),
+                    top: Val::Px(220.0),
+                    padding: UiRect::all(Val::Px(14.0)),
+                    max_width: Val::Px(340.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
+                BorderRadius::all(Val::Px(10.0)),
+            ))
+            .with_children(|panel| {
+                panel.spawn((
+                    Text::new("Alerts"),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: 16.0,
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                ));
+                panel.spawn((
+                    Text::new("No alerts"),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: 14.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.86, 0.90, 0.96)),
+                    GameplayAlertsText,
+                ));
+            });
+
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    right: Val::Px(20.0),
                     bottom: Val::Px(20.0),
                     padding: UiRect::all(Val::Px(14.0)),
-                    max_width: Val::Px(300.0),
+                    max_width: Val::Px(320.0),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
@@ -117,10 +179,10 @@ pub(crate) fn spawn_runtime_scene(
             .with_children(|panel| {
                 panel.spawn((
                     Text::new(
-                        "Flight Controls\nW / Up: thrust\nA,D / Left,Right: rotate\nSpace: fire turrets\nF: collect salvage after encounter\nTab: return to editor",
+                        "Controls\nW / A / S / D or Arrows: flight or internal movement\nC: toggle flight/internal control\nE: interact / hold to work\nSpace: fire turrets\nF: collect salvage after encounter\nTab: return to editor",
                     ),
                     TextFont {
-                        font: mono_font.clone(),
+                        font: mono_font,
                         font_size: 14.0,
                         ..default()
                     },
@@ -200,8 +262,8 @@ fn spawn_test_arena(commands: &mut Commands) {
                 value: FixedVec2::from_vec2(translation.truncate()),
             },
             HostileWeaponState {
-                cooldown_remaining: super::helpers::Fx::from_num(HOSTILE_FIRE_COOLDOWN * 0.5),
-                cooldown_duration: super::helpers::Fx::from_num(HOSTILE_FIRE_COOLDOWN),
+                cooldown_remaining: Fx::from_num(HOSTILE_FIRE_COOLDOWN * 0.5),
+                cooldown_duration: Fx::from_num(HOSTILE_FIRE_COOLDOWN),
             },
             Integrity { current: 6, max: 6 },
             PlayingCleanup,
@@ -220,157 +282,4 @@ fn spawn_salvage_wreck(commands: &mut Commands) {
         SalvagePickup { scrap_value: 6 },
         PlayingCleanup,
     ));
-}
-
-fn spawn_runtime_ship(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    ship: &ShipDefinition,
-) {
-    let engine_count = count_modules(ship, ModuleKind::Engine);
-    let reactor_count = count_modules(ship, ModuleKind::Reactor);
-    let battery_count = count_modules(ship, ModuleKind::Battery);
-    let turret_count = count_modules(ship, ModuleKind::Turret);
-    let movement_model = ship_movement_model(ship.modules.len(), engine_count);
-    let power_model = ship_power_model(
-        ship.modules.len(),
-        reactor_count,
-        battery_count,
-        engine_count,
-        turret_count,
-    );
-
-    let root_entity = commands
-        .spawn((
-            Transform::from_translation(RUNTIME_SHIP_ORIGIN),
-            GlobalTransform::default(),
-            Visibility::Visible,
-            InheritedVisibility::VISIBLE,
-            ViewVisibility::default(),
-            PlayerShip,
-            ShipRoot,
-            PlayingCleanup,
-        ))
-        .insert((
-            LinearVelocity {
-                value: FixedVec2::zero(),
-            },
-            AngularVelocity {
-                radians_per_second: super::helpers::Fx::from_num(0),
-            },
-            SimPosition {
-                value: FixedVec2::from_vec2(RUNTIME_SHIP_ORIGIN.truncate()),
-            },
-            SimRotation {
-                radians: super::helpers::Fx::from_num(0),
-            },
-            movement_model,
-            ShipPowerState {
-                stored_energy: power_model.battery_capacity,
-                generation: power_model.reactor_output,
-                draw: power_model.passive_draw,
-                surplus: power_model.reactor_output - power_model.passive_draw,
-                engine_power_ratio: if engine_count > 0 {
-                    super::helpers::Fx::from_num(1)
-                } else {
-                    super::helpers::Fx::from_num(0)
-                },
-                weapons_powered: turret_count > 0,
-                engines_powered: engine_count > 0,
-            },
-            power_model,
-            ShipControlState::default(),
-            ShipWeaponState {
-                turret_count,
-                cooldown_remaining: super::helpers::Fx::from_num(0),
-                cooldown_duration: if turret_count > 0 {
-                    super::helpers::Fx::from_num(0.3)
-                } else {
-                    super::helpers::Fx::from_num(0)
-                },
-            },
-            MissionState {
-                failed: false,
-                failure_reason: None,
-                encounter_cleared: false,
-                completed: false,
-                completion_reason: None,
-                salvage_collected: false,
-                salvage_scrap_awarded: 0,
-                return_delay_remaining: None,
-            },
-        ))
-        .id();
-
-    let (min_x, max_x, min_y, max_y) = ship.bounds().unwrap_or((0, 0, 0, 0));
-    let center_x = (min_x + max_x) as f32 * 0.5;
-    let center_y = (min_y + max_y) as f32 * 0.5;
-    let center_x_fixed = super::helpers::Fx::from_num(center_x);
-    let center_y_fixed = super::helpers::Fx::from_num(center_y);
-
-    let child_entities: Vec<_> = ship
-        .modules
-        .iter()
-        .map(|module| {
-            spawn_runtime_module(
-                commands,
-                asset_server,
-                module,
-                center_x,
-                center_y,
-                center_x_fixed,
-                center_y_fixed,
-            )
-        })
-        .collect();
-
-    commands.entity(root_entity).add_children(&child_entities);
-}
-
-fn spawn_runtime_module(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    module: &ShipModule,
-    center_x: f32,
-    center_y: f32,
-    center_x_fixed: super::helpers::Fx,
-    center_y_fixed: super::helpers::Fx,
-) -> Entity {
-    let local_position = module_local_position(module, center_x_fixed, center_y_fixed);
-    let mut entity = commands.spawn((
-        Sprite::from_image(asset_server.load(sprite_path_for_kind(&module.kind))),
-        Transform {
-            translation: module_local_translation(module, center_x, center_y),
-            rotation: Quat::from_rotation_z(-(module.rotation_quadrants as f32) * FRAC_PI_2),
-            ..default()
-        },
-        RuntimeShipModule {
-            module_id: module.id,
-            kind: module.kind,
-            local_position,
-        },
-        Integrity {
-            current: module_integrity(module.kind),
-            max: module_integrity(module.kind),
-        },
-        PlayingCleanup,
-    ));
-
-    match module.kind {
-        ModuleKind::Reactor => {
-            entity.insert(PowerProducer { output: 10 });
-        }
-        ModuleKind::Battery => {
-            entity.insert(PowerProducer { output: 4 });
-        }
-        ModuleKind::Engine => {
-            entity.insert((PowerConsumer { draw: 3 }, EngineModule));
-        }
-        ModuleKind::Turret => {
-            entity.insert((PowerConsumer { draw: 2 }, WeaponModule));
-        }
-        _ => {}
-    }
-
-    entity.id()
 }

@@ -11,28 +11,124 @@ pub(crate) struct PlayerShip;
 pub(crate) struct ShipRoot;
 
 #[derive(Component)]
-#[allow(dead_code)]
-pub(crate) struct RuntimeShipModule {
+pub(crate) struct ShipboardPlayer;
+
+#[derive(Component)]
+pub(crate) struct ShipboardMarker;
+
+#[derive(Component)]
+pub(crate) struct PlayerShipAssignment {
+    pub(crate) _ship_entity: Entity,
+}
+
+#[derive(Clone)]
+pub(crate) struct ShipInteriorNode {
     pub(crate) module_id: u64,
     pub(crate) kind: ModuleKind,
+    pub(crate) grid_x: i32,
+    pub(crate) grid_y: i32,
+    pub(crate) local_position: FixedVec2,
+}
+
+#[derive(Component, Default)]
+pub(crate) struct ShipInteriorMap {
+    pub(crate) walkable_nodes: Vec<ShipInteriorNode>,
+}
+
+#[derive(Component)]
+pub(crate) struct InternalPosition {
+    pub(crate) node_index: usize,
+    pub(crate) grid_x: i32,
+    pub(crate) grid_y: i32,
     pub(crate) local_position: FixedVec2,
 }
 
 #[derive(Component)]
-#[allow(dead_code)]
+pub(crate) struct CurrentStation {
+    pub(crate) module_id: u64,
+    pub(crate) kind: ModuleKind,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ShipControlMode {
+    ShipFlight,
+    Internal,
+}
+
+#[derive(Component)]
+pub(crate) struct ShipboardControlState {
+    pub(crate) mode: ShipControlMode,
+}
+
+#[derive(Component, Default)]
+pub(crate) struct NearbyInteraction {
+    pub(crate) target: Option<Entity>,
+    pub(crate) kind: Option<InteractionKind>,
+    pub(crate) prompt: Option<String>,
+    pub(crate) unavailable_reason: Option<String>,
+}
+
+#[derive(Component, Default)]
+pub(crate) struct HeldInteraction {
+    pub(crate) target: Option<Entity>,
+    pub(crate) kind: Option<InteractionKind>,
+    pub(crate) progress: Fx,
+    pub(crate) required: Fx,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InteractionKind {
+    Cockpit,
+    Reactor,
+    Turret,
+    Repair,
+}
+
+#[derive(Component)]
+pub(crate) struct Interactable;
+
+#[derive(Event)]
+pub(crate) struct InteractWithModule {
+    pub(crate) target: Entity,
+    pub(crate) kind: InteractionKind,
+}
+
+#[derive(Event)]
+pub(crate) struct BeginHeldInteraction {
+    pub(crate) target: Entity,
+    pub(crate) kind: InteractionKind,
+    pub(crate) required: Fx,
+}
+
+#[derive(Event)]
+pub(crate) struct CompleteHeldInteraction {
+    pub(crate) target: Entity,
+    pub(crate) kind: InteractionKind,
+}
+
+#[derive(Component)]
+pub(crate) struct RuntimeShipModule {
+    pub(crate) module_id: u64,
+    pub(crate) kind: ModuleKind,
+    pub(crate) grid_x: i32,
+    pub(crate) grid_y: i32,
+    pub(crate) local_position: FixedVec2,
+}
+
+#[derive(Component)]
 pub(crate) struct Integrity {
     pub(crate) current: i32,
     pub(crate) max: i32,
 }
 
-#[derive(Component)]
 #[allow(dead_code)]
+#[derive(Component)]
 pub(crate) struct PowerProducer {
     pub(crate) output: i32,
 }
 
-#[derive(Component)]
 #[allow(dead_code)]
+#[derive(Component)]
 pub(crate) struct PowerConsumer {
     pub(crate) draw: i32,
 }
@@ -42,6 +138,40 @@ pub(crate) struct EngineModule;
 
 #[derive(Component)]
 pub(crate) struct WeaponModule;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ModuleCondition {
+    Healthy,
+    Degraded,
+    Disabled,
+    Destroyed,
+}
+
+#[derive(Component)]
+pub(crate) struct ModuleRuntimeState {
+    pub(crate) current_heat: Fx,
+    pub(crate) electrical_instability: Fx,
+    pub(crate) sampled_heat: Fx,
+    pub(crate) sampled_electrical: Fx,
+    pub(crate) is_disabled: bool,
+    pub(crate) needs_attention: bool,
+    pub(crate) last_interaction_age: Fx,
+}
+
+#[derive(Component)]
+pub(crate) struct ModuleFieldEmitter {
+    pub(crate) heat_output: Fx,
+    pub(crate) cooling_output: Fx,
+    pub(crate) electrical_output: Fx,
+}
+
+#[derive(Component)]
+pub(crate) struct PlayerFieldState {
+    pub(crate) local_heat: Fx,
+    pub(crate) local_electrical: Fx,
+    pub(crate) heat_danger: bool,
+    pub(crate) electrical_danger: bool,
+}
 
 #[derive(Component)]
 pub(crate) struct Projectile {

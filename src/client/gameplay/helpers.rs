@@ -1,15 +1,19 @@
-use std::{f32::consts::FRAC_PI_2, ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign}};
+use std::{
+    f32::consts::FRAC_PI_2,
+    ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
+};
 
 use bevy::prelude::*;
-use fixed::{FixedI32, FixedI64, types::extra::U16};
 use cordic::{atan2, cos, sin};
+use fixed::{types::extra::U16, FixedI32, FixedI64};
 
 use crate::ship::{ModuleKind, ShipDefinition, ShipModule};
 
 use super::{
     components::{
-        MissionState, Projectile, ProjectileFaction, SalvagePickup, SalvageWreck, ShipMovementModel,
-        ShipPowerModel, ShipPowerState, SimPosition,
+        Integrity, InteractionKind, MissionState, ModuleCondition, ModuleFieldEmitter,
+        ModuleRuntimeState, Projectile, ProjectileFaction, SalvagePickup,
+        SalvageWreck, ShipMovementModel, ShipPowerModel, ShipPowerState, SimPosition,
     },
     ARENA_HEIGHT_TILES, ARENA_WIDTH_TILES, PROJECTILE_LIFETIME,
 };
@@ -176,16 +180,15 @@ pub(crate) fn fx_from_time_delta(time: &Time) -> Fx {
 pub(crate) fn wrap_radians(phi: Fx) -> Fx {
     let pi = Fx::PI;
     let tau = 2 * Fx::PI;
+    let mut angle = phi;
 
-    let mut temp_scalar = phi;
-
-    while temp_scalar < -pi {
-        temp_scalar = temp_scalar + tau;
+    while angle < -pi {
+        angle += tau;
     }
-    while pi <= temp_scalar {
-        temp_scalar = temp_scalar - tau;
+    while pi <= angle {
+        angle -= tau;
     }
-    return temp_scalar;
+    angle
 }
 
 pub(crate) fn format_fx0(value: Fx) -> String {
@@ -237,7 +240,10 @@ pub(super) fn mission_return_line(mission_state: &MissionState) -> Option<String
 pub(super) fn salvage_status_line(
     ship_position: FixedVec2,
     mission_state: &MissionState,
-    salvage_query: &Query<(&SimPosition, &SalvagePickup), (With<SalvageWreck>, Without<super::components::CollectedSalvage>)>,
+    salvage_query: &Query<
+        (&SimPosition, &SalvagePickup),
+        (With<SalvageWreck>, Without<super::components::CollectedSalvage>),
+    >,
 ) -> String {
     if mission_state.salvage_collected {
         return format!("recovered {} scrap", mission_state.salvage_scrap_awarded);
@@ -288,16 +294,64 @@ pub(super) fn module_integrity(kind: ModuleKind) -> i32 {
 }
 
 pub(super) fn ship_movement_model(module_count: usize, engine_count: u32) -> ShipMovementModel {
-    let effective_engines = engine_count.max(1) as f32;
+    ship_movement_model_with_effective(module_count, engine_count, Fx::from_num(engine_count.max(1)))
+}
+
+pub(super) fn ship_movement_model_with_effective(
+    module_count: usize,
+    engine_count: u32,
+    effective_engines: Fx,
+) -> ShipMovementModel {
+    let engine_scalar = effective_engines.max(fx_ratio(1, 4)).to_num::<f32>();
     let mass_factor = (module_count.max(1) as f32).sqrt();
 
     ShipMovementModel {
         engine_count,
-        thrust_acceleration: Fx::from_num(260.0 * effective_engines / mass_factor),
-        turn_speed: Fx::from_num(1.5 + (0.25 * effective_engines)),
-        max_speed: Fx::from_num(120.0 + 28.0 * effective_engines),
+        thrust_acceleration: Fx::from_num(260.0 * engine_scalar / mass_factor),
+        turn_speed: Fx::from_num(1.2 + 0.35 * engine_scalar),
+        max_speed: Fx::from_num(110.0 + 24.0 * engine_scalar),
         linear_damping: Fx::from_num(0.9),
         angular_damping: Fx::from_num(5.0),
+    }
+}
+
+pub(super) fn ship_power_model(
+    module_count: usize,
+    reactor_count: u32,
+    battery_count: u32,
+    engine_count: u32,
+    turret_count: u32,
+) -> ShipPowerModel {
+    ship_power_model_with_effective(
+        module_count,
+        reactor_count,
+        battery_count,
+        engine_count,
+        turret_count,
+        Fx::from_num(reactor_count.max(1)),
+        Fx::from_num(battery_count),
+        Fx::from_num(engine_count),
+        Fx::from_num(turret_count),
+    )
+}
+
+pub(super) fn ship_power_model_with_effective(
+    module_count: usize,
+    _reactor_count: u32,
+    battery_count: u32,
+    engine_count: u32,
+    turret_count: u32,
+    effective_reactors: Fx,
+    effective_batteries: Fx,
+    effective_engines: Fx,
+    effective_turrets: Fx,
+) -> ShipPowerModel {
+    ShipPowerModel {
+        reactor_output: effective_reactors * Fx::from_num(8),
+        battery_capacity: effective_batteries.max(Fx::from_num(battery_count)) * Fx::from_num(24),
+        passive_draw: Fx::from_num(1.0 + module_count as f32 * 0.08),
+        engine_draw: effective_engines.max(Fx::from_num(engine_count)) * Fx::from_num(2.5),
+        weapon_draw: effective_turrets.max(Fx::from_num(turret_count)) * Fx::from_num(2),
     }
 }
 
@@ -312,11 +366,7 @@ fn power_draw_for_requested_systems(
         Fx::from_num(0)
     };
 
-    (
-        power_model.passive_draw,
-        power_model.weapon_draw,
-        engine_requested,
-    )
+    (power_model.passive_draw, power_model.weapon_draw, engine_requested)
 }
 
 pub(super) fn update_ship_power_state(
@@ -337,7 +387,11 @@ pub(super) fn update_ship_power_state(
         Fx::from_num(0)
     };
 
-    let safe_dt = if dt > fx_ratio(1, 1000) { dt } else { fx_ratio(1, 1000) };
+    let safe_dt = if dt > fx_ratio(1, 1000) {
+        dt
+    } else {
+        fx_ratio(1, 1000)
+    };
     let available_energy = power_model.reactor_output + power_state.stored_energy / safe_dt;
 
     if effective_draw > available_energy {
@@ -351,7 +405,8 @@ pub(super) fn update_ship_power_state(
         let baseline_draw = effective_draw - engine_draw;
         let remaining_for_engines = (available_energy - baseline_draw).max(Fx::from_num(0));
         if engine_draw > Fx::from_num(0) {
-            engine_power_ratio = (remaining_for_engines / engine_draw).clamp(Fx::from_num(0), Fx::from_num(1));
+            engine_power_ratio =
+                (remaining_for_engines / engine_draw).clamp(Fx::from_num(0), Fx::from_num(1));
             effective_draw = baseline_draw + engine_draw * engine_power_ratio;
         } else {
             engine_power_ratio = Fx::from_num(0);
@@ -369,22 +424,6 @@ pub(super) fn update_ship_power_state(
     power_state.engine_power_ratio = engine_power_ratio;
     power_state.weapons_powered = weapons_powered;
     power_state.engines_powered = engine_power_ratio > Fx::from_num(0);
-}
-
-pub(super) fn ship_power_model(
-    module_count: usize,
-    reactor_count: u32,
-    battery_count: u32,
-    engine_count: u32,
-    turret_count: u32,
-) -> ShipPowerModel {
-    ShipPowerModel {
-        reactor_output: Fx::from_num(reactor_count) * Fx::from_num(8),
-        battery_capacity: Fx::from_num(battery_count) * Fx::from_num(24),
-        passive_draw: Fx::from_num(1.0 + module_count as f32 * 0.08),
-        engine_draw: Fx::from_num(engine_count) * Fx::from_num(2.5),
-        weapon_draw: Fx::from_num(turret_count) * Fx::from_num(2),
-    }
 }
 
 pub(super) fn count_modules(ship: &ShipDefinition, kind: ModuleKind) -> u32 {
@@ -475,7 +514,7 @@ pub(super) fn angle_from_vector(vector: FixedVec2) -> Fx {
         return Fx::from_num(0);
     }
 
-    atan2(vector.y, vector.x)
+    Fx::from_num(atan2(widen(vector.y), widen(vector.x)))
 }
 
 pub(super) fn fixed_radius_sq(radius: f32) -> WideFx {
@@ -485,4 +524,144 @@ pub(super) fn fixed_radius_sq(radius: f32) -> WideFx {
 
 pub(super) fn sprite_path_for_kind(kind: &ModuleKind) -> String {
     format!("tiles/{}.png", kind.as_str())
+}
+
+pub(super) fn interaction_for_module(
+    kind: ModuleKind,
+    integrity: &Integrity,
+    runtime_state: &ModuleRuntimeState,
+    destroyed: bool,
+) -> Option<InteractionKind> {
+    if destroyed {
+        return None;
+    }
+    if kind == ModuleKind::Cockpit {
+        return Some(InteractionKind::Cockpit);
+    }
+    if kind == ModuleKind::Reactor {
+        return Some(InteractionKind::Reactor);
+    }
+    if kind == ModuleKind::Turret {
+        return Some(InteractionKind::Turret);
+    }
+    if integrity.current < integrity.max || runtime_state.needs_attention || runtime_state.is_disabled {
+        return Some(InteractionKind::Repair);
+    }
+    None
+}
+
+pub(super) fn interaction_prompt(kind: InteractionKind) -> &'static str {
+    match kind {
+        InteractionKind::Cockpit => "E: return to flight controls",
+        InteractionKind::Reactor => "Hold E: stabilize reactor",
+        InteractionKind::Turret => "E: reset turret",
+        InteractionKind::Repair => "Hold E: repair module",
+    }
+}
+
+pub(super) fn is_hold_interaction(kind: InteractionKind) -> bool {
+    matches!(kind, InteractionKind::Reactor | InteractionKind::Repair)
+}
+
+pub(super) fn interaction_hold_duration(kind: InteractionKind) -> Fx {
+    match kind {
+        InteractionKind::Cockpit | InteractionKind::Turret => Fx::from_num(0),
+        InteractionKind::Reactor => Fx::from_num(1.2),
+        InteractionKind::Repair => Fx::from_num(1.8),
+    }
+}
+
+pub(super) fn module_effectiveness(
+    integrity: &Integrity,
+    runtime_state: &ModuleRuntimeState,
+    destroyed: bool,
+) -> Fx {
+    if destroyed || integrity.current <= 0 || runtime_state.is_disabled {
+        return Fx::from_num(0);
+    }
+
+    let mut effectiveness = Fx::from_num(integrity.current.max(0)) / Fx::from_num(integrity.max.max(1));
+    if runtime_state.needs_attention {
+        effectiveness *= fx_ratio(3, 4);
+    }
+    effectiveness -= runtime_state.current_heat * fx_ratio(1, 48);
+    effectiveness -= runtime_state.electrical_instability * fx_ratio(1, 40);
+    effectiveness.clamp(Fx::from_num(0), Fx::from_num(1))
+}
+
+pub(super) fn module_condition(
+    integrity: &Integrity,
+    runtime_state: &ModuleRuntimeState,
+    destroyed: bool,
+) -> ModuleCondition {
+    if destroyed || integrity.current <= 0 {
+        ModuleCondition::Destroyed
+    } else if runtime_state.is_disabled {
+        ModuleCondition::Disabled
+    } else if runtime_state.needs_attention
+        || runtime_state.current_heat >= Fx::from_num(8)
+        || runtime_state.electrical_instability >= Fx::from_num(7)
+        || integrity.current * 2 <= integrity.max
+    {
+        ModuleCondition::Degraded
+    } else {
+        ModuleCondition::Healthy
+    }
+}
+
+pub(super) fn module_condition_label(condition: ModuleCondition) -> &'static str {
+    match condition {
+        ModuleCondition::Healthy => "healthy",
+        ModuleCondition::Degraded => "degraded",
+        ModuleCondition::Disabled => "disabled",
+        ModuleCondition::Destroyed => "destroyed",
+    }
+}
+
+pub(super) fn dynamic_field_output(
+    emitter: &ModuleFieldEmitter,
+    runtime_state: &ModuleRuntimeState,
+    integrity: &Integrity,
+    destroyed: bool,
+) -> (Fx, Fx, Fx) {
+    if destroyed || integrity.current <= 0 {
+        return (Fx::from_num(0), Fx::from_num(0), Fx::from_num(0));
+    }
+
+    let damage_factor = Fx::from_num(1)
+        - Fx::from_num(integrity.current.max(0)) / Fx::from_num(integrity.max.max(1));
+    let attention_bonus = if runtime_state.needs_attention {
+        Fx::from_num(1.5)
+    } else {
+        Fx::from_num(1)
+    };
+    let heat = emitter.heat_output * attention_bonus + damage_factor * Fx::from_num(3);
+    let cooling = emitter.cooling_output;
+    let electrical =
+        emitter.electrical_output * attention_bonus + runtime_state.electrical_instability * fx_ratio(1, 6);
+
+    (heat, cooling, electrical)
+}
+
+pub(super) fn local_field_distance(a: FixedVec2, b: FixedVec2) -> Fx {
+    (a - b).length()
+}
+
+pub(super) fn field_attenuation(distance: Fx) -> Fx {
+    let radius = Fx::from_num(TILE_SIZE * 3.5);
+    if distance >= radius {
+        Fx::from_num(0)
+    } else {
+        Fx::from_num(1) - distance / radius
+    }
+}
+
+pub(super) fn danger_level(value: Fx, warning: Fx, critical: Fx) -> &'static str {
+    if value >= critical {
+        "critical"
+    } else if value >= warning {
+        "warning"
+    } else {
+        "safe"
+    }
 }

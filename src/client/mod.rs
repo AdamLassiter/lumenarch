@@ -42,6 +42,9 @@ pub fn run_client() {
             ..default()
         }))
         .init_state::<ClientAppState>()
+        .add_event::<gameplay::components::InteractWithModule>()
+        .add_event::<gameplay::components::BeginHeldInteraction>()
+        .add_event::<gameplay::components::CompleteHeldInteraction>()
         .add_systems(Startup, setup_camera)
         .add_systems(OnEnter(ClientAppState::Menu), menu::spawn_menu_ui)
         .add_systems(
@@ -94,6 +97,19 @@ pub fn run_client() {
                 gameplay::return_button_system.run_if(in_state(ClientAppState::Playing)),
                 gameplay::return_keyboard_shortcut.run_if(in_state(ClientAppState::Playing)),
                 (
+                    gameplay::toggle_shipboard_control_mode,
+                    gameplay::move_shipboard_player,
+                    gameplay::detect_nearby_interactions,
+                    gameplay::run_shipboard_interaction_input,
+                    gameplay::begin_held_interactions,
+                    gameplay::complete_held_interactions,
+                    gameplay::apply_module_interactions,
+                    gameplay::sample_ship_fields,
+                    gameplay::update_module_runtime_state,
+                )
+                    .chain()
+                    .run_if(in_state(ClientAppState::Playing)),
+                (
                     gameplay::sync_runtime_ship_state,
                     gameplay::apply_player_ship_controls,
                     gameplay::fire_player_weapons,
@@ -105,9 +121,11 @@ pub fn run_client() {
                     gameplay::collect_salvage,
                     gameplay::return_after_mission_resolution,
                     gameplay::update_destroyed_module_visuals,
+                    gameplay::sync_shipboard_player_visual,
                     gameplay::integrate_player_ship_motion,
                     gameplay::camera_follow_player_ship,
                     gameplay::update_gameplay_status_text,
+                    gameplay::update_inspection_and_alerts_text,
                 )
                     .chain()
                     .run_if(in_state(ClientAppState::Playing)),
