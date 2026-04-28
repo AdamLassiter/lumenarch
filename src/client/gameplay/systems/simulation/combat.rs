@@ -15,13 +15,13 @@ use crate::client::gameplay::{
         RuntimeShipModule,
         ShipArchCommandState,
         ShipControlMode,
-        ShipControlState,
         ShipPowerState,
         ShipRoot,
         ShipWeaponState,
         ShipboardControlState,
         SimPosition,
         SimRotation,
+        TurretCommandState,
         WeaponModule,
     },
     helpers::{
@@ -51,31 +51,36 @@ pub(crate) fn fire_player_weapons(
             &Children,
             &SimPosition,
             &SimRotation,
-            &ShipControlState,
             &ShipPowerState,
             &ShipArchCommandState,
             &mut ShipWeaponState,
         ),
         (With<PlayerShip>, With<ShipRoot>),
     >,
-    weapon_query: Query<(&RuntimeShipModule, &ModuleRuntimeState, Option<&DestroyedModule>), With<WeaponModule>>,
+    weapon_query: Query<
+        (
+            Entity,
+            &RuntimeShipModule,
+            &ModuleRuntimeState,
+            &TurretCommandState,
+            Option<&DestroyedModule>,
+        ),
+        With<WeaponModule>,
+    >,
 ) {
-    if control_mode_query.into_inner().mode != ShipControlMode::ShipFlight {
-        return;
-    }
+    let control_mode = control_mode_query.into_inner();
 
     let (
         children,
         ship_position,
         ship_rotation,
-        control_state,
         power_state,
         arch_commands,
         mut weapon_state,
     ) =
         player_ship_query.into_inner();
 
-    let fire_requested = control_state.fire_pressed || arch_commands.turret_auto_fire;
+    let fire_requested = control_mode.mode == ShipControlMode::Turret || arch_commands.turret_auto_fire;
     if !fire_requested
         || !power_state.weapons_powered
         || weapon_state.turret_count == 0
@@ -84,21 +89,32 @@ pub(crate) fn fire_player_weapons(
         return;
     }
 
-    let ship_forward = crate::client::gameplay::helpers::facing_vector(ship_rotation.radians);
-    let projectile_velocity = ship_forward * Fx::from_num(PROJECTILE_SPEED);
-    if projectile_velocity.is_near_zero() {
-        return;
-    }
-
-    let muzzle_offset = ship_forward * Fx::from_num(TILE_SIZE * 0.35);
     let mut fired_any = false;
     for child in children.iter() {
-        let Ok((weapon_module, runtime_state, destroyed)) = weapon_query.get(*child) else {
+        let Ok((weapon_entity, weapon_module, runtime_state, turret_state, destroyed)) =
+            weapon_query.get(*child)
+        else {
             continue;
         };
         if destroyed.is_some() || runtime_state.is_disabled {
             continue;
         }
+        let is_manual_turret =
+            control_mode.mode == ShipControlMode::Turret && control_mode.focused_entity == Some(weapon_entity);
+        if !is_manual_turret && !arch_commands.turret_auto_fire {
+            continue;
+        }
+        if is_manual_turret && !turret_state.fire_intent {
+            continue;
+        }
+        let world_angle = ship_rotation.radians + turret_state.actual_angle;
+        let projectile_velocity =
+            crate::client::gameplay::helpers::facing_vector(world_angle) * Fx::from_num(PROJECTILE_SPEED);
+        if projectile_velocity.is_near_zero() {
+            continue;
+        }
+        let muzzle_offset =
+            crate::client::gameplay::helpers::facing_vector(world_angle) * Fx::from_num(TILE_SIZE * 0.35);
         let origin = ship_position.value
             + weapon_module.local_position.rotate(ship_rotation.radians)
             + muzzle_offset;

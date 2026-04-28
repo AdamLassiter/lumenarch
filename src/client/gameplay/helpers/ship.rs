@@ -105,27 +105,26 @@ pub(crate) fn ship_power_model_with_effective(
 
 fn power_draw_for_requested_systems(
     power_model: &ShipPowerModel,
-    thrust_active: bool,
+    throttle_demand: Fx,
     turn_input: Fx,
 ) -> (Fx, Fx, Fx) {
-    let engine_requested = if thrust_active || turn_input != Fx::from_num(0) {
-        power_model.engine_draw
-    } else {
-        Fx::from_num(0)
-    };
+    let throttle = throttle_demand.clamp(Fx::from_num(0), Fx::from_num(1));
+    let steering_fraction = turn_input.abs().clamp(Fx::from_num(0), Fx::from_num(1)) * fx_ratio(2, 5);
+    let engine_requested =
+        power_model.engine_draw * throttle.max(steering_fraction);
 
     (power_model.passive_draw, power_model.weapon_draw, engine_requested)
 }
 
 pub(crate) fn update_ship_power_state(
     dt: Fx,
-    thrust_active: bool,
+    throttle_demand: Fx,
     turn_input: Fx,
     power_model: &ShipPowerModel,
     power_state: &mut ShipPowerState,
 ) {
     let (passive_draw, weapon_draw, engine_draw) =
-        power_draw_for_requested_systems(power_model, thrust_active, turn_input);
+        power_draw_for_requested_systems(power_model, throttle_demand, turn_input);
     let requested_draw = passive_draw + weapon_draw + engine_draw;
     let mut effective_draw = requested_draw;
     let mut engine_power_ratio = if engine_draw > Fx::from_num(0) {

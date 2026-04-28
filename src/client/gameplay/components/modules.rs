@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use super::super::helpers::{FixedVec2, Fx};
+use super::logistics::ResourceKind;
 use crate::ship::arch::ArchProgram;
 use crate::ship::ModuleKind;
 
@@ -59,6 +60,103 @@ pub(crate) struct RuntimeArchComputer {
 
 #[derive(Component)]
 pub(crate) struct TurretTopSprite;
+
+#[derive(Component)]
+pub(crate) struct TurretCommandState {
+    pub(crate) desired_angle: Fx,
+    pub(crate) actual_angle: Fx,
+    pub(crate) fire_intent: bool,
+}
+
+#[derive(Component)]
+pub(crate) struct ReactorCommandState {
+    pub(crate) reaction_rate: Fx,
+    pub(crate) turbine_load: Fx,
+    pub(crate) power_output: Fx,
+    pub(crate) fuel_remaining: Fx,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ProcessorRecipe {
+    RepairCharge,
+}
+
+impl ProcessorRecipe {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::RepairCharge => "Repair Charge",
+        }
+    }
+}
+
+#[derive(Component)]
+pub(crate) struct StorageCommandState {
+    pub(crate) allow_intake: bool,
+}
+
+#[derive(Component)]
+pub(crate) struct ManipulatorCommandState {
+    pub(crate) manual_mode: bool,
+    pub(crate) transfer_enabled: bool,
+    pub(crate) source_module_id: Option<u64>,
+    pub(crate) target_module_id: Option<u64>,
+    pub(crate) resource_kind: ResourceKind,
+}
+
+#[derive(Component)]
+pub(crate) struct ProcessorCommandState {
+    pub(crate) selected_recipe: ProcessorRecipe,
+    pub(crate) enabled: bool,
+}
+
+#[allow(dead_code)]
+#[derive(Component)]
+pub(crate) struct ShieldCommandState {
+    pub(crate) desired_angle: Fx,
+    pub(crate) width: Fx,
+    pub(crate) strength: Fx,
+}
+
+#[allow(dead_code)]
+#[derive(Component)]
+pub(crate) struct DetectorCommandState {
+    pub(crate) show_targets: bool,
+    pub(crate) show_heat: bool,
+    pub(crate) show_electrical: bool,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DroneTask {
+    Idle,
+    Salvage,
+    Repair,
+    Defend,
+}
+
+#[allow(dead_code)]
+impl DroneTask {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Idle => "Idle",
+            Self::Salvage => "Salvage",
+            Self::Repair => "Repair",
+            Self::Defend => "Defend",
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Component)]
+pub(crate) struct DroneStationCommandState {
+    pub(crate) selected_task: DroneTask,
+}
+
+#[allow(dead_code)]
+#[derive(Component)]
+pub(crate) struct MemoryBankState {
+    pub(crate) words: [i32; 4],
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ModuleCondition {

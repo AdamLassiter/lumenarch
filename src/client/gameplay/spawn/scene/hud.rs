@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use crate::client::gameplay::helpers::gameplay_status_line;
 use crate::client::state::{
     GameplayAlertsText,
+    GameplayControlsText,
     GameplayInspectionText,
     GameplayStatusText,
     PlayingCleanup,
@@ -192,7 +193,7 @@ fn spawn_controls_panel(root: &mut ChildBuilder, mono_font: Handle<Font>) {
     .with_children(|panel| {
         panel.spawn((
             Text::new(
-                "Controls\nW / A / S / D or Arrows: flight or internal movement\nC: toggle flight/internal control\nE: interact / hold to work\nComputer: cycle ARCH modes (reactor / logistics / balanced)\nSpace: fire turrets\nF: collect salvage after encounter\nF3: toggle diagnostics overlay\nTab: return to editor",
+                "Controls pending",
             ),
             TextFont {
                 font: mono_font,
@@ -200,6 +201,7 @@ fn spawn_controls_panel(root: &mut ChildBuilder, mono_font: Handle<Font>) {
                 ..default()
             },
             TextColor(Color::srgb(0.82, 0.86, 0.92)),
+            GameplayControlsText,
         ));
     });
 }

@@ -33,6 +33,9 @@ pub(crate) fn interaction_for_module(
     if kind == ModuleKind::Cargo {
         return Some(InteractionKind::Storage);
     }
+    if kind == ModuleKind::Airlock {
+        return Some(InteractionKind::Manipulator);
+    }
     if kind == ModuleKind::Processor {
         return Some(InteractionKind::Processor);
     }
@@ -56,19 +59,20 @@ pub(crate) fn interaction_for_module(
 
 pub(crate) fn interaction_prompt(kind: InteractionKind) -> &'static str {
     match kind {
-        InteractionKind::Cockpit => "E: return to flight controls",
-        InteractionKind::Computer => "E: cycle automation mode",
-        InteractionKind::Storage => "E: inspect cargo state",
-        InteractionKind::Processor => "E: inspect processor state",
-        InteractionKind::Reactor => "Hold E: stabilize reactor",
-        InteractionKind::Turret => "E: reset turret",
+        InteractionKind::Cockpit => "E: enter cockpit station",
+        InteractionKind::Computer => "E: open computer console",
+        InteractionKind::Storage => "E: open storage panel",
+        InteractionKind::Manipulator => "E: open manipulator panel",
+        InteractionKind::Processor => "E: open processor panel",
+        InteractionKind::Reactor => "E: operate reactor",
+        InteractionKind::Turret => "E: man turret",
         InteractionKind::Engine => "E: reset engine",
         InteractionKind::Repair => "Hold E: repair module",
     }
 }
 
 pub(crate) fn is_hold_interaction(kind: InteractionKind) -> bool {
-    matches!(kind, InteractionKind::Reactor | InteractionKind::Repair)
+    matches!(kind, InteractionKind::Repair)
 }
 
 pub(crate) fn interaction_hold_duration(kind: InteractionKind) -> Fx {
@@ -76,10 +80,11 @@ pub(crate) fn interaction_hold_duration(kind: InteractionKind) -> Fx {
         InteractionKind::Cockpit
         | InteractionKind::Computer
         | InteractionKind::Storage
+        | InteractionKind::Manipulator
         | InteractionKind::Processor
         | InteractionKind::Turret
+        | InteractionKind::Reactor
         | InteractionKind::Engine => Fx::from_num(0),
-        InteractionKind::Reactor => Fx::from_num(1.2),
         InteractionKind::Repair => Fx::from_num(1.8),
     }
 }

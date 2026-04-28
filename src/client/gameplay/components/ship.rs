@@ -35,6 +35,7 @@ pub(crate) struct ShipPowerState {
 
 #[derive(Component, Default)]
 pub(crate) struct ShipControlState {
+    pub(crate) throttle_demand: Fx,
     pub(crate) thrust_active: bool,
     pub(crate) turn_input: Fx,
     pub(crate) fire_pressed: bool,

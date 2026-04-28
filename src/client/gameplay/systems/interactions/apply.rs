@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use super::super::control::focus_station;
 use crate::client::gameplay::{
     components::{
         ArchComputerModule,
@@ -16,10 +17,10 @@ use crate::client::gameplay::{
         ResourceKind,
         RuntimeShipModule,
         RuntimeArchComputer,
-        ShipAutomationMode,
-        ShipAutomationState,
         ShipRoot,
         ShipboardControlState,
+        ShipControlMode,
+        StationFamily,
         StorageModule,
     },
     helpers::Fx,
@@ -29,14 +30,11 @@ pub(crate) fn apply_module_interactions(
     mut instant_events: EventReader<InteractWithModule>,
     mut complete_events: EventReader<CompleteHeldInteraction>,
     ship_query: Single<
-        (
-            &mut ShipboardControlState,
-            &mut ShipAutomationState,
-            &mut MissionState,
-        ),
+        (&mut ShipboardControlState, &mut MissionState),
         (With<PlayerShip>, With<ShipRoot>),
     >,
     mut module_query: Query<(
+        Entity,
         &RuntimeShipModule,
         &mut Integrity,
         &mut ModuleRuntimeState,
@@ -52,12 +50,11 @@ pub(crate) fn apply_module_interactions(
         Option<&DestroyedModule>,
     )>,
 ) {
-    let (mut ship_control, mut automation_state, mut mission_state) = ship_query.into_inner();
+    let (mut ship_control, mut mission_state) = ship_query.into_inner();
     for event in instant_events.read() {
         apply_instant_interaction(
             event,
             &mut ship_control,
-            &mut automation_state,
             &mut mission_state,
             &mut module_query,
         );
@@ -76,9 +73,9 @@ pub(crate) fn apply_module_interactions(
 fn apply_instant_interaction(
     event: &InteractWithModule,
     ship_control: &mut ShipboardControlState,
-    automation_state: &mut ShipAutomationState,
     mission_state: &mut MissionState,
     module_query: &mut Query<(
+        Entity,
         &RuntimeShipModule,
         &mut Integrity,
         &mut ModuleRuntimeState,
@@ -89,48 +86,129 @@ fn apply_instant_interaction(
 ) {
     match event.kind {
         InteractionKind::Cockpit => {
-            ship_control.mode = crate::client::gameplay::components::ShipControlMode::ShipFlight;
-            set_recent_action(mission_state, "Returned to cockpit control", 1.5);
+            if let Ok((entity, runtime_module, _, _, _, _, destroyed)) =
+                module_query.get_mut(event.target)
+                && destroyed.is_none()
+            {
+                focus_station(
+                    ship_control,
+                    entity,
+                    runtime_module.module_id,
+                    runtime_module.kind,
+                    StationFamily::Cockpit,
+                    ShipControlMode::Cockpit,
+                );
+                set_recent_action(mission_state, "Entered cockpit station", 1.5);
+            }
         }
         InteractionKind::Computer => {
-            if let Ok((_, _, _, computer, arch_runtime, destroyed)) = module_query.get_mut(event.target)
+            if let Ok((entity, runtime_module, _, _, computer, arch_runtime, destroyed)) =
+                module_query.get_mut(event.target)
                 && computer.is_some()
                 && destroyed.is_none()
             {
-                automation_state.mode = ShipAutomationMode::Mixed;
-                let label = if let Some(mut arch_runtime) = arch_runtime {
-                    arch_runtime.enabled = !arch_runtime.enabled;
-                    if arch_runtime.enabled {
-                        format!("{} online", arch_runtime.program.name)
-                    } else {
-                        format!("{} offline", arch_runtime.program.name)
-                    }
-                } else {
-                    "Computer toggled".to_string()
-                };
-                set_recent_action(mission_state, &label, 1.8);
+                if let Some(arch_runtime) = arch_runtime {
+                    focus_station(
+                        ship_control,
+                        entity,
+                        runtime_module.module_id,
+                        runtime_module.kind,
+                        StationFamily::Computer,
+                        ShipControlMode::Computer,
+                    );
+                    set_recent_action(
+                        mission_state,
+                        &format!("Opened {} console", arch_runtime.program.name),
+                        1.8,
+                    );
+                }
             }
         }
         InteractionKind::Storage => {
-            set_recent_action(mission_state, "Cargo hold inspected", 1.2);
+            if let Ok((entity, runtime_module, _, _, _, _, destroyed)) =
+                module_query.get_mut(event.target)
+                && destroyed.is_none()
+            {
+                focus_station(
+                    ship_control,
+                    entity,
+                    runtime_module.module_id,
+                    runtime_module.kind,
+                    StationFamily::Storage,
+                    ShipControlMode::Logistics,
+                );
+                set_recent_action(mission_state, "Opened storage panel", 1.2);
+            }
+        }
+        InteractionKind::Manipulator => {
+            if let Ok((entity, runtime_module, _, _, _, _, destroyed)) =
+                module_query.get_mut(event.target)
+                && destroyed.is_none()
+            {
+                focus_station(
+                    ship_control,
+                    entity,
+                    runtime_module.module_id,
+                    runtime_module.kind,
+                    StationFamily::Manipulator,
+                    ShipControlMode::Logistics,
+                );
+                set_recent_action(mission_state, "Opened manipulator panel", 1.2);
+            }
         }
         InteractionKind::Processor => {
-            set_recent_action(mission_state, "Processor inspected", 1.2);
+            if let Ok((entity, runtime_module, _, _, _, _, destroyed)) =
+                module_query.get_mut(event.target)
+                && destroyed.is_none()
+            {
+                focus_station(
+                    ship_control,
+                    entity,
+                    runtime_module.module_id,
+                    runtime_module.kind,
+                    StationFamily::Processor,
+                    ShipControlMode::Logistics,
+                );
+                set_recent_action(mission_state, "Opened processor panel", 1.2);
+            }
+        }
+        InteractionKind::Reactor => {
+            if let Ok((entity, runtime_module, _, _, _, _, destroyed)) =
+                module_query.get_mut(event.target)
+                && destroyed.is_none()
+            {
+                focus_station(
+                    ship_control,
+                    entity,
+                    runtime_module.module_id,
+                    runtime_module.kind,
+                    StationFamily::Reactor,
+                    ShipControlMode::Reactor,
+                );
+                set_recent_action(mission_state, "Opened reactor controls", 1.5);
+            }
         }
         InteractionKind::Turret => {
-            if let Ok((_, _, mut runtime_state, _, _, destroyed)) = module_query.get_mut(event.target)
+            if let Ok((entity, runtime_module, _, mut runtime_state, _, _, destroyed)) =
+                module_query.get_mut(event.target)
                 && destroyed.is_none()
             {
                 runtime_state.is_disabled = false;
                 runtime_state.needs_attention = false;
-                runtime_state.electrical_instability =
-                    (runtime_state.electrical_instability - Fx::from_num(4)).max(Fx::from_num(0));
-                runtime_state.last_interaction_age = Fx::from_num(0);
-                set_recent_action(mission_state, "Turret reset complete", 1.5);
+                focus_station(
+                    ship_control,
+                    entity,
+                    runtime_module.module_id,
+                    runtime_module.kind,
+                    StationFamily::Turret,
+                    ShipControlMode::Turret,
+                );
+                set_recent_action(mission_state, "Manned turret station", 1.5);
             }
         }
         InteractionKind::Engine => {
-            if let Ok((_, _, mut runtime_state, _, _, destroyed)) = module_query.get_mut(event.target)
+            if let Ok((_, _, _, mut runtime_state, _, _, destroyed)) =
+                module_query.get_mut(event.target)
                 && destroyed.is_none()
             {
                 runtime_state.current_heat =
@@ -151,6 +229,7 @@ fn apply_completed_interaction(
     event: &CompleteHeldInteraction,
     mission_state: &mut MissionState,
     module_query: &mut Query<(
+        Entity,
         &RuntimeShipModule,
         &mut Integrity,
         &mut ModuleRuntimeState,
@@ -166,23 +245,13 @@ fn apply_completed_interaction(
         Option<&DestroyedModule>,
     )>,
 ) {
-    if let Ok((runtime_module, mut integrity, mut runtime_state, _, _, destroyed)) =
+    if let Ok((_, runtime_module, mut integrity, mut runtime_state, _, _, destroyed)) =
         module_query.get_mut(event.target)
     {
         if destroyed.is_some() {
             return;
         }
         match event.kind {
-            InteractionKind::Reactor => {
-                runtime_state.current_heat =
-                    (runtime_state.current_heat - Fx::from_num(6)).max(Fx::from_num(0));
-                runtime_state.electrical_instability =
-                    (runtime_state.electrical_instability - Fx::from_num(5)).max(Fx::from_num(0));
-                runtime_state.needs_attention = false;
-                runtime_state.is_disabled = false;
-                mission_state.stabilizations_performed += 1;
-                set_recent_action(mission_state, "Reactor stabilized", 2.0);
-            }
             InteractionKind::Repair => {
                 let used_repair_charge = try_consume_repair_charge(logistics_query);
                 if used_repair_charge {

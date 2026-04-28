@@ -23,6 +23,7 @@ pub(crate) enum InteractionKind {
     Cockpit,
     Computer,
     Storage,
+    Manipulator,
     Processor,
     Reactor,
     Turret,

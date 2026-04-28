@@ -42,14 +42,14 @@ Define the shared interaction model for component stations and the staged comman
 
 Tasks:
 
-- [ ] Add a station-focus model for the onboard player:
+- [x] Add a station-focus model for the onboard player:
   - current station entity
   - current station family
   - current station interaction mode
-- [ ] Define a shared command-state layer for manually writable component control.
-- [ ] Separate component readable state from component writable command state.
-- [ ] Ensure command state is consumed deterministically during fixed-step simulation.
-- [ ] Decide which commands live:
+- [x] Define a shared command-state layer for manually writable component control.
+- [x] Separate component readable state from component writable command state.
+- [x] Ensure command state is consumed deterministically during fixed-step simulation.
+- [x] Decide which commands live:
   - per-module
   - per-vessel
   - per-station session
@@ -64,6 +64,12 @@ Definition of done:
 
 * component-local manual controls can write staged command values without directly bypassing simulation
 
+Implementation notes:
+
+* `ShipboardControlState` now tracks focused station entity, family, and mode
+* vessel commands now live on the ship root, while turret / reactor / logistics commands live per module
+* focused-station session state currently lives on the ship root rather than a separate transient session object
+
 ## Phase 2 — Ship-Local Interior Camera
 
 Goal:
@@ -71,14 +77,14 @@ Make the default onboard experience ship-relative and distinct from flight view.
 
 Tasks:
 
-- [ ] Add ship-relative camera behavior for interior movement mode.
-- [ ] Rotate the camera so the ship is always “up” on screen while onboard.
-- [ ] Increase zoom-in for interior mode relative to cockpit / turret views.
-- [ ] Preserve smooth transitions between:
+- [x] Add ship-relative camera behavior for interior movement mode.
+- [x] Rotate the camera so the ship is always “up” on screen while onboard.
+- [x] Increase zoom-in for interior mode relative to cockpit / turret views.
+- [x] Preserve smooth transitions between:
   - ship-local interior
   - cockpit world view
   - turret station view
-- [ ] Ensure shipboard marker, prompts, and local overlays remain readable in the rotated view.
+- [x] Ensure shipboard marker, prompts, and local overlays remain readable in the rotated view.
 
 Likely files:
 
@@ -97,14 +103,14 @@ Make station use explicit rather than treating all nearby interaction as the sam
 
 Tasks:
 
-- [ ] Add station enter / exit interactions.
-- [ ] Decide how the player enters a focused station mode:
+- [x] Add station enter / exit interactions.
+- [x] Decide how the player enters a focused station mode:
   - `E`
   - click
   - both
-- [ ] Allow leaving the station cleanly back to interior mode.
-- [ ] Prevent conflicting movement / action input while in a focused station mode.
-- [ ] Surface the active station family in the HUD.
+- [x] Allow leaving the station cleanly back to interior mode.
+- [x] Prevent conflicting movement / action input while in a focused station mode.
+- [x] Surface the active station family in the HUD.
 
 Likely files:
 
@@ -115,6 +121,11 @@ Definition of done:
 
 * the player can intentionally move from walking mode into a focused component-control mode and back
 
+Implementation notes:
+
+* this first pass ships keyboard-first entry with `E` and exit with `Q` / `Esc`
+* click-to-enter can be layered in later without changing the station architecture
+
 ## Phase 4 — Cockpit Station
 
 Goal:
@@ -122,16 +133,16 @@ Turn the cockpit into the canonical manual helm interface.
 
 Tasks:
 
-- [ ] Add cockpit station mode with world-view camera framing.
-- [ ] Add helm controls for:
+- [x] Add cockpit station mode with world-view camera framing.
+- [x] Add helm controls for:
   - throttle demand
   - steering / turn demand
-- [ ] Support both keyboard and mouse input paths.
-- [ ] Add semi-diagetic cockpit readouts:
+- [x] Support both keyboard and mouse input paths.
+- [x] Add semi-diagetic cockpit readouts:
   - throttle position
   - helm steering rotation / demand
   - movement feedback
-- [ ] Route cockpit input into shared ship command state rather than directly into motion behavior.
+- [x] Route cockpit input into shared ship command state rather than directly into motion behavior.
 
 Likely files:
 
@@ -150,17 +161,17 @@ Give turrets their own local control mode and readable aiming behavior.
 
 Tasks:
 
-- [ ] Add turret station mode using cockpit-style zoom but turret-hardpoint-local control.
-- [ ] Add aim controls using:
+- [x] Add turret station mode using cockpit-style zoom but turret-hardpoint-local control.
+- [x] Add aim controls using:
   - mouse
   - keyboard
-- [ ] Expose desired angle and actual angle separately.
-- [ ] Add firing intent through the turret station.
-- [ ] Show local turret cues:
+- [x] Expose desired angle and actual angle separately.
+- [x] Add firing intent through the turret station.
+- [x] Show local turret cues:
   - actual vs desired angle
   - readiness / cooldown
   - local status if damaged or unstable
-- [ ] Route these through turret command state rather than direct projectile spawning.
+- [x] Route these through turret command state rather than direct projectile spawning.
 
 Likely files:
 
@@ -180,19 +191,19 @@ Replace the current abstract reactor “stabilize” interaction with a real man
 
 Tasks:
 
-- [ ] Add reactor station mode.
-- [ ] Add writable controls for:
+- [x] Add reactor station mode.
+- [x] Add writable controls for:
   - reaction rate
   - turbine load
-- [ ] Add readable reactor outputs:
+- [x] Add readable reactor outputs:
   - internal heat
   - power output
   - fuel consumption
   - stability if modeled separately
-- [ ] Update simulation so:
+- [x] Update simulation so:
   - higher reaction rate increases heat and fuel consumption
   - higher turbine load reduces internal heat and increases power output
-- [ ] Preserve failure / danger behavior under bad settings.
+- [x] Preserve failure / danger behavior under bad settings.
 
 Likely files:
 
@@ -213,20 +224,20 @@ Make logistics stations into active operational panels rather than mostly passiv
 
 Tasks:
 
-- [ ] Add storage panel with:
+- [x] Add storage panel with:
   - contents breakdown
   - fill state
   - reserved / usable distinction if needed
-- [ ] Add manipulator panel with:
+- [x] Add manipulator panel with:
   - source / target
   - held load or current job
   - manual transfer or routing controls
-- [ ] Add processor panel with:
+- [x] Add processor panel with:
   - recipe list
   - current recipe
   - progress
   - input / output state
-- [ ] Route logistics controls into staged command state.
+- [x] Route logistics controls into staged command state.
 
 Likely files:
 
@@ -245,18 +256,18 @@ Avoid rewriting bespoke UI plumbing for every future component subtype.
 
 Tasks:
 
-- [ ] Define a common panel shell:
+- [x] Define a common panel shell:
   - title
   - health / condition
   - warnings
   - local controls area
-- [ ] Define family-level panel groupings for:
+- [x] Define family-level panel groupings for:
   - cockpit
   - turret
   - reactor family
   - logistics family
-- [ ] Separate family-specific content from generic panel layout code.
-- [ ] Leave clear extension points for:
+- [x] Separate family-specific content from generic panel layout code.
+- [x] Leave clear extension points for:
   - shields
   - detectors
   - drone stations
@@ -278,15 +289,15 @@ Ensure the interaction model can support upcoming component types without redesi
 
 Tasks:
 
-- [ ] Define placeholder command/read models for:
+- [x] Define placeholder command/read models for:
   - shields
   - detectors
   - drone stations
   - memory banks
 - [ ] For detectors, allow initial information-layer toggles to piggyback on the current debug overlay where practical.
-- [ ] For shields, sketch directional-control-ready command fields even if no shield component is yet playable.
-- [ ] For drone stations, define task-selection command semantics.
-- [ ] For memory banks, define readable stored-data presentation semantics.
+- [x] For shields, sketch directional-control-ready command fields even if no shield component is yet playable.
+- [x] For drone stations, define task-selection command semantics.
+- [x] For memory banks, define readable stored-data presentation semantics.
 
 Likely files:
 
@@ -298,6 +309,10 @@ Definition of done:
 
 * the component-interaction model is visibly ready for the next families even if their content is still partial
 
+Implementation notes:
+
+* detector overlay toggles remain the main intentionally deferred item in this phase
+
 ## Phase 10 — Correct Earlier-Slice Shortcuts
 
 Goal:
@@ -305,11 +320,11 @@ Replace abstractions from earlier milestones that would conflict with the compon
 
 Tasks:
 
-- [ ] Replace generic cockpit “return to flight” behavior with cockpit station flow.
-- [ ] Replace global-only turret fire assumptions with turret-local command support.
-- [ ] Replace reactor “stabilize only” interaction with the real control panel.
-- [ ] Upgrade logistics inspection from passive display to control-capable panel flow.
-- [ ] Ensure the ship-local onboard view is now the default non-station interior mode.
+- [x] Replace generic cockpit “return to flight” behavior with cockpit station flow.
+- [x] Replace global-only turret fire assumptions with turret-local command support.
+- [x] Replace reactor “stabilize only” interaction with the real control panel.
+- [x] Upgrade logistics inspection from passive display to control-capable panel flow.
+- [x] Ensure the ship-local onboard view is now the default non-station interior mode.
 
 Likely files:
 
@@ -328,13 +343,13 @@ Make sure 04 can build directly on this work rather than creating a second contr
 
 Tasks:
 
-- [ ] Audit every manual station control and identify its future writable register equivalent.
-- [ ] Document the mapping from:
+- [x] Audit every manual station control and identify its future writable register equivalent.
+- [x] Document the mapping from:
   - station UI control
   - staged command state
   - future ARCH writable register
-- [ ] Ensure no critical manual path still bypasses staged command state.
-- [ ] Add naming that will remain coherent once ARCH writes those controls too.
+- [x] Ensure no critical manual path still bypasses staged command state.
+- [x] Add naming that will remain coherent once ARCH writes those controls too.
 
 Likely files:
 
@@ -345,6 +360,13 @@ Likely files:
 Definition of done:
 
 * 04 ARCH can target the established command surfaces directly
+
+Implementation notes:
+
+* cockpit -> `ShipControlState`
+* turret -> `TurretCommandState`
+* reactor -> `ReactorCommandState`
+* logistics -> `StorageCommandState`, `ManipulatorCommandState`, `ProcessorCommandState`
 
 ## Phase 12 — Playtest And Tuning
 
@@ -365,10 +387,10 @@ Definition of done:
 
 ## Immediate Next Task
 
-Start with **Phase 1**:
+Follow-up after this implementation:
 
-* define station-focus state
-* define per-component command-state structures
-* route manual interaction toward staged commands instead of direct effect mutation
+* playtest the new station flow and tune values
+* add detector/debug-layer toggles
+* deepen the UI from text-first panels into richer semi-diagetic station art where useful
 
-That is the foundation the rest of the slice, and later 04 ARCH work, depends on.
+That is the highest-value next pass on top of the now-working station architecture.

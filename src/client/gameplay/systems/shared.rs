@@ -7,12 +7,13 @@ pub(super) fn module_display_name(kind: ModuleKind) -> &'static str {
 
 pub(super) fn interaction_label(kind: InteractionKind) -> &'static str {
     match kind {
-        InteractionKind::Cockpit => "return to cockpit control",
-        InteractionKind::Computer => "cycle automation mode",
-        InteractionKind::Storage => "inspect cargo hold",
-        InteractionKind::Processor => "inspect processor",
-        InteractionKind::Reactor => "stabilize reactor",
-        InteractionKind::Turret => "reset turret",
+        InteractionKind::Cockpit => "enter cockpit station",
+        InteractionKind::Computer => "open computer console",
+        InteractionKind::Storage => "open storage panel",
+        InteractionKind::Manipulator => "open manipulator panel",
+        InteractionKind::Processor => "open processor panel",
+        InteractionKind::Reactor => "operate reactor",
+        InteractionKind::Turret => "man turret",
         InteractionKind::Engine => "reset engine",
         InteractionKind::Repair => "repair module",
     }

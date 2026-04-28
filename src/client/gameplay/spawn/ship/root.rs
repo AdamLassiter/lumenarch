@@ -13,6 +13,7 @@ use crate::client::gameplay::{
         PlayerFieldState,
         PlayerShip,
         PlayerShipAssignment,
+        StationFocusMode,
         ShipArchCommandState,
         ShipAutomationMode,
         ShipAutomationState,
@@ -95,7 +96,12 @@ pub(crate) fn spawn_runtime_ship(
             power_model,
             ShipControlState::default(),
             ShipboardControlState {
-                mode: ShipControlMode::ShipFlight,
+                mode: ShipControlMode::Interior,
+                focus_mode: StationFocusMode::Internal,
+                focused_entity: None,
+                focused_module_id: None,
+                focused_kind: None,
+                focused_family: None,
             },
             ShipWeaponState {
                 turret_count,

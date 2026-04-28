@@ -9,15 +9,21 @@ use crate::client::gameplay::{
         EngineModule,
         Integrity,
         Interactable,
+        ManipulatorCommandState,
         ManipulatorModule,
         ModuleFieldEmitter,
         ModuleRuntimeState,
         PowerConsumer,
         PowerProducer,
+        ProcessorCommandState,
+        ProcessorRecipe,
         ProcessorModule,
+        ReactorCommandState,
         ResourceInventory,
         RuntimeArchComputer,
         RuntimeShipModule,
+        StorageCommandState,
+        TurretCommandState,
         StorageModule,
         TurretTopSprite,
         WeaponModule,
@@ -77,16 +83,27 @@ pub(super) fn spawn_runtime_module(
 
     match module.kind {
         ModuleKind::Reactor => {
-            entity.insert(PowerProducer { output: 10 });
+            entity.insert((
+                PowerProducer { output: 10 },
+                ReactorCommandState {
+                    reaction_rate: Fx::from_num(0.5),
+                    turbine_load: Fx::from_num(0.5),
+                    power_output: Fx::from_num(4),
+                    fuel_remaining: Fx::from_num(100),
+                },
+            ));
         }
         ModuleKind::Battery => {
             entity.insert(PowerProducer { output: 4 });
         }
         ModuleKind::Cargo => {
-            entity.insert(StorageModule {
-                capacity: 8,
-                inventory: ResourceInventory::default(),
-            });
+            entity.insert((
+                StorageModule {
+                    capacity: 8,
+                    inventory: ResourceInventory::default(),
+                },
+                StorageCommandState { allow_intake: true },
+            ));
         }
         ModuleKind::Airlock => {
             entity.insert((
@@ -94,6 +111,7 @@ pub(super) fn spawn_runtime_module(
                     capacity: 4,
                     inventory: ResourceInventory::default(),
                 },
+                StorageCommandState { allow_intake: true },
                 ManipulatorModule {
                     transfer_progress: Fx::from_num(0),
                     transfer_duration: Fx::from_num(0.75),
@@ -102,6 +120,13 @@ pub(super) fn spawn_runtime_module(
                     target_module_id: None,
                     resource_kind: None,
                     blocked_reason: None,
+                },
+                ManipulatorCommandState {
+                    manual_mode: false,
+                    transfer_enabled: false,
+                    source_module_id: Some(module.id),
+                    target_module_id: None,
+                    resource_kind: crate::client::gameplay::components::ResourceKind::RawSalvage,
                 },
             ));
         }
@@ -138,16 +163,30 @@ pub(super) fn spawn_runtime_module(
                     input_required: 2,
                     output_amount: 1,
                 },
+                ProcessorCommandState {
+                    selected_recipe: ProcessorRecipe::RepairCharge,
+                    enabled: true,
+                },
             ));
         }
         ModuleKind::Turret => {
-            entity.insert((PowerConsumer { draw: 2 }, WeaponModule)).with_children(|parent| {
-                parent.spawn((
-                    Sprite::from_image(asset_server.load("tiles/turret.png")),
-                    Transform::from_xyz(0.0, 0.0, 0.2),
-                    TurretTopSprite,
-                ));
-            });
+            entity
+                .insert((
+                    PowerConsumer { draw: 2 },
+                    WeaponModule,
+                    TurretCommandState {
+                        desired_angle: Fx::from_num(0),
+                        actual_angle: Fx::from_num(0),
+                        fire_intent: false,
+                    },
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Sprite::from_image(asset_server.load("tiles/turret.png")),
+                        Transform::from_xyz(0.0, 0.0, 0.2),
+                        TurretTopSprite,
+                    ));
+                });
         }
         _ => {}
     }

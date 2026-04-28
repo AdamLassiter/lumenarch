@@ -10,6 +10,7 @@ use crate::client::gameplay::{
         ModuleRuntimeState,
         PlayerShip,
         ProcessorModule,
+        ReactorCommandState,
         RuntimeArchComputer,
         RuntimeShipModule,
         ShipAutomationState,
@@ -103,6 +104,7 @@ pub(crate) fn sync_runtime_ship_state(
         &RuntimeShipModule,
         &Integrity,
         &ModuleRuntimeState,
+        Option<&ReactorCommandState>,
         Option<&DestroyedModule>,
         Option<&WeaponModule>,
     )>,
@@ -124,11 +126,12 @@ pub(crate) fn sync_runtime_ship_state(
     let mut core_alive = false;
     let mut effective_engines = Fx::from_num(0);
     let mut effective_reactors = Fx::from_num(0);
+    let mut effective_reactor_output = Fx::from_num(0);
     let mut effective_batteries = Fx::from_num(0);
     let mut effective_turrets = Fx::from_num(0);
 
     for child in children.iter() {
-        let Ok((runtime_module, integrity, runtime_state, destroyed, weapon_module)) =
+        let Ok((runtime_module, integrity, runtime_state, reactor_state, destroyed, weapon_module)) =
             module_query.get(*child)
         else {
             continue;
@@ -148,6 +151,9 @@ pub(crate) fn sync_runtime_ship_state(
             ModuleKind::Reactor => {
                 reactor_count += 1;
                 effective_reactors += effectiveness;
+                if let Some(reactor_state) = reactor_state {
+                    effective_reactor_output += reactor_state.power_output * effectiveness;
+                }
             }
             ModuleKind::Battery => {
                 battery_count += 1;
@@ -176,6 +182,10 @@ pub(crate) fn sync_runtime_ship_state(
         effective_engines,
         effective_turrets,
     );
+    if reactor_count > 0 {
+        power_model.reactor_output =
+            effective_reactor_output.max(Fx::from_num(reactor_count) * Fx::from_num(0.8));
+    }
     power_model.reactor_output *= automation_state.output_scale;
     weapon_state.turret_count = effective_turrets.to_num::<u32>();
     if weapon_state.turret_count == 0 {

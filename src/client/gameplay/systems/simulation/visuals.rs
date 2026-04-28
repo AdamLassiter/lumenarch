@@ -4,7 +4,6 @@ use crate::client::state::DebugOverlayState;
 use crate::client::gameplay::{
     components::{
         DestroyedModule,
-        HostileTarget,
         Integrity,
         ManipulatorModule,
         ModuleCondition,
@@ -15,9 +14,10 @@ use crate::client::gameplay::{
         ShipRoot,
         SimPosition,
         SimRotation,
+        TurretCommandState,
         TurretTopSprite,
     },
-    helpers::{local_field_distance, module_condition, Fx},
+    helpers::{module_condition, Fx},
 };
 use crate::client::TILE_SIZE;
 use crate::ship::ModuleKind;
@@ -34,28 +34,21 @@ pub(crate) fn toggle_debug_overlay(
 pub(crate) fn draw_debug_overlay(
     debug_overlay: Res<DebugOverlayState>,
     player_ship_query: Single<(&SimPosition, &SimRotation), (With<PlayerShip>, With<ShipRoot>)>,
-    hostile_query: Query<&SimPosition, With<HostileTarget>>,
     module_query: Query<
         (
             Entity,
             &RuntimeShipModule,
             &ModuleFieldEmitter,
             Option<&ManipulatorModule>,
+            Option<&TurretCommandState>,
             Option<&DestroyedModule>,
-            Option<&Children>,
         ),
     >,
     mut turret_top_query: Query<(&Parent, &mut Transform), With<TurretTopSprite>>,
     mut gizmos: Gizmos,
 ) {
     let (ship_position, ship_rotation) = player_ship_query.into_inner();
-    update_turret_top_visuals(
-        ship_position.value,
-        ship_rotation.radians,
-        &hostile_query,
-        &module_query,
-        &mut turret_top_query,
-    );
+    update_turret_top_visuals(ship_rotation.radians, &module_query, &mut turret_top_query);
 
     if !debug_overlay.enabled {
         return;
@@ -64,7 +57,7 @@ pub(crate) fn draw_debug_overlay(
     let field_radius = TILE_SIZE * 3.5;
     let manipulator_radius = TILE_SIZE * 2.5;
 
-    for (_, runtime_module, emitter, manipulator, destroyed, _) in &module_query {
+    for (_, runtime_module, emitter, manipulator, _, destroyed) in &module_query {
         if destroyed.is_some() {
             continue;
         }
@@ -83,7 +76,7 @@ pub(crate) fn draw_debug_overlay(
 
     let module_positions: Vec<_> = module_query
         .iter()
-        .map(|(entity, runtime_module, _, _, destroyed, _)| {
+        .map(|(entity, runtime_module, _, _, _, destroyed)| {
             (
                 entity,
                 runtime_module.module_id,
@@ -93,7 +86,7 @@ pub(crate) fn draw_debug_overlay(
         })
         .collect();
 
-    for (_, _, _, manipulator, destroyed, _) in &module_query {
+    for (_, _, _, manipulator, _, destroyed) in &module_query {
         let Some(manipulator) = manipulator else {
             continue;
         };
@@ -173,59 +166,32 @@ pub(crate) fn update_destroyed_module_visuals(
 }
 
 fn update_turret_top_visuals(
-    ship_position: crate::client::gameplay::helpers::FixedVec2,
     ship_rotation: Fx,
-    hostile_query: &Query<&SimPosition, With<HostileTarget>>,
     module_query: &Query<
         (
             Entity,
             &RuntimeShipModule,
             &ModuleFieldEmitter,
             Option<&ManipulatorModule>,
+            Option<&TurretCommandState>,
             Option<&DestroyedModule>,
-            Option<&Children>,
         ),
     >,
     turret_top_query: &mut Query<(&Parent, &mut Transform), With<TurretTopSprite>>,
 ) {
-    let nearest_hostile = hostile_query
-        .iter()
-        .min_by_key(|hostile| {
-            let distance = local_field_distance(ship_position, hostile.value);
-            distance.to_bits()
-        })
-        .map(|hostile| hostile.value);
-
     for (parent, mut transform) in turret_top_query.iter_mut() {
         let parent_entity = parent.get();
-        let Ok((_, runtime_module, _, _, destroyed, _)) = module_query.get(parent_entity) else {
+        let Ok((_, runtime_module, _, _, turret_state, destroyed)) = module_query.get(parent_entity) else {
             continue;
         };
         if destroyed.is_some() || runtime_module.kind != ModuleKind::Turret {
             continue;
         }
-
-        let base_world = ship_position + runtime_module.local_position.rotate(ship_rotation);
-        let desired_local_angle = nearest_hostile
-            .map(|hostile_pos| {
-                let to_target = hostile_pos - base_world;
-                if to_target.is_near_zero() {
-                    Fx::from_num(0)
-                } else {
-                    crate::client::gameplay::helpers::angle_from_vector(to_target)
-                        - ship_rotation
-                        + Fx::from_num(runtime_module.local_position.x.to_num::<f32>() * 0.0)
-                }
-            })
+        let actual_local_angle = turret_state
+            .map(|state| state.actual_angle)
             .unwrap_or(Fx::from_num(0));
-
         transform.rotation = Quat::from_rotation_z(
-            desired_local_angle.to_num::<f32>()
-                + runtime_module
-                    .kind
-                    .eq(&ModuleKind::Turret)
-                    .then_some(0.0)
-                    .unwrap_or(0.0),
+            (actual_local_angle + ship_rotation * Fx::from_num(0)).to_num::<f32>(),
         );
     }
 }

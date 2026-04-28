@@ -4,10 +4,12 @@ use crate::client::gameplay::{
     components::{
         CollectedSalvage,
         DestroyedModule,
+        ManipulatorCommandState,
         ManipulatorModule,
         MissionState,
         ModuleRuntimeState,
         PlayerShip,
+        ProcessorCommandState,
         ProcessorModule,
         ResourceKind,
         RuntimeShipModule,
@@ -132,6 +134,7 @@ pub(crate) fn run_logistics_transfers(
             &RuntimeShipModule,
             &ModuleRuntimeState,
             &mut ManipulatorModule,
+            Option<&mut ManipulatorCommandState>,
             Option<&DestroyedModule>,
         ),
     >,
@@ -158,7 +161,9 @@ pub(crate) fn run_logistics_transfers(
             .collect()
     };
 
-    for (manip_runtime_module, manip_runtime_state, mut manipulator, destroyed) in &mut manipulator_query {
+    for (manip_runtime_module, manip_runtime_state, mut manipulator, command_state, destroyed) in
+        &mut manipulator_query
+    {
         if destroyed.is_some() || manip_runtime_state.is_disabled {
             manipulator.active = false;
             manipulator.blocked_reason = Some("manipulator offline".to_string());
@@ -173,7 +178,14 @@ pub(crate) fn run_logistics_transfers(
 
         let mut task: Option<(u64, u64, ResourceKind)> = None;
 
-        if logistics_mode {
+        if let Some(command_state) = command_state.as_ref()
+            && command_state.manual_mode
+            && command_state.transfer_enabled
+            && let (Some(source_module_id), Some(target_module_id)) =
+                (command_state.source_module_id, command_state.target_module_id)
+        {
+            task = Some((source_module_id, target_module_id, command_state.resource_kind));
+        } else if logistics_mode {
             task = find_automation_transfer_task(
                 &snapshots,
                 &in_range,
@@ -269,6 +281,9 @@ pub(crate) fn run_logistics_transfers(
             if logistics_mode {
                 mission_state.logistics_automation_used = true;
             }
+            if let Some(mut command_state) = command_state {
+                command_state.transfer_enabled = false;
+            }
         } else {
             if let Some(storage) = source_storage.as_mut() {
                 storage.inventory.add(resource_kind, 1);
@@ -285,17 +300,29 @@ pub(crate) fn run_processors(
     time: Res<Time>,
     ship_query: Single<(&ShipPowerState, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,
     mut processor_query: Query<
-        (&RuntimeShipModule, &ModuleRuntimeState, &mut ProcessorModule, Option<&DestroyedModule>),
+        (
+            &RuntimeShipModule,
+            &ModuleRuntimeState,
+            &mut ProcessorModule,
+            Option<&ProcessorCommandState>,
+            Option<&DestroyedModule>,
+        ),
     >,
 ) {
     let dt = fx_from_time_delta(&time);
     let (power_state, mut mission_state) = ship_query.into_inner();
 
-    for (runtime_module, runtime_state, mut processor, destroyed) in &mut processor_query {
+    for (runtime_module, runtime_state, mut processor, command_state, destroyed) in &mut processor_query {
         if destroyed.is_some() || runtime_state.is_disabled {
             processor.active = false;
             processor.progress = Fx::from_num(0);
             processor.blocked_reason = Some("processor offline".to_string());
+            continue;
+        }
+        if command_state.is_some_and(|command_state| !command_state.enabled) {
+            processor.active = false;
+            processor.progress = Fx::from_num(0);
+            processor.blocked_reason = Some("manual hold".to_string());
             continue;
         }
         let output_cap = processor.output_amount * 3;

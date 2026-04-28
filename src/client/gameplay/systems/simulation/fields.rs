@@ -8,8 +8,10 @@ use crate::client::gameplay::{
         ModuleFieldEmitter,
         ModuleRuntimeState,
         PlayerFieldState,
+        ReactorCommandState,
         RuntimeShipModule,
         ShipboardPlayer,
+        TurretCommandState,
     },
     helpers::{
         dynamic_field_output,
@@ -17,6 +19,7 @@ use crate::client::gameplay::{
         local_field_distance,
         fx_from_time_delta,
         Fx,
+        wrap_radians,
     },
 };
 use crate::ship::ModuleKind;
@@ -131,12 +134,16 @@ pub(crate) fn update_module_runtime_state(
         &RuntimeShipModule,
         &Integrity,
         &mut ModuleRuntimeState,
+        Option<&mut ReactorCommandState>,
+        Option<&mut TurretCommandState>,
         Option<&DestroyedModule>,
     )>,
 ) {
     let dt = fx_from_time_delta(&time);
 
-    for (runtime_module, integrity, mut runtime_state, destroyed) in &mut module_query {
+    for (runtime_module, integrity, mut runtime_state, reactor_state, turret_state, destroyed) in
+        &mut module_query
+    {
         runtime_state.was_disabled_last_frame = runtime_state.is_disabled;
         if destroyed.is_some() || integrity.current <= 0 {
             runtime_state.is_disabled = true;
@@ -154,8 +161,37 @@ pub(crate) fn update_module_runtime_state(
         let damage_factor = Fx::from_num(1)
             - Fx::from_num(integrity.current.max(0)) / Fx::from_num(integrity.max.max(1));
         runtime_state.last_interaction_age += dt;
+        let mut reactor_heat_bonus = Fx::from_num(0);
+        if let Some(mut reactor_state) = reactor_state {
+            if reactor_state.fuel_remaining > Fx::from_num(0) {
+                reactor_state.fuel_remaining =
+                    (reactor_state.fuel_remaining - reactor_state.reaction_rate * dt * Fx::from_num(0.22))
+                        .max(Fx::from_num(0));
+            } else {
+                reactor_state.reaction_rate = Fx::from_num(0);
+            }
+            reactor_state.power_output = (reactor_state.reaction_rate * Fx::from_num(3)
+                + reactor_state.turbine_load * Fx::from_num(9))
+                .min(Fx::from_num(12));
+            reactor_heat_bonus = reactor_state.reaction_rate * Fx::from_num(4.8)
+                - reactor_state.turbine_load * Fx::from_num(2.2);
+        }
+        if let Some(mut turret_state) = turret_state {
+            let angle_delta = wrap_radians(turret_state.desired_angle - turret_state.actual_angle);
+            let step = Fx::from_num(2.6) * dt;
+            turret_state.actual_angle = if angle_delta > step {
+                wrap_radians(turret_state.actual_angle + step)
+            } else if angle_delta < -step {
+                wrap_radians(turret_state.actual_angle - step)
+            } else {
+                wrap_radians(turret_state.desired_angle)
+            };
+        }
         let target_heat =
-            base_heat + runtime_state.sampled_heat * Fx::from_num(0.45) + damage_factor;
+            base_heat
+                + reactor_heat_bonus.max(Fx::from_num(-1.5))
+                + runtime_state.sampled_heat * Fx::from_num(0.45)
+                + damage_factor;
         runtime_state.current_heat = (runtime_state.current_heat
             + (target_heat - runtime_state.current_heat) * Fx::from_num(1.35) * dt)
             .max(Fx::from_num(0));

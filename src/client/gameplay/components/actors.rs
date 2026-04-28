@@ -48,15 +48,77 @@ pub(crate) struct CurrentStation {
     pub(crate) kind: ModuleKind,
 }
 
+#[allow(dead_code)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StationFamily {
+    Cockpit,
+    Turret,
+    Reactor,
+    Storage,
+    Manipulator,
+    Processor,
+    Computer,
+    Shield,
+    Detector,
+    Drone,
+    Memory,
+}
+
+impl StationFamily {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Cockpit => "Cockpit",
+            Self::Turret => "Turret",
+            Self::Reactor => "Reactor",
+            Self::Storage => "Storage",
+            Self::Manipulator => "Manipulator",
+            Self::Processor => "Processor",
+            Self::Computer => "Computer",
+            Self::Shield => "Shield",
+            Self::Detector => "Detector",
+            Self::Drone => "Drone Station",
+            Self::Memory => "Memory Bank",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ShipControlMode {
-    ShipFlight,
+    Interior,
+    Cockpit,
+    Turret,
+    Reactor,
+    Logistics,
+    Computer,
+}
+
+impl ShipControlMode {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Interior => "Interior",
+            Self::Cockpit => "Cockpit",
+            Self::Turret => "Turret",
+            Self::Reactor => "Reactor",
+            Self::Logistics => "Logistics",
+            Self::Computer => "Computer",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StationFocusMode {
     Internal,
+    Focused,
 }
 
 #[derive(Component)]
 pub(crate) struct ShipboardControlState {
     pub(crate) mode: ShipControlMode,
+    pub(crate) focus_mode: StationFocusMode,
+    pub(crate) focused_entity: Option<Entity>,
+    pub(crate) focused_module_id: Option<u64>,
+    pub(crate) focused_kind: Option<ModuleKind>,
+    pub(crate) focused_family: Option<StationFamily>,
 }
 
 #[derive(Component)]

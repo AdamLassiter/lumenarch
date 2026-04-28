@@ -8,16 +8,21 @@ use crate::client::gameplay::{
         DestroyedModule,
         Integrity,
         LinearVelocity,
+        ManipulatorCommandState,
+        ManipulatorModule,
         MissionState,
         ModuleCondition,
         ModuleRuntimeState,
         PlayerFieldState,
         PlayerShip,
+        ProcessorCommandState,
         ProcessorModule,
         Projectile,
+        ReactorCommandState,
         RuntimeArchComputer,
         RuntimeShipModule,
         ShipAutomationState,
+        ShipControlState,
         ShipMovementModel,
         ShipPowerState,
         ShipRoot,
@@ -25,7 +30,9 @@ use crate::client::gameplay::{
         ShipboardControlState,
         ShipboardPlayer,
         SimPosition,
+        StorageCommandState,
         StorageModule,
+        TurretCommandState,
         WeaponModule,
         HostileTarget,
         SalvagePickup,
@@ -45,7 +52,7 @@ use crate::client::gameplay::{
     },
     systems::shared::module_display_name,
 };
-use crate::client::state::{DemoProgression, GameplayStatusText};
+use crate::client::state::{DemoProgression, GameplayControlsText, GameplayStatusText};
 
 pub(crate) fn update_gameplay_status_text(
     ship_query: Single<
@@ -60,6 +67,7 @@ pub(crate) fn update_gameplay_status_text(
             &ShipWeaponState,
             &MissionState,
             &ShipboardControlState,
+            &ShipControlState,
         ),
         (With<PlayerShip>, With<ShipRoot>),
     >,
@@ -73,7 +81,13 @@ pub(crate) fn update_gameplay_status_text(
             &ModuleRuntimeState,
             Option<&RuntimeArchComputer>,
             Option<&StorageModule>,
+            Option<&StorageCommandState>,
+            Option<&ManipulatorModule>,
+            Option<&ManipulatorCommandState>,
             Option<&ProcessorModule>,
+            Option<&ProcessorCommandState>,
+            Option<&ReactorCommandState>,
+            Option<&TurretCommandState>,
             Option<&DestroyedModule>,
             Option<&WeaponModule>,
         ),
@@ -85,6 +99,7 @@ pub(crate) fn update_gameplay_status_text(
     >,
     progression: Res<DemoProgression>,
     mut status_query: Query<&mut Text, With<GameplayStatusText>>,
+    mut controls_query: Query<&mut Text, With<GameplayControlsText>>,
 ) {
     let (
         ship_position,
@@ -97,6 +112,7 @@ pub(crate) fn update_gameplay_status_text(
         weapon_state,
         mission_state,
         control_mode,
+        ship_controls,
     ) = ship_query.into_inner();
     let (current_station, player_fields) = player_query.into_inner();
 
@@ -112,9 +128,13 @@ pub(crate) fn update_gameplay_status_text(
             None => mission_status_line(mission_state).to_string(),
         };
         **text = format!(
-            "Mission Status\nOutcome: {}\nMode: {:?}\nStation: {}\nPosition: {}, {}\nVelocity: {}\nTurn Rate: {}\nIntegrity\nHull / Systems: {} / {}\nActive Modules: {}\nDegraded / Disabled: {} / {}\nPower\nEngine Output: {} ({}%)\nGeneration / Draw: {} / {}\nBattery Reserve: {}\nWeapons Online: {}\nARCH\nMode: {:?}\nStatus: {}\nProgram: {}\nExec / Invalid: {} / {}\nWrites: {}\nCombat\nTurrets: {}  Cooldown: {}\nProjectiles: {}  Hostiles: {}\nLogistics\nRecovered Raw: {}\nProcessed / Used Charges: {} / {}\nTransfers / Cycles: {} / {}\nBottleneck: {}\nInterventions\nRepairs / Stabilizations: {} / {}\nRecent: {}\nInterior\nLocal Heat: {} {} ({})\nLocal Electrical: {} {} ({})\nSalvage: {}\nScrap Total: {}",
+            "Mission Status\nOutcome: {}\nMode: {}\nFocus: {}\nStation: {}\nPosition: {}, {}\nVelocity: {}\nTurn Rate: {}\nIntegrity\nHull / Systems: {} / {}\nActive Modules: {}\nDegraded / Disabled: {} / {}\nPower\nEngine Output: {} ({}%)\nGeneration / Draw: {} / {}\nBattery Reserve: {}\nWeapons Online: {}\nARCH\nMode: {:?}\nStatus: {}\nProgram: {}\nExec / Invalid: {} / {}\nWrites: {}\nCombat\nTurrets: {}  Cooldown: {}\nProjectiles: {}  Hostiles: {}\nLogistics\nRecovered Raw: {}\nProcessed / Used Charges: {} / {}\nTransfers / Cycles: {} / {}\nBottleneck: {}\nInterventions\nRepairs / Stabilizations: {} / {}\nRecent: {}\nHelm\nThrottle: {}%\nTurn Demand: {}\nInterior\nLocal Heat: {} {} ({})\nLocal Electrical: {} {} ({})\nSalvage: {}\nScrap Total: {}",
             status_line,
-            control_mode.mode,
+            control_mode.mode.as_str(),
+            control_mode
+                .focused_family
+                .map(|family| family.as_str())
+                .unwrap_or("None"),
             module_display_name(current_station.kind),
             format_fx0(ship_position.value.x),
             format_fx0(ship_position.value.y),
@@ -153,6 +173,8 @@ pub(crate) fn update_gameplay_status_text(
             mission_state.repairs_performed,
             mission_state.stabilizations_performed,
             mission_state.recent_action.as_deref().unwrap_or("none"),
+            format_fx0(ship_controls.throttle_demand * Fx::from_num(100)),
+            format_fx1(ship_controls.turn_input),
             format_fx1(player_fields.local_heat),
             meter_bar(player_fields.local_heat, Fx::from_num(16), 12),
             danger_level(player_fields.local_heat, Fx::from_num(8), Fx::from_num(14)),
@@ -162,6 +184,126 @@ pub(crate) fn update_gameplay_status_text(
             salvage_line,
             progression.scrap,
         );
+    }
+
+    let controls_text = control_mode
+        .focused_entity
+        .and_then(|entity| module_query.get(entity).ok())
+        .map(
+            |(
+                runtime_module,
+                _,
+                runtime_state,
+                computer,
+                storage,
+                storage_command,
+                manipulator,
+                manipulator_command,
+                processor,
+                processor_command,
+                reactor,
+                turret,
+                destroyed,
+                _,
+            )| {
+                if destroyed.is_some() {
+                    return "Focused Station\nDestroyed module".to_string();
+                }
+                if let Some(reactor) = reactor {
+                    return format!(
+                        "Focused Station\nReactor Controls\nRate: {}%\nTurbine: {}%\nPower Output: {}\nFuel: {}\nHeat: {}\nControls: W/S reaction, A/D turbine, Q leave",
+                        format_fx0(reactor.reaction_rate * Fx::from_num(100)),
+                        format_fx0(reactor.turbine_load * Fx::from_num(100)),
+                        format_fx1(reactor.power_output),
+                        format_fx0(reactor.fuel_remaining),
+                        format_fx1(runtime_state.current_heat),
+                    );
+                }
+                if let Some(turret) = turret {
+                    return format!(
+                        "Focused Station\nTurret Controls\nDesired Angle: {}\nActual Angle: {}\nFire Gate: {}\nCooldown: {}\nControls: mouse or A/D aim, Space or left mouse fire, Q leave",
+                        format_fx1(turret.desired_angle),
+                        format_fx1(turret.actual_angle),
+                        if turret.fire_intent { "open" } else { "hold" },
+                        format_fx2(weapon_state.cooldown_remaining),
+                    );
+                }
+                if let Some(storage) = storage {
+                    return format!(
+                        "Focused Station\nStorage Panel\nRaw: {}  Charge: {}\nFill: {}/{}\nIntake: {}\nControls: Space toggles intake, Q leave",
+                        storage.inventory.raw_salvage,
+                        storage.inventory.repair_charge,
+                        storage.inventory.total_units(),
+                        storage.capacity,
+                        if storage_command.is_some_and(|command| command.allow_intake) {
+                            "open"
+                        } else {
+                            "closed"
+                        },
+                    );
+                }
+                if let Some(manipulator) = manipulator {
+                    return format!(
+                        "Focused Station\nManipulator Panel\nManual: {}\nTarget: {}\nResource: {:?}\nArmed: {}\nStatus: {}\nControls: M manual, [/] target, R resource, Space arm, Q leave",
+                        if manipulator_command.is_some_and(|command| command.manual_mode) {
+                            "yes"
+                        } else {
+                            "no"
+                        },
+                        manipulator_command
+                            .and_then(|command| command.target_module_id)
+                            .map(|id| id.to_string())
+                            .unwrap_or_else(|| "none".to_string()),
+                        manipulator_command
+                            .map(|command| command.resource_kind)
+                            .unwrap_or(crate::client::gameplay::components::ResourceKind::RawSalvage),
+                        if manipulator_command.is_some_and(|command| command.transfer_enabled) {
+                            "yes"
+                        } else {
+                            "no"
+                        },
+                        manipulator.blocked_reason.as_deref().unwrap_or("ready"),
+                    );
+                }
+                if let Some(processor) = processor {
+                    let progress_pct = if processor.duration > Fx::from_num(0) {
+                        processor.progress / processor.duration * Fx::from_num(100)
+                    } else {
+                        Fx::from_num(0)
+                    };
+                    return format!(
+                        "Focused Station\nProcessor Panel\nRecipe: {}\nEnabled: {}\nProgress: {}%\nRaw: {}  Charge: {}\nState: {}\nControls: Space enable, R recipe, Q leave",
+                        processor_command
+                            .map(|command| command.selected_recipe.as_str())
+                            .unwrap_or("Repair Charge"),
+                        if processor_command.is_none_or(|command| command.enabled) {
+                            "yes"
+                        } else {
+                            "no"
+                        },
+                        format_fx0(progress_pct),
+                        processor.inventory.raw_salvage,
+                        processor.inventory.repair_charge,
+                        processor.blocked_reason.as_deref().unwrap_or("running"),
+                    );
+                }
+                if let Some(computer) = computer {
+                    return format!(
+                        "Focused Station\nComputer Console\nProgram: {}\nOnline: {}\nExec: {}/{}\nLast: {}\nControls: Space power, T cycle template, Q leave",
+                        computer.program.name,
+                        if computer.enabled { "yes" } else { "no" },
+                        computer.last_result.executed,
+                        computer.last_result.budget,
+                        computer.last_result.halted_reason.as_deref().unwrap_or("ok"),
+                    );
+                }
+                format!("Focused Station\n{} ready", runtime_module.kind.as_str())
+            },
+        )
+        .unwrap_or_else(|| controls_help_text(control_mode.mode));
+
+    for mut text in &mut controls_query {
+        **text = controls_text.clone();
     }
 }
 
@@ -174,7 +316,13 @@ fn summarize_modules(
             &ModuleRuntimeState,
             Option<&RuntimeArchComputer>,
             Option<&StorageModule>,
+            Option<&StorageCommandState>,
+            Option<&ManipulatorModule>,
+            Option<&ManipulatorCommandState>,
             Option<&ProcessorModule>,
+            Option<&ProcessorCommandState>,
+            Option<&ReactorCommandState>,
+            Option<&TurretCommandState>,
             Option<&DestroyedModule>,
             Option<&WeaponModule>,
         ),
@@ -188,7 +336,9 @@ fn summarize_modules(
     let mut disabled_modules = 0usize;
 
     for child in children.iter() {
-        let Ok((_, integrity, runtime_state, _, _, _, destroyed, _)) = module_query.get(*child) else {
+        let Ok((_, integrity, runtime_state, _, _, _, _, _, _, _, _, _, destroyed, _)) =
+            module_query.get(*child)
+        else {
             continue;
         };
         max_integrity += integrity.max;
@@ -222,7 +372,13 @@ fn summarize_arch(
             &ModuleRuntimeState,
             Option<&RuntimeArchComputer>,
             Option<&StorageModule>,
+            Option<&StorageCommandState>,
+            Option<&ManipulatorModule>,
+            Option<&ManipulatorCommandState>,
             Option<&ProcessorModule>,
+            Option<&ProcessorCommandState>,
+            Option<&ReactorCommandState>,
+            Option<&TurretCommandState>,
             Option<&DestroyedModule>,
             Option<&WeaponModule>,
         ),
@@ -230,7 +386,9 @@ fn summarize_arch(
     >,
 ) -> (String, String, u32, String) {
     for child in children.iter() {
-        let Ok((_, _, _, computer, _, _, destroyed, _)) = module_query.get(*child) else {
+        let Ok((_, _, _, computer, _, _, _, _, _, _, _, _, destroyed, _)) =
+            module_query.get(*child)
+        else {
             continue;
         };
         if destroyed.is_some() {
@@ -254,10 +412,28 @@ fn summarize_arch(
         }
     }
 
-    (
-        "none".to_string(),
-        "0/0".to_string(),
-        0,
-        "none".to_string(),
-    )
+    ("none".to_string(), "0/0".to_string(), 0, "none".to_string())
+}
+
+fn controls_help_text(mode: crate::client::gameplay::components::ShipControlMode) -> String {
+    match mode {
+        crate::client::gameplay::components::ShipControlMode::Interior => {
+            "Controls\nW/A/S/D: move between ship tiles\nE: enter nearby station\nQ or Esc: leave focused station\nF: collect salvage\nF3: diagnostics\nTab: return to editor".to_string()
+        }
+        crate::client::gameplay::components::ShipControlMode::Cockpit => {
+            "Cockpit Controls\nW/S or mouse: throttle demand\nA/D or mouse: steering\nC or Q: leave cockpit".to_string()
+        }
+        crate::client::gameplay::components::ShipControlMode::Turret => {
+            "Turret Controls\nMouse or A/D: aim turret\nSpace or left mouse: fire\nQ or Esc: leave turret".to_string()
+        }
+        crate::client::gameplay::components::ShipControlMode::Reactor => {
+            "Reactor Controls\nW/S: reaction rate\nA/D: turbine load\nQ or Esc: leave reactor".to_string()
+        }
+        crate::client::gameplay::components::ShipControlMode::Logistics => {
+            "Logistics Controls\nStorage: Space toggles intake\nManipulator: M manual, [/] target, R resource, Space arm\nProcessor: Space enable, R recipe\nQ or Esc: leave panel".to_string()
+        }
+        crate::client::gameplay::components::ShipControlMode::Computer => {
+            "Computer Controls\nSpace: online/offline\nT: cycle starter template\nQ or Esc: leave console".to_string()
+        }
+    }
 }
