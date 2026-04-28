@@ -9,10 +9,14 @@ use super::{
     PRESSED_BUTTON,
     net,
     state::{
+        ClientAppState,
         ConnectionConfig,
         ConnectionMailbox,
         ConnectionPhase,
         ConnectionStatus,
+        DebugEnemyEditorButton,
+        EditorMode,
+        EditorSessionState,
         HostAddressText,
         JoinButton,
         MenuRoot,
@@ -124,6 +128,30 @@ pub(crate) fn spawn_menu_ui(
                             TextColor(Color::WHITE),
                         ));
 
+                    panel
+                        .spawn((
+                            Button,
+                            Node {
+                                width: Val::Px(240.0),
+                                height: Val::Px(44.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            BorderRadius::all(Val::Px(10.0)),
+                            BackgroundColor(Color::srgb(0.46, 0.34, 0.22)),
+                            DebugEnemyEditorButton,
+                        ))
+                        .with_child((
+                            Text::new("Debug Enemy Ships"),
+                            TextFont {
+                                font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                                font_size: 18.0,
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                        ));
+
                     panel.spawn((
                         Text::new(menu_status_line(&status.phase, &config.server_addr)),
                         TextFont {
@@ -183,24 +211,42 @@ pub(crate) fn update_host_address_text(
 
 pub(crate) fn menu_button_system(
     mut interaction_query: Query<
-        (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<Button>, With<JoinButton>),
+        (
+            &Interaction,
+            &mut BackgroundColor,
+            Option<&JoinButton>,
+            Option<&DebugEnemyEditorButton>,
+        ),
+        (Changed<Interaction>, With<Button>),
     >,
     config: Res<ConnectionConfig>,
     mut status: ResMut<ConnectionStatus>,
     mailbox: Res<ConnectionMailbox>,
+    mut editor_session: ResMut<EditorSessionState>,
+    mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
-    for (interaction, mut background) in &mut interaction_query {
+    for (interaction, mut background, join, debug_enemy) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
-                *background = BackgroundColor(PRESSED_BUTTON);
-                net::begin_connection_attempt(&config.server_addr, &mut status, &mailbox);
+                if join.is_some() {
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                    editor_session.mode = EditorMode::Player;
+                    net::begin_connection_attempt(&config.server_addr, &mut status, &mailbox);
+                } else if debug_enemy.is_some() {
+                    *background = BackgroundColor(Color::srgb(0.36, 0.24, 0.16));
+                    editor_session.mode = EditorMode::Enemy;
+                    next_state.set(ClientAppState::Editing);
+                }
             }
             Interaction::Hovered => {
                 *background = BackgroundColor(HOVERED_BUTTON);
             }
             Interaction::None => {
-                *background = BackgroundColor(NORMAL_BUTTON);
+                *background = BackgroundColor(if join.is_some() {
+                    NORMAL_BUTTON
+                } else {
+                    Color::srgb(0.46, 0.34, 0.22)
+                });
             }
         }
     }

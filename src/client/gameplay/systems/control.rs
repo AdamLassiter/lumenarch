@@ -158,27 +158,24 @@ pub(crate) fn toggle_shipboard_control_mode(
 
     let (mut control_state, children) = ship_query.into_inner();
     let current_station = station_query.into_inner();
-    match control_state.mode {
-        ShipControlMode::Interior => {
-            if current_station.kind != ModuleKind::Cockpit {
-                return;
-            }
-            if let Some((entity, runtime_module)) = children
-                .iter()
-                .find_map(|entity| module_query.get(*entity).ok())
-                .filter(|(_, runtime_module)| runtime_module.kind == ModuleKind::Cockpit)
-            {
-                focus_station(
-                    &mut control_state,
-                    entity,
-                    runtime_module.module_id,
-                    runtime_module.kind,
-                    StationFamily::Cockpit,
-                    ShipControlMode::Cockpit,
-                );
-            }
+    if control_state.mode == ShipControlMode::Interior {
+        if current_station.kind != ModuleKind::Cockpit {
+            return;
         }
-        _ => {}
+        if let Some((entity, runtime_module)) = children
+            .iter()
+            .find_map(|entity| module_query.get(*entity).ok())
+            .filter(|(_, runtime_module)| runtime_module.kind == ModuleKind::Cockpit)
+        {
+            focus_station(
+                &mut control_state,
+                entity,
+                runtime_module.module_id,
+                runtime_module.kind,
+                StationFamily::Cockpit,
+                ShipControlMode::Cockpit,
+            );
+        }
     }
 }
 
@@ -436,10 +433,10 @@ pub(crate) fn update_station_command_input(
             else {
                 return;
             };
-            if let Some(mut storage_cmd) = storage_cmd {
-                if keys.just_pressed(KeyCode::Space) {
-                    storage_cmd.allow_intake = !storage_cmd.allow_intake;
-                }
+            if let Some(mut storage_cmd) = storage_cmd
+                && keys.just_pressed(KeyCode::Space)
+            {
+                storage_cmd.allow_intake = !storage_cmd.allow_intake;
             }
             if let Some(mut manipulator_cmd) = manipulator_cmd {
                 if keys.just_pressed(KeyCode::KeyM) {

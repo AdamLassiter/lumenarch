@@ -11,10 +11,16 @@ use super::{
             ConnectionStatus,
             DemoProgression,
             EditingCleanup,
+            EditorMode,
             EditorRoot,
+            EditorSessionState,
             EditorShip,
             EditorStatusText,
             EditorToolState,
+            EnemyNewButton,
+            EnemyNextButton,
+            EnemyPrevButton,
+            EnemyShipLibraryState,
             LastMissionReport,
             LeaveEditorButton,
             ProgramButtonAction,
@@ -26,31 +32,60 @@ use crate::ship::{
     ModuleKind,
     ShipDefinition,
     arch::{ArchProgram, ArchProgramTemplate},
+    enemy::load_default_enemy_library,
     storage::{load_default_ship, save_default_ship},
 };
 
 pub(crate) fn initialize_editor_ship(
     status: Res<ConnectionStatus>,
+    editor_session: Res<EditorSessionState>,
+    mut enemy_library_state: ResMut<EnemyShipLibraryState>,
     mut editor_ship: ResMut<EditorShip>,
     mut tool_state: ResMut<EditorToolState>,
 ) {
-    match load_default_ship() {
-        Ok(Some(saved_ship)) => {
-            editor_ship.ship = saved_ship;
-        }
-        Ok(None) => {
-            if let Some(snapshot) = status.active_snapshot.as_ref() {
-                editor_ship.ship = snapshot.clone();
-            } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
-                editor_ship.ship = ShipDefinition::empty("Untitled Knot");
+    match editor_session.mode {
+        EditorMode::Player => match load_default_ship() {
+            Ok(Some(saved_ship)) => {
+                editor_ship.ship = saved_ship;
             }
-        }
-        Err(error) => {
-            eprintln!("editor: failed to load saved ship: {error}");
-            if let Some(snapshot) = status.active_snapshot.as_ref() {
-                editor_ship.ship = snapshot.clone();
-            } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
-                editor_ship.ship = ShipDefinition::empty("Untitled Knot");
+            Ok(None) => {
+                if let Some(snapshot) = status.active_snapshot.as_ref() {
+                    editor_ship.ship = snapshot.clone();
+                } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
+                    editor_ship.ship = ShipDefinition::empty("Untitled Knot");
+                }
+            }
+            Err(error) => {
+                eprintln!("editor: failed to load saved ship: {error}");
+                if let Some(snapshot) = status.active_snapshot.as_ref() {
+                    editor_ship.ship = snapshot.clone();
+                } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
+                    editor_ship.ship = ShipDefinition::empty("Untitled Knot");
+                }
+            }
+        },
+        EditorMode::Enemy => {
+            match load_default_enemy_library() {
+                Ok(Some(library)) => {
+                    enemy_library_state.library = library;
+                }
+                Ok(None) => {
+                    enemy_library_state.library = crate::ship::enemy::EnemyShipLibrary::seeded();
+                }
+                Err(error) => {
+                    eprintln!("editor: failed to load enemy ship library: {error}");
+                    enemy_library_state.library = crate::ship::enemy::EnemyShipLibrary::seeded();
+                }
+            }
+            enemy_library_state.library.ensure_seeded();
+            enemy_library_state.selected_index = enemy_library_state
+                .selected_index
+                .min(enemy_library_state.library.entries.len().saturating_sub(1));
+            if let Some(entry) = enemy_library_state
+                .library
+                .selected_or_first(enemy_library_state.selected_index)
+            {
+                editor_ship.ship = entry.ship.clone();
             }
         }
     }
@@ -62,6 +97,8 @@ pub(crate) fn initialize_editor_ship(
 pub(crate) fn spawn_editor_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    editor_session: Res<EditorSessionState>,
+    enemy_library_state: Res<EnemyShipLibraryState>,
     editor_ship: Res<EditorShip>,
     progression: Res<DemoProgression>,
     last_mission_report: Res<LastMissionReport>,
@@ -97,7 +134,10 @@ pub(crate) fn spawn_editor_ui(
             ))
             .with_children(|toolbox| {
                 toolbox.spawn((
-                    Text::new("Toolbox"),
+                    Text::new(match editor_session.mode {
+                        EditorMode::Player => "Toolbox".to_string(),
+                        EditorMode::Enemy => "Enemy Ship Debug".to_string(),
+                    }),
                     TextFont {
                         font: title_font.clone(),
                         font_size: 26.0,
@@ -108,7 +148,10 @@ pub(crate) fn spawn_editor_ui(
 
                 toolbox.spawn((
                     Text::new(
-                        "Click a component, then place it on the grid.\nLeft click: place/replace\nRight click: erase\nQ/E: rotate\nF5: save ship\nF9: reload saved ship\nTab or Return: station hub",
+                        match editor_session.mode {
+                            EditorMode::Player => "Click a component, then place it on the grid.\nLeft click: place/replace\nRight click: erase\nQ/E: rotate\nF5: save ship\nF9: reload saved ship\nTab or Return: station hub".to_string(),
+                            EditorMode::Enemy => "Debug authoring for hostile ship layouts.\nLeft click: place/replace\nRight click: erase\nQ/E: rotate\nF5: save enemy library\nF9: reload enemy library\n[ / ]: cycle enemy entry\nN: new enemy entry\nTab or Return: main menu".to_string(),
+                        },
                     ),
                     TextFont {
                         font: mono_font.clone(),
@@ -151,6 +194,59 @@ pub(crate) fn spawn_editor_ui(
                         });
                 }
 
+                if editor_session.mode == EditorMode::Enemy {
+                    if let Some(entry) = enemy_library_state
+                        .library
+                        .selected_or_first(enemy_library_state.selected_index)
+                    {
+                        toolbox.spawn((
+                            Text::new(format!(
+                                "Editing: {} [{}]\nThreat: {}  Behavior: {}",
+                                entry.display_name, entry.id, entry.threat_tier, entry.behavior_tag
+                            )),
+                            TextFont {
+                                font: mono_font.clone(),
+                                font_size: 14.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgb(0.92, 0.94, 0.98)),
+                        ));
+                    }
+
+                    for (label, marker) in [
+                        ("Previous Enemy", 0usize),
+                        ("Next Enemy", 1usize),
+                        ("New Enemy", 2usize),
+                    ] {
+                        let mut button = toolbox.spawn((
+                            Button,
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Px(34.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                            BorderRadius::all(Val::Px(8.0)),
+                            BackgroundColor(Color::srgb(0.24, 0.32, 0.48)),
+                        ));
+                        let button = match marker {
+                            0 => button.insert(EnemyPrevButton),
+                            1 => button.insert(EnemyNextButton),
+                            _ => button.insert(EnemyNewButton),
+                        };
+                        button.with_child((
+                            Text::new(label),
+                            TextFont {
+                                font: mono_font.clone(),
+                                font_size: 15.0,
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                        ));
+                    }
+                }
+
                 toolbox
                     .spawn((
                         Button,
@@ -166,7 +262,10 @@ pub(crate) fn spawn_editor_ui(
                         LeaveEditorButton,
                     ))
                     .with_child((
-                        Text::new("Return To Station"),
+                        Text::new(match editor_session.mode {
+                            EditorMode::Player => "Return To Station",
+                            EditorMode::Enemy => "Return To Menu",
+                        }),
                         TextFont {
                             font: mono_font.clone(),
                             font_size: 18.0,
@@ -190,6 +289,8 @@ pub(crate) fn spawn_editor_ui(
             .with_children(|hud| {
                 hud.spawn((
                     Text::new(editor_status_line(
+                        editor_session.mode,
+                        enemy_entry_label(&editor_session, &enemy_library_state),
                         &editor_ship.ship.name,
                         &TOOLBOX_COMPONENTS[0],
                         0,
@@ -253,6 +354,8 @@ pub(crate) fn spawn_editor_ui(
 
 pub(crate) fn update_editor_status_text(
     editor_ship: Res<EditorShip>,
+    editor_session: Res<EditorSessionState>,
+    enemy_library_state: Res<EnemyShipLibraryState>,
     tool_state: Res<EditorToolState>,
     progression: Res<DemoProgression>,
     last_mission_report: Res<LastMissionReport>,
@@ -268,6 +371,8 @@ pub(crate) fn update_editor_status_text(
 
     for mut text in &mut query {
         **text = editor_status_line(
+            editor_session.mode,
+            enemy_entry_label(&editor_session, &enemy_library_state),
             &editor_ship.ship.name,
             &tool_state.selected_kind,
             tool_state.selected_rotation,
@@ -275,6 +380,21 @@ pub(crate) fn update_editor_status_text(
             progression.scrap,
             &last_mission_report,
         );
+    }
+}
+
+fn enemy_entry_label<'a>(
+    editor_session: &'a EditorSessionState,
+    enemy_library_state: &'a EnemyShipLibraryState,
+) -> &'a str {
+    if editor_session.mode == EditorMode::Enemy {
+        enemy_library_state
+            .library
+            .selected_or_first(enemy_library_state.selected_index)
+            .map(|entry| entry.display_name.as_str())
+            .unwrap_or("No Enemy Entry")
+    } else {
+        "Player Ship"
     }
 }
 

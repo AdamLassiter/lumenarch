@@ -14,6 +14,7 @@ use crate::{
                 ReactorCommandState,
                 RuntimeArchComputer,
                 RuntimeShipModule,
+                SalvageWreck,
                 ShipAutomationState,
                 ShipMovementModel,
                 ShipPowerModel,
@@ -72,6 +73,7 @@ pub(crate) fn update_mission_telemetry(
 pub(crate) fn update_mission_state(
     hostile_query: Query<Entity, With<HostileTarget>>,
     processor_query: Query<&ProcessorModule>,
+    salvage_query: Query<Entity, With<SalvageWreck>>,
     player_ship_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
 ) {
     let mut mission_state = player_ship_query.into_inner();
@@ -87,10 +89,19 @@ pub(crate) fn update_mission_state(
     if hostile_query.is_empty() {
         mission_state.encounter_cleared = true;
         let requires_processing = !processor_query.is_empty();
-        mission_state.completed = mission_state.salvage_collected
-            && (!requires_processing || mission_state.processed_repair_charge > 0);
+        let salvage_required = !salvage_query.is_empty();
+        mission_state.completed = if salvage_required {
+            mission_state.salvage_collected
+                && (!requires_processing || mission_state.processed_repair_charge > 0)
+        } else {
+            true
+        };
         if mission_state.completion_reason.is_none() {
-            mission_state.completion_reason = Some("Encounter cleared".to_string());
+            mission_state.completion_reason = Some(if salvage_required {
+                "Encounter cleared".to_string()
+            } else {
+                "Test route complete".to_string()
+            });
         }
         if mission_state.completed {
             mission_state

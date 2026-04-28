@@ -83,10 +83,10 @@ fn load_host_ship_snapshot() -> ShipSnapshot {
 fn sample_ship_snapshot() -> ShipSnapshot {
     let mut snapshot = ShipSnapshot::empty("Untitled Knot");
     snapshot.modules = vec![
-        ShipModule::new(1, ModuleKind::HullCorner, -2, -2, 0),
+        ShipModule::new(1, ModuleKind::HullInnerCorner, -2, -2, 0),
         ShipModule::new(2, ModuleKind::Cockpit, -1, -2, 0),
         ShipModule::new(3, ModuleKind::Hull, 0, -2, 0),
-        ShipModule::new(4, ModuleKind::HullCorner, 1, -2, 1),
+        ShipModule::new(4, ModuleKind::HullInnerCorner, 1, -2, 1),
         ShipModule::new(5, ModuleKind::Hull, -2, -1, 3),
         ShipModule::new(6, ModuleKind::Airlock, -1, -1, 3),
         ShipModule::new(7, ModuleKind::Turret, 0, -1, 0),
@@ -95,10 +95,10 @@ fn sample_ship_snapshot() -> ShipSnapshot {
         ShipModule::new(10, ModuleKind::Core, -1, 0, 0),
         ShipModule::new(11, ModuleKind::Reactor, 0, 0, 0),
         ShipModule::new(12, ModuleKind::Hull, 1, 0, 1),
-        ShipModule::new(13, ModuleKind::HullCorner, -2, 1, 3),
+        ShipModule::new(13, ModuleKind::HullInnerCorner, -2, 1, 3),
         ShipModule::new(14, ModuleKind::Cargo, -1, 1, 0),
         ShipModule::new(15, ModuleKind::Processor, 0, 1, 0),
-        ShipModule::new(16, ModuleKind::HullCorner, 1, 1, 2),
+        ShipModule::new(16, ModuleKind::HullInnerCorner, 1, 1, 2),
         ShipModule::new(17, ModuleKind::Computer, 1, 1, 0),
         ShipModule::new(18, ModuleKind::Engine, -1, 2, 2),
         ShipModule::new(19, ModuleKind::Engine, 0, 2, 2),

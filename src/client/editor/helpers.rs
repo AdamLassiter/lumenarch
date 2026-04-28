@@ -1,9 +1,16 @@
 use bevy::prelude::*;
 
-use super::super::{HALF_TILE_SIZE, TILE_SIZE, TOOLBOX_WIDTH, state::LastMissionReport};
+use super::super::{
+    HALF_TILE_SIZE,
+    TILE_SIZE,
+    TOOLBOX_WIDTH,
+    state::{EditorMode, LastMissionReport},
+};
 use crate::ship::ModuleKind;
 
 pub(super) fn editor_status_line(
+    mode: EditorMode,
+    entry_label: &str,
     ship_name: &str,
     selected_kind: &ModuleKind,
     selected_rotation: u8,
@@ -73,14 +80,18 @@ pub(super) fn editor_status_line(
     };
 
     format!(
-        "Editor Status\nShip: {ship_name}\nSelected Tool: {selected_kind}\nRotation: {selected_rotation}\nPlaced Modules: {module_count}\nScrap: {scrap_total}\nPlacement Cost: {selected_cost} ({affordability}){mission_summary}"
+        "{}\nEntry: {entry_label}\nShip: {ship_name}\nSelected Tool: {selected_kind}\nRotation: {selected_rotation}\nPlaced Modules: {module_count}\nScrap: {scrap_total}\nPlacement Cost: {selected_cost} ({affordability}){mission_summary}",
+        match mode {
+            EditorMode::Player => "Player Refit",
+            EditorMode::Enemy => "Enemy Ship Debug Editor",
+        }
     )
 }
 
 pub(super) fn module_kind_cost(kind: ModuleKind) -> u32 {
     match kind {
         ModuleKind::Interior => 0,
-        ModuleKind::Hull | ModuleKind::HullCorner => 1,
+        ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner => 1,
         ModuleKind::Battery | ModuleKind::Cargo | ModuleKind::Airlock => 2,
         ModuleKind::Engine => 3,
         ModuleKind::Cockpit | ModuleKind::Computer | ModuleKind::Processor | ModuleKind::Turret => {

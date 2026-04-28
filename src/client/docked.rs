@@ -15,7 +15,10 @@ use super::{
         DockedState,
         DockedStatusText,
         EditingCleanup,
+        EditorMode,
+        EditorSessionState,
         EditorShip,
+        EnemyShipLibraryState,
         LastMissionReport,
         OpenSectorMapButton,
         RefitButton,
@@ -23,7 +26,7 @@ use super::{
         SectorState,
     },
 };
-use crate::ship::{ShipDefinition, storage::load_default_ship};
+use crate::ship::{ShipDefinition, enemy::load_default_enemy_library, storage::load_default_ship};
 
 pub(crate) fn initialize_campaign_state(
     status: Res<ConnectionStatus>,
@@ -32,6 +35,7 @@ pub(crate) fn initialize_campaign_state(
     mut sector_state: ResMut<SectorState>,
     mut docked_state: ResMut<DockedState>,
     mut last_mission_report: ResMut<LastMissionReport>,
+    mut enemy_library_state: ResMut<EnemyShipLibraryState>,
     mut editor_ship: ResMut<EditorShip>,
 ) {
     if !campaign_load_state.hydrated {
@@ -39,6 +43,7 @@ pub(crate) fn initialize_campaign_state(
             Ok(Some(save)) => {
                 *progression = save.progression;
                 *sector_state = save.sector;
+                sector_state.ensure_latest_layout();
                 *last_mission_report = save.last_mission_report;
             }
             Ok(None) => {
@@ -60,6 +65,11 @@ pub(crate) fn initialize_campaign_state(
             editor_ship.ship = snapshot.clone();
         } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
             editor_ship.ship = ShipDefinition::empty("Untitled Knot");
+        }
+
+        if let Ok(Some(library)) = load_default_enemy_library() {
+            enemy_library_state.library = library;
+            enemy_library_state.library.ensure_seeded();
         }
 
         campaign_load_state.hydrated = true;
@@ -229,6 +239,7 @@ pub(crate) fn docked_button_system(
     >,
     mut progression: ResMut<DemoProgression>,
     mut last_mission_report: ResMut<LastMissionReport>,
+    mut editor_session: ResMut<EditorSessionState>,
     mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
     for (interaction, mut background, refit, open_map, repair) in &mut interaction_query {
@@ -236,6 +247,7 @@ pub(crate) fn docked_button_system(
             Interaction::Pressed => {
                 if refit.is_some() {
                     *background = BackgroundColor(PRESSED_BUTTON);
+                    editor_session.mode = EditorMode::Player;
                     next_state.set(ClientAppState::Editing);
                 } else if open_map.is_some() {
                     *background = BackgroundColor(Color::srgb(0.12, 0.40, 0.24));

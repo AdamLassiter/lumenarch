@@ -18,8 +18,10 @@ use self::state::{
     DebugOverlayState,
     DemoProgression,
     DockedState,
+    EditorSessionState,
     EditorShip,
     EditorToolState,
+    EnemyShipLibraryState,
     LastMissionReport,
     MainCamera,
     SectorState,
@@ -35,7 +37,7 @@ pub(crate) const HOVERED_BUTTON: Color = Color::srgb(0.30, 0.55, 0.88);
 pub(crate) const PRESSED_BUTTON: Color = Color::srgb(0.18, 0.36, 0.62);
 pub(crate) const SELECTED_BUTTON: Color = Color::srgb(0.78, 0.48, 0.20);
 pub(crate) const GRID_COLOR: Color = Color::srgba(0.38, 0.45, 0.56, 0.28);
-pub(crate) const TOOLBOX_COMPONENTS: [ModuleKind; 13] = ModuleKind::ALL;
+pub(crate) const TOOLBOX_COMPONENTS: [ModuleKind; 14] = ModuleKind::ALL;
 
 pub fn run_client() {
     App::new()
@@ -44,6 +46,8 @@ pub fn run_client() {
         .insert_resource(ConnectionStatus::default())
         .insert_resource(ConnectionMailbox::default())
         .insert_resource(EditorShip::default())
+        .insert_resource(EditorSessionState::default())
+        .insert_resource(EnemyShipLibraryState::default())
         .insert_resource(DemoProgression::default())
         .insert_resource(DockedState::default())
         .insert_resource(SectorState::default())
@@ -126,6 +130,8 @@ pub fn run_client() {
                 editor::draw_grid_overlay.run_if(in_state(ClientAppState::Editing)),
                 editor::toolbox_button_system.run_if(in_state(ClientAppState::Editing)),
                 editor::computer_program_button_system.run_if(in_state(ClientAppState::Editing)),
+                editor::enemy_library_button_system.run_if(in_state(ClientAppState::Editing)),
+                editor::enemy_library_keyboard_shortcuts.run_if(in_state(ClientAppState::Editing)),
                 editor::leave_editor_button_system.run_if(in_state(ClientAppState::Editing)),
                 editor::leave_editor_keyboard_shortcut.run_if(in_state(ClientAppState::Editing)),
                 editor::rotate_selected_tool.run_if(in_state(ClientAppState::Editing)),
@@ -171,13 +177,16 @@ pub fn run_client() {
                     gameplay::run_processors,
                     gameplay::update_mission_telemetry,
                     gameplay::tick_recent_action_feedback,
+                    gameplay::sync_hostile_ship_state,
                 )
                     .chain()
                     .run_if(in_state(ClientAppState::Encounter)),
                 (
                     gameplay::sync_runtime_ship_state,
                     gameplay::apply_player_ship_controls,
+                    gameplay::drive_hostile_ships,
                     gameplay::fire_player_weapons,
+                    gameplay::fire_hostile_ship_weapons,
                     gameplay::aim_hostile_turrets,
                     gameplay::fire_hostile_targets,
                     gameplay::advance_projectiles,
@@ -188,6 +197,7 @@ pub fn run_client() {
                     gameplay::update_destroyed_module_visuals,
                     gameplay::sync_shipboard_player_visual,
                     gameplay::integrate_player_ship_motion,
+                    gameplay::integrate_hostile_ship_motion,
                     gameplay::camera_follow_player_ship,
                     gameplay::draw_debug_overlay,
                     gameplay::update_gameplay_status_text,

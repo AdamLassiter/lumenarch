@@ -70,16 +70,13 @@ pub(crate) struct ShipAutomationState {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Default)]
 pub(crate) enum ArchLogisticsPreference {
+    #[default]
     FeedProcessor,
     StoreCharges,
 }
 
-impl Default for ArchLogisticsPreference {
-    fn default() -> Self {
-        Self::FeedProcessor
-    }
-}
 
 #[derive(Component)]
 pub(crate) struct ShipArchCommandState {

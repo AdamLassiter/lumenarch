@@ -1,8 +1,8 @@
 {
   "progression": {
-    "scrap": 77,
+    "scrap": 64,
     "hull_wear": 0,
-    "jump_count": 13
+    "jump_count": 24
   },
   "sector": {
     "seed": 66790,
@@ -19,7 +19,8 @@
         "neighbors": [
           1,
           2,
-          3
+          3,
+          6
         ],
         "status": "Fresh",
         "position": [
@@ -27,6 +28,7 @@
           0.0
         ],
         "encounter": {
+          "enemy_ship_ids": [],
           "hostile_count": 0,
           "salvage_value": 0,
           "ambient_heat_pressure": 0,
@@ -51,6 +53,7 @@
           150.0
         ],
         "encounter": {
+          "enemy_ship_ids": [],
           "hostile_count": 1,
           "salvage_value": 10,
           "ambient_heat_pressure": 0,
@@ -76,6 +79,7 @@
           200.0
         ],
         "encounter": {
+          "enemy_ship_ids": [],
           "hostile_count": 3,
           "salvage_value": 8,
           "ambient_heat_pressure": 1,
@@ -100,6 +104,7 @@
           120.0
         ],
         "encounter": {
+          "enemy_ship_ids": [],
           "hostile_count": 2,
           "salvage_value": 9,
           "ambient_heat_pressure": 1,
@@ -124,6 +129,7 @@
           -70.0
         ],
         "encounter": {
+          "enemy_ship_ids": [],
           "hostile_count": 2,
           "salvage_value": 12,
           "ambient_heat_pressure": 1,
@@ -148,6 +154,7 @@
           -90.0
         ],
         "encounter": {
+          "enemy_ship_ids": [],
           "hostile_count": 4,
           "salvage_value": 14,
           "ambient_heat_pressure": 2,
@@ -155,33 +162,64 @@
           "reward_multiplier": 5,
           "arena_variant": "storm"
         }
+      },
+      {
+        "id": 6,
+        "label": "Calibration Ring",
+        "kind": "TestRange",
+        "risk_tier": 0,
+        "reward_hint": "No hostiles, no salvage, pure ship testing",
+        "neighbors": [
+          0
+        ],
+        "status": "Exhausted",
+        "position": [
+          320.0,
+          220.0
+        ],
+        "encounter": {
+          "enemy_ship_ids": [],
+          "hostile_count": 0,
+          "salvage_value": 1,
+          "ambient_heat_pressure": 0,
+          "ambient_electrical_pressure": 0,
+          "reward_multiplier": 1,
+          "arena_variant": "test"
+        }
       }
     ]
   },
   "last_mission_report": {
-    "headline": "Mission Failed",
-    "detail": "Station service restored your ship for 6 scrap.",
-    "scrap_awarded": 0,
-    "total_scrap": 100,
-    "hottest_module": "core",
+    "headline": "Mission Complete",
+    "detail": "Recovered 1 raw salvage and returned 0 repair charge worth 1 scrap.",
+    "scrap_awarded": 1,
+    "total_scrap": 68,
+    "hottest_module": "reactor",
     "first_disabled_module": null,
     "repairs_performed": 0,
     "stabilizations_performed": 0,
     "automation_used": false,
     "automation_triggers": 0,
-    "redesign_hints": [],
-    "recovered_raw_salvage": 0,
+    "redesign_hints": [
+      "Reactor ran hottest. Consider more spacing or cooler hull nearby.",
+      "Recovered cargo never reached a useful processor cycle.",
+      "Cargo flow barely moved. Manipulator reach or automation priority may be wrong."
+    ],
+    "recovered_raw_salvage": 1,
     "processed_repair_charge": 0,
     "consumed_repair_charge": 0,
     "transfer_count": 0,
     "processor_cycles": 0,
     "logistics_bottleneck": null,
     "logistics_automation_used": false,
-    "arch_primary_program": null,
+    "arch_primary_program": "TurretAssist",
     "arch_invalid_executions": 0,
-    "arch_recent_writes": [],
-    "node_name": "Latchline Debris",
-    "node_kind": "Salvage Field",
-    "travel_outcome": "Latchline Debris failed, +3 hull wear"
+    "arch_recent_writes": [
+      "WTA0 <- off",
+      "WTF0 <- off"
+    ],
+    "node_name": "Calibration Ring",
+    "node_kind": "Test Range",
+    "travel_outcome": "Calibration Ring cleared, +1 scrap, +0 hull wear"
   }
 }

@@ -9,6 +9,8 @@ use crate::{
                 AngularVelocity,
                 CurrentStation,
                 HeldInteraction,
+                HostileShip,
+                HostileShipAi,
                 InternalPosition,
                 LinearVelocity,
                 MissionState,
@@ -207,6 +209,7 @@ pub(crate) fn spawn_runtime_ship(
                 center_x_fixed,
                 center_y_fixed,
                 wear_penalty,
+                false,
             )
         })
         .collect();
@@ -253,4 +256,116 @@ pub(crate) fn spawn_runtime_ship(
         })
         .add_children(&child_entities)
         .add_child(shipboard_marker);
+}
+
+pub(crate) fn spawn_hostile_ship(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    ship: &ShipDefinition,
+    spawn_position: FixedVec2,
+    preferred_range: Fx,
+    aggression: Fx,
+    salvage_reward: u32,
+) {
+    let engine_count = count_modules(ship, ModuleKind::Engine);
+    let reactor_count = count_modules(ship, ModuleKind::Reactor);
+    let battery_count = count_modules(ship, ModuleKind::Battery);
+    let turret_count = count_modules(ship, ModuleKind::Turret);
+    let movement_model = ship_movement_model(ship.modules.len(), engine_count);
+    let power_model = ship_power_model(
+        ship.modules.len(),
+        reactor_count,
+        battery_count,
+        engine_count,
+        turret_count,
+    );
+
+    let root_entity = commands
+        .spawn((
+            Transform::from_xyz(
+                spawn_position.x.to_num::<f32>(),
+                spawn_position.y.to_num::<f32>(),
+                RUNTIME_SHIP_ORIGIN.z,
+            ),
+            GlobalTransform::default(),
+            Visibility::Visible,
+            InheritedVisibility::VISIBLE,
+            ViewVisibility::default(),
+            HostileShip,
+            ShipRoot,
+            crate::client::gameplay::components::HostileTarget,
+            HostileShipAi {
+                preferred_range,
+                aggression,
+                salvage_reward,
+            },
+            PlayingCleanup,
+        ))
+        .insert((
+            LinearVelocity {
+                value: FixedVec2::zero(),
+            },
+            AngularVelocity {
+                radians_per_second: Fx::from_num(0),
+            },
+            SimPosition {
+                value: spawn_position,
+            },
+            SimRotation {
+                radians: Fx::from_num(0),
+            },
+            movement_model,
+            ShipPowerState {
+                stored_energy: power_model.battery_capacity,
+                generation: power_model.reactor_output,
+                draw: power_model.passive_draw,
+                surplus: power_model.reactor_output - power_model.passive_draw,
+                engine_power_ratio: if engine_count > 0 {
+                    Fx::from_num(1)
+                } else {
+                    Fx::from_num(0)
+                },
+                weapons_powered: turret_count > 0,
+                engines_powered: engine_count > 0,
+            },
+            power_model,
+            ShipControlState::default(),
+            ShipWeaponState {
+                turret_count,
+                cooldown_remaining: Fx::from_num(0.4),
+                cooldown_duration: if turret_count > 0 {
+                    Fx::from_num(0.55)
+                } else {
+                    Fx::from_num(0)
+                },
+            },
+            ShipArchCommandState::default(),
+        ))
+        .id();
+
+    let (min_x, max_x, min_y, max_y) = ship.bounds().unwrap_or((0, 0, 0, 0));
+    let center_x = (min_x + max_x) as f32 * 0.5;
+    let center_y = (min_y + max_y) as f32 * 0.5;
+    let center_x_fixed = Fx::from_num(center_x);
+    let center_y_fixed = Fx::from_num(center_y);
+
+    let child_entities: Vec<_> = ship
+        .modules
+        .iter()
+        .map(|module| {
+            spawn_runtime_module(
+                commands,
+                asset_server,
+                module,
+                center_x,
+                center_y,
+                center_x_fixed,
+                center_y_fixed,
+                0,
+                true,
+            )
+        })
+        .collect();
+
+    commands.entity(root_entity).add_children(&child_entities);
 }

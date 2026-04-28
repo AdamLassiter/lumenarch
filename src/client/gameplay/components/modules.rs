@@ -17,6 +17,9 @@ pub(crate) struct RuntimeShipModule {
 }
 
 #[derive(Component)]
+pub(crate) struct HostileShipModule;
+
+#[derive(Component)]
 pub(crate) struct Integrity {
     pub(crate) current: i32,
     pub(crate) max: i32,

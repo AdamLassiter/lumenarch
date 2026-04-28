@@ -1,4 +1,5 @@
 pub mod arch;
+pub mod enemy;
 pub mod storage;
 
 use std::fmt;
@@ -21,11 +22,12 @@ pub enum ModuleKind {
     Airlock,
     Turret,
     Hull,
-    HullCorner,
+    HullInnerCorner,
+    HullOuterCorner,
 }
 
 impl ModuleKind {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::Core,
         Self::Interior,
         Self::Cockpit,
@@ -38,7 +40,8 @@ impl ModuleKind {
         Self::Airlock,
         Self::Turret,
         Self::Hull,
-        Self::HullCorner,
+        Self::HullInnerCorner,
+        Self::HullOuterCorner,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -55,7 +58,8 @@ impl ModuleKind {
             Self::Airlock => "airlock",
             Self::Turret => "turret",
             Self::Hull => "hull",
-            Self::HullCorner => "hull_corner",
+            Self::HullInnerCorner => "hull_inner_corner",
+            Self::HullOuterCorner => "hull_outer_corner",
         }
     }
 }

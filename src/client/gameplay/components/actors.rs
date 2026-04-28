@@ -10,6 +10,16 @@ pub(crate) struct PlayerShip;
 pub(crate) struct ShipRoot;
 
 #[derive(Component)]
+pub(crate) struct HostileShip;
+
+#[derive(Component)]
+pub(crate) struct HostileShipAi {
+    pub(crate) preferred_range: Fx,
+    pub(crate) aggression: Fx,
+    pub(crate) salvage_reward: u32,
+}
+
+#[derive(Component)]
 pub(crate) struct ShipboardPlayer;
 
 #[derive(Component)]

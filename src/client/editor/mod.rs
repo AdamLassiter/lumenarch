@@ -5,6 +5,8 @@ mod ui;
 
 pub(crate) use input::{
     computer_program_button_system,
+    enemy_library_button_system,
+    enemy_library_keyboard_shortcuts,
     leave_editor_button_system,
     leave_editor_keyboard_shortcut,
     load_editor_ship_shortcut,

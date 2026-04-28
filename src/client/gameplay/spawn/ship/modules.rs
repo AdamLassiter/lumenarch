@@ -8,6 +8,7 @@ use crate::{
             ArchComputerModule,
             ArchExecutionResult,
             EngineModule,
+            HostileShipModule,
             Integrity,
             Interactable,
             ManipulatorCommandState,
@@ -49,6 +50,7 @@ pub(super) fn spawn_runtime_module(
     center_x_fixed: Fx,
     center_y_fixed: Fx,
     wear_penalty: u32,
+    hostile: bool,
 ) -> Entity {
     let local_position = module_local_position(module, center_x_fixed, center_y_fixed);
     let max_integrity = module_integrity(module.kind);
@@ -86,6 +88,10 @@ pub(super) fn spawn_runtime_module(
         Interactable,
         crate::client::state::PlayingCleanup,
     ));
+
+    if hostile {
+        entity.insert(HostileShipModule);
+    }
 
     match module.kind {
         ModuleKind::Reactor => {
@@ -235,12 +241,14 @@ fn module_field_emitter(kind: ModuleKind) -> ModuleFieldEmitter {
             electrical_output: Fx::from_num(0.4),
             grounding_output: Fx::from_num(0.8),
         },
-        ModuleKind::Hull | ModuleKind::HullCorner | ModuleKind::Airlock => ModuleFieldEmitter {
-            heat_output: Fx::from_num(0),
-            cooling_output: Fx::from_num(2),
-            electrical_output: Fx::from_num(0),
-            grounding_output: Fx::from_num(2.8),
-        },
+        ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner | ModuleKind::Airlock => {
+            ModuleFieldEmitter {
+                heat_output: Fx::from_num(0),
+                cooling_output: Fx::from_num(2),
+                electrical_output: Fx::from_num(0),
+                grounding_output: Fx::from_num(2.8),
+            }
+        }
         ModuleKind::Core | ModuleKind::Cockpit | ModuleKind::Cargo | ModuleKind::Interior => {
             ModuleFieldEmitter {
                 heat_output: Fx::from_num(0),

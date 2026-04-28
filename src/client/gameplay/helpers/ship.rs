@@ -26,7 +26,7 @@ pub(crate) fn module_local_position(module: &ShipModule, center_x: Fx, center_y:
 
 pub(crate) fn module_integrity(kind: ModuleKind) -> i32 {
     match kind {
-        ModuleKind::Hull | ModuleKind::HullCorner => 12,
+        ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner => 12,
         ModuleKind::Core => 20,
         ModuleKind::Cockpit => 10,
         ModuleKind::Computer => 8,

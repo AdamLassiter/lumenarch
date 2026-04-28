@@ -7,6 +7,8 @@ mod simulation;
 
 pub(crate) use actors::{
     CurrentStation,
+    HostileShip,
+    HostileShipAi,
     InternalPosition,
     PlayerFieldState,
     PlayerShip,
@@ -46,6 +48,7 @@ pub(crate) use modules::{
     DroneStationCommandState,
     DroneTask,
     EngineModule,
+    HostileShipModule,
     Integrity,
     ManipulatorCommandState,
     MemoryBankState,

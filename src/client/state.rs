@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::DEFAULT_HOST_ADDR;
 use crate::{
     protocol::ShipSnapshot,
-    ship::{ModuleKind, ShipDefinition},
+    ship::{ModuleKind, ShipDefinition, enemy::EnemyShipLibrary},
 };
 
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
@@ -60,6 +60,33 @@ pub(crate) enum ConnectionEvent {
 #[derive(Resource, Default, Clone)]
 pub(crate) struct EditorShip {
     pub(crate) ship: ShipDefinition,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum EditorMode {
+    #[default]
+    Player,
+    Enemy,
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct EditorSessionState {
+    pub(crate) mode: EditorMode,
+}
+
+#[derive(Resource, Clone)]
+pub(crate) struct EnemyShipLibraryState {
+    pub(crate) library: EnemyShipLibrary,
+    pub(crate) selected_index: usize,
+}
+
+impl Default for EnemyShipLibraryState {
+    fn default() -> Self {
+        Self {
+            library: EnemyShipLibrary::seeded(),
+            selected_index: 0,
+        }
+    }
 }
 
 #[derive(Resource, Clone, Serialize, Deserialize)]
@@ -150,6 +177,7 @@ impl SectorNodeStatus {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum SectorNodeKind {
     HubStation,
+    TestRange,
     SalvageField,
     HostileHold,
     UnstableDerelict,
@@ -159,6 +187,7 @@ impl SectorNodeKind {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::HubStation => "Hub Station",
+            Self::TestRange => "Test Range",
             Self::SalvageField => "Salvage Field",
             Self::HostileHold => "Hostile Hold",
             Self::UnstableDerelict => "Unstable Derelict",
@@ -168,6 +197,8 @@ impl SectorNodeKind {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct EncounterSpec {
+    #[serde(default)]
+    pub(crate) enemy_ship_ids: Vec<String>,
     pub(crate) hostile_count: u32,
     pub(crate) salvage_value: u32,
     pub(crate) ambient_heat_pressure: i32,
@@ -223,10 +254,11 @@ impl SectorState {
                 kind: SectorNodeKind::HubStation,
                 risk_tier: 0,
                 reward_hint: "Safe dock, refit, relaunch".to_string(),
-                neighbors: vec![1, 2, 3],
+                neighbors: vec![1, 2, 3, 6],
                 status: SectorNodeStatus::Fresh,
                 position: [0.0, 0.0],
                 encounter: EncounterSpec {
+                    enemy_ship_ids: Vec::new(),
                     hostile_count: 0,
                     salvage_value: 0,
                     ambient_heat_pressure: 0,
@@ -245,12 +277,32 @@ impl SectorState {
                 status: SectorNodeStatus::Fresh,
                 position: [-260.0, 150.0],
                 encounter: EncounterSpec {
+                    enemy_ship_ids: vec!["raider_skiff".to_string()],
                     hostile_count: 1,
                     salvage_value: 10,
                     ambient_heat_pressure: 0,
                     ambient_electrical_pressure: 0,
                     reward_multiplier: 2,
                     arena_variant: "salvage".to_string(),
+                },
+            },
+            SectorNode {
+                id: 6,
+                label: "Calibration Ring".to_string(),
+                kind: SectorNodeKind::TestRange,
+                risk_tier: 0,
+                reward_hint: "No hostiles, no salvage, pure ship testing".to_string(),
+                neighbors: vec![0],
+                status: SectorNodeStatus::Fresh,
+                position: [320.0, 220.0],
+                encounter: EncounterSpec {
+                    enemy_ship_ids: Vec::new(),
+                    hostile_count: 0,
+                    salvage_value: 1,
+                    ambient_heat_pressure: 0,
+                    ambient_electrical_pressure: 0,
+                    reward_multiplier: 1,
+                    arena_variant: "test".to_string(),
                 },
             },
             SectorNode {
@@ -263,6 +315,7 @@ impl SectorState {
                 status: SectorNodeStatus::Fresh,
                 position: [0.0, 200.0],
                 encounter: EncounterSpec {
+                    enemy_ship_ids: vec!["scrap_brigand".to_string()],
                     hostile_count: 3,
                     salvage_value: 8,
                     ambient_heat_pressure: 1,
@@ -281,6 +334,7 @@ impl SectorState {
                 status: SectorNodeStatus::Fresh,
                 position: [250.0, 120.0],
                 encounter: EncounterSpec {
+                    enemy_ship_ids: vec!["raider_skiff".to_string(), "raider_skiff".to_string()],
                     hostile_count: 2,
                     salvage_value: 9,
                     ambient_heat_pressure: 1,
@@ -299,6 +353,7 @@ impl SectorState {
                 status: SectorNodeStatus::Fresh,
                 position: [-320.0, -70.0],
                 encounter: EncounterSpec {
+                    enemy_ship_ids: vec!["raider_skiff".to_string(), "scrap_brigand".to_string()],
                     hostile_count: 2,
                     salvage_value: 12,
                     ambient_heat_pressure: 1,
@@ -317,6 +372,7 @@ impl SectorState {
                 status: SectorNodeStatus::Fresh,
                 position: [300.0, -90.0],
                 encounter: EncounterSpec {
+                    enemy_ship_ids: vec!["scrap_brigand".to_string(), "raider_skiff".to_string()],
                     hostile_count: 4,
                     salvage_value: 14,
                     ambient_heat_pressure: 2,
@@ -333,6 +389,29 @@ impl SectorState {
             selected_node_id: Some(1),
             active_encounter_node_id: None,
             nodes,
+        }
+    }
+
+    pub(crate) fn ensure_latest_layout(&mut self) {
+        let default_state = Self::from_seed(self.seed);
+
+        for default_node in default_state.nodes {
+            if self.nodes.iter().all(|node| node.id != default_node.id) {
+                self.nodes.push(default_node);
+            }
+        }
+
+        self.nodes.sort_by_key(|node| node.id);
+
+        if let Some(hub) = self.node_mut(0)
+            && !hub.neighbors.contains(&6)
+        {
+            hub.neighbors.push(6);
+            hub.neighbors.sort_unstable();
+        }
+
+        if self.selected_node_id.is_none() {
+            self.selected_node_id = Some(1);
         }
     }
 
@@ -413,6 +492,9 @@ pub(crate) struct MainCamera;
 pub(crate) struct JoinButton;
 
 #[derive(Component)]
+pub(crate) struct DebugEnemyEditorButton;
+
+#[derive(Component)]
 pub(crate) struct RefitButton;
 
 #[derive(Component)]
@@ -423,6 +505,15 @@ pub(crate) struct RepairShipButton;
 
 #[derive(Component)]
 pub(crate) struct LeaveEditorButton;
+
+#[derive(Component)]
+pub(crate) struct EnemyPrevButton;
+
+#[derive(Component)]
+pub(crate) struct EnemyNextButton;
+
+#[derive(Component)]
+pub(crate) struct EnemyNewButton;
 
 #[derive(Component)]
 pub(crate) struct AbortEncounterButton;

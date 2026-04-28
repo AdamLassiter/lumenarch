@@ -36,7 +36,7 @@ pub(super) fn spawn_runtime_hud(
         .with_children(|root| {
             spawn_status_panel(
                 root,
-                &asset_server,
+                asset_server,
                 title_font.clone(),
                 mono_font.clone(),
                 ship,

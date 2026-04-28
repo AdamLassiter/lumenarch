@@ -174,7 +174,7 @@ pub(crate) fn update_destroyed_module_visuals(
 
         if matches!(
             runtime_module.kind,
-            ModuleKind::Hull | ModuleKind::HullCorner
+            ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner | ModuleKind::Airlock
         ) {
             sprite.color = match condition {
                 ModuleCondition::Healthy => Color::WHITE,

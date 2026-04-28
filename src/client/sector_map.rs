@@ -362,6 +362,7 @@ fn node_button_color(
         SectorNodeStatus::Failed => Color::srgb(0.44, 0.20, 0.18),
         SectorNodeStatus::Fresh => match kind {
             SectorNodeKind::HubStation => Color::srgb(0.44, 0.34, 0.18),
+            SectorNodeKind::TestRange => Color::srgb(0.24, 0.48, 0.54),
             SectorNodeKind::SalvageField => Color::srgb(0.18, 0.46, 0.26),
             SectorNodeKind::HostileHold => Color::srgb(0.56, 0.24, 0.20),
             SectorNodeKind::UnstableDerelict => Color::srgb(0.26, 0.34, 0.56),

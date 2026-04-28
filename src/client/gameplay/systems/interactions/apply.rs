@@ -106,22 +106,21 @@ fn apply_instant_interaction(
                 module_query.get_mut(event.target)
                 && computer.is_some()
                 && destroyed.is_none()
+                && let Some(arch_runtime) = arch_runtime
             {
-                if let Some(arch_runtime) = arch_runtime {
-                    focus_station(
-                        ship_control,
-                        entity,
-                        runtime_module.module_id,
-                        runtime_module.kind,
-                        StationFamily::Computer,
-                        ShipControlMode::Computer,
-                    );
-                    set_recent_action(
-                        mission_state,
-                        &format!("Opened {} console", arch_runtime.program.name),
-                        1.8,
-                    );
-                }
+                focus_station(
+                    ship_control,
+                    entity,
+                    runtime_module.module_id,
+                    runtime_module.kind,
+                    StationFamily::Computer,
+                    ShipControlMode::Computer,
+                );
+                set_recent_action(
+                    mission_state,
+                    &format!("Opened {} console", arch_runtime.program.name),
+                    1.8,
+                );
             }
         }
         InteractionKind::Storage => {
@@ -251,39 +250,34 @@ fn apply_completed_interaction(
         if destroyed.is_some() {
             return;
         }
-        match event.kind {
-            InteractionKind::Repair => {
-                let used_repair_charge = try_consume_repair_charge(logistics_query);
-                if used_repair_charge {
-                    integrity.current = (integrity.current + 6).min(integrity.max);
-                    runtime_state.current_heat =
-                        (runtime_state.current_heat - Fx::from_num(5)).max(Fx::from_num(0));
-                    runtime_state.electrical_instability = (runtime_state.electrical_instability
-                        - Fx::from_num(5))
-                    .max(Fx::from_num(0));
-                    mission_state.consumed_repair_charge += 1;
-                } else {
-                    integrity.current = (integrity.current + 3).min(integrity.max);
-                    runtime_state.current_heat =
-                        (runtime_state.current_heat - Fx::from_num(3)).max(Fx::from_num(0));
-                    runtime_state.electrical_instability = (runtime_state.electrical_instability
-                        - Fx::from_num(3))
-                    .max(Fx::from_num(0));
-                }
-                runtime_state.needs_attention = integrity.current < integrity.max;
-                runtime_state.is_disabled = false;
-                mission_state.repairs_performed += 1;
-                set_recent_action(
-                    mission_state,
-                    &if used_repair_charge {
-                        format!("{} repaired with charge", runtime_module.kind.as_str())
-                    } else {
-                        format!("{} field-patched", runtime_module.kind.as_str())
-                    },
-                    2.0,
-                );
+        if event.kind == InteractionKind::Repair {
+            let used_repair_charge = try_consume_repair_charge(logistics_query);
+            if used_repair_charge {
+                integrity.current = (integrity.current + 6).min(integrity.max);
+                runtime_state.current_heat =
+                    (runtime_state.current_heat - Fx::from_num(5)).max(Fx::from_num(0));
+                runtime_state.electrical_instability =
+                    (runtime_state.electrical_instability - Fx::from_num(5)).max(Fx::from_num(0));
+                mission_state.consumed_repair_charge += 1;
+            } else {
+                integrity.current = (integrity.current + 3).min(integrity.max);
+                runtime_state.current_heat =
+                    (runtime_state.current_heat - Fx::from_num(3)).max(Fx::from_num(0));
+                runtime_state.electrical_instability =
+                    (runtime_state.electrical_instability - Fx::from_num(3)).max(Fx::from_num(0));
             }
-            _ => {}
+            runtime_state.needs_attention = integrity.current < integrity.max;
+            runtime_state.is_disabled = false;
+            mission_state.repairs_performed += 1;
+            set_recent_action(
+                mission_state,
+                &if used_repair_charge {
+                    format!("{} repaired with charge", runtime_module.kind.as_str())
+                } else {
+                    format!("{} field-patched", runtime_module.kind.as_str())
+                },
+                2.0,
+            );
         }
         runtime_state.last_interaction_age = Fx::from_num(0);
     }
