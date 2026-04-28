@@ -149,8 +149,8 @@ pub(crate) fn spawn_editor_ui(
                 toolbox.spawn((
                     Text::new(
                         match editor_session.mode {
-                            EditorMode::Player => "Click a component, then place it on the grid.\nLeft click: place/replace\nRight click: erase\nQ/E: rotate\nF5: save ship\nF9: reload saved ship\nTab or Return: station hub".to_string(),
-                            EditorMode::Enemy => "Debug authoring for hostile ship layouts.\nLeft click: place/replace\nRight click: erase\nQ/E: rotate\nF5: save enemy library\nF9: reload enemy library\n[ / ]: cycle enemy entry\nN: new enemy entry\nTab or Return: main menu".to_string(),
+                            EditorMode::Player => "Click a component, then place it on the grid.\nLeft click: place/replace\nRight click: erase\nQ/E: rotate\nScroll: zoom\nMiddle drag: pan\nF5: save ship\nF9: reload saved ship\nTab or Return: station hub".to_string(),
+                            EditorMode::Enemy => "Debug authoring for hostile ship layouts.\nLeft click: place/replace\nRight click: erase\nQ/E: rotate\nScroll: zoom\nMiddle drag: pan\nF5: save enemy library\nF9: reload enemy library\n[ / ]: cycle enemy entry\nN: new enemy entry\nTab or Return: main menu".to_string(),
                         },
                     ),
                     TextFont {
@@ -339,7 +339,7 @@ pub(crate) fn spawn_editor_ui(
             .with_children(|panel| {
                 panel.spawn((
                     Text::new(
-                        "Refit Controls\nLeft click: place or replace\nRight click: erase\nQ / E: rotate selected part\nF5: save current ship\nF9: reload saved ship\nTab: return to station\nCosts are shown in [scrap]",
+                        "Refit Controls\nLeft click: place or replace\nRight click: erase\nQ / E: rotate selected part\nScroll: zoom view\nMiddle drag: pan view\nF5: save current ship\nF9: reload saved ship\nTab: return to station\nCosts are shown in [scrap]",
                     ),
                     TextFont {
                         font: mono_font.clone(),

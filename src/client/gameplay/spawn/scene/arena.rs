@@ -2,10 +2,10 @@ use bevy::prelude::*;
 
 use crate::client::{
     TILE_SIZE,
+    balance::BalanceConfig,
     gameplay::{
         ARENA_HEIGHT_TILES,
         ARENA_WIDTH_TILES,
-        HOSTILE_FIRE_COOLDOWN,
         components::{
             HostileTarget,
             HostileTurretPlatform,
@@ -20,6 +20,7 @@ use crate::client::{
 
 pub(super) fn spawn_test_arena(
     commands: &mut Commands,
+    balance: &BalanceConfig,
     arena_variant: &str,
     hostile_count: u32,
     ambient_heat_pressure: i32,
@@ -43,6 +44,7 @@ pub(super) fn spawn_test_arena(
     spawn_arena_walls(commands, arena_width, arena_height);
     spawn_hostile_platforms(
         commands,
+        balance,
         hostile_count,
         ambient_heat_pressure,
         ambient_electrical_pressure,
@@ -83,6 +85,7 @@ fn spawn_arena_walls(commands: &mut Commands, arena_width: f32, arena_height: f3
 
 fn spawn_hostile_platforms(
     commands: &mut Commands,
+    balance: &BalanceConfig,
     hostile_count: u32,
     ambient_heat_pressure: i32,
     ambient_electrical_pressure: i32,
@@ -136,7 +139,7 @@ fn spawn_hostile_platforms(
             HostileTurretPlatform,
             HostileWeaponState {
                 cooldown_remaining: Fx::from_num(0.4),
-                cooldown_duration: Fx::from_num(HOSTILE_FIRE_COOLDOWN),
+                cooldown_duration: Fx::from_num(balance.combat.hostile_fire_cooldown),
                 heat_damage: heat_damage + Fx::from_num(ambient_heat_pressure) * Fx::from_num(0.2),
                 electrical_damage: electrical_damage
                     + Fx::from_num(ambient_electrical_pressure) * Fx::from_num(0.2),

@@ -2,7 +2,6 @@ use bevy::{prelude::*, window::PrimaryWindow};
 
 use super::super::{
     super::state::{AbortEncounterButton, ClientAppState, MainCamera},
-    CAMERA_FOLLOW_LERP_RATE,
     components::{
         AngularVelocity,
         CurrentStation,
@@ -16,6 +15,7 @@ use super::super::{
         ReactorCommandState,
         RuntimeArchComputer,
         RuntimeShipModule,
+        ShipArchCommandState,
         ShipControlMode,
         ShipControlState,
         ShipInteriorMap,
@@ -47,7 +47,7 @@ use super::super::{
         wrap_radians,
     },
 };
-use crate::ship::ModuleKind;
+use crate::{client::balance::BalanceConfig, ship::ModuleKind};
 
 const INTERIOR_CAMERA_SCALE: f32 = 0.58;
 const EXTERIOR_CAMERA_SCALE: f32 = 1.0;
@@ -90,6 +90,7 @@ pub(crate) fn return_keyboard_shortcut(
 
 pub(crate) fn camera_follow_player_ship(
     time: Res<Time>,
+    balance: Res<BalanceConfig>,
     ship_query: Single<
         (&SimPosition, &SimRotation, &ShipboardControlState),
         (With<PlayerShip>, With<ShipRoot>),
@@ -131,7 +132,7 @@ pub(crate) fn camera_follow_player_ship(
         }
     };
 
-    let blend = 1.0 - (-CAMERA_FOLLOW_LERP_RATE * time.delta_secs()).exp();
+    let blend = 1.0 - (-balance.combat.camera_follow_lerp_rate * time.delta_secs()).exp();
     let desired_center = desired_center.to_vec2();
     camera_transform.translation.x += (desired_center.x - camera_transform.translation.x) * blend;
     camera_transform.translation.y += (desired_center.y - camera_transform.translation.y) * blend;
@@ -284,6 +285,7 @@ pub(crate) fn sync_shipboard_player_visual(
 
 pub(crate) fn update_station_command_input(
     time: Res<Time>,
+    balance: Res<BalanceConfig>,
     keys: Res<ButtonInput<KeyCode>>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     window_query: Single<&Window, With<PrimaryWindow>>,
@@ -387,8 +389,9 @@ pub(crate) fn update_station_command_input(
                 turret_state.desired_angle -= dt * Fx::from_num(1.8);
             }
             turret_state.desired_angle = wrap_radians(turret_state.desired_angle);
-            turret_state.fire_intent =
+            ship_controls.fire_pressed =
                 keys.pressed(KeyCode::Space) || mouse_buttons.pressed(MouseButton::Left);
+            turret_state.fire_intent = ship_controls.fire_pressed;
         }
         ShipControlMode::Reactor => {
             let Some(focused_entity) = control_state.focused_entity else {
@@ -402,16 +405,20 @@ pub(crate) fn update_station_command_input(
                 return;
             };
             if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
-                reactor_state.reaction_rate += dt * Fx::from_num(0.45);
+                reactor_state.reaction_rate +=
+                    dt * Fx::from_num(balance.reactor.control_adjust_rate);
             }
             if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
-                reactor_state.reaction_rate -= dt * Fx::from_num(0.45);
+                reactor_state.reaction_rate -=
+                    dt * Fx::from_num(balance.reactor.control_adjust_rate);
             }
             if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
-                reactor_state.turbine_load += dt * Fx::from_num(0.45);
+                reactor_state.turbine_load +=
+                    dt * Fx::from_num(balance.reactor.control_adjust_rate);
             }
             if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
-                reactor_state.turbine_load -= dt * Fx::from_num(0.45);
+                reactor_state.turbine_load -=
+                    dt * Fx::from_num(balance.reactor.control_adjust_rate);
             }
             reactor_state.reaction_rate = reactor_state
                 .reaction_rate
@@ -518,6 +525,7 @@ pub(crate) fn apply_player_ship_controls(
             &ShipMovementModel,
             &ShipPowerModel,
             &mut ShipPowerState,
+            &ShipArchCommandState,
             &ShipboardControlState,
             &mut ShipControlState,
             &mut ShipWeaponState,
@@ -533,6 +541,7 @@ pub(crate) fn apply_player_ship_controls(
         movement_model,
         power_model,
         mut power_state,
+        arch_commands,
         control_mode,
         mut control_state,
         mut weapon_state,
@@ -569,6 +578,11 @@ pub(crate) fn apply_player_ship_controls(
         dt,
         throttle_demand,
         turn_input,
+        if control_state.fire_pressed || arch_commands.turret_auto_fire {
+            Fx::from_num(1)
+        } else {
+            Fx::from_num(0)
+        },
         power_model,
         &mut power_state,
     );

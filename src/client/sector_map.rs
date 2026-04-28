@@ -1,4 +1,8 @@
-use bevy::prelude::*;
+use bevy::{
+    input::mouse::{MouseMotion, MouseWheel},
+    prelude::*,
+    window::PrimaryWindow,
+};
 
 use super::{
     HOVERED_BUTTON,
@@ -8,15 +12,22 @@ use super::{
         ClientAppState,
         DemoProgression,
         LaunchEncounterButton,
+        SectorMapCanvas,
         SectorMapDetailText,
         SectorMapRoot,
         SectorMapStatusText,
+        SectorMapViewState,
         SectorNodeButton,
         SectorNodeKind,
         SectorNodeStatus,
         SectorState,
     },
 };
+
+const MAP_CENTER_X: f32 = 360.0;
+const MAP_CENTER_Y: f32 = 230.0;
+const MAP_NODE_WIDTH: f32 = 170.0;
+const MAP_NODE_HEIGHT: f32 = 52.0;
 
 pub(crate) fn spawn_sector_map_ui(
     mut commands: Commands,
@@ -142,6 +153,7 @@ pub(crate) fn spawn_sector_map_ui(
                 },
                 BackgroundColor(Color::srgba(0.05, 0.07, 0.10, 0.88)),
                 BorderRadius::all(Val::Px(14.0)),
+                SectorMapCanvas,
             ))
             .with_children(|map| {
                 for node in &sector_state.nodes {
@@ -157,17 +169,7 @@ pub(crate) fn spawn_sector_map_ui(
                     );
                     map.spawn((
                         Button,
-                        Node {
-                            position_type: PositionType::Absolute,
-                            left: Val::Px(node.position[0] + 360.0),
-                            top: Val::Px(node.position[1] + 230.0),
-                            width: Val::Px(170.0),
-                            height: Val::Px(52.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            padding: UiRect::horizontal(Val::Px(8.0)),
-                            ..default()
-                        },
+                        projected_node(node.position, 1.0, Vec2::ZERO),
                         BorderRadius::all(Val::Px(10.0)),
                         BackgroundColor(base_color),
                         SectorNodeButton { node_id: node.id },
@@ -189,6 +191,50 @@ pub(crate) fn spawn_sector_map_ui(
                 }
             });
         });
+}
+
+pub(crate) fn pan_and_zoom_sector_map(
+    window: Single<&Window, With<PrimaryWindow>>,
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    mut mouse_wheel: EventReader<MouseWheel>,
+    mut mouse_motion: EventReader<MouseMotion>,
+    mut view_state: ResMut<SectorMapViewState>,
+) {
+    let window = window.into_inner();
+
+    for event in mouse_wheel.read() {
+        let zoom_step = (1.0 + event.y * 0.08).clamp(0.75, 1.25);
+        view_state.zoom = (view_state.zoom * zoom_step).clamp(0.65, 1.8);
+    }
+
+    let cursor_over_map = window
+        .cursor_position()
+        .map(|cursor| cursor.x >= 400.0)
+        .unwrap_or(false);
+    if mouse_buttons.pressed(MouseButton::Middle) && cursor_over_map {
+        for event in mouse_motion.read() {
+            view_state.offset += event.delta;
+        }
+    } else {
+        mouse_motion.clear();
+    }
+}
+
+pub(crate) fn sync_sector_map_layout(
+    sector_state: Res<SectorState>,
+    view_state: Res<SectorMapViewState>,
+    mut node_query: Query<(&SectorNodeButton, &mut Node)>,
+) {
+    if !sector_state.is_changed() && !view_state.is_changed() {
+        return;
+    }
+
+    for (button, mut node_style) in &mut node_query {
+        let Some(node) = sector_state.node(button.node_id) else {
+            continue;
+        };
+        *node_style = projected_node(node.position, view_state.zoom, view_state.offset);
+    }
 }
 
 pub(crate) fn cleanup_sector_map_ui(
@@ -314,7 +360,7 @@ fn sector_status_text(sector_state: &SectorState) -> String {
         .unwrap_or("None");
 
     format!(
-        "Current Node: {current}\nSelected Node: {selected}\nSeed: {}\nReachable Nodes: {}",
+        "Current Node: {current}\nSelected Node: {selected}\nSeed: {}\nReachable Nodes: {}\nControls: scroll zoom, middle drag pan",
         sector_state.seed,
         sector_state.available_neighbors().len(),
     )
@@ -367,5 +413,19 @@ fn node_button_color(
             SectorNodeKind::HostileHold => Color::srgb(0.56, 0.24, 0.20),
             SectorNodeKind::UnstableDerelict => Color::srgb(0.26, 0.34, 0.56),
         },
+    }
+}
+
+fn projected_node(position: [f32; 2], zoom: f32, offset: Vec2) -> Node {
+    Node {
+        position_type: PositionType::Absolute,
+        left: Val::Px(position[0] * zoom + MAP_CENTER_X + offset.x),
+        top: Val::Px(position[1] * zoom + MAP_CENTER_Y + offset.y),
+        width: Val::Px(MAP_NODE_WIDTH * zoom.clamp(0.8, 1.35)),
+        height: Val::Px(MAP_NODE_HEIGHT * zoom.clamp(0.8, 1.35)),
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        padding: UiRect::horizontal(Val::Px(8.0)),
+        ..default()
     }
 }

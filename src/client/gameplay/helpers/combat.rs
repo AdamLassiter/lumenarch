@@ -6,10 +6,10 @@ use cordic::{atan2, sin};
 use super::{FixedVec2, Fx, WideFx, fx_ratio, widen, wrap_radians};
 use crate::client::{
     TILE_SIZE,
+    balance::BalanceConfig,
     gameplay::{
         ARENA_HEIGHT_TILES,
         ARENA_WIDTH_TILES,
-        PROJECTILE_LIFETIME,
         components::{Projectile, ProjectileFaction, SimPosition},
     },
     state::PlayingCleanup,
@@ -19,11 +19,13 @@ pub(crate) fn spawn_player_projectile(
     commands: &mut Commands,
     origin: FixedVec2,
     velocity: FixedVec2,
+    balance: &BalanceConfig,
 ) {
     spawn_projectile_entity(
         commands,
         origin,
         velocity,
+        balance,
         ProjectileFaction::Player,
         2,
         Fx::from_num(0),
@@ -36,6 +38,7 @@ pub(crate) fn spawn_projectile_entity(
     commands: &mut Commands,
     origin: FixedVec2,
     velocity: FixedVec2,
+    balance: &BalanceConfig,
     faction: ProjectileFaction,
     damage: i32,
     heat_damage: Fx,
@@ -47,14 +50,14 @@ pub(crate) fn spawn_projectile_entity(
     commands.spawn((
         Sprite::from_color(color, Vec2::new(10.0, 6.0)),
         Transform {
-            translation: render_translation(origin, 2.0),
+            translation: render_translation(origin, 8.0),
             rotation: Quat::from_rotation_z(-velocity_angle.to_num::<f32>() + FRAC_PI_2),
             ..default()
         },
         SimPosition { value: origin },
         Projectile {
             velocity,
-            remaining_life: Fx::from_num(PROJECTILE_LIFETIME),
+            remaining_life: Fx::from_num(balance.combat.projectile_lifetime),
             damage,
             faction,
             heat_damage,

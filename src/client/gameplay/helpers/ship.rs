@@ -4,6 +4,7 @@ use super::{FixedVec2, Fx, fx_ratio};
 use crate::{
     client::{
         TILE_SIZE,
+        balance::BalanceConfig,
         gameplay::components::{ShipMovementModel, ShipPowerModel, ShipPowerState},
     },
     ship::{ModuleKind, ShipDefinition, ShipModule},
@@ -41,11 +42,16 @@ pub(crate) fn module_integrity(kind: ModuleKind) -> i32 {
     }
 }
 
-pub(crate) fn ship_movement_model(module_count: usize, engine_count: u32) -> ShipMovementModel {
+pub(crate) fn ship_movement_model(
+    module_count: usize,
+    engine_count: u32,
+    balance: &BalanceConfig,
+) -> ShipMovementModel {
     ship_movement_model_with_effective(
         module_count,
         engine_count,
         Fx::from_num(engine_count.max(1)),
+        balance,
     )
 }
 
@@ -53,17 +59,24 @@ pub(crate) fn ship_movement_model_with_effective(
     module_count: usize,
     engine_count: u32,
     effective_engines: Fx,
+    balance: &BalanceConfig,
 ) -> ShipMovementModel {
     let engine_scalar = effective_engines.max(fx_ratio(1, 4)).to_num::<f32>();
     let mass_factor = (module_count.max(1) as f32).sqrt();
 
     ShipMovementModel {
         engine_count,
-        thrust_acceleration: Fx::from_num(260.0 * engine_scalar / mass_factor),
-        turn_speed: Fx::from_num(1.2 + 0.35 * engine_scalar),
-        max_speed: Fx::from_num(110.0 + 24.0 * engine_scalar),
-        linear_damping: Fx::from_num(0.9),
-        angular_damping: Fx::from_num(5.0),
+        thrust_acceleration: Fx::from_num(
+            balance.ship.thrust_base_acceleration * engine_scalar / mass_factor,
+        ),
+        turn_speed: Fx::from_num(
+            balance.ship.turn_speed_base + balance.ship.turn_speed_per_engine * engine_scalar,
+        ),
+        max_speed: Fx::from_num(
+            balance.ship.max_speed_base + balance.ship.max_speed_per_engine * engine_scalar,
+        ),
+        linear_damping: Fx::from_num(balance.ship.linear_damping),
+        angular_damping: Fx::from_num(balance.ship.angular_damping),
     }
 }
 
@@ -73,6 +86,7 @@ pub(crate) fn ship_power_model(
     battery_count: u32,
     engine_count: u32,
     turret_count: u32,
+    balance: &BalanceConfig,
 ) -> ShipPowerModel {
     ship_power_model_with_effective(
         module_count,
@@ -84,6 +98,7 @@ pub(crate) fn ship_power_model(
         Fx::from_num(battery_count),
         Fx::from_num(engine_count),
         Fx::from_num(turret_count),
+        balance,
     )
 }
 
@@ -97,13 +112,20 @@ pub(crate) fn ship_power_model_with_effective(
     effective_batteries: Fx,
     effective_engines: Fx,
     effective_turrets: Fx,
+    balance: &BalanceConfig,
 ) -> ShipPowerModel {
     ShipPowerModel {
-        reactor_output: effective_reactors * Fx::from_num(8),
-        battery_capacity: effective_batteries.max(Fx::from_num(battery_count)) * Fx::from_num(24),
-        passive_draw: Fx::from_num(1.0 + module_count as f32 * 0.08),
-        engine_draw: effective_engines.max(Fx::from_num(engine_count)) * Fx::from_num(2.5),
-        weapon_draw: effective_turrets.max(Fx::from_num(turret_count)) * Fx::from_num(2),
+        reactor_output: effective_reactors * Fx::from_num(balance.ship.reactor_output_per_reactor),
+        battery_capacity: effective_batteries.max(Fx::from_num(battery_count))
+            * Fx::from_num(balance.ship.battery_capacity_per_battery),
+        passive_draw: Fx::from_num(
+            balance.ship.passive_draw_base
+                + module_count as f32 * balance.ship.passive_draw_per_module,
+        ),
+        engine_draw: effective_engines.max(Fx::from_num(engine_count))
+            * Fx::from_num(balance.ship.engine_draw_per_engine),
+        weapon_draw: effective_turrets.max(Fx::from_num(turret_count))
+            * Fx::from_num(balance.ship.weapon_draw_per_turret),
     }
 }
 
@@ -111,28 +133,28 @@ fn power_draw_for_requested_systems(
     power_model: &ShipPowerModel,
     throttle_demand: Fx,
     turn_input: Fx,
+    weapon_demand: Fx,
 ) -> (Fx, Fx, Fx) {
     let throttle = throttle_demand.clamp(Fx::from_num(0), Fx::from_num(1));
     let steering_fraction =
         turn_input.abs().clamp(Fx::from_num(0), Fx::from_num(1)) * fx_ratio(2, 5);
     let engine_requested = power_model.engine_draw * throttle.max(steering_fraction);
+    let weapon_requested =
+        power_model.weapon_draw * weapon_demand.clamp(Fx::from_num(0), Fx::from_num(1));
 
-    (
-        power_model.passive_draw,
-        power_model.weapon_draw,
-        engine_requested,
-    )
+    (power_model.passive_draw, weapon_requested, engine_requested)
 }
 
 pub(crate) fn update_ship_power_state(
     dt: Fx,
     throttle_demand: Fx,
     turn_input: Fx,
+    weapon_demand: Fx,
     power_model: &ShipPowerModel,
     power_state: &mut ShipPowerState,
 ) {
     let (passive_draw, weapon_draw, engine_draw) =
-        power_draw_for_requested_systems(power_model, throttle_demand, turn_input);
+        power_draw_for_requested_systems(power_model, throttle_demand, turn_input, weapon_demand);
     let requested_draw = passive_draw + weapon_draw + engine_draw;
     let mut effective_draw = requested_draw;
     let mut engine_power_ratio = if engine_draw > Fx::from_num(0) {

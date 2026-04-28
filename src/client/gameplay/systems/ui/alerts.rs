@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::client::{
+    balance::BalanceConfig,
     gameplay::{
         components::{
             CurrentStation,
@@ -34,6 +35,7 @@ use crate::client::{
 };
 
 pub(crate) fn update_inspection_and_alerts_text(
+    balance: Res<BalanceConfig>,
     player_query: Single<
         (
             &CurrentStation,
@@ -66,10 +68,10 @@ pub(crate) fn update_inspection_and_alerts_text(
         .find(|(runtime_module, _, _, _, _, _, _)| runtime_module.module_id == station.module_id);
 
     for mut text in &mut inspection_query {
-        **text = inspection_text(current_module, nearby, held, automation_state);
+        **text = inspection_text(current_module, nearby, held, automation_state, &balance);
     }
 
-    let mut issues = collect_alert_issues(&module_query);
+    let mut issues = collect_alert_issues(&module_query, &balance);
     issues.sort_by_key(|a| std::cmp::Reverse(a.0));
     issues.truncate(3);
 
@@ -91,6 +93,7 @@ fn inspection_text(
     nearby: &NearbyInteraction,
     held: &HeldInteraction,
     automation_state: &ShipAutomationState,
+    balance: &BalanceConfig,
 ) -> String {
     let Some((runtime_module, integrity, runtime_state, computer, storage, processor, destroyed)) =
         current_module
@@ -98,7 +101,7 @@ fn inspection_text(
         return "Module: unavailable".to_string();
     };
 
-    let condition = module_condition(integrity, runtime_state, destroyed.is_some());
+    let condition = module_condition(integrity, runtime_state, destroyed.is_some(), balance);
     let interaction_line = match nearby.kind {
         Some(kind) if held.target.is_some() => format!(
             "Action: {} {:.0}%",
@@ -190,6 +193,7 @@ fn collect_alert_issues(
         Option<&ProcessorModule>,
         Option<&DestroyedModule>,
     )>,
+    balance: &BalanceConfig,
 ) -> Vec<(i32, String)> {
     module_query
         .iter()
@@ -203,7 +207,8 @@ fn collect_alert_issues(
                 processor,
                 destroyed,
             )| {
-                let condition = module_condition(integrity, runtime_state, destroyed.is_some());
+                let condition =
+                    module_condition(integrity, runtime_state, destroyed.is_some(), balance);
                 let severity = condition_severity(condition);
                 let logistics_issue = storage
                     .filter(|storage| storage.inventory.total_units() >= storage.capacity)

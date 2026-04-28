@@ -3,39 +3,42 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::prelude::*;
 
 use crate::{
-    client::gameplay::{
-        components::{
-            ArchComputerModule,
-            ArchExecutionResult,
-            EngineModule,
-            HostileShipModule,
-            Integrity,
-            Interactable,
-            ManipulatorCommandState,
-            ManipulatorModule,
-            ModuleFieldEmitter,
-            ModuleRuntimeState,
-            PowerConsumer,
-            PowerProducer,
-            ProcessorCommandState,
-            ProcessorModule,
-            ProcessorRecipe,
-            ReactorCommandState,
-            ResourceInventory,
-            RuntimeArchComputer,
-            RuntimeShipModule,
-            StorageCommandState,
-            StorageModule,
-            TurretCommandState,
-            TurretTopSprite,
-            WeaponModule,
-        },
-        helpers::{
-            Fx,
-            module_integrity,
-            module_local_position,
-            module_local_translation,
-            sprite_path_for_kind,
+    client::{
+        balance::BalanceConfig,
+        gameplay::{
+            components::{
+                ArchComputerModule,
+                ArchExecutionResult,
+                EngineModule,
+                HostileShipModule,
+                Integrity,
+                Interactable,
+                ManipulatorCommandState,
+                ManipulatorModule,
+                ModuleFieldEmitter,
+                ModuleRuntimeState,
+                PowerConsumer,
+                PowerProducer,
+                ProcessorCommandState,
+                ProcessorModule,
+                ProcessorRecipe,
+                ReactorCommandState,
+                ResourceInventory,
+                RuntimeArchComputer,
+                RuntimeShipModule,
+                StorageCommandState,
+                StorageModule,
+                TurretCommandState,
+                TurretTopSprite,
+                WeaponModule,
+            },
+            helpers::{
+                Fx,
+                module_integrity,
+                module_local_position,
+                module_local_translation,
+                sprite_path_for_kind,
+            },
         },
     },
     ship::{ModuleKind, ShipModule},
@@ -45,6 +48,7 @@ pub(super) fn spawn_runtime_module(
     commands: &mut Commands,
     asset_server: &AssetServer,
     module: &ShipModule,
+    balance: &BalanceConfig,
     center_x: f32,
     center_y: f32,
     center_x_fixed: Fx,
@@ -84,7 +88,7 @@ pub(super) fn spawn_runtime_module(
             needs_attention: false,
             last_interaction_age: Fx::from_num(0),
         },
-        module_field_emitter(module.kind),
+        module_field_emitter(module.kind, balance),
         Interactable,
         crate::client::state::PlayingCleanup,
     ));
@@ -98,10 +102,10 @@ pub(super) fn spawn_runtime_module(
             entity.insert((
                 PowerProducer { output: 10 },
                 ReactorCommandState {
-                    reaction_rate: Fx::from_num(0.5),
-                    turbine_load: Fx::from_num(0.5),
-                    power_output: Fx::from_num(4),
-                    fuel_remaining: Fx::from_num(100),
+                    reaction_rate: Fx::from_num(balance.reactor.starting_reaction_rate),
+                    turbine_load: Fx::from_num(balance.reactor.starting_turbine_load),
+                    power_output: Fx::from_num(balance.reactor.starting_power_output),
+                    fuel_remaining: Fx::from_num(balance.reactor.starting_fuel),
                 },
             ));
         }
@@ -126,7 +130,9 @@ pub(super) fn spawn_runtime_module(
                 StorageCommandState { allow_intake: true },
                 ManipulatorModule {
                     transfer_progress: Fx::from_num(0),
-                    transfer_duration: Fx::from_num(0.75),
+                    transfer_duration: Fx::from_num(
+                        balance.logistics.manipulator_transfer_duration,
+                    ),
                     active: false,
                     source_module_id: None,
                     target_module_id: None,
@@ -165,7 +171,7 @@ pub(super) fn spawn_runtime_module(
                 PowerConsumer { draw: 2 },
                 ProcessorModule {
                     progress: Fx::from_num(0),
-                    duration: Fx::from_num(2.2),
+                    duration: Fx::from_num(balance.logistics.processor_duration),
                     active: false,
                     blocked_reason: None,
                     inventory: ResourceInventory::default(),
@@ -203,58 +209,59 @@ pub(super) fn spawn_runtime_module(
     entity.id()
 }
 
-fn module_field_emitter(kind: ModuleKind) -> ModuleFieldEmitter {
+fn module_field_emitter(kind: ModuleKind, balance: &BalanceConfig) -> ModuleFieldEmitter {
     match kind {
         ModuleKind::Reactor => ModuleFieldEmitter {
-            heat_output: Fx::from_num(1),
+            heat_output: Fx::from_num(balance.fields.emitter_reactor_heat),
             cooling_output: Fx::from_num(0),
-            electrical_output: Fx::from_num(0.5),
-            grounding_output: Fx::from_num(0.2),
+            electrical_output: Fx::from_num(balance.fields.emitter_reactor_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_reactor_grounding),
         },
         ModuleKind::Engine => ModuleFieldEmitter {
-            heat_output: Fx::from_num(1),
+            heat_output: Fx::from_num(balance.fields.emitter_engine_heat),
             cooling_output: Fx::from_num(0),
-            electrical_output: Fx::from_num(0.5),
-            grounding_output: Fx::from_num(0.2),
+            electrical_output: Fx::from_num(balance.fields.emitter_engine_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_engine_grounding),
         },
         ModuleKind::Turret => ModuleFieldEmitter {
-            heat_output: Fx::from_num(2),
+            heat_output: Fx::from_num(balance.fields.emitter_turret_heat),
             cooling_output: Fx::from_num(0),
-            electrical_output: Fx::from_num(1),
-            grounding_output: Fx::from_num(0.2),
+            electrical_output: Fx::from_num(balance.fields.emitter_turret_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_turret_grounding),
         },
         ModuleKind::Battery => ModuleFieldEmitter {
-            heat_output: Fx::from_num(0.5),
+            heat_output: Fx::from_num(balance.fields.emitter_battery_heat),
             cooling_output: Fx::from_num(0),
-            electrical_output: Fx::from_num(2),
-            grounding_output: Fx::from_num(1.4),
+            electrical_output: Fx::from_num(balance.fields.emitter_battery_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_battery_grounding),
         },
         ModuleKind::Computer => ModuleFieldEmitter {
-            heat_output: Fx::from_num(0.3),
+            heat_output: Fx::from_num(balance.fields.emitter_computer_heat),
             cooling_output: Fx::from_num(0),
-            electrical_output: Fx::from_num(0.4),
-            grounding_output: Fx::from_num(1.6),
+            electrical_output: Fx::from_num(balance.fields.emitter_computer_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_computer_grounding),
         },
         ModuleKind::Processor => ModuleFieldEmitter {
-            heat_output: Fx::from_num(0.8),
+            heat_output: Fx::from_num(balance.fields.emitter_processor_heat),
             cooling_output: Fx::from_num(0),
-            electrical_output: Fx::from_num(0.4),
-            grounding_output: Fx::from_num(0.8),
+            electrical_output: Fx::from_num(balance.fields.emitter_processor_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_processor_grounding),
         },
-        ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner | ModuleKind::Airlock => {
-            ModuleFieldEmitter {
-                heat_output: Fx::from_num(0),
-                cooling_output: Fx::from_num(2),
-                electrical_output: Fx::from_num(0),
-                grounding_output: Fx::from_num(2.8),
-            }
-        }
+        ModuleKind::Hull
+        | ModuleKind::HullInnerCorner
+        | ModuleKind::HullOuterCorner
+        | ModuleKind::Airlock => ModuleFieldEmitter {
+            heat_output: Fx::from_num(0),
+            cooling_output: Fx::from_num(balance.fields.emitter_hull_cooling),
+            electrical_output: Fx::from_num(0),
+            grounding_output: Fx::from_num(balance.fields.emitter_hull_grounding),
+        },
         ModuleKind::Core | ModuleKind::Cockpit | ModuleKind::Cargo | ModuleKind::Interior => {
             ModuleFieldEmitter {
                 heat_output: Fx::from_num(0),
                 cooling_output: Fx::from_num(0),
                 electrical_output: Fx::from_num(0),
-                grounding_output: Fx::from_num(0.8),
+                grounding_output: Fx::from_num(balance.fields.emitter_generic_grounding),
             }
         }
     }

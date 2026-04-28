@@ -50,12 +50,3 @@ pub(crate) use systems::{
 const RUNTIME_SHIP_ORIGIN: bevy::prelude::Vec3 = bevy::prelude::Vec3::new(0.0, 0.0, 10.0);
 const ARENA_WIDTH_TILES: i32 = 48;
 const ARENA_HEIGHT_TILES: i32 = 32;
-const CAMERA_FOLLOW_LERP_RATE: f32 = 8.0;
-const PROJECTILE_SPEED: f32 = 420.0;
-const PROJECTILE_LIFETIME: f32 = 1.6;
-const PROJECTILE_RADIUS: f32 = 8.0;
-const HOSTILE_TARGET_RADIUS: f32 = 18.0;
-const MODULE_HIT_RADIUS: f32 = 15.0;
-const HOSTILE_PROJECTILE_SPEED: f32 = 180.0;
-const HOSTILE_FIRE_COOLDOWN: f32 = 1.8;
-const SALVAGE_PICKUP_RADIUS: f32 = 42.0;

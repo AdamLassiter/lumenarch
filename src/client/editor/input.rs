@@ -1,4 +1,8 @@
-use bevy::{input::mouse::MouseButton, prelude::*, window::PrimaryWindow};
+use bevy::{
+    input::mouse::{MouseButton, MouseMotion, MouseWheel},
+    prelude::*,
+    window::PrimaryWindow,
+};
 
 use super::{
     super::{
@@ -12,6 +16,7 @@ use super::{
             EditorSessionState,
             EditorShip,
             EditorToolState,
+            EditorViewState,
             EnemyNewButton,
             EnemyNextButton,
             EnemyPrevButton,
@@ -237,6 +242,39 @@ pub(crate) fn save_editor_ship_shortcut(
     if let Err(error) = result {
         eprintln!("editor: failed to save ship data: {error}");
     }
+}
+
+pub(crate) fn pan_and_zoom_editor_view(
+    mut mouse_wheel: EventReader<MouseWheel>,
+    mut mouse_motion: EventReader<MouseMotion>,
+    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    window: Single<&Window, With<PrimaryWindow>>,
+    mut view_state: ResMut<EditorViewState>,
+    camera_query: Single<
+        (&mut Transform, &mut OrthographicProjection),
+        (With<Camera2d>, With<crate::client::state::MainCamera>),
+    >,
+) {
+    let window = window.into_inner();
+    let (mut camera_transform, mut projection) = camera_query.into_inner();
+
+    for event in mouse_wheel.read() {
+        let zoom_step = (1.0 - event.y * 0.08).clamp(0.75, 1.25);
+        view_state.zoom = (view_state.zoom * zoom_step).clamp(0.35, 2.75);
+    }
+
+    if mouse_buttons.pressed(MouseButton::Middle) && !is_cursor_over_editor_ui(window) {
+        for event in mouse_motion.read() {
+            view_state.center.x -= event.delta.x * view_state.zoom;
+            view_state.center.y += event.delta.y * view_state.zoom;
+        }
+    } else {
+        mouse_motion.clear();
+    }
+
+    camera_transform.translation.x = view_state.center.x;
+    camera_transform.translation.y = view_state.center.y;
+    projection.scale = view_state.zoom;
 }
 
 pub(crate) fn load_editor_ship_shortcut(

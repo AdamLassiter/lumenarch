@@ -1,35 +1,39 @@
 use bevy::prelude::*;
 
 use crate::{
-    client::gameplay::{
-        components::{
-            CurrentStation,
-            DestroyedModule,
-            Integrity,
-            MissionState,
-            ModuleFieldEmitter,
-            ModuleRuntimeState,
-            PlayerFieldState,
-            PlayerShip,
-            ReactorCommandState,
-            RuntimeShipModule,
-            ShipRoot,
-            ShipboardPlayer,
-            TurretCommandState,
-        },
-        helpers::{
-            Fx,
-            dynamic_field_output,
-            field_attenuation,
-            fx_from_time_delta,
-            local_field_distance,
-            wrap_radians,
+    client::{
+        balance::BalanceConfig,
+        gameplay::{
+            components::{
+                CurrentStation,
+                DestroyedModule,
+                Integrity,
+                MissionState,
+                ModuleFieldEmitter,
+                ModuleRuntimeState,
+                PlayerFieldState,
+                PlayerShip,
+                ReactorCommandState,
+                RuntimeShipModule,
+                ShipRoot,
+                ShipboardPlayer,
+                TurretCommandState,
+            },
+            helpers::{
+                Fx,
+                dynamic_field_output,
+                field_attenuation,
+                fx_from_time_delta,
+                local_field_distance,
+                wrap_radians,
+            },
         },
     },
     ship::ModuleKind,
 };
 
 pub(crate) fn sample_ship_fields(
+    balance: Res<BalanceConfig>,
     mut module_query: Query<(
         Entity,
         &RuntimeShipModule,
@@ -46,8 +50,13 @@ pub(crate) fn sample_ship_fields(
         .iter()
         .map(
             |(entity, runtime_module, emitter, integrity, runtime_state, destroyed)| {
-                let output =
-                    dynamic_field_output(emitter, runtime_state, integrity, destroyed.is_some());
+                let output = dynamic_field_output(
+                    emitter,
+                    runtime_state,
+                    integrity,
+                    destroyed.is_some(),
+                    &balance,
+                );
                 (
                     entity,
                     runtime_module.local_position,
@@ -83,10 +92,10 @@ pub(crate) fn sample_ship_fields(
             if *source_destroyed || *source_entity == entity {
                 continue;
             }
-            let attenuation = field_attenuation(local_field_distance(
-                runtime_module.local_position,
-                *source_pos,
-            ));
+            let attenuation = field_attenuation(
+                local_field_distance(runtime_module.local_position, *source_pos),
+                &balance,
+            );
             if attenuation <= Fx::from_num(0) {
                 continue;
             }
@@ -123,7 +132,8 @@ pub(crate) fn sample_ship_fields(
         if *source_destroyed {
             continue;
         }
-        let attenuation = field_attenuation(local_field_distance(player_pos, *source_pos));
+        let attenuation =
+            field_attenuation(local_field_distance(player_pos, *source_pos), &balance);
         if attenuation <= Fx::from_num(0) {
             continue;
         }
@@ -134,12 +144,15 @@ pub(crate) fn sample_ship_fields(
     player_fields.local_heat = (heat + mission_state.ambient_heat_pressure).max(Fx::from_num(0));
     player_fields.local_electrical =
         (electrical + mission_state.ambient_electrical_pressure).max(Fx::from_num(0));
-    player_fields.heat_danger = player_fields.local_heat >= Fx::from_num(8);
-    player_fields.electrical_danger = player_fields.local_electrical >= Fx::from_num(7);
+    player_fields.heat_danger =
+        player_fields.local_heat >= Fx::from_num(balance.fields.player_heat_warning_threshold);
+    player_fields.electrical_danger = player_fields.local_electrical
+        >= Fx::from_num(balance.fields.player_electrical_warning_threshold);
 }
 
 pub(crate) fn update_module_runtime_state(
     time: Res<Time>,
+    balance: Res<BalanceConfig>,
     mut module_query: Query<(
         &RuntimeShipModule,
         &Integrity,
@@ -161,46 +174,55 @@ pub(crate) fn update_module_runtime_state(
         }
 
         let base_heat = match runtime_module.kind {
-            ModuleKind::Reactor => Fx::from_num(0.9),
-            ModuleKind::Engine => Fx::from_num(0.45),
-            ModuleKind::Turret => Fx::from_num(0.3),
-            ModuleKind::Battery => Fx::from_num(0.2),
-            ModuleKind::Computer => Fx::from_num(0.15),
-            _ => Fx::from_num(0.05),
+            ModuleKind::Reactor => Fx::from_num(balance.fields.reactor_base_heat),
+            ModuleKind::Engine => Fx::from_num(balance.fields.engine_base_heat),
+            ModuleKind::Turret => Fx::from_num(balance.fields.turret_base_heat),
+            ModuleKind::Battery => Fx::from_num(balance.fields.battery_base_heat),
+            ModuleKind::Computer => Fx::from_num(balance.fields.computer_base_heat),
+            _ => Fx::from_num(balance.fields.generic_base_heat),
         };
         let damage_factor = Fx::from_num(1)
             - Fx::from_num(integrity.current.max(0)) / Fx::from_num(integrity.max.max(1));
         runtime_state.last_interaction_age += dt;
         let mut reactor_heat_bonus = Fx::from_num(0);
         if let Some(mut reactor_state) = reactor_state {
-            let warmup_threshold = Fx::from_num(3.0);
-            let full_power_threshold = Fx::from_num(6.0);
+            let warmup_threshold = Fx::from_num(balance.reactor.warmup_threshold);
+            let full_power_threshold = Fx::from_num(balance.reactor.full_power_threshold);
             if reactor_state.fuel_remaining > Fx::from_num(0) {
                 reactor_state.fuel_remaining = (reactor_state.fuel_remaining
-                    - reactor_state.reaction_rate * dt * Fx::from_num(0.22))
+                    - reactor_state.reaction_rate
+                        * dt
+                        * Fx::from_num(balance.reactor.fuel_burn_rate))
                 .max(Fx::from_num(0));
             } else {
                 reactor_state.reaction_rate = Fx::from_num(0);
             }
-            if runtime_state.current_heat < warmup_threshold {
-                reactor_state.reaction_rate =
-                    (reactor_state.reaction_rate - dt * Fx::from_num(0.35)).max(Fx::from_num(0));
-                reactor_state.power_output = Fx::from_num(0);
+            let heat_span = (full_power_threshold - warmup_threshold).max(Fx::from_num(1));
+            let warmup_ratio = if runtime_state.current_heat <= Fx::from_num(0) {
+                Fx::from_num(0)
+            } else if runtime_state.current_heat < warmup_threshold {
+                (runtime_state.current_heat / warmup_threshold)
+                    .clamp(Fx::from_num(0), Fx::from_num(1))
+                    * Fx::from_num(0.5)
             } else {
-                let heat_span = (full_power_threshold - warmup_threshold).max(Fx::from_num(1));
-                let warmup_ratio = ((runtime_state.current_heat - warmup_threshold) / heat_span)
-                    .clamp(Fx::from_num(0), Fx::from_num(1));
-                reactor_state.power_output = ((reactor_state.reaction_rate * Fx::from_num(3)
-                    + reactor_state.turbine_load * Fx::from_num(9))
-                .min(Fx::from_num(12)))
-                    * warmup_ratio;
-            }
-            reactor_heat_bonus = reactor_state.reaction_rate * Fx::from_num(4.8)
-                - reactor_state.turbine_load * Fx::from_num(2.2);
+                (Fx::from_num(0.5)
+                    + ((runtime_state.current_heat - warmup_threshold) / heat_span)
+                        .clamp(Fx::from_num(0), Fx::from_num(1))
+                        * Fx::from_num(0.5))
+                .clamp(Fx::from_num(0), Fx::from_num(1))
+            };
+            reactor_state.power_output = ((reactor_state.reaction_rate
+                * Fx::from_num(balance.reactor.reaction_power_factor)
+                + reactor_state.turbine_load * Fx::from_num(balance.reactor.turbine_power_factor))
+            .min(Fx::from_num(balance.reactor.max_power_output)))
+                * warmup_ratio;
+            reactor_heat_bonus = reactor_state.reaction_rate
+                * Fx::from_num(balance.reactor.reaction_heat_factor)
+                - reactor_state.turbine_load * Fx::from_num(balance.reactor.turbine_cooling_factor);
         }
         if let Some(mut turret_state) = turret_state {
             let angle_delta = wrap_radians(turret_state.desired_angle - turret_state.actual_angle);
-            let step = Fx::from_num(2.6) * dt;
+            let step = Fx::from_num(balance.combat.turret_rotation_speed) * dt;
             turret_state.actual_angle = if angle_delta > step {
                 wrap_radians(turret_state.actual_angle + step)
             } else if angle_delta < -step {
@@ -210,23 +232,30 @@ pub(crate) fn update_module_runtime_state(
             };
         }
         let target_heat = base_heat
-            + reactor_heat_bonus.max(Fx::from_num(-1.5))
-            + runtime_state.sampled_heat * Fx::from_num(0.45)
+            + reactor_heat_bonus.max(Fx::from_num(balance.fields.reactor_heat_min_bonus))
+            + runtime_state.sampled_heat * Fx::from_num(balance.fields.sampled_heat_factor)
             + damage_factor;
         runtime_state.current_heat = (runtime_state.current_heat
-            + (target_heat - runtime_state.current_heat) * Fx::from_num(1.35) * dt)
+            + (target_heat - runtime_state.current_heat)
+                * Fx::from_num(balance.fields.heat_response_rate)
+                * dt)
             .max(Fx::from_num(0));
         runtime_state.electrical_instability = (runtime_state.electrical_instability
-            + (runtime_state.sampled_electrical * Fx::from_num(0.08)
-                + damage_factor * Fx::from_num(0.45))
+            + (runtime_state.sampled_electrical
+                * Fx::from_num(balance.fields.sampled_electrical_factor)
+                + damage_factor * Fx::from_num(balance.fields.damage_instability_factor))
                 * dt
-            - Fx::from_num(0.5) * dt)
+            - Fx::from_num(balance.fields.electrical_decay_rate) * dt)
             .max(Fx::from_num(0));
 
-        runtime_state.needs_attention = runtime_state.current_heat >= Fx::from_num(9)
-            || runtime_state.electrical_instability >= Fx::from_num(8)
+        runtime_state.needs_attention = runtime_state.current_heat
+            >= Fx::from_num(balance.fields.degraded_heat_threshold)
+            || runtime_state.electrical_instability
+                >= Fx::from_num(balance.fields.degraded_electrical_threshold)
             || integrity.current < integrity.max;
-        runtime_state.is_disabled = runtime_state.current_heat >= Fx::from_num(16)
-            || runtime_state.electrical_instability >= Fx::from_num(14);
+        runtime_state.is_disabled = runtime_state.current_heat
+            >= Fx::from_num(balance.fields.disabled_heat_threshold)
+            || runtime_state.electrical_instability
+                >= Fx::from_num(balance.fields.disabled_electrical_threshold);
     }
 }

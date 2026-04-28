@@ -69,14 +69,12 @@ pub(crate) struct ShipAutomationState {
     pub(crate) recent_writes: Vec<String>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub(crate) enum ArchLogisticsPreference {
     #[default]
     FeedProcessor,
     StoreCharges,
 }
-
 
 #[derive(Component)]
 pub(crate) struct ShipArchCommandState {

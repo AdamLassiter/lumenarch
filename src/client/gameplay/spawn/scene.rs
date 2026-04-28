@@ -9,6 +9,7 @@ use salvage::spawn_salvage_wreck;
 
 use super::ship::{spawn_hostile_ship, spawn_runtime_ship};
 use crate::client::{
+    balance::BalanceConfig,
     gameplay::helpers::{FixedVec2, Fx},
     state::{DemoProgression, EditorShip, EnemyShipLibraryState, SectorState},
 };
@@ -20,6 +21,7 @@ pub(crate) fn spawn_runtime_scene(
     progression: Res<DemoProgression>,
     enemy_library_state: Res<EnemyShipLibraryState>,
     sector_state: Res<SectorState>,
+    balance: Res<BalanceConfig>,
 ) {
     spawn_runtime_hud(&mut commands, &asset_server, &editor_ship.ship);
     let active_node = sector_state
@@ -29,6 +31,7 @@ pub(crate) fn spawn_runtime_scene(
         .unwrap_or_else(|| sector_state.nodes[1].clone());
     spawn_test_arena(
         &mut commands,
+        &balance,
         &active_node.encounter.arena_variant,
         if active_node.encounter.enemy_ship_ids.is_empty() {
             active_node.encounter.hostile_count
@@ -43,6 +46,7 @@ pub(crate) fn spawn_runtime_scene(
         &mut commands,
         &asset_server,
         &editor_ship.ship,
+        &balance,
         active_node.id,
         &active_node.label,
         active_node.kind.as_str(),
@@ -67,18 +71,20 @@ pub(crate) fn spawn_runtime_scene(
             .copied()
             .unwrap_or_else(|| FixedVec2::from_num(180.0 + index as f32 * 40.0, 90.0));
         let preferred_range = match entry.behavior_tag.as_str() {
-            "brawler" => Fx::from_num(120.0),
-            "skirmisher" => Fx::from_num(220.0),
-            _ => Fx::from_num(180.0),
+            "brawler" => Fx::from_num(balance.hostile_ai.brawler_preferred_range),
+            "skirmisher" => Fx::from_num(balance.hostile_ai.skirmisher_preferred_range),
+            _ => Fx::from_num(balance.hostile_ai.default_preferred_range),
         };
         spawn_hostile_ship(
             &mut commands,
             &asset_server,
             &entry.ship,
+            &balance,
             spawn_position,
             preferred_range,
-            Fx::from_num(0.85),
-            4 + u32::from(entry.threat_tier) * 3,
+            Fx::from_num(balance.hostile_ai.default_aggression),
+            balance.hostile_ai.salvage_reward_base
+                + u32::from(entry.threat_tier) * balance.hostile_ai.salvage_reward_per_threat,
         );
     }
 }

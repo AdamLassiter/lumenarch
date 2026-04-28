@@ -111,6 +111,36 @@ pub(crate) struct DebugOverlayState {
     pub(crate) enabled: bool,
 }
 
+#[derive(Resource, Clone, Copy)]
+pub(crate) struct EditorViewState {
+    pub(crate) center: Vec2,
+    pub(crate) zoom: f32,
+}
+
+impl Default for EditorViewState {
+    fn default() -> Self {
+        Self {
+            center: Vec2::ZERO,
+            zoom: 1.0,
+        }
+    }
+}
+
+#[derive(Resource, Clone, Copy)]
+pub(crate) struct SectorMapViewState {
+    pub(crate) offset: Vec2,
+    pub(crate) zoom: f32,
+}
+
+impl Default for SectorMapViewState {
+    fn default() -> Self {
+        Self {
+            offset: Vec2::ZERO,
+            zoom: 1.0,
+        }
+    }
+}
+
 #[derive(Resource, Default, Clone, Serialize, Deserialize)]
 pub(crate) struct LastMissionReport {
     pub(crate) headline: Option<String>,
@@ -481,6 +511,9 @@ pub(crate) struct DockedRoot;
 
 #[derive(Component)]
 pub(crate) struct SectorMapRoot;
+
+#[derive(Component)]
+pub(crate) struct SectorMapCanvas;
 
 #[derive(Component)]
 pub(crate) struct EditorRoot;

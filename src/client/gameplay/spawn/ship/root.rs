@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use super::{interior::build_interior_nodes, modules::spawn_runtime_module};
 use crate::{
     client::{
+        balance::BalanceConfig,
         gameplay::{
             RUNTIME_SHIP_ORIGIN,
             components::{
@@ -46,6 +47,7 @@ pub(crate) fn spawn_runtime_ship(
     commands: &mut Commands,
     asset_server: &AssetServer,
     ship: &ShipDefinition,
+    balance: &BalanceConfig,
     node_id: u32,
     node_name: &str,
     node_kind_name: &str,
@@ -59,13 +61,14 @@ pub(crate) fn spawn_runtime_ship(
     let battery_count = count_modules(ship, ModuleKind::Battery);
     let turret_count = count_modules(ship, ModuleKind::Turret);
     let computer_count = count_modules(ship, ModuleKind::Computer);
-    let movement_model = ship_movement_model(ship.modules.len(), engine_count);
+    let movement_model = ship_movement_model(ship.modules.len(), engine_count, balance);
     let power_model = ship_power_model(
         ship.modules.len(),
         reactor_count,
         battery_count,
         engine_count,
         turret_count,
+        balance,
     );
 
     let root_entity = commands
@@ -120,7 +123,7 @@ pub(crate) fn spawn_runtime_ship(
                 turret_count,
                 cooldown_remaining: Fx::from_num(0),
                 cooldown_duration: if turret_count > 0 {
-                    Fx::from_num(0.3)
+                    Fx::from_num(balance.combat.player_weapon_cooldown)
                 } else {
                     Fx::from_num(0)
                 },
@@ -204,6 +207,7 @@ pub(crate) fn spawn_runtime_ship(
                 commands,
                 asset_server,
                 module,
+                balance,
                 center_x,
                 center_y,
                 center_x_fixed,
@@ -262,6 +266,7 @@ pub(crate) fn spawn_hostile_ship(
     commands: &mut Commands,
     asset_server: &AssetServer,
     ship: &ShipDefinition,
+    balance: &BalanceConfig,
     spawn_position: FixedVec2,
     preferred_range: Fx,
     aggression: Fx,
@@ -271,13 +276,14 @@ pub(crate) fn spawn_hostile_ship(
     let reactor_count = count_modules(ship, ModuleKind::Reactor);
     let battery_count = count_modules(ship, ModuleKind::Battery);
     let turret_count = count_modules(ship, ModuleKind::Turret);
-    let movement_model = ship_movement_model(ship.modules.len(), engine_count);
+    let movement_model = ship_movement_model(ship.modules.len(), engine_count, balance);
     let power_model = ship_power_model(
         ship.modules.len(),
         reactor_count,
         battery_count,
         engine_count,
         turret_count,
+        balance,
     );
 
     let root_entity = commands
@@ -332,9 +338,9 @@ pub(crate) fn spawn_hostile_ship(
             ShipControlState::default(),
             ShipWeaponState {
                 turret_count,
-                cooldown_remaining: Fx::from_num(0.4),
+                cooldown_remaining: Fx::from_num(balance.combat.hostile_fire_cooldown * 0.22),
                 cooldown_duration: if turret_count > 0 {
-                    Fx::from_num(0.55)
+                    Fx::from_num(balance.combat.hostile_fire_cooldown * 0.31)
                 } else {
                     Fx::from_num(0)
                 },
@@ -357,6 +363,7 @@ pub(crate) fn spawn_hostile_ship(
                 commands,
                 asset_server,
                 module,
+                balance,
                 center_x,
                 center_y,
                 center_x_fixed,

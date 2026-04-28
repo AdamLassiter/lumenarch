@@ -14,6 +14,7 @@ use super::{
             EditingCleanup,
             EditorShip,
             EditorToolState,
+            MainCamera,
             PreviewTile,
             ShipTileSprite,
             ToolboxButton,
@@ -126,21 +127,30 @@ pub(crate) fn sync_toolbox_visuals(
     }
 }
 
-pub(crate) fn draw_grid_overlay(window: Single<&Window, With<PrimaryWindow>>, mut gizmos: Gizmos) {
+pub(crate) fn draw_grid_overlay(
+    window: Single<&Window, With<PrimaryWindow>>,
+    camera_query: Single<(&Transform, &OrthographicProjection), (With<Camera2d>, With<MainCamera>)>,
+    mut gizmos: Gizmos,
+) {
     let window = window.into_inner();
-    let half_w = (window.width() * 0.5) + TILE_SIZE * 4.0;
-    let half_h = (window.height() * 0.5) + TILE_SIZE * 4.0;
+    let (camera_transform, projection) = camera_query.into_inner();
+    let half_w = (window.width() * projection.scale * 0.5) + TILE_SIZE * 4.0;
+    let half_h = (window.height() * projection.scale * 0.5) + TILE_SIZE * 4.0;
+    let min_world_x = camera_transform.translation.x - half_w;
+    let max_world_x = camera_transform.translation.x + half_w;
+    let min_world_y = camera_transform.translation.y - half_h;
+    let max_world_y = camera_transform.translation.y + half_h;
 
-    let min_x = ((-half_w - HALF_TILE_SIZE) / TILE_SIZE).floor() as i32;
-    let max_x = ((half_w + HALF_TILE_SIZE) / TILE_SIZE).ceil() as i32;
-    let min_y = ((-half_h - HALF_TILE_SIZE) / TILE_SIZE).floor() as i32;
-    let max_y = ((half_h + HALF_TILE_SIZE) / TILE_SIZE).ceil() as i32;
+    let min_x = ((min_world_x - HALF_TILE_SIZE) / TILE_SIZE).floor() as i32;
+    let max_x = ((max_world_x + HALF_TILE_SIZE) / TILE_SIZE).ceil() as i32;
+    let min_y = ((min_world_y - HALF_TILE_SIZE) / TILE_SIZE).floor() as i32;
+    let max_y = ((max_world_y + HALF_TILE_SIZE) / TILE_SIZE).ceil() as i32;
 
     for grid_x in min_x..=max_x {
         let x = grid_x as f32 * TILE_SIZE - HALF_TILE_SIZE;
         gizmos.line_2d(
-            Vec2::new(x, min_y as f32 * TILE_SIZE - HALF_TILE_SIZE),
-            Vec2::new(x, max_y as f32 * TILE_SIZE - HALF_TILE_SIZE),
+            Vec2::new(x, min_world_y),
+            Vec2::new(x, max_world_y),
             GRID_COLOR,
         );
     }
@@ -148,8 +158,8 @@ pub(crate) fn draw_grid_overlay(window: Single<&Window, With<PrimaryWindow>>, mu
     for grid_y in min_y..=max_y {
         let y = grid_y as f32 * TILE_SIZE - HALF_TILE_SIZE;
         gizmos.line_2d(
-            Vec2::new(min_x as f32 * TILE_SIZE - HALF_TILE_SIZE, y),
-            Vec2::new(max_x as f32 * TILE_SIZE - HALF_TILE_SIZE, y),
+            Vec2::new(min_world_x, y),
+            Vec2::new(max_world_x, y),
             GRID_COLOR,
         );
     }

@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     client::{
+        balance::BalanceConfig,
         gameplay::{
             components::{
                 DestroyedModule,
@@ -119,6 +120,7 @@ pub(crate) fn update_mission_state(
 }
 
 pub(crate) fn sync_runtime_ship_state(
+    balance: Res<BalanceConfig>,
     player_ship_query: Single<
         (
             &Children,
@@ -199,8 +201,12 @@ pub(crate) fn sync_runtime_ship_state(
         }
     }
 
-    *movement_model =
-        ship_movement_model_with_effective(live_modules.max(1), engine_count, effective_engines);
+    *movement_model = ship_movement_model_with_effective(
+        live_modules.max(1),
+        engine_count,
+        effective_engines,
+        &balance,
+    );
     *power_model = ship_power_model_with_effective(
         live_modules.max(1),
         reactor_count,
@@ -211,10 +217,13 @@ pub(crate) fn sync_runtime_ship_state(
         effective_batteries,
         effective_engines,
         effective_turrets,
+        &balance,
     );
     if reactor_count > 0 {
-        power_model.reactor_output =
-            effective_reactor_output.max(Fx::from_num(reactor_count) * Fx::from_num(0.8));
+        power_model.reactor_output = effective_reactor_output.max(
+            Fx::from_num(reactor_count)
+                * Fx::from_num(balance.ship.reactor_output_floor_per_reactor),
+        );
     }
     power_model.reactor_output *= automation_state.output_scale;
     weapon_state.turret_count = effective_turrets.to_num::<u32>();

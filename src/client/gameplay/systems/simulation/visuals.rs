@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use crate::{
     client::{
         TILE_SIZE,
+        balance::BalanceConfig,
         gameplay::{
             components::{
                 DestroyedModule,
@@ -134,6 +135,7 @@ pub(crate) fn draw_debug_overlay(
 }
 
 pub(crate) fn update_destroyed_module_visuals(
+    balance: Res<BalanceConfig>,
     mut module_query: Query<
         (
             &RuntimeShipModule,
@@ -149,7 +151,7 @@ pub(crate) fn update_destroyed_module_visuals(
     for (runtime_module, integrity, runtime_state, destroyed, mut sprite, mut visibility) in
         &mut module_query
     {
-        let condition = module_condition(integrity, runtime_state, destroyed.is_some());
+        let condition = module_condition(integrity, runtime_state, destroyed.is_some(), &balance);
         if condition == ModuleCondition::Destroyed {
             sprite.color = Color::srgba(0.28, 0.08, 0.08, 0.12);
             *visibility = Visibility::Hidden;
@@ -157,8 +159,10 @@ pub(crate) fn update_destroyed_module_visuals(
         }
 
         *visibility = Visibility::Visible;
-        let hot = runtime_state.current_heat >= Fx::from_num(9);
-        let electrical = runtime_state.electrical_instability >= Fx::from_num(8);
+        let hot =
+            runtime_state.current_heat >= Fx::from_num(balance.fields.degraded_heat_threshold);
+        let electrical = runtime_state.electrical_instability
+            >= Fx::from_num(balance.fields.degraded_electrical_threshold);
         sprite.color = match condition {
             ModuleCondition::Healthy => Color::WHITE,
             ModuleCondition::Degraded if hot && electrical => Color::srgb(0.96, 0.52, 0.90),
@@ -174,7 +178,10 @@ pub(crate) fn update_destroyed_module_visuals(
 
         if matches!(
             runtime_module.kind,
-            ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner | ModuleKind::Airlock
+            ModuleKind::Hull
+                | ModuleKind::HullInnerCorner
+                | ModuleKind::HullOuterCorner
+                | ModuleKind::Airlock
         ) {
             sprite.color = match condition {
                 ModuleCondition::Healthy => Color::WHITE,

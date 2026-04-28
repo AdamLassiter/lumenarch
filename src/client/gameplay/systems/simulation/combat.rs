@@ -3,12 +3,8 @@ use bevy::prelude::*;
 use crate::{
     client::{
         TILE_SIZE,
+        balance::BalanceConfig,
         gameplay::{
-            HOSTILE_PROJECTILE_SPEED,
-            HOSTILE_TARGET_RADIUS,
-            MODULE_HIT_RADIUS,
-            PROJECTILE_RADIUS,
-            PROJECTILE_SPEED,
             components::{
                 AngularVelocity,
                 DestroyedModule,
@@ -66,6 +62,7 @@ use crate::{
 
 pub(crate) fn fire_player_weapons(
     mut commands: Commands,
+    balance: Res<BalanceConfig>,
     control_mode_query: Single<&ShipboardControlState, (With<PlayerShip>, With<ShipRoot>)>,
     player_ship_query: Single<
         (
@@ -123,15 +120,17 @@ pub(crate) fn fire_player_weapons(
             continue;
         }
         let world_angle = ship_rotation.radians + turret_state.actual_angle;
-        let projectile_velocity = facing_vector(world_angle) * Fx::from_num(PROJECTILE_SPEED);
+        let projectile_velocity =
+            facing_vector(world_angle) * Fx::from_num(balance.combat.projectile_speed);
         if projectile_velocity.is_near_zero() {
             continue;
         }
-        let muzzle_offset = facing_vector(world_angle) * Fx::from_num(TILE_SIZE * 0.35);
+        let muzzle_offset = facing_vector(world_angle)
+            * Fx::from_num(TILE_SIZE * balance.combat.muzzle_offset_tiles);
         let origin = ship_position.value
             + weapon_module.local_position.rotate(ship_rotation.radians)
             + muzzle_offset;
-        spawn_player_projectile(&mut commands, origin, projectile_velocity);
+        spawn_player_projectile(&mut commands, origin, projectile_velocity, &balance);
         fired_any = true;
     }
 
@@ -141,6 +140,7 @@ pub(crate) fn fire_player_weapons(
 }
 
 pub(crate) fn sync_hostile_ship_state(
+    balance: Res<BalanceConfig>,
     mut hostile_query: Query<
         (
             &Children,
@@ -211,6 +211,7 @@ pub(crate) fn sync_hostile_ship_state(
             live_modules.max(1),
             engine_count,
             effective_engines,
+            &balance,
         );
         *power_model = ship_power_model_with_effective(
             live_modules.max(1),
@@ -222,6 +223,7 @@ pub(crate) fn sync_hostile_ship_state(
             effective_batteries,
             effective_engines,
             effective_turrets,
+            &balance,
         );
         weapon_state.turret_count = effective_turrets.to_num::<u32>();
         if weapon_state.turret_count == 0 {
@@ -232,6 +234,7 @@ pub(crate) fn sync_hostile_ship_state(
 
 pub(crate) fn drive_hostile_ships(
     time: Res<Time>,
+    balance: Res<BalanceConfig>,
     mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     player_query: Single<&SimPosition, (With<PlayerShip>, With<ShipRoot>)>,
     mut hostile_query: Query<
@@ -295,20 +298,37 @@ pub(crate) fn drive_hostile_ships(
             .max(-ai.aggression)
             .min(ai.aggression);
 
-        let mut throttle = if distance > ai.preferred_range * Fx::from_num(1.15) {
+        let mut throttle = if distance
+            > ai.preferred_range * Fx::from_num(balance.hostile_ai.far_range_multiplier)
+        {
             Fx::from_num(1)
-        } else if distance < ai.preferred_range * Fx::from_num(0.75) {
-            Fx::from_num(0.2)
+        } else if distance
+            < ai.preferred_range * Fx::from_num(balance.hostile_ai.near_range_multiplier)
+        {
+            Fx::from_num(balance.hostile_ai.close_throttle)
         } else {
-            Fx::from_num(0.55)
+            Fx::from_num(balance.hostile_ai.cruise_throttle)
         };
-        if angle_error.abs() > Fx::from_num(0.45) {
-            throttle *= Fx::from_num(0.35);
+        if angle_error.abs() > Fx::from_num(balance.hostile_ai.turn_slowdown_angle) {
+            throttle *= Fx::from_num(balance.hostile_ai.turn_slowdown_multiplier);
         }
+        let wants_fire =
+            angle_error.abs() <= Fx::from_num(balance.hostile_ai.firing_angle_threshold);
 
         weapon_state.cooldown_remaining =
             (weapon_state.cooldown_remaining - dt).max(Fx::from_num(0));
-        update_ship_power_state(dt, throttle, turn_input, power_model, &mut power_state);
+        update_ship_power_state(
+            dt,
+            throttle,
+            turn_input,
+            if wants_fire {
+                Fx::from_num(1)
+            } else {
+                Fx::from_num(0)
+            },
+            power_model,
+            &mut power_state,
+        );
 
         let effective_turn_input = turn_input * power_state.engine_power_ratio;
         if effective_turn_input.abs() > Fx::from_num(0.01) && power_state.engines_powered {
@@ -346,7 +366,7 @@ pub(crate) fn drive_hostile_ships(
             }
             turret_state.desired_angle =
                 wrap_radians(angle_from_vector(to_player) - Fx::FRAC_PI_2 - ship_rotation.radians);
-            turret_state.fire_intent = angle_error.abs() <= Fx::from_num(0.35);
+            turret_state.fire_intent = wants_fire;
         }
     }
 }
@@ -380,6 +400,7 @@ pub(crate) fn integrate_hostile_ship_motion(
 
 pub(crate) fn fire_hostile_ship_weapons(
     mut commands: Commands,
+    balance: Res<BalanceConfig>,
     mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     mut hostile_query: Query<
         (
@@ -435,11 +456,12 @@ pub(crate) fn fire_hostile_ship_weapons(
 
             let world_angle = ship_rotation.radians + turret_state.actual_angle;
             let projectile_velocity =
-                facing_vector(world_angle) * Fx::from_num(HOSTILE_PROJECTILE_SPEED);
+                facing_vector(world_angle) * Fx::from_num(balance.combat.hostile_projectile_speed);
             if projectile_velocity.is_near_zero() {
                 continue;
             }
-            let muzzle_offset = facing_vector(world_angle) * Fx::from_num(TILE_SIZE * 0.35);
+            let muzzle_offset = facing_vector(world_angle)
+                * Fx::from_num(TILE_SIZE * balance.combat.muzzle_offset_tiles);
             let origin = ship_position.value
                 + weapon_module.local_position.rotate(ship_rotation.radians)
                 + muzzle_offset;
@@ -447,10 +469,11 @@ pub(crate) fn fire_hostile_ship_weapons(
                 &mut commands,
                 origin,
                 projectile_velocity,
+                &balance,
                 ProjectileFaction::Hostile,
-                3,
-                Fx::from_num(1.2),
-                Fx::from_num(0.8),
+                balance.combat.hostile_projectile_damage,
+                Fx::from_num(balance.combat.hostile_projectile_heat_damage),
+                Fx::from_num(balance.combat.hostile_projectile_electrical_damage),
                 Color::srgb(0.96, 0.38, 0.24),
             );
             fired_any = true;
@@ -465,6 +488,7 @@ pub(crate) fn fire_hostile_ship_weapons(
 pub(crate) fn fire_hostile_targets(
     mut commands: Commands,
     time: Res<Time>,
+    balance: Res<BalanceConfig>,
     player_ship_query: Single<&SimPosition, (With<PlayerShip>, With<ShipRoot>)>,
     mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     mut hostile_query: Query<(&SimPosition, &mut HostileWeaponState), With<HostileTurretPlatform>>,
@@ -493,9 +517,10 @@ pub(crate) fn fire_hostile_targets(
         spawn_projectile_entity(
             &mut commands,
             origin,
-            direction * Fx::from_num(HOSTILE_PROJECTILE_SPEED),
+            direction * Fx::from_num(balance.combat.hostile_projectile_speed),
+            &balance,
             ProjectileFaction::Hostile,
-            3,
+            balance.combat.hostile_projectile_damage,
             weapon_state.heat_damage,
             weapon_state.electrical_damage,
             Color::srgb(0.96, 0.38, 0.24),
@@ -544,6 +569,7 @@ pub(crate) fn advance_projectiles(
 
 pub(crate) fn handle_projectile_hits(
     mut commands: Commands,
+    balance: Res<BalanceConfig>,
     projectile_query: Query<(Entity, &SimPosition, &Projectile)>,
     hostile_root_query: Query<
         (
@@ -590,8 +616,10 @@ pub(crate) fn handle_projectile_hits(
     >,
 ) {
     let (ship_position, ship_rotation, mut mission_state) = player_ship_query.into_inner();
-    let hostile_hit_distance_sq = fixed_radius_sq(HOSTILE_TARGET_RADIUS + PROJECTILE_RADIUS);
-    let module_hit_distance_sq = fixed_radius_sq(MODULE_HIT_RADIUS + PROJECTILE_RADIUS);
+    let hostile_hit_distance_sq =
+        fixed_radius_sq(balance.combat.hostile_target_radius + balance.combat.projectile_radius);
+    let module_hit_distance_sq =
+        fixed_radius_sq(balance.combat.module_hit_radius + balance.combat.projectile_radius);
 
     for (projectile_entity, projectile_position, projectile) in &projectile_query {
         let projectile_pos = projectile_position.value;

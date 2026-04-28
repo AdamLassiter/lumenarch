@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::client::{
+    balance::BalanceConfig,
     gameplay::{
         components::{
             AngularVelocity,
@@ -57,6 +58,7 @@ use crate::client::{
 };
 
 pub(crate) fn update_gameplay_status_text(
+    balance: Res<BalanceConfig>,
     ship_query: Single<
         (
             &SimPosition,
@@ -118,9 +120,14 @@ pub(crate) fn update_gameplay_status_text(
     ) = ship_query.into_inner();
     let (current_station, player_fields) = player_query.into_inner();
 
-    let salvage_line = salvage_status_line(ship_position.value, mission_state, &salvage_query);
+    let salvage_line = salvage_status_line(
+        ship_position.value,
+        mission_state,
+        &salvage_query,
+        balance.combat.salvage_pickup_radius,
+    );
     let (current_integrity, max_integrity, active_modules, degraded_modules, disabled_modules) =
-        summarize_modules(children, &module_query);
+        summarize_modules(children, &module_query, &balance);
     let (arch_program, arch_exec, arch_invalid, arch_writes) =
         summarize_arch(children, &module_query);
 
@@ -342,6 +349,7 @@ fn summarize_modules(
         ),
         With<RuntimeShipModule>,
     >,
+    balance: &BalanceConfig,
 ) -> (i32, i32, usize, usize, usize) {
     let mut current_integrity = 0i32;
     let mut max_integrity = 0i32;
@@ -356,7 +364,7 @@ fn summarize_modules(
             continue;
         };
         max_integrity += integrity.max;
-        let condition = module_condition(integrity, runtime_state, destroyed.is_some());
+        let condition = module_condition(integrity, runtime_state, destroyed.is_some(), balance);
         if condition != ModuleCondition::Destroyed {
             current_integrity += integrity.current;
             active_modules += 1;

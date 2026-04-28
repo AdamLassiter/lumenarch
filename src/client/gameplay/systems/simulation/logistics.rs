@@ -3,8 +3,8 @@ use bevy::prelude::*;
 use crate::{
     client::{
         TILE_SIZE,
+        balance::BalanceConfig,
         gameplay::{
-            SALVAGE_PICKUP_RADIUS,
             components::{
                 CollectedSalvage,
                 DestroyedModule,
@@ -40,6 +40,7 @@ use crate::{
 
 pub(crate) fn collect_salvage(
     mut commands: Commands,
+    balance: Res<BalanceConfig>,
     keys: Res<ButtonInput<KeyCode>>,
     player_ship_query: Single<
         (&SimPosition, &mut MissionState),
@@ -63,7 +64,7 @@ pub(crate) fn collect_salvage(
         return;
     }
 
-    let pickup_radius_sq = fixed_radius_sq(SALVAGE_PICKUP_RADIUS);
+    let pickup_radius_sq = fixed_radius_sq(balance.combat.salvage_pickup_radius);
     for (entity, salvage_position, salvage_pickup) in &salvage_query {
         if ship_position.value.distance_sq(salvage_position.value) <= pickup_radius_sq {
             let mut best_target = None;
@@ -134,6 +135,7 @@ pub(crate) fn collect_salvage(
 
 pub(crate) fn run_logistics_transfers(
     time: Res<Time>,
+    balance: Res<BalanceConfig>,
     ship_query: Single<
         (&ShipArchCommandState, &mut MissionState),
         (With<PlayerShip>, With<ShipRoot>),
@@ -196,7 +198,7 @@ pub(crate) fn run_logistics_transfers(
 
         let in_range = |source_pos: FixedVec2| {
             local_field_distance(manip_runtime_module.local_position, source_pos)
-                <= Fx::from_num(TILE_SIZE * 2.5)
+                <= Fx::from_num(TILE_SIZE * balance.logistics.manipulator_range_tiles)
         };
 
         let mut task: Option<(u64, u64, ResourceKind)> = None;

@@ -56,6 +56,7 @@ pub(crate) fn salvage_status_line(
         (&SimPosition, &SalvagePickup),
         (With<SalvageWreck>, Without<CollectedSalvage>),
     >,
+    salvage_pickup_radius: f32,
 ) -> String {
     if mission_state.salvage_collected {
         return format!("recovered {} scrap", mission_state.salvage_scrap_awarded);
@@ -65,7 +66,7 @@ pub(crate) fn salvage_status_line(
         return "secure the encounter first".to_string();
     }
 
-    let pickup_radius_sq = fixed_radius_sq(super::super::SALVAGE_PICKUP_RADIUS);
+    let pickup_radius_sq = fixed_radius_sq(salvage_pickup_radius);
     for (position, salvage) in salvage_query.iter() {
         if ship_position.distance_sq(position.value) <= pickup_radius_sq {
             return format!("press F for {} scrap", salvage.scrap_value);

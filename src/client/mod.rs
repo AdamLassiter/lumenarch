@@ -1,3 +1,4 @@
+mod balance;
 mod campaign;
 mod docked;
 mod editor;
@@ -21,9 +22,11 @@ use self::state::{
     EditorSessionState,
     EditorShip,
     EditorToolState,
+    EditorViewState,
     EnemyShipLibraryState,
     LastMissionReport,
     MainCamera,
+    SectorMapViewState,
     SectorState,
 };
 use crate::ship::ModuleKind;
@@ -40,8 +43,14 @@ pub(crate) const GRID_COLOR: Color = Color::srgba(0.38, 0.45, 0.56, 0.28);
 pub(crate) const TOOLBOX_COMPONENTS: [ModuleKind; 14] = ModuleKind::ALL;
 
 pub fn run_client() {
+    let balance_config = balance::load_or_create_default_balance().unwrap_or_else(|error| {
+        eprintln!("client: failed to load balance config, using defaults: {error}");
+        balance::BalanceConfig::default()
+    });
+
     App::new()
         .insert_resource(ClearColor(Color::srgb(0.04, 0.05, 0.08)))
+        .insert_resource(balance_config)
         .insert_resource(ConnectionConfig::default())
         .insert_resource(ConnectionStatus::default())
         .insert_resource(ConnectionMailbox::default())
@@ -55,6 +64,8 @@ pub fn run_client() {
         .insert_resource(DebugOverlayState::default())
         .insert_resource(LastMissionReport::default())
         .insert_resource(EditorToolState::default())
+        .insert_resource(EditorViewState::default())
+        .insert_resource(SectorMapViewState::default())
         .add_plugins(
             DefaultPlugins
                 .set(ImagePlugin::default_nearest())
@@ -109,6 +120,8 @@ pub fn run_client() {
                 sector_map::sector_node_button_system.run_if(in_state(ClientAppState::SectorMap)),
                 sector_map::sector_navigation_button_system
                     .run_if(in_state(ClientAppState::SectorMap)),
+                sector_map::pan_and_zoom_sector_map.run_if(in_state(ClientAppState::SectorMap)),
+                sector_map::sync_sector_map_layout.run_if(in_state(ClientAppState::SectorMap)),
                 sector_map::update_sector_map_text.run_if(in_state(ClientAppState::SectorMap)),
             ),
         )
@@ -136,6 +149,7 @@ pub fn run_client() {
                 editor::leave_editor_keyboard_shortcut.run_if(in_state(ClientAppState::Editing)),
                 editor::rotate_selected_tool.run_if(in_state(ClientAppState::Editing)),
                 editor::place_or_remove_tile.run_if(in_state(ClientAppState::Editing)),
+                editor::pan_and_zoom_editor_view.run_if(in_state(ClientAppState::Editing)),
                 editor::save_editor_ship_shortcut.run_if(in_state(ClientAppState::Editing)),
                 editor::load_editor_ship_shortcut.run_if(in_state(ClientAppState::Editing)),
                 editor::persist_editor_ship.run_if(in_state(ClientAppState::Editing)),
