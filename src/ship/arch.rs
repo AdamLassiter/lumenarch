@@ -299,7 +299,10 @@ impl ArchProgramTemplate {
     }
 
     pub fn next(self) -> Self {
-        let index = Self::ALL.iter().position(|template| *template == self).unwrap_or(0);
+        let index = Self::ALL
+            .iter()
+            .position(|template| *template == self)
+            .unwrap_or(0);
         Self::ALL[(index + 1) % Self::ALL.len()]
     }
 }

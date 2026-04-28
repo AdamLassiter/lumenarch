@@ -1,58 +1,60 @@
 use bevy::prelude::*;
 
-use crate::client::gameplay::{
-    components::{
-        AngularVelocity,
-        CollectedSalvage,
-        CurrentStation,
-        DestroyedModule,
-        Integrity,
-        LinearVelocity,
-        ManipulatorCommandState,
-        ManipulatorModule,
-        MissionState,
-        ModuleCondition,
-        ModuleRuntimeState,
-        PlayerFieldState,
-        PlayerShip,
-        ProcessorCommandState,
-        ProcessorModule,
-        Projectile,
-        ReactorCommandState,
-        RuntimeArchComputer,
-        RuntimeShipModule,
-        ShipAutomationState,
-        ShipControlState,
-        ShipMovementModel,
-        ShipPowerState,
-        ShipRoot,
-        ShipWeaponState,
-        ShipboardControlState,
-        ShipboardPlayer,
-        SimPosition,
-        StorageCommandState,
-        StorageModule,
-        TurretCommandState,
-        WeaponModule,
-        HostileTarget,
-        SalvagePickup,
-        SalvageWreck,
+use crate::client::{
+    gameplay::{
+        components::{
+            AngularVelocity,
+            CollectedSalvage,
+            CurrentStation,
+            DestroyedModule,
+            HostileTarget,
+            Integrity,
+            LinearVelocity,
+            ManipulatorCommandState,
+            ManipulatorModule,
+            MissionState,
+            ModuleCondition,
+            ModuleRuntimeState,
+            PlayerFieldState,
+            PlayerShip,
+            ProcessorCommandState,
+            ProcessorModule,
+            Projectile,
+            ReactorCommandState,
+            RuntimeArchComputer,
+            RuntimeShipModule,
+            SalvagePickup,
+            SalvageWreck,
+            ShipAutomationState,
+            ShipControlState,
+            ShipMovementModel,
+            ShipPowerState,
+            ShipRoot,
+            ShipWeaponState,
+            ShipboardControlState,
+            ShipboardPlayer,
+            SimPosition,
+            StorageCommandState,
+            StorageModule,
+            TurretCommandState,
+            WeaponModule,
+        },
+        helpers::{
+            Fx,
+            danger_level,
+            format_fx0,
+            format_fx1,
+            format_fx2,
+            meter_bar,
+            mission_return_line,
+            mission_status_line,
+            module_condition,
+            salvage_status_line,
+        },
+        systems::shared::module_display_name,
     },
-    helpers::{
-        danger_level,
-        format_fx0,
-        format_fx1,
-        format_fx2,
-        meter_bar,
-        mission_return_line,
-        mission_status_line,
-        module_condition,
-        salvage_status_line,
-        Fx,
-    },
-    systems::shared::module_display_name,
+    state::{DemoProgression, GameplayControlsText, GameplayStatusText},
 };
-use crate::client::state::{DemoProgression, GameplayControlsText, GameplayStatusText};
 
 pub(crate) fn update_gameplay_status_text(
     ship_query: Single<
@@ -98,8 +100,8 @@ pub(crate) fn update_gameplay_status_text(
         (With<SalvageWreck>, Without<CollectedSalvage>),
     >,
     progression: Res<DemoProgression>,
-    mut status_query: Query<&mut Text, With<GameplayStatusText>>,
-    mut controls_query: Query<&mut Text, With<GameplayControlsText>>,
+    mut status_query: Query<&mut Text, (With<GameplayStatusText>, Without<GameplayControlsText>)>,
+    mut controls_query: Query<&mut Text, (With<GameplayControlsText>, Without<GameplayStatusText>)>,
 ) {
     let (
         ship_position,
@@ -150,9 +152,17 @@ pub(crate) fn update_gameplay_status_text(
             format_fx1(power_state.generation),
             format_fx1(power_state.draw),
             format_fx1(power_state.stored_energy),
-            if power_state.weapons_powered { "yes" } else { "no" },
+            if power_state.weapons_powered {
+                "yes"
+            } else {
+                "no"
+            },
             automation_state.mode,
-            if automation_state.active { "engaged" } else { "standby" },
+            if automation_state.active {
+                "engaged"
+            } else {
+                "standby"
+            },
             arch_program,
             arch_exec,
             arch_invalid,
@@ -180,7 +190,11 @@ pub(crate) fn update_gameplay_status_text(
             danger_level(player_fields.local_heat, Fx::from_num(8), Fx::from_num(14)),
             format_fx1(player_fields.local_electrical),
             meter_bar(player_fields.local_electrical, Fx::from_num(14), 12),
-            danger_level(player_fields.local_electrical, Fx::from_num(7), Fx::from_num(12)),
+            danger_level(
+                player_fields.local_electrical,
+                Fx::from_num(7),
+                Fx::from_num(12)
+            ),
             salvage_line,
             progression.scrap,
         );
@@ -401,7 +415,10 @@ fn summarize_arch(
                 } else {
                     computer.last_result.program_name.clone()
                 },
-                format!("{}/{}", computer.last_result.executed, computer.last_result.budget),
+                format!(
+                    "{}/{}",
+                    computer.last_result.executed, computer.last_result.budget
+                ),
                 u32::from(computer.last_result.halted_reason.is_some()),
                 if computer.last_result.recent_writes.is_empty() {
                     "none".to_string()
@@ -418,10 +435,10 @@ fn summarize_arch(
 fn controls_help_text(mode: crate::client::gameplay::components::ShipControlMode) -> String {
     match mode {
         crate::client::gameplay::components::ShipControlMode::Interior => {
-            "Controls\nW/A/S/D: move between ship tiles\nE: enter nearby station\nQ or Esc: leave focused station\nF: collect salvage\nF3: diagnostics\nTab: return to editor".to_string()
+            "Controls\nW/A/S/D: move between ship tiles\nE: enter nearby station\nQ or Esc: leave focused station\nF: collect salvage\nF3: diagnostics\nTab: return to station".to_string()
         }
         crate::client::gameplay::components::ShipControlMode::Cockpit => {
-            "Cockpit Controls\nW/S or mouse: throttle demand\nA/D or mouse: steering\nC or Q: leave cockpit".to_string()
+            "Cockpit Controls\nW/S or mouse: throttle demand\nA/D or mouse: steering\nQ or Esc: leave cockpit".to_string()
         }
         crate::client::gameplay::components::ShipControlMode::Turret => {
             "Turret Controls\nMouse or A/D: aim turret\nSpace or left mouse: fire\nQ or Esc: leave turret".to_string()

@@ -1,39 +1,54 @@
 use bevy::prelude::*;
 
-use crate::client::state::{ClientAppState, DemoProgression, LastMissionReport};
-use crate::client::gameplay::{
-    components::{
-        DestroyedModule,
-        HostileTarget,
-        Integrity,
-        MissionState,
-        ModuleRuntimeState,
-        PlayerShip,
-        ProcessorModule,
-        ReactorCommandState,
-        RuntimeArchComputer,
-        RuntimeShipModule,
-        ShipAutomationState,
-        ShipMovementModel,
-        ShipPowerModel,
-        ShipRoot,
-        ShipWeaponState,
-        StorageModule,
-        WeaponModule,
+use crate::{
+    client::{
+        gameplay::{
+            components::{
+                DestroyedModule,
+                HostileTarget,
+                Integrity,
+                MissionState,
+                ModuleRuntimeState,
+                PlayerShip,
+                ProcessorModule,
+                ReactorCommandState,
+                RuntimeArchComputer,
+                RuntimeShipModule,
+                ShipAutomationState,
+                ShipMovementModel,
+                ShipPowerModel,
+                ShipRoot,
+                ShipWeaponState,
+                StorageModule,
+                WeaponModule,
+            },
+            helpers::{
+                Fx,
+                fx_from_time_delta,
+                module_effectiveness,
+                ship_movement_model_with_effective,
+                ship_power_model_with_effective,
+            },
+        },
+        state::{
+            ClientAppState,
+            DemoProgression,
+            LastMissionReport,
+            SectorNodeStatus,
+            SectorState,
+            TravelOutcome,
+        },
     },
-    helpers::{
-        fx_from_time_delta,
-        module_effectiveness,
-        ship_movement_model_with_effective,
-        ship_power_model_with_effective,
-        Fx,
-    },
+    ship::ModuleKind,
 };
-use crate::ship::ModuleKind;
 
 pub(crate) fn update_mission_telemetry(
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
-    module_query: Query<(&RuntimeShipModule, &ModuleRuntimeState, Option<&DestroyedModule>)>,
+    module_query: Query<(
+        &RuntimeShipModule,
+        &ModuleRuntimeState,
+        Option<&DestroyedModule>,
+    )>,
 ) {
     let mut mission_state = mission_query.into_inner();
 
@@ -63,7 +78,9 @@ pub(crate) fn update_mission_state(
     if mission_state.failed {
         mission_state.encounter_cleared = false;
         mission_state.completed = false;
-        mission_state.return_delay_remaining.get_or_insert(Fx::from_num(2.5));
+        mission_state
+            .return_delay_remaining
+            .get_or_insert(Fx::from_num(2.5));
         return;
     }
 
@@ -76,7 +93,9 @@ pub(crate) fn update_mission_state(
             mission_state.completion_reason = Some("Encounter cleared".to_string());
         }
         if mission_state.completed {
-            mission_state.return_delay_remaining.get_or_insert(Fx::from_num(2.5));
+            mission_state
+                .return_delay_remaining
+                .get_or_insert(Fx::from_num(2.5));
         } else {
             mission_state.return_delay_remaining = None;
         }
@@ -197,7 +216,9 @@ pub(crate) fn sync_runtime_ship_state(
         mission_state.failure_reason = Some("Core destroyed".to_string());
         mission_state.encounter_cleared = false;
         mission_state.completed = false;
-        mission_state.return_delay_remaining.get_or_insert(Fx::from_num(2.5));
+        mission_state
+            .return_delay_remaining
+            .get_or_insert(Fx::from_num(2.5));
     }
 }
 
@@ -205,7 +226,12 @@ pub(crate) fn return_after_mission_resolution(
     time: Res<Time>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     mut progression: ResMut<DemoProgression>,
-    inventory_query: Query<(&RuntimeShipModule, Option<&StorageModule>, Option<&ProcessorModule>)>,
+    mut sector_state: ResMut<SectorState>,
+    inventory_query: Query<(
+        &RuntimeShipModule,
+        Option<&StorageModule>,
+        Option<&ProcessorModule>,
+    )>,
     computer_query: Query<&RuntimeArchComputer>,
     mut last_mission_report: ResMut<LastMissionReport>,
     mut next_state: ResMut<NextState<ClientAppState>>,
@@ -232,9 +258,21 @@ pub(crate) fn return_after_mission_resolution(
             repair_charge_returned += processor.inventory.repair_charge;
         }
     }
-    let logistics_payout = raw_salvage_returned + repair_charge_returned * 3;
+    let logistics_payout = (raw_salvage_returned + repair_charge_returned * 3)
+        * mission_state.reward_multiplier.max(1);
     progression.scrap += logistics_payout;
     mission_state.salvage_scrap_awarded = logistics_payout;
+
+    let hull_wear_delta = if mission_state.failed {
+        3
+    } else if mission_state.first_disabled_module_kind.is_some() {
+        2
+    } else if mission_state.highest_heat >= Fx::from_num(10) {
+        1
+    } else {
+        0
+    };
+    progression.hull_wear = progression.hull_wear.saturating_add(hull_wear_delta);
 
     let (headline, detail) = if mission_state.failed {
         (
@@ -309,11 +347,55 @@ pub(crate) fn return_after_mission_resolution(
         hints.push("Recovered cargo never reached a useful processor cycle.".to_string());
     }
     if mission_state.transfer_count <= 1 && mission_state.recovered_raw_salvage > 0 {
-        hints.push("Cargo flow barely moved. Manipulator reach or automation priority may be wrong.".to_string());
+        hints.push(
+            "Cargo flow barely moved. Manipulator reach or automation priority may be wrong."
+                .to_string(),
+        );
     }
     last_mission_report.redesign_hints = hints;
+    last_mission_report.node_name = Some(mission_state.node_name.clone());
+    last_mission_report.node_kind = Some(mission_state.node_kind_name.clone());
+
+    let travel_outcome = TravelOutcome {
+        node_id: mission_state.node_id,
+        success: !mission_state.failed,
+        failed: mission_state.failed,
+        scrap_awarded: mission_state.salvage_scrap_awarded,
+        hull_wear_delta,
+        exhausted: !mission_state.failed,
+    };
+    last_mission_report.travel_outcome = Some(if travel_outcome.failed {
+        format!(
+            "{} failed, +{} hull wear",
+            mission_state.node_name, travel_outcome.hull_wear_delta
+        )
+    } else {
+        format!(
+            "{} cleared, +{} scrap, +{} hull wear",
+            mission_state.node_name, travel_outcome.scrap_awarded, travel_outcome.hull_wear_delta
+        )
+    });
+
+    if let Some(node) = sector_state.node_mut(mission_state.node_id) {
+        node.status = if travel_outcome.failed {
+            SectorNodeStatus::Failed
+        } else {
+            SectorNodeStatus::Exhausted
+        };
+    }
+    sector_state.current_node_id = 0;
+    sector_state.active_encounter_node_id = None;
+    if let Some(next_node) = sector_state.available_neighbors().into_iter().find(|node| {
+        matches!(
+            node.status,
+            SectorNodeStatus::Fresh | SectorNodeStatus::Completed
+        )
+    }) {
+        sector_state.selected_node_id = Some(next_node.id);
+    }
+
     mission_state.return_delay_remaining = None;
-    next_state.set(ClientAppState::Editing);
+    next_state.set(ClientAppState::Docked);
 }
 
 fn automation_program_name(computer_query: &Query<&RuntimeArchComputer>) -> Option<String> {

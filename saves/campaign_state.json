@@ -1,0 +1,187 @@
+{
+  "progression": {
+    "scrap": 77,
+    "hull_wear": 0,
+    "jump_count": 13
+  },
+  "sector": {
+    "seed": 66790,
+    "current_node_id": 0,
+    "selected_node_id": 1,
+    "active_encounter_node_id": 1,
+    "nodes": [
+      {
+        "id": 0,
+        "label": "Needle Rest",
+        "kind": "HubStation",
+        "risk_tier": 0,
+        "reward_hint": "Safe dock, refit, relaunch",
+        "neighbors": [
+          1,
+          2,
+          3
+        ],
+        "status": "Fresh",
+        "position": [
+          0.0,
+          0.0
+        ],
+        "encounter": {
+          "hostile_count": 0,
+          "salvage_value": 0,
+          "ambient_heat_pressure": 0,
+          "ambient_electrical_pressure": 0,
+          "reward_multiplier": 1,
+          "arena_variant": "station"
+        }
+      },
+      {
+        "id": 1,
+        "label": "Latchline Debris",
+        "kind": "SalvageField",
+        "risk_tier": 1,
+        "reward_hint": "Low threat, strong salvage",
+        "neighbors": [
+          0,
+          4
+        ],
+        "status": "Failed",
+        "position": [
+          -260.0,
+          150.0
+        ],
+        "encounter": {
+          "hostile_count": 1,
+          "salvage_value": 10,
+          "ambient_heat_pressure": 0,
+          "ambient_electrical_pressure": 0,
+          "reward_multiplier": 2,
+          "arena_variant": "salvage"
+        }
+      },
+      {
+        "id": 2,
+        "label": "Gravehook Nest",
+        "kind": "HostileHold",
+        "risk_tier": 3,
+        "reward_hint": "Heavy guns, middling haul",
+        "neighbors": [
+          0,
+          4,
+          5
+        ],
+        "status": "Fresh",
+        "position": [
+          0.0,
+          200.0
+        ],
+        "encounter": {
+          "hostile_count": 3,
+          "salvage_value": 8,
+          "ambient_heat_pressure": 1,
+          "ambient_electrical_pressure": 0,
+          "reward_multiplier": 3,
+          "arena_variant": "hostile"
+        }
+      },
+      {
+        "id": 3,
+        "label": "Blueglass Hush",
+        "kind": "UnstableDerelict",
+        "risk_tier": 2,
+        "reward_hint": "System stress, moderate reward",
+        "neighbors": [
+          0,
+          5
+        ],
+        "status": "Fresh",
+        "position": [
+          250.0,
+          120.0
+        ],
+        "encounter": {
+          "hostile_count": 2,
+          "salvage_value": 9,
+          "ambient_heat_pressure": 1,
+          "ambient_electrical_pressure": 2,
+          "reward_multiplier": 3,
+          "arena_variant": "unstable"
+        }
+      },
+      {
+        "id": 4,
+        "label": "Forked Cache",
+        "kind": "SalvageField",
+        "risk_tier": 2,
+        "reward_hint": "Branch route, better payout",
+        "neighbors": [
+          1,
+          2
+        ],
+        "status": "Fresh",
+        "position": [
+          -320.0,
+          -70.0
+        ],
+        "encounter": {
+          "hostile_count": 2,
+          "salvage_value": 12,
+          "ambient_heat_pressure": 1,
+          "ambient_electrical_pressure": 1,
+          "reward_multiplier": 4,
+          "arena_variant": "cache"
+        }
+      },
+      {
+        "id": 5,
+        "label": "Static Wake",
+        "kind": "UnstableDerelict",
+        "risk_tier": 4,
+        "reward_hint": "Brutal branch, rich recovery",
+        "neighbors": [
+          2,
+          3
+        ],
+        "status": "Fresh",
+        "position": [
+          300.0,
+          -90.0
+        ],
+        "encounter": {
+          "hostile_count": 4,
+          "salvage_value": 14,
+          "ambient_heat_pressure": 2,
+          "ambient_electrical_pressure": 3,
+          "reward_multiplier": 5,
+          "arena_variant": "storm"
+        }
+      }
+    ]
+  },
+  "last_mission_report": {
+    "headline": "Mission Failed",
+    "detail": "Station service restored your ship for 6 scrap.",
+    "scrap_awarded": 0,
+    "total_scrap": 100,
+    "hottest_module": "core",
+    "first_disabled_module": null,
+    "repairs_performed": 0,
+    "stabilizations_performed": 0,
+    "automation_used": false,
+    "automation_triggers": 0,
+    "redesign_hints": [],
+    "recovered_raw_salvage": 0,
+    "processed_repair_charge": 0,
+    "consumed_repair_charge": 0,
+    "transfer_count": 0,
+    "processor_cycles": 0,
+    "logistics_bottleneck": null,
+    "logistics_automation_used": false,
+    "arch_primary_program": null,
+    "arch_invalid_executions": 0,
+    "arch_recent_writes": [],
+    "node_name": "Latchline Debris",
+    "node_kind": "Salvage Field",
+    "travel_outcome": "Latchline Debris failed, +3 hull wear"
+  }
+}

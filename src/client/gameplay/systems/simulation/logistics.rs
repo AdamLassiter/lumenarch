@@ -1,45 +1,59 @@
 use bevy::prelude::*;
 
-use crate::client::gameplay::{
-    components::{
-        CollectedSalvage,
-        DestroyedModule,
-        ManipulatorCommandState,
-        ManipulatorModule,
-        MissionState,
-        ModuleRuntimeState,
-        PlayerShip,
-        ProcessorCommandState,
-        ProcessorModule,
-        ResourceKind,
-        RuntimeShipModule,
-        SalvagePickup,
-        SalvageWreck,
-        ShipArchCommandState,
-        ShipPowerState,
-        ShipRoot,
-        SimPosition,
-        StorageModule,
+use crate::{
+    client::{
+        TILE_SIZE,
+        gameplay::{
+            SALVAGE_PICKUP_RADIUS,
+            components::{
+                CollectedSalvage,
+                DestroyedModule,
+                ManipulatorCommandState,
+                ManipulatorModule,
+                MissionState,
+                ModuleRuntimeState,
+                PlayerShip,
+                ProcessorCommandState,
+                ProcessorModule,
+                ResourceKind,
+                RuntimeShipModule,
+                SalvagePickup,
+                SalvageWreck,
+                ShipArchCommandState,
+                ShipPowerState,
+                ShipRoot,
+                SimPosition,
+                StorageModule,
+            },
+            helpers::{
+                FixedVec2,
+                Fx,
+                fixed_radius_sq,
+                fx_from_time_delta,
+                local_field_distance,
+                resource_kind_label,
+            },
+        },
     },
-    helpers::{
-        local_field_distance,
-        resource_kind_label,
-        fixed_radius_sq,
-        fx_from_time_delta,
-        FixedVec2,
-        Fx,
-    },
-    SALVAGE_PICKUP_RADIUS,
+    ship::ModuleKind,
 };
-use crate::client::TILE_SIZE;
-use crate::ship::ModuleKind;
 
 pub(crate) fn collect_salvage(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
-    player_ship_query: Single<(&SimPosition, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,
-    mut storage_query: Query<(&RuntimeShipModule, &mut StorageModule, Option<&DestroyedModule>)>,
-    salvage_query: Query<(Entity, &SimPosition, &SalvagePickup), (With<SalvageWreck>, Without<CollectedSalvage>)>,
+    player_ship_query: Single<
+        (&SimPosition, &mut MissionState),
+        (With<PlayerShip>, With<ShipRoot>),
+    >,
+    mut storage_query: Query<(
+        &RuntimeShipModule,
+        &mut StorageModule,
+        Option<&DestroyedModule>,
+    )>,
+    salvage_query: Query<
+        (Entity, &SimPosition, &SalvagePickup),
+        (With<SalvageWreck>, Without<CollectedSalvage>),
+    >,
 ) {
     let (ship_position, mut mission_state) = player_ship_query.into_inner();
     if !mission_state.encounter_cleared || mission_state.failed || mission_state.salvage_collected {
@@ -57,13 +71,19 @@ pub(crate) fn collect_salvage(
                 if destroyed.is_some() {
                     continue;
                 }
-                if runtime_module.kind != ModuleKind::Airlock && runtime_module.kind != ModuleKind::Cargo {
+                if runtime_module.kind != ModuleKind::Airlock
+                    && runtime_module.kind != ModuleKind::Cargo
+                {
                     continue;
                 }
                 if storage.inventory.total_units() >= storage.capacity {
                     continue;
                 }
-                let priority = if runtime_module.kind == ModuleKind::Airlock { 0 } else { 1 };
+                let priority = if runtime_module.kind == ModuleKind::Airlock {
+                    0
+                } else {
+                    1
+                };
                 best_target = Some((priority, runtime_module.module_id));
                 if priority == 0 {
                     break;
@@ -83,7 +103,9 @@ pub(crate) fn collect_salvage(
                 if destroyed.is_some() || runtime_module.module_id != target_module_id {
                     continue;
                 }
-                let free = storage.capacity.saturating_sub(storage.inventory.total_units());
+                let free = storage
+                    .capacity
+                    .saturating_sub(storage.inventory.total_units());
                 let moved = salvage_pickup.scrap_value.min(free);
                 if moved == 0 {
                     mission_state.logistics_bottleneck =
@@ -112,7 +134,10 @@ pub(crate) fn collect_salvage(
 
 pub(crate) fn run_logistics_transfers(
     time: Res<Time>,
-    ship_query: Single<(&ShipArchCommandState, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,
+    ship_query: Single<
+        (&ShipArchCommandState, &mut MissionState),
+        (With<PlayerShip>, With<ShipRoot>),
+    >,
     mut logistics_sets: ParamSet<(
         Query<(
             Entity,
@@ -129,15 +154,13 @@ pub(crate) fn run_logistics_transfers(
             Option<&DestroyedModule>,
         )>,
     )>,
-    mut manipulator_query: Query<
-        (
-            &RuntimeShipModule,
-            &ModuleRuntimeState,
-            &mut ManipulatorModule,
-            Option<&mut ManipulatorCommandState>,
-            Option<&DestroyedModule>,
-        ),
-    >,
+    mut manipulator_query: Query<(
+        &RuntimeShipModule,
+        &ModuleRuntimeState,
+        &mut ManipulatorModule,
+        Option<&mut ManipulatorCommandState>,
+        Option<&DestroyedModule>,
+    )>,
 ) {
     let dt = fx_from_time_delta(&time);
     let (arch_commands, mut mission_state) = ship_query.into_inner();
@@ -181,10 +204,16 @@ pub(crate) fn run_logistics_transfers(
         if let Some(command_state) = command_state.as_ref()
             && command_state.manual_mode
             && command_state.transfer_enabled
-            && let (Some(source_module_id), Some(target_module_id)) =
-                (command_state.source_module_id, command_state.target_module_id)
+            && let (Some(source_module_id), Some(target_module_id)) = (
+                command_state.source_module_id,
+                command_state.target_module_id,
+            )
         {
-            task = Some((source_module_id, target_module_id, command_state.resource_kind));
+            task = Some((
+                source_module_id,
+                target_module_id,
+                command_state.resource_kind,
+            ));
         } else if logistics_mode {
             task = find_automation_transfer_task(
                 &snapshots,
@@ -257,8 +286,10 @@ pub(crate) fn run_logistics_transfers(
             source_taken = processor.inventory.remove(resource_kind, 1);
         }
         if source_taken == 0 {
-            manipulator.blocked_reason =
-                Some(format!("source lacks {}", resource_kind_label(resource_kind)));
+            manipulator.blocked_reason = Some(format!(
+                "source lacks {}",
+                resource_kind_label(resource_kind)
+            ));
             continue;
         }
 
@@ -299,20 +330,20 @@ pub(crate) fn run_logistics_transfers(
 pub(crate) fn run_processors(
     time: Res<Time>,
     ship_query: Single<(&ShipPowerState, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,
-    mut processor_query: Query<
-        (
-            &RuntimeShipModule,
-            &ModuleRuntimeState,
-            &mut ProcessorModule,
-            Option<&ProcessorCommandState>,
-            Option<&DestroyedModule>,
-        ),
-    >,
+    mut processor_query: Query<(
+        &RuntimeShipModule,
+        &ModuleRuntimeState,
+        &mut ProcessorModule,
+        Option<&ProcessorCommandState>,
+        Option<&DestroyedModule>,
+    )>,
 ) {
     let dt = fx_from_time_delta(&time);
     let (power_state, mut mission_state) = ship_query.into_inner();
 
-    for (runtime_module, runtime_state, mut processor, command_state, destroyed) in &mut processor_query {
+    for (runtime_module, runtime_state, mut processor, command_state, destroyed) in
+        &mut processor_query
+    {
         if destroyed.is_some() || runtime_state.is_disabled {
             processor.active = false;
             processor.progress = Fx::from_num(0);
@@ -357,12 +388,16 @@ pub(crate) fn run_processors(
         processor.progress = Fx::from_num(0);
         let input_required = processor.input_required;
         let output_amount = processor.output_amount;
-        let consumed = processor.inventory.remove(ResourceKind::RawSalvage, input_required);
+        let consumed = processor
+            .inventory
+            .remove(ResourceKind::RawSalvage, input_required);
         if consumed < input_required {
             processor.blocked_reason = Some("input lost before cycle complete".to_string());
             continue;
         }
-        processor.inventory.add(ResourceKind::RepairCharge, output_amount);
+        processor
+            .inventory
+            .add(ResourceKind::RepairCharge, output_amount);
         mission_state.processed_repair_charge += output_amount;
         mission_state.processor_cycles += 1;
         mission_state.recent_action = Some(format!(
@@ -374,7 +409,19 @@ pub(crate) fn run_processors(
 }
 
 fn find_automation_transfer_task(
-    snapshots: &[(Entity, u64, ModuleKind, FixedVec2, Option<(u32, crate::client::gameplay::components::ResourceInventory)>, Option<(u32, u32, crate::client::gameplay::components::ResourceInventory)>, bool)],
+    snapshots: &[(
+        Entity,
+        u64,
+        ModuleKind,
+        FixedVec2,
+        Option<(u32, crate::client::gameplay::components::ResourceInventory)>,
+        Option<(
+            u32,
+            u32,
+            crate::client::gameplay::components::ResourceInventory,
+        )>,
+        bool,
+    )],
     in_range: &impl Fn(FixedVec2) -> bool,
     preference: crate::client::gameplay::components::ArchLogisticsPreference,
 ) -> Option<(u64, u64, ResourceKind)> {
@@ -439,7 +486,19 @@ fn find_automation_transfer_task(
 }
 
 fn find_airlock_to_cargo_transfer(
-    snapshots: &[(Entity, u64, ModuleKind, FixedVec2, Option<(u32, crate::client::gameplay::components::ResourceInventory)>, Option<(u32, u32, crate::client::gameplay::components::ResourceInventory)>, bool)],
+    snapshots: &[(
+        Entity,
+        u64,
+        ModuleKind,
+        FixedVec2,
+        Option<(u32, crate::client::gameplay::components::ResourceInventory)>,
+        Option<(
+            u32,
+            u32,
+            crate::client::gameplay::components::ResourceInventory,
+        )>,
+        bool,
+    )],
     in_range: &impl Fn(FixedVec2) -> bool,
 ) -> Option<(u64, u64, ResourceKind)> {
     for (_, source_id, source_kind, source_pos, storage, _, source_destroyed) in snapshots {

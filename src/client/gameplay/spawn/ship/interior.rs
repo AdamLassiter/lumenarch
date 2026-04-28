@@ -1,8 +1,10 @@
-use crate::client::gameplay::{
-    components::ShipInteriorNode,
-    helpers::{module_local_position, Fx},
+use crate::{
+    client::gameplay::{
+        components::ShipInteriorNode,
+        helpers::{Fx, module_local_position},
+    },
+    ship::ShipDefinition,
 };
-use crate::ship::ShipDefinition;
 
 pub(super) fn build_interior_nodes(
     ship: &ShipDefinition,

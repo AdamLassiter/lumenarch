@@ -6,343 +6,490 @@
       "kind": "Interior",
       "grid_x": 1,
       "grid_y": -1,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 2,
       "kind": "Interior",
       "grid_x": -1,
       "grid_y": -2,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 3,
       "kind": "Interior",
       "grid_x": 0,
       "grid_y": -2,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 4,
       "kind": "Cockpit",
       "grid_x": 1,
       "grid_y": -2,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 5,
       "kind": "Interior",
       "grid_x": 2,
       "grid_y": -2,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 6,
       "kind": "Interior",
       "grid_x": 3,
       "grid_y": -2,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 7,
       "kind": "Interior",
       "grid_x": 3,
       "grid_y": -1,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 8,
       "kind": "Interior",
       "grid_x": 2,
       "grid_y": -1,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 9,
       "kind": "Interior",
       "grid_x": 3,
       "grid_y": 0,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 10,
-      "kind": "Interior",
+      "kind": "Processor",
       "grid_x": 2,
       "grid_y": 0,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 11,
       "kind": "Core",
       "grid_x": 1,
       "grid_y": 0,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 12,
-      "kind": "Interior",
+      "kind": "Computer",
       "grid_x": 0,
       "grid_y": 0,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": {
+        "template": "LogisticsFeed",
+        "name": "LogisticsFeed",
+        "constants": [
+          2,
+          1
+        ],
+        "instructions": [
+          {
+            "Mov": {
+              "dst": "CmdLogisticsEnable",
+              "src": {
+                "Immediate": 0
+              }
+            }
+          },
+          {
+            "Mov": {
+              "dst": "CmdLogisticsPreference",
+              "src": {
+                "Immediate": 0
+              }
+            }
+          },
+          {
+            "Gt": {
+              "dst": "Gp0",
+              "lhs": {
+                "Register": "StorageRawSalvage"
+              },
+              "rhs": {
+                "Immediate": 0
+              }
+            }
+          },
+          {
+            "Lt": {
+              "dst": "Gp1",
+              "lhs": {
+                "Register": "ProcessorRawSalvage"
+              },
+              "rhs": {
+                "Immediate": 2
+              }
+            }
+          },
+          {
+            "Add": {
+              "dst": "Gp2",
+              "lhs": {
+                "Register": "Gp0"
+              },
+              "rhs": {
+                "Register": "Gp1"
+              }
+            }
+          },
+          {
+            "Gt": {
+              "dst": "Gp3",
+              "lhs": {
+                "Register": "Gp2"
+              },
+              "rhs": {
+                "Immediate": 1
+              }
+            }
+          },
+          {
+            "Jnz": {
+              "cond": {
+                "Register": "Gp3"
+              },
+              "target": 9
+            }
+          },
+          {
+            "Jmp": {
+              "target": 11
+            }
+          },
+          {
+            "Mov": {
+              "dst": "CmdLogisticsEnable",
+              "src": {
+                "Immediate": 1
+              }
+            }
+          },
+          {
+            "Mov": {
+              "dst": "CmdLogisticsPreference",
+              "src": {
+                "Immediate": 0
+              }
+            }
+          }
+        ]
+      }
     },
     {
       "id": 13,
       "kind": "Interior",
       "grid_x": 0,
       "grid_y": -1,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 14,
       "kind": "Interior",
       "grid_x": -1,
       "grid_y": -1,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 15,
       "kind": "Interior",
       "grid_x": -1,
       "grid_y": 0,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 16,
       "kind": "Cargo",
       "grid_x": -1,
       "grid_y": 1,
-      "rotation_quadrants": 2
+      "rotation_quadrants": 2,
+      "arch_program": null
     },
     {
       "id": 17,
       "kind": "Cargo",
       "grid_x": -1,
       "grid_y": 2,
-      "rotation_quadrants": 3
+      "rotation_quadrants": 3,
+      "arch_program": null
     },
     {
       "id": 18,
       "kind": "Interior",
       "grid_x": 0,
       "grid_y": 1,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 19,
       "kind": "Reactor",
       "grid_x": 0,
       "grid_y": 2,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 20,
       "kind": "Interior",
       "grid_x": 1,
       "grid_y": 1,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 21,
       "kind": "Interior",
       "grid_x": 1,
       "grid_y": 2,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 22,
       "kind": "Interior",
       "grid_x": 2,
       "grid_y": 1,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 23,
       "kind": "Reactor",
       "grid_x": 2,
       "grid_y": 2,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 24,
       "kind": "Battery",
       "grid_x": 3,
       "grid_y": 1,
-      "rotation_quadrants": 2
+      "rotation_quadrants": 2,
+      "arch_program": null
     },
     {
       "id": 25,
       "kind": "Battery",
       "grid_x": 3,
       "grid_y": 2,
-      "rotation_quadrants": 3
+      "rotation_quadrants": 3,
+      "arch_program": null
     },
     {
       "id": 26,
       "kind": "Engine",
       "grid_x": 0,
       "grid_y": 3,
-      "rotation_quadrants": 2
+      "rotation_quadrants": 2,
+      "arch_program": null
     },
     {
       "id": 27,
       "kind": "Engine",
       "grid_x": 2,
       "grid_y": 3,
-      "rotation_quadrants": 2
+      "rotation_quadrants": 2,
+      "arch_program": null
     },
     {
       "id": 28,
       "kind": "Airlock",
       "grid_x": 4,
       "grid_y": 0,
-      "rotation_quadrants": 1
+      "rotation_quadrants": 1,
+      "arch_program": null
     },
     {
       "id": 29,
       "kind": "Turret",
       "grid_x": 4,
       "grid_y": -2,
-      "rotation_quadrants": 1
+      "rotation_quadrants": 1,
+      "arch_program": null
     },
     {
       "id": 30,
       "kind": "Turret",
       "grid_x": -2,
       "grid_y": -2,
-      "rotation_quadrants": 3
+      "rotation_quadrants": 3,
+      "arch_program": null
     },
     {
       "id": 31,
       "kind": "Hull",
       "grid_x": -2,
       "grid_y": -1,
-      "rotation_quadrants": 3
+      "rotation_quadrants": 3,
+      "arch_program": null
     },
     {
       "id": 32,
       "kind": "Hull",
       "grid_x": -2,
       "grid_y": 0,
-      "rotation_quadrants": 3
+      "rotation_quadrants": 3,
+      "arch_program": null
     },
     {
       "id": 33,
       "kind": "Hull",
       "grid_x": -2,
       "grid_y": 1,
-      "rotation_quadrants": 3
+      "rotation_quadrants": 3,
+      "arch_program": null
     },
     {
       "id": 34,
       "kind": "Hull",
       "grid_x": -2,
       "grid_y": 2,
-      "rotation_quadrants": 3
+      "rotation_quadrants": 3,
+      "arch_program": null
     },
     {
       "id": 35,
       "kind": "Hull",
       "grid_x": -1,
       "grid_y": -3,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 36,
       "kind": "Hull",
       "grid_x": 0,
       "grid_y": -3,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 37,
       "kind": "Hull",
       "grid_x": 1,
       "grid_y": -3,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 38,
       "kind": "Hull",
       "grid_x": 2,
       "grid_y": -3,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 39,
       "kind": "Hull",
       "grid_x": 3,
       "grid_y": -3,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 40,
       "kind": "Hull",
       "grid_x": 4,
       "grid_y": -1,
-      "rotation_quadrants": 1
+      "rotation_quadrants": 1,
+      "arch_program": null
     },
     {
       "id": 41,
       "kind": "Hull",
       "grid_x": 4,
       "grid_y": 1,
-      "rotation_quadrants": 1
+      "rotation_quadrants": 1,
+      "arch_program": null
     },
     {
       "id": 42,
       "kind": "Hull",
       "grid_x": 4,
       "grid_y": 2,
-      "rotation_quadrants": 1
+      "rotation_quadrants": 1,
+      "arch_program": null
     },
     {
       "id": 43,
       "kind": "Hull",
       "grid_x": 3,
       "grid_y": 3,
-      "rotation_quadrants": 2
+      "rotation_quadrants": 2,
+      "arch_program": null
     },
     {
       "id": 44,
       "kind": "Engine",
       "grid_x": 1,
       "grid_y": 3,
-      "rotation_quadrants": 2
+      "rotation_quadrants": 2,
+      "arch_program": null
     },
     {
       "id": 45,
       "kind": "Hull",
       "grid_x": -1,
       "grid_y": 3,
-      "rotation_quadrants": 2
+      "rotation_quadrants": 2,
+      "arch_program": null
     },
     {
       "id": 46,
       "kind": "HullCorner",
       "grid_x": -2,
       "grid_y": 3,
-      "rotation_quadrants": 3
+      "rotation_quadrants": 3,
+      "arch_program": null
     },
     {
       "id": 47,
       "kind": "HullCorner",
       "grid_x": -2,
       "grid_y": -3,
-      "rotation_quadrants": 0
+      "rotation_quadrants": 0,
+      "arch_program": null
     },
     {
       "id": 48,
       "kind": "HullCorner",
       "grid_x": 4,
       "grid_y": -3,
-      "rotation_quadrants": 1
+      "rotation_quadrants": 1,
+      "arch_program": null
     },
     {
       "id": 49,
       "kind": "HullCorner",
       "grid_x": 4,
       "grid_y": 3,
-      "rotation_quadrants": 2
+      "rotation_quadrants": 2,
+      "arch_program": null
     }
   ]
 }

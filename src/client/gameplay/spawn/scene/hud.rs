@@ -1,15 +1,19 @@
 use bevy::prelude::*;
 
-use crate::client::gameplay::helpers::gameplay_status_line;
-use crate::client::state::{
-    GameplayAlertsText,
-    GameplayControlsText,
-    GameplayInspectionText,
-    GameplayStatusText,
-    PlayingCleanup,
-    ReturnButton,
+use crate::{
+    client::{
+        gameplay::helpers::gameplay_status_line,
+        state::{
+            AbortEncounterButton,
+            GameplayAlertsText,
+            GameplayControlsText,
+            GameplayInspectionText,
+            GameplayStatusText,
+            PlayingCleanup,
+        },
+    },
+    ship::ShipDefinition,
 };
-use crate::ship::ShipDefinition;
 
 pub(super) fn spawn_runtime_hud(
     commands: &mut Commands,
@@ -30,7 +34,13 @@ pub(super) fn spawn_runtime_hud(
             PlayingCleanup,
         ))
         .with_children(|root| {
-            spawn_status_panel(root, &asset_server, title_font.clone(), mono_font.clone(), ship);
+            spawn_status_panel(
+                root,
+                &asset_server,
+                title_font.clone(),
+                mono_font.clone(),
+                ship,
+            );
             spawn_inspection_panel(root, mono_font.clone());
             spawn_alerts_panel(root, mono_font.clone());
             spawn_controls_panel(root, mono_font);
@@ -91,10 +101,10 @@ fn spawn_status_panel(
                 },
                 BackgroundColor(Color::srgb(0.52, 0.27, 0.18)),
                 BorderRadius::all(Val::Px(8.0)),
-                ReturnButton,
+                AbortEncounterButton,
             ))
             .with_child((
-                Text::new("Return To Editor"),
+                Text::new("Abort To Station"),
                 TextFont {
                     font: asset_server.load("fonts/FiraMono-Medium.ttf"),
                     font_size: 16.0,
@@ -192,9 +202,7 @@ fn spawn_controls_panel(root: &mut ChildBuilder, mono_font: Handle<Font>) {
     ))
     .with_children(|panel| {
         panel.spawn((
-            Text::new(
-                "Controls pending",
-            ),
+            Text::new("Controls pending"),
             TextFont {
                 font: mono_font,
                 font_size: 14.0,

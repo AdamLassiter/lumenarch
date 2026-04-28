@@ -2,8 +2,8 @@ mod actors;
 mod interactions;
 mod logistics;
 mod modules;
-mod simulation;
 mod ship;
+mod simulation;
 
 pub(crate) use actors::{
     CurrentStation,
@@ -11,8 +11,6 @@ pub(crate) use actors::{
     PlayerFieldState,
     PlayerShip,
     PlayerShipAssignment,
-    StationFamily,
-    StationFocusMode,
     ShipControlMode,
     ShipInteriorMap,
     ShipInteriorNode,
@@ -20,6 +18,8 @@ pub(crate) use actors::{
     ShipboardControlState,
     ShipboardMarker,
     ShipboardPlayer,
+    StationFamily,
+    StationFocusMode,
 };
 pub(crate) use interactions::{
     BeginHeldInteraction,

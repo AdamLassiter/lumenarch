@@ -57,7 +57,7 @@ pub(crate) fn poll_connection_events(
             ConnectionEvent::Connected(snapshot) => {
                 status.phase = ConnectionPhase::Connected;
                 status.active_snapshot = Some(snapshot);
-                next_state.set(ClientAppState::Editing);
+                next_state.set(ClientAppState::Docked);
             }
             ConnectionEvent::Failed(message) => {
                 status.phase = ConnectionPhase::Failed(message);

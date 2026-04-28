@@ -16,16 +16,16 @@ use super::{
             EditorStatusText,
             EditorToolState,
             LastMissionReport,
-            LaunchButton,
+            LeaveEditorButton,
             ProgramButtonAction,
         },
     },
     helpers::{editor_status_line, module_kind_cost},
 };
 use crate::ship::{
-    arch::{ArchProgram, ArchProgramTemplate},
     ModuleKind,
     ShipDefinition,
+    arch::{ArchProgram, ArchProgramTemplate},
     storage::{load_default_ship, save_default_ship},
 };
 
@@ -108,7 +108,7 @@ pub(crate) fn spawn_editor_ui(
 
                 toolbox.spawn((
                     Text::new(
-                        "Click a component, then place it on the grid.\nLeft click: place/replace\nRight click: erase\nQ/E: rotate\nF5: save ship\nF9: reload saved ship\nL or Launch: runtime scene",
+                        "Click a component, then place it on the grid.\nLeft click: place/replace\nRight click: erase\nQ/E: rotate\nF5: save ship\nF9: reload saved ship\nTab or Return: station hub",
                     ),
                     TextFont {
                         font: mono_font.clone(),
@@ -162,11 +162,11 @@ pub(crate) fn spawn_editor_ui(
                             ..default()
                         },
                         BorderRadius::all(Val::Px(8.0)),
-                        BackgroundColor(Color::srgb(0.18, 0.50, 0.30)),
-                        LaunchButton,
+                        BackgroundColor(Color::srgb(0.46, 0.34, 0.22)),
+                        LeaveEditorButton,
                     ))
                     .with_child((
-                        Text::new("Launch"),
+                        Text::new("Return To Station"),
                         TextFont {
                             font: mono_font.clone(),
                             font_size: 18.0,
@@ -238,7 +238,7 @@ pub(crate) fn spawn_editor_ui(
             .with_children(|panel| {
                 panel.spawn((
                     Text::new(
-                        "Editor Controls\nLeft click: place or replace\nRight click: erase\nQ / E: rotate selected part\nF5: save current ship\nF9: reload saved ship\nL: launch mission\nCosts are shown in [scrap]",
+                        "Refit Controls\nLeft click: place or replace\nRight click: erase\nQ / E: rotate selected part\nF5: save current ship\nF9: reload saved ship\nTab: return to station\nCosts are shown in [scrap]",
                     ),
                     TextFont {
                         font: mono_font.clone(),
@@ -344,70 +344,77 @@ pub(crate) fn sync_computer_program_entries(
                 .arch_program
                 .clone()
                 .unwrap_or_else(|| ArchProgram::from_template(ArchProgramTemplate::BalancedOps));
-            panel.spawn((
-                Node {
-                    width: Val::Percent(100.0),
-                    padding: UiRect::all(Val::Px(10.0)),
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(6.0),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.12, 0.14, 0.18, 0.92)),
-                BorderRadius::all(Val::Px(8.0)),
-                ComputerProgramEntry,
-            ))
-            .with_children(|entry| {
-                entry.spawn((
-                    Text::new(format!(
-                        "Computer #{}\nProgram: {}\nConst A / B: {} / {}",
-                        module.id,
-                        program.template.as_str(),
-                        program.constants[0],
-                        program.constants[1]
-                    )),
-                    TextFont {
-                        font: mono_font.clone(),
-                        font_size: 14.0,
+            panel
+                .spawn((
+                    Node {
+                        width: Val::Percent(100.0),
+                        padding: UiRect::all(Val::Px(10.0)),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(6.0),
                         ..default()
                     },
-                    TextColor(Color::srgb(0.92, 0.94, 0.98)),
-                ));
-                spawn_program_button(
-                    entry,
-                    &mono_font,
-                    "Cycle Template",
-                    module.id,
-                    ProgramButtonAction::CycleTemplate,
-                );
-                spawn_program_button(
-                    entry,
-                    &mono_font,
-                    "Const A +1",
-                    module.id,
-                    ProgramButtonAction::AdjustConstant { index: 0, delta: 1 },
-                );
-                spawn_program_button(
-                    entry,
-                    &mono_font,
-                    "Const A -1",
-                    module.id,
-                    ProgramButtonAction::AdjustConstant { index: 0, delta: -1 },
-                );
-                spawn_program_button(
-                    entry,
-                    &mono_font,
-                    "Const B +1",
-                    module.id,
-                    ProgramButtonAction::AdjustConstant { index: 1, delta: 1 },
-                );
-                spawn_program_button(
-                    entry,
-                    &mono_font,
-                    "Const B -1",
-                    module.id,
-                    ProgramButtonAction::AdjustConstant { index: 1, delta: -1 },
-                );
-            });
+                    BackgroundColor(Color::srgba(0.12, 0.14, 0.18, 0.92)),
+                    BorderRadius::all(Val::Px(8.0)),
+                    ComputerProgramEntry,
+                ))
+                .with_children(|entry| {
+                    entry.spawn((
+                        Text::new(format!(
+                            "Computer #{}\nProgram: {}\nConst A / B: {} / {}",
+                            module.id,
+                            program.template.as_str(),
+                            program.constants[0],
+                            program.constants[1]
+                        )),
+                        TextFont {
+                            font: mono_font.clone(),
+                            font_size: 14.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.92, 0.94, 0.98)),
+                    ));
+                    spawn_program_button(
+                        entry,
+                        &mono_font,
+                        "Cycle Template",
+                        module.id,
+                        ProgramButtonAction::CycleTemplate,
+                    );
+                    spawn_program_button(
+                        entry,
+                        &mono_font,
+                        "Const A +1",
+                        module.id,
+                        ProgramButtonAction::AdjustConstant { index: 0, delta: 1 },
+                    );
+                    spawn_program_button(
+                        entry,
+                        &mono_font,
+                        "Const A -1",
+                        module.id,
+                        ProgramButtonAction::AdjustConstant {
+                            index: 0,
+                            delta: -1,
+                        },
+                    );
+                    spawn_program_button(
+                        entry,
+                        &mono_font,
+                        "Const B +1",
+                        module.id,
+                        ProgramButtonAction::AdjustConstant { index: 1, delta: 1 },
+                    );
+                    spawn_program_button(
+                        entry,
+                        &mono_font,
+                        "Const B -1",
+                        module.id,
+                        ProgramButtonAction::AdjustConstant {
+                            index: 1,
+                            delta: -1,
+                        },
+                    );
+                });
         }
     });
 }

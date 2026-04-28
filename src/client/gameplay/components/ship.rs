@@ -104,6 +104,12 @@ impl Default for ShipArchCommandState {
 
 #[derive(Component)]
 pub(crate) struct MissionState {
+    pub(crate) node_id: u32,
+    pub(crate) node_name: String,
+    pub(crate) node_kind_name: String,
+    pub(crate) reward_multiplier: u32,
+    pub(crate) ambient_heat_pressure: Fx,
+    pub(crate) ambient_electrical_pressure: Fx,
     pub(crate) failed: bool,
     pub(crate) failure_reason: Option<String>,
     pub(crate) encounter_cleared: bool,

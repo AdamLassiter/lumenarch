@@ -2,41 +2,43 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::prelude::*;
 
-use crate::client::gameplay::{
-    components::{
-        ArchComputerModule,
-        ArchExecutionResult,
-        EngineModule,
-        Integrity,
-        Interactable,
-        ManipulatorCommandState,
-        ManipulatorModule,
-        ModuleFieldEmitter,
-        ModuleRuntimeState,
-        PowerConsumer,
-        PowerProducer,
-        ProcessorCommandState,
-        ProcessorRecipe,
-        ProcessorModule,
-        ReactorCommandState,
-        ResourceInventory,
-        RuntimeArchComputer,
-        RuntimeShipModule,
-        StorageCommandState,
-        TurretCommandState,
-        StorageModule,
-        TurretTopSprite,
-        WeaponModule,
+use crate::{
+    client::gameplay::{
+        components::{
+            ArchComputerModule,
+            ArchExecutionResult,
+            EngineModule,
+            Integrity,
+            Interactable,
+            ManipulatorCommandState,
+            ManipulatorModule,
+            ModuleFieldEmitter,
+            ModuleRuntimeState,
+            PowerConsumer,
+            PowerProducer,
+            ProcessorCommandState,
+            ProcessorModule,
+            ProcessorRecipe,
+            ReactorCommandState,
+            ResourceInventory,
+            RuntimeArchComputer,
+            RuntimeShipModule,
+            StorageCommandState,
+            StorageModule,
+            TurretCommandState,
+            TurretTopSprite,
+            WeaponModule,
+        },
+        helpers::{
+            Fx,
+            module_integrity,
+            module_local_position,
+            module_local_translation,
+            sprite_path_for_kind,
+        },
     },
-    helpers::{
-        module_integrity,
-        module_local_position,
-        module_local_translation,
-        sprite_path_for_kind,
-        Fx,
-    },
+    ship::{ModuleKind, ShipModule},
 };
-use crate::ship::{ModuleKind, ShipModule};
 
 pub(super) fn spawn_runtime_module(
     commands: &mut Commands,
@@ -46,8 +48,11 @@ pub(super) fn spawn_runtime_module(
     center_y: f32,
     center_x_fixed: Fx,
     center_y_fixed: Fx,
+    wear_penalty: u32,
 ) -> Entity {
     let local_position = module_local_position(module, center_x_fixed, center_y_fixed);
+    let max_integrity = module_integrity(module.kind);
+    let applied_wear = i32::min(wear_penalty as i32, max_integrity.saturating_sub(1)).max(0);
     let mut entity = commands.spawn((
         Sprite::from_image(asset_server.load(sprite_path_for_kind(&module.kind))),
         Transform {
@@ -60,11 +65,12 @@ pub(super) fn spawn_runtime_module(
             kind: module.kind,
             grid_x: module.grid_x,
             grid_y: module.grid_y,
+            rotation_quadrants: module.rotation_quadrants,
             local_position,
         },
         Integrity {
-            current: module_integrity(module.kind),
-            max: module_integrity(module.kind),
+            current: max_integrity - applied_wear,
+            max: max_integrity,
         },
         ModuleRuntimeState {
             current_heat: Fx::from_num(0),
@@ -139,14 +145,11 @@ pub(super) fn spawn_runtime_module(
                 RuntimeArchComputer {
                     enabled: true,
                     instruction_budget: 24,
-                    program: module
-                        .arch_program
-                        .clone()
-                        .unwrap_or_else(|| {
-                            crate::ship::arch::ArchProgram::from_template(
-                                crate::ship::arch::ArchProgramTemplate::BalancedOps,
-                            )
-                        }),
+                    program: module.arch_program.clone().unwrap_or_else(|| {
+                        crate::ship::arch::ArchProgram::from_template(
+                            crate::ship::arch::ArchProgramTemplate::BalancedOps,
+                        )
+                    }),
                     last_result: ArchExecutionResult::default(),
                 },
             ));

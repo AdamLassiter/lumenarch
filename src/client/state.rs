@@ -1,18 +1,22 @@
 use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use super::DEFAULT_HOST_ADDR;
 use crate::{
     protocol::ShipSnapshot,
     ship::{ModuleKind, ShipDefinition},
 };
+
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub(crate) enum ClientAppState {
     #[default]
     Menu,
+    Docked,
+    SectorMap,
     Editing,
-    Playing,
+    Encounter,
 }
 
 #[derive(Resource)]
@@ -58,14 +62,20 @@ pub(crate) struct EditorShip {
     pub(crate) ship: ShipDefinition,
 }
 
-#[derive(Resource)]
+#[derive(Resource, Clone, Serialize, Deserialize)]
 pub(crate) struct DemoProgression {
     pub(crate) scrap: u32,
+    pub(crate) hull_wear: u32,
+    pub(crate) jump_count: u32,
 }
 
 impl Default for DemoProgression {
     fn default() -> Self {
-        Self { scrap: 100 }
+        Self {
+            scrap: 100,
+            hull_wear: 0,
+            jump_count: 0,
+        }
     }
 }
 
@@ -74,7 +84,7 @@ pub(crate) struct DebugOverlayState {
     pub(crate) enabled: bool,
 }
 
-#[derive(Resource, Default, Clone)]
+#[derive(Resource, Default, Clone, Serialize, Deserialize)]
 pub(crate) struct LastMissionReport {
     pub(crate) headline: Option<String>,
     pub(crate) detail: Option<String>,
@@ -97,6 +107,9 @@ pub(crate) struct LastMissionReport {
     pub(crate) arch_primary_program: Option<String>,
     pub(crate) arch_invalid_executions: u32,
     pub(crate) arch_recent_writes: Vec<String>,
+    pub(crate) node_name: Option<String>,
+    pub(crate) node_kind: Option<String>,
+    pub(crate) travel_outcome: Option<String>,
 }
 
 #[derive(Resource)]
@@ -114,8 +127,281 @@ impl Default for EditorToolState {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum SectorNodeStatus {
+    #[default]
+    Fresh,
+    Completed,
+    Exhausted,
+    Failed,
+}
+
+impl SectorNodeStatus {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Fresh => "Fresh",
+            Self::Completed => "Completed",
+            Self::Exhausted => "Exhausted",
+            Self::Failed => "Failed",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum SectorNodeKind {
+    HubStation,
+    SalvageField,
+    HostileHold,
+    UnstableDerelict,
+}
+
+impl SectorNodeKind {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::HubStation => "Hub Station",
+            Self::SalvageField => "Salvage Field",
+            Self::HostileHold => "Hostile Hold",
+            Self::UnstableDerelict => "Unstable Derelict",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct EncounterSpec {
+    pub(crate) hostile_count: u32,
+    pub(crate) salvage_value: u32,
+    pub(crate) ambient_heat_pressure: i32,
+    pub(crate) ambient_electrical_pressure: i32,
+    pub(crate) reward_multiplier: u32,
+    pub(crate) arena_variant: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct TravelOutcome {
+    pub(crate) node_id: u32,
+    pub(crate) success: bool,
+    pub(crate) failed: bool,
+    pub(crate) scrap_awarded: u32,
+    pub(crate) hull_wear_delta: u32,
+    pub(crate) exhausted: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct SectorNode {
+    pub(crate) id: u32,
+    pub(crate) label: String,
+    pub(crate) kind: SectorNodeKind,
+    pub(crate) risk_tier: u8,
+    pub(crate) reward_hint: String,
+    pub(crate) neighbors: Vec<u32>,
+    pub(crate) status: SectorNodeStatus,
+    pub(crate) position: [f32; 2],
+    pub(crate) encounter: EncounterSpec,
+}
+
+#[derive(Resource, Clone, Serialize, Deserialize)]
+pub(crate) struct SectorState {
+    pub(crate) seed: u64,
+    pub(crate) current_node_id: u32,
+    pub(crate) selected_node_id: Option<u32>,
+    pub(crate) active_encounter_node_id: Option<u32>,
+    pub(crate) nodes: Vec<SectorNode>,
+}
+
+impl Default for SectorState {
+    fn default() -> Self {
+        Self::from_seed(0x10_4E6)
+    }
+}
+
+impl SectorState {
+    pub(crate) fn from_seed(seed: u64) -> Self {
+        let nodes = vec![
+            SectorNode {
+                id: 0,
+                label: "Needle Rest".to_string(),
+                kind: SectorNodeKind::HubStation,
+                risk_tier: 0,
+                reward_hint: "Safe dock, refit, relaunch".to_string(),
+                neighbors: vec![1, 2, 3],
+                status: SectorNodeStatus::Fresh,
+                position: [0.0, 0.0],
+                encounter: EncounterSpec {
+                    hostile_count: 0,
+                    salvage_value: 0,
+                    ambient_heat_pressure: 0,
+                    ambient_electrical_pressure: 0,
+                    reward_multiplier: 1,
+                    arena_variant: "station".to_string(),
+                },
+            },
+            SectorNode {
+                id: 1,
+                label: "Latchline Debris".to_string(),
+                kind: SectorNodeKind::SalvageField,
+                risk_tier: 1,
+                reward_hint: "Low threat, strong salvage".to_string(),
+                neighbors: vec![0, 4],
+                status: SectorNodeStatus::Fresh,
+                position: [-260.0, 150.0],
+                encounter: EncounterSpec {
+                    hostile_count: 1,
+                    salvage_value: 10,
+                    ambient_heat_pressure: 0,
+                    ambient_electrical_pressure: 0,
+                    reward_multiplier: 2,
+                    arena_variant: "salvage".to_string(),
+                },
+            },
+            SectorNode {
+                id: 2,
+                label: "Gravehook Nest".to_string(),
+                kind: SectorNodeKind::HostileHold,
+                risk_tier: 3,
+                reward_hint: "Heavy guns, middling haul".to_string(),
+                neighbors: vec![0, 4, 5],
+                status: SectorNodeStatus::Fresh,
+                position: [0.0, 200.0],
+                encounter: EncounterSpec {
+                    hostile_count: 3,
+                    salvage_value: 8,
+                    ambient_heat_pressure: 1,
+                    ambient_electrical_pressure: 0,
+                    reward_multiplier: 3,
+                    arena_variant: "hostile".to_string(),
+                },
+            },
+            SectorNode {
+                id: 3,
+                label: "Blueglass Hush".to_string(),
+                kind: SectorNodeKind::UnstableDerelict,
+                risk_tier: 2,
+                reward_hint: "System stress, moderate reward".to_string(),
+                neighbors: vec![0, 5],
+                status: SectorNodeStatus::Fresh,
+                position: [250.0, 120.0],
+                encounter: EncounterSpec {
+                    hostile_count: 2,
+                    salvage_value: 9,
+                    ambient_heat_pressure: 1,
+                    ambient_electrical_pressure: 2,
+                    reward_multiplier: 3,
+                    arena_variant: "unstable".to_string(),
+                },
+            },
+            SectorNode {
+                id: 4,
+                label: "Forked Cache".to_string(),
+                kind: SectorNodeKind::SalvageField,
+                risk_tier: 2,
+                reward_hint: "Branch route, better payout".to_string(),
+                neighbors: vec![1, 2],
+                status: SectorNodeStatus::Fresh,
+                position: [-320.0, -70.0],
+                encounter: EncounterSpec {
+                    hostile_count: 2,
+                    salvage_value: 12,
+                    ambient_heat_pressure: 1,
+                    ambient_electrical_pressure: 1,
+                    reward_multiplier: 4,
+                    arena_variant: "cache".to_string(),
+                },
+            },
+            SectorNode {
+                id: 5,
+                label: "Static Wake".to_string(),
+                kind: SectorNodeKind::UnstableDerelict,
+                risk_tier: 4,
+                reward_hint: "Brutal branch, rich recovery".to_string(),
+                neighbors: vec![2, 3],
+                status: SectorNodeStatus::Fresh,
+                position: [300.0, -90.0],
+                encounter: EncounterSpec {
+                    hostile_count: 4,
+                    salvage_value: 14,
+                    ambient_heat_pressure: 2,
+                    ambient_electrical_pressure: 3,
+                    reward_multiplier: 5,
+                    arena_variant: "storm".to_string(),
+                },
+            },
+        ];
+
+        Self {
+            seed,
+            current_node_id: 0,
+            selected_node_id: Some(1),
+            active_encounter_node_id: None,
+            nodes,
+        }
+    }
+
+    pub(crate) fn node(&self, node_id: u32) -> Option<&SectorNode> {
+        self.nodes.iter().find(|node| node.id == node_id)
+    }
+
+    pub(crate) fn node_mut(&mut self, node_id: u32) -> Option<&mut SectorNode> {
+        self.nodes.iter_mut().find(|node| node.id == node_id)
+    }
+
+    pub(crate) fn current_node(&self) -> Option<&SectorNode> {
+        self.node(self.current_node_id)
+    }
+
+    pub(crate) fn selected_node(&self) -> Option<&SectorNode> {
+        self.selected_node_id.and_then(|node_id| self.node(node_id))
+    }
+
+    pub(crate) fn active_node(&self) -> Option<&SectorNode> {
+        self.active_encounter_node_id
+            .and_then(|node_id| self.node(node_id))
+    }
+
+    pub(crate) fn is_reachable(&self, node_id: u32) -> bool {
+        self.current_node()
+            .map(|node| node.neighbors.contains(&node_id))
+            .unwrap_or(false)
+    }
+
+    pub(crate) fn available_neighbors(&self) -> Vec<&SectorNode> {
+        let Some(current) = self.current_node() else {
+            return Vec::new();
+        };
+
+        current
+            .neighbors
+            .iter()
+            .filter_map(|neighbor_id| self.node(*neighbor_id))
+            .collect()
+    }
+}
+
+#[derive(Resource, Clone, Serialize, Deserialize)]
+pub(crate) struct DockedState {
+    pub(crate) station_title: String,
+}
+
+impl Default for DockedState {
+    fn default() -> Self {
+        Self {
+            station_title: "Needle Rest".to_string(),
+        }
+    }
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct CampaignLoadState {
+    pub(crate) hydrated: bool,
+}
+
 #[derive(Component)]
 pub(crate) struct MenuRoot;
+
+#[derive(Component)]
+pub(crate) struct DockedRoot;
+
+#[derive(Component)]
+pub(crate) struct SectorMapRoot;
 
 #[derive(Component)]
 pub(crate) struct EditorRoot;
@@ -127,10 +413,25 @@ pub(crate) struct MainCamera;
 pub(crate) struct JoinButton;
 
 #[derive(Component)]
-pub(crate) struct LaunchButton;
+pub(crate) struct RefitButton;
 
 #[derive(Component)]
-pub(crate) struct ReturnButton;
+pub(crate) struct OpenSectorMapButton;
+
+#[derive(Component)]
+pub(crate) struct RepairShipButton;
+
+#[derive(Component)]
+pub(crate) struct LeaveEditorButton;
+
+#[derive(Component)]
+pub(crate) struct AbortEncounterButton;
+
+#[derive(Component)]
+pub(crate) struct BackToStationButton;
+
+#[derive(Component)]
+pub(crate) struct LaunchEncounterButton;
 
 #[derive(Component)]
 pub(crate) struct StatusText;
@@ -140,6 +441,15 @@ pub(crate) struct HostAddressText;
 
 #[derive(Component)]
 pub(crate) struct EditorStatusText;
+
+#[derive(Component)]
+pub(crate) struct DockedStatusText;
+
+#[derive(Component)]
+pub(crate) struct SectorMapStatusText;
+
+#[derive(Component)]
+pub(crate) struct SectorMapDetailText;
 
 #[derive(Component)]
 pub(crate) struct GameplayStatusText;
@@ -156,6 +466,11 @@ pub(crate) struct GameplayControlsText;
 #[derive(Component)]
 pub(crate) struct ToolboxButton {
     pub(crate) kind: ModuleKind,
+}
+
+#[derive(Component)]
+pub(crate) struct SectorNodeButton {
+    pub(crate) node_id: u32,
 }
 
 #[derive(Clone, Copy)]

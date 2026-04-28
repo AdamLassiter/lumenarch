@@ -15,11 +15,11 @@ use crate::client::gameplay::{
         PlayerShip,
         ProcessorModule,
         ResourceKind,
-        RuntimeShipModule,
         RuntimeArchComputer,
+        RuntimeShipModule,
+        ShipControlMode,
         ShipRoot,
         ShipboardControlState,
-        ShipControlMode,
         StationFamily,
         StorageModule,
     },
@@ -258,15 +258,17 @@ fn apply_completed_interaction(
                     integrity.current = (integrity.current + 6).min(integrity.max);
                     runtime_state.current_heat =
                         (runtime_state.current_heat - Fx::from_num(5)).max(Fx::from_num(0));
-                    runtime_state.electrical_instability =
-                        (runtime_state.electrical_instability - Fx::from_num(5)).max(Fx::from_num(0));
+                    runtime_state.electrical_instability = (runtime_state.electrical_instability
+                        - Fx::from_num(5))
+                    .max(Fx::from_num(0));
                     mission_state.consumed_repair_charge += 1;
                 } else {
                     integrity.current = (integrity.current + 3).min(integrity.max);
                     runtime_state.current_heat =
                         (runtime_state.current_heat - Fx::from_num(3)).max(Fx::from_num(0));
-                    runtime_state.electrical_instability =
-                        (runtime_state.electrical_instability - Fx::from_num(3)).max(Fx::from_num(0));
+                    runtime_state.electrical_instability = (runtime_state.electrical_instability
+                        - Fx::from_num(3))
+                    .max(Fx::from_num(0));
                 }
                 runtime_state.needs_attention = integrity.current < integrity.max;
                 runtime_state.is_disabled = false;

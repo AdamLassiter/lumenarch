@@ -1,29 +1,52 @@
 use bevy::prelude::*;
 
-use crate::client::gameplay::{
-    components::{HostileTarget, HostileTurretPlatform, HostileWeaponState, Integrity, SimPosition},
-    helpers::{angle_from_vector, render_translation, FixedVec2, Fx},
-    ARENA_HEIGHT_TILES,
-    ARENA_WIDTH_TILES,
-    HOSTILE_FIRE_COOLDOWN,
+use crate::client::{
+    TILE_SIZE,
+    gameplay::{
+        ARENA_HEIGHT_TILES,
+        ARENA_WIDTH_TILES,
+        HOSTILE_FIRE_COOLDOWN,
+        components::{
+            HostileTarget,
+            HostileTurretPlatform,
+            HostileWeaponState,
+            Integrity,
+            SimPosition,
+        },
+        helpers::{FixedVec2, Fx, angle_from_vector, render_translation},
+    },
+    state::PlayingCleanup,
 };
-use crate::client::{state::PlayingCleanup, TILE_SIZE};
 
-pub(super) fn spawn_test_arena(commands: &mut Commands) {
+pub(super) fn spawn_test_arena(
+    commands: &mut Commands,
+    arena_variant: &str,
+    hostile_count: u32,
+    ambient_heat_pressure: i32,
+    ambient_electrical_pressure: i32,
+) {
     let arena_width = ARENA_WIDTH_TILES as f32 * TILE_SIZE;
     let arena_height = ARENA_HEIGHT_TILES as f32 * TILE_SIZE;
+    let backdrop = match arena_variant {
+        "salvage" | "cache" => Color::srgb(0.08, 0.11, 0.10),
+        "hostile" => Color::srgb(0.11, 0.08, 0.09),
+        "unstable" | "storm" => Color::srgb(0.07, 0.08, 0.13),
+        _ => Color::srgb(0.07, 0.09, 0.13),
+    };
 
     commands.spawn((
-        Sprite::from_color(
-            Color::srgb(0.07, 0.09, 0.13),
-            Vec2::new(arena_width, arena_height),
-        ),
+        Sprite::from_color(backdrop, Vec2::new(arena_width, arena_height)),
         Transform::from_xyz(0.0, 0.0, -20.0),
         PlayingCleanup,
     ));
 
     spawn_arena_walls(commands, arena_width, arena_height);
-    spawn_hostile_platforms(commands);
+    spawn_hostile_platforms(
+        commands,
+        hostile_count,
+        ambient_heat_pressure,
+        ambient_electrical_pressure,
+    );
 }
 
 fn spawn_arena_walls(commands: &mut Commands, arena_width: f32, arena_height: f32) {
@@ -58,7 +81,12 @@ fn spawn_arena_walls(commands: &mut Commands, arena_width: f32, arena_height: f3
     }
 }
 
-fn spawn_hostile_platforms(commands: &mut Commands) {
+fn spawn_hostile_platforms(
+    commands: &mut Commands,
+    hostile_count: u32,
+    ambient_heat_pressure: i32,
+    ambient_electrical_pressure: i32,
+) {
     let platforms = [
         (
             FixedVec2::from_num(-220.0, 120.0),
@@ -78,9 +106,20 @@ fn spawn_hostile_platforms(commands: &mut Commands) {
             Fx::from_num(2.2),
             Fx::from_num(2.2),
         ),
+        (
+            FixedVec2::from_num(-80.0, -160.0),
+            Color::srgb(0.82, 0.48, 0.20),
+            Fx::from_num(2.4),
+            Fx::from_num(1.8),
+        ),
     ];
 
-    for (position, color, heat_damage, electrical_damage) in platforms {
+    for (index, (position, color, heat_damage, electrical_damage)) in
+        platforms.into_iter().enumerate()
+    {
+        if index >= hostile_count as usize {
+            break;
+        }
         commands.spawn((
             Sprite::from_color(color, Vec2::splat(30.0)),
             Transform {
@@ -92,17 +131,15 @@ fn spawn_hostile_platforms(commands: &mut Commands) {
                 ..default()
             },
             SimPosition { value: position },
-            Integrity {
-                current: 8,
-                max: 8,
-            },
+            Integrity { current: 8, max: 8 },
             HostileTarget,
             HostileTurretPlatform,
             HostileWeaponState {
                 cooldown_remaining: Fx::from_num(0.4),
                 cooldown_duration: Fx::from_num(HOSTILE_FIRE_COOLDOWN),
-                heat_damage,
-                electrical_damage,
+                heat_damage: heat_damage + Fx::from_num(ambient_heat_pressure) * Fx::from_num(0.2),
+                electrical_damage: electrical_damage
+                    + Fx::from_num(ambient_electrical_pressure) * Fx::from_num(0.2),
             },
             PlayingCleanup,
         ));

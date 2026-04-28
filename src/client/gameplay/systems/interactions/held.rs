@@ -12,7 +12,7 @@ use crate::client::gameplay::{
         ShipRoot,
         ShipboardPlayer,
     },
-    helpers::{fx_from_time_delta, Fx},
+    helpers::{Fx, fx_from_time_delta},
 };
 
 pub(crate) fn begin_held_interactions(

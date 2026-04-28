@@ -83,7 +83,9 @@ pub(super) fn module_kind_cost(kind: ModuleKind) -> u32 {
         ModuleKind::Hull | ModuleKind::HullCorner => 1,
         ModuleKind::Battery | ModuleKind::Cargo | ModuleKind::Airlock => 2,
         ModuleKind::Engine => 3,
-        ModuleKind::Cockpit | ModuleKind::Computer | ModuleKind::Processor | ModuleKind::Turret => 4,
+        ModuleKind::Cockpit | ModuleKind::Computer | ModuleKind::Processor | ModuleKind::Turret => {
+            4
+        }
         ModuleKind::Reactor => 5,
         ModuleKind::Core => 6,
     }
@@ -112,10 +114,27 @@ pub(super) fn is_cursor_over_toolbox(window: &Window) -> bool {
     cursor.x <= TOOLBOX_WIDTH
 }
 
-pub(super) fn sprite_path_for_kind(kind: &ModuleKind) -> String {
-    match kind {
-        ModuleKind::Computer => "tiles/battery.png".to_string(),
-        ModuleKind::Processor => "tiles/reactor.png".to_string(),
-        _ => format!("tiles/{}.png", kind.as_str()),
+pub(super) fn is_cursor_over_editor_ui(window: &Window) -> bool {
+    let Some(cursor) = window.cursor_position() else {
+        return false;
+    };
+
+    if cursor.x <= TOOLBOX_WIDTH {
+        return true;
     }
+
+    let width = window.width();
+    let height = window.height();
+
+    let over_arch_panel = cursor.x >= TOOLBOX_WIDTH + 16.0
+        && cursor.x <= TOOLBOX_WIDTH + 16.0 + 360.0
+        && cursor.y >= height - 280.0;
+    let over_status_panel = cursor.x >= width - 360.0 && cursor.y <= 220.0;
+    let over_controls_panel = cursor.x >= width - 340.0 && cursor.y >= height - 200.0;
+
+    over_arch_panel || over_status_panel || over_controls_panel
+}
+
+pub(super) fn sprite_path_for_kind(kind: &ModuleKind) -> String {
+    format!("tiles/{}.png", kind.as_str())
 }

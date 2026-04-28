@@ -1,26 +1,30 @@
 use bevy::prelude::*;
 
-use crate::client::state::DebugOverlayState;
-use crate::client::gameplay::{
-    components::{
-        DestroyedModule,
-        Integrity,
-        ManipulatorModule,
-        ModuleCondition,
-        ModuleFieldEmitter,
-        ModuleRuntimeState,
-        PlayerShip,
-        RuntimeShipModule,
-        ShipRoot,
-        SimPosition,
-        SimRotation,
-        TurretCommandState,
-        TurretTopSprite,
+use crate::{
+    client::{
+        TILE_SIZE,
+        gameplay::{
+            components::{
+                DestroyedModule,
+                Integrity,
+                ManipulatorModule,
+                ModuleCondition,
+                ModuleFieldEmitter,
+                ModuleRuntimeState,
+                PlayerShip,
+                RuntimeShipModule,
+                ShipRoot,
+                SimPosition,
+                SimRotation,
+                TurretCommandState,
+                TurretTopSprite,
+            },
+            helpers::{Fx, module_condition},
+        },
+        state::DebugOverlayState,
     },
-    helpers::{module_condition, Fx},
+    ship::ModuleKind,
 };
-use crate::client::TILE_SIZE;
-use crate::ship::ModuleKind;
 
 pub(crate) fn toggle_debug_overlay(
     keys: Res<ButtonInput<KeyCode>>,
@@ -34,16 +38,14 @@ pub(crate) fn toggle_debug_overlay(
 pub(crate) fn draw_debug_overlay(
     debug_overlay: Res<DebugOverlayState>,
     player_ship_query: Single<(&SimPosition, &SimRotation), (With<PlayerShip>, With<ShipRoot>)>,
-    module_query: Query<
-        (
-            Entity,
-            &RuntimeShipModule,
-            &ModuleFieldEmitter,
-            Option<&ManipulatorModule>,
-            Option<&TurretCommandState>,
-            Option<&DestroyedModule>,
-        ),
-    >,
+    module_query: Query<(
+        Entity,
+        &RuntimeShipModule,
+        &ModuleFieldEmitter,
+        Option<&ManipulatorModule>,
+        Option<&TurretCommandState>,
+        Option<&DestroyedModule>,
+    )>,
     mut turret_top_query: Query<(&Parent, &mut Transform), With<TurretTopSprite>>,
     mut gizmos: Gizmos,
 ) {
@@ -61,16 +63,30 @@ pub(crate) fn draw_debug_overlay(
         if destroyed.is_some() {
             continue;
         }
-        let world = ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians);
+        let world =
+            ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians);
         let world_center = world.to_vec2();
         if emitter.heat_output > Fx::from_num(0) || emitter.cooling_output > Fx::from_num(0) {
-            gizmos.circle_2d(world_center, field_radius, Color::srgba(1.0, 0.58, 0.24, 0.18));
+            gizmos.circle_2d(
+                world_center,
+                field_radius,
+                Color::srgba(1.0, 0.58, 0.24, 0.18),
+            );
         }
-        if emitter.electrical_output > Fx::from_num(0) || emitter.grounding_output > Fx::from_num(0) {
-            gizmos.circle_2d(world_center, field_radius * 0.72, Color::srgba(0.32, 0.78, 1.0, 0.18));
+        if emitter.electrical_output > Fx::from_num(0) || emitter.grounding_output > Fx::from_num(0)
+        {
+            gizmos.circle_2d(
+                world_center,
+                field_radius * 0.72,
+                Color::srgba(0.32, 0.78, 1.0, 0.18),
+            );
         }
         if manipulator.is_some() {
-            gizmos.circle_2d(world_center, manipulator_radius, Color::srgba(0.72, 1.0, 0.58, 0.18));
+            gizmos.circle_2d(
+                world_center,
+                manipulator_radius,
+                Color::srgba(0.72, 1.0, 0.58, 0.18),
+            );
         }
     }
 
@@ -108,7 +124,11 @@ pub(crate) fn draw_debug_overlay(
             .find(|(_, module_id, _, is_destroyed)| *module_id == target_id && !*is_destroyed)
             .map(|(_, _, pos, _)| *pos);
         if let (Some(source), Some(target)) = (source, target) {
-            gizmos.line_2d(source.to_vec2(), target.to_vec2(), Color::srgb(0.72, 1.0, 0.58));
+            gizmos.line_2d(
+                source.to_vec2(),
+                target.to_vec2(),
+                Color::srgb(0.72, 1.0, 0.58),
+            );
         }
     }
 }
@@ -152,7 +172,10 @@ pub(crate) fn update_destroyed_module_visuals(
             ModuleCondition::Destroyed => Color::WHITE,
         };
 
-        if matches!(runtime_module.kind, ModuleKind::Hull | ModuleKind::HullCorner) {
+        if matches!(
+            runtime_module.kind,
+            ModuleKind::Hull | ModuleKind::HullCorner
+        ) {
             sprite.color = match condition {
                 ModuleCondition::Healthy => Color::WHITE,
                 ModuleCondition::Degraded if electrical => Color::srgb(0.62, 0.88, 0.98),
@@ -166,22 +189,22 @@ pub(crate) fn update_destroyed_module_visuals(
 }
 
 fn update_turret_top_visuals(
-    ship_rotation: Fx,
-    module_query: &Query<
-        (
-            Entity,
-            &RuntimeShipModule,
-            &ModuleFieldEmitter,
-            Option<&ManipulatorModule>,
-            Option<&TurretCommandState>,
-            Option<&DestroyedModule>,
-        ),
-    >,
+    _ship_rotation: Fx,
+    module_query: &Query<(
+        Entity,
+        &RuntimeShipModule,
+        &ModuleFieldEmitter,
+        Option<&ManipulatorModule>,
+        Option<&TurretCommandState>,
+        Option<&DestroyedModule>,
+    )>,
     turret_top_query: &mut Query<(&Parent, &mut Transform), With<TurretTopSprite>>,
 ) {
     for (parent, mut transform) in turret_top_query.iter_mut() {
         let parent_entity = parent.get();
-        let Ok((_, runtime_module, _, _, turret_state, destroyed)) = module_query.get(parent_entity) else {
+        let Ok((_, runtime_module, _, _, turret_state, destroyed)) =
+            module_query.get(parent_entity)
+        else {
             continue;
         };
         if destroyed.is_some() || runtime_module.kind != ModuleKind::Turret {
@@ -190,8 +213,8 @@ fn update_turret_top_visuals(
         let actual_local_angle = turret_state
             .map(|state| state.actual_angle)
             .unwrap_or(Fx::from_num(0));
-        transform.rotation = Quat::from_rotation_z(
-            (actual_local_angle + ship_rotation * Fx::from_num(0)).to_num::<f32>(),
-        );
+        let base_rotation = -Fx::from_num(runtime_module.rotation_quadrants as i32) * Fx::FRAC_PI_2;
+        transform.rotation =
+            Quat::from_rotation_z((actual_local_angle - base_rotation).to_num::<f32>());
     }
 }

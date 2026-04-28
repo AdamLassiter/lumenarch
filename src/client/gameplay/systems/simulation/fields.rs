@@ -1,28 +1,33 @@
 use bevy::prelude::*;
 
-use crate::client::gameplay::{
-    components::{
-        CurrentStation,
-        DestroyedModule,
-        Integrity,
-        ModuleFieldEmitter,
-        ModuleRuntimeState,
-        PlayerFieldState,
-        ReactorCommandState,
-        RuntimeShipModule,
-        ShipboardPlayer,
-        TurretCommandState,
+use crate::{
+    client::gameplay::{
+        components::{
+            CurrentStation,
+            DestroyedModule,
+            Integrity,
+            MissionState,
+            ModuleFieldEmitter,
+            ModuleRuntimeState,
+            PlayerFieldState,
+            PlayerShip,
+            ReactorCommandState,
+            RuntimeShipModule,
+            ShipRoot,
+            ShipboardPlayer,
+            TurretCommandState,
+        },
+        helpers::{
+            Fx,
+            dynamic_field_output,
+            field_attenuation,
+            fx_from_time_delta,
+            local_field_distance,
+            wrap_radians,
+        },
     },
-    helpers::{
-        dynamic_field_output,
-        field_attenuation,
-        local_field_distance,
-        fx_from_time_delta,
-        Fx,
-        wrap_radians,
-    },
+    ship::ModuleKind,
 };
-use crate::ship::ModuleKind;
 
 pub(crate) fn sample_ship_fields(
     mut module_query: Query<(
@@ -33,8 +38,10 @@ pub(crate) fn sample_ship_fields(
         &mut ModuleRuntimeState,
         Option<&DestroyedModule>,
     )>,
+    mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     player_query: Single<(&CurrentStation, &mut PlayerFieldState), With<ShipboardPlayer>>,
 ) {
+    let mission_state = mission_query.into_inner();
     let module_samples: Vec<_> = module_query
         .iter()
         .map(
@@ -86,8 +93,10 @@ pub(crate) fn sample_ship_fields(
             heat += (*source_heat - *source_cooling) * attenuation;
             electrical += (*source_electrical - *source_grounding) * attenuation;
         }
-        runtime_state.sampled_heat = heat.max(Fx::from_num(0));
-        runtime_state.sampled_electrical = electrical.max(Fx::from_num(0));
+        runtime_state.sampled_heat =
+            (heat + mission_state.ambient_heat_pressure).max(Fx::from_num(0));
+        runtime_state.sampled_electrical =
+            (electrical + mission_state.ambient_electrical_pressure).max(Fx::from_num(0));
     }
 
     let (station, mut player_fields) = player_query.into_inner();
@@ -122,8 +131,9 @@ pub(crate) fn sample_ship_fields(
         electrical += (*source_electrical - *source_grounding) * attenuation;
     }
 
-    player_fields.local_heat = heat.max(Fx::from_num(0));
-    player_fields.local_electrical = electrical.max(Fx::from_num(0));
+    player_fields.local_heat = (heat + mission_state.ambient_heat_pressure).max(Fx::from_num(0));
+    player_fields.local_electrical =
+        (electrical + mission_state.ambient_electrical_pressure).max(Fx::from_num(0));
     player_fields.heat_danger = player_fields.local_heat >= Fx::from_num(8);
     player_fields.electrical_danger = player_fields.local_electrical >= Fx::from_num(7);
 }
@@ -163,16 +173,28 @@ pub(crate) fn update_module_runtime_state(
         runtime_state.last_interaction_age += dt;
         let mut reactor_heat_bonus = Fx::from_num(0);
         if let Some(mut reactor_state) = reactor_state {
+            let warmup_threshold = Fx::from_num(3.0);
+            let full_power_threshold = Fx::from_num(6.0);
             if reactor_state.fuel_remaining > Fx::from_num(0) {
-                reactor_state.fuel_remaining =
-                    (reactor_state.fuel_remaining - reactor_state.reaction_rate * dt * Fx::from_num(0.22))
-                        .max(Fx::from_num(0));
+                reactor_state.fuel_remaining = (reactor_state.fuel_remaining
+                    - reactor_state.reaction_rate * dt * Fx::from_num(0.22))
+                .max(Fx::from_num(0));
             } else {
                 reactor_state.reaction_rate = Fx::from_num(0);
             }
-            reactor_state.power_output = (reactor_state.reaction_rate * Fx::from_num(3)
-                + reactor_state.turbine_load * Fx::from_num(9))
-                .min(Fx::from_num(12));
+            if runtime_state.current_heat < warmup_threshold {
+                reactor_state.reaction_rate =
+                    (reactor_state.reaction_rate - dt * Fx::from_num(0.35)).max(Fx::from_num(0));
+                reactor_state.power_output = Fx::from_num(0);
+            } else {
+                let heat_span = (full_power_threshold - warmup_threshold).max(Fx::from_num(1));
+                let warmup_ratio = ((runtime_state.current_heat - warmup_threshold) / heat_span)
+                    .clamp(Fx::from_num(0), Fx::from_num(1));
+                reactor_state.power_output = ((reactor_state.reaction_rate * Fx::from_num(3)
+                    + reactor_state.turbine_load * Fx::from_num(9))
+                .min(Fx::from_num(12)))
+                    * warmup_ratio;
+            }
             reactor_heat_bonus = reactor_state.reaction_rate * Fx::from_num(4.8)
                 - reactor_state.turbine_load * Fx::from_num(2.2);
         }
@@ -187,11 +209,10 @@ pub(crate) fn update_module_runtime_state(
                 wrap_radians(turret_state.desired_angle)
             };
         }
-        let target_heat =
-            base_heat
-                + reactor_heat_bonus.max(Fx::from_num(-1.5))
-                + runtime_state.sampled_heat * Fx::from_num(0.45)
-                + damage_factor;
+        let target_heat = base_heat
+            + reactor_heat_bonus.max(Fx::from_num(-1.5))
+            + runtime_state.sampled_heat * Fx::from_num(0.45)
+            + damage_factor;
         runtime_state.current_heat = (runtime_state.current_heat
             + (target_heat - runtime_state.current_heat) * Fx::from_num(1.35) * dt)
             .max(Fx::from_num(0));

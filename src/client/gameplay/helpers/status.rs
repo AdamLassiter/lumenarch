@@ -1,16 +1,20 @@
 use bevy::prelude::*;
 
-use super::{
-    fixed_radius_sq,
-    FixedVec2,
-    Fx,
+use super::{FixedVec2, Fx, fixed_radius_sq};
+use crate::{
+    client::gameplay::components::{
+        CollectedSalvage,
+        MissionState,
+        SalvagePickup,
+        SalvageWreck,
+        SimPosition,
+    },
+    ship::ShipDefinition,
 };
-use crate::client::gameplay::components::{CollectedSalvage, MissionState, SalvagePickup, SalvageWreck, SimPosition};
-use crate::ship::ShipDefinition;
 
 pub(crate) fn gameplay_status_line(ship: &ShipDefinition) -> String {
     format!(
-        "Ship: {}\nModules: {}\nRuntime arena bootstrap active\nPress Tab or use the button to return",
+        "Ship: {}\nModules: {}\nEncounter runtime active\nPress Tab or use the button to abort to station",
         ship.name,
         ship.modules.len()
     )
@@ -39,7 +43,7 @@ pub(crate) fn mission_status_line(mission_state: &MissionState) -> &str {
 pub(crate) fn mission_return_line(mission_state: &MissionState) -> Option<String> {
     mission_state.return_delay_remaining.map(|seconds| {
         format!(
-            "returning to editor in {:.1}s",
+            "returning to station in {:.1}s",
             seconds.to_num::<f32>().max(0.0)
         )
     })
@@ -48,7 +52,10 @@ pub(crate) fn mission_return_line(mission_state: &MissionState) -> Option<String
 pub(crate) fn salvage_status_line(
     ship_position: FixedVec2,
     mission_state: &MissionState,
-    salvage_query: &Query<(&SimPosition, &SalvagePickup), (With<SalvageWreck>, Without<CollectedSalvage>)>,
+    salvage_query: &Query<
+        (&SimPosition, &SalvagePickup),
+        (With<SalvageWreck>, Without<CollectedSalvage>),
+    >,
 ) -> String {
     if mission_state.salvage_collected {
         return format!("recovered {} scrap", mission_state.salvage_scrap_awarded);

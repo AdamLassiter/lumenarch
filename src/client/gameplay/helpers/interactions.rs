@@ -1,15 +1,11 @@
 use super::Fx;
-use crate::client::gameplay::components::{
-    Integrity,
-    InteractionKind,
-    ModuleRuntimeState,
-    ResourceKind,
+use crate::{
+    client::gameplay::components::{Integrity, InteractionKind, ModuleRuntimeState, ResourceKind},
+    ship::ModuleKind,
 };
-use crate::ship::ModuleKind;
 
 pub(crate) fn sprite_path_for_kind(kind: &ModuleKind) -> String {
     match kind {
-        ModuleKind::Computer => "tiles/battery.png".to_string(),
         ModuleKind::Turret => "tiles/hardpoint.png".to_string(),
         _ => format!("tiles/{}.png", kind.as_str()),
     }

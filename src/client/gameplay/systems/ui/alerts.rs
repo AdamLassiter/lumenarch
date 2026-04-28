@@ -1,35 +1,37 @@
 use bevy::prelude::*;
 
-use crate::client::gameplay::{
-    components::{
-        CurrentStation,
-        DestroyedModule,
-        HeldInteraction,
-        Integrity,
-        MissionState,
-        ModuleRuntimeState,
-        NearbyInteraction,
-        PlayerFieldState,
-        PlayerShip,
-        ProcessorModule,
-        RuntimeArchComputer,
-        RuntimeShipModule,
-        ShipAutomationState,
-        ShipRoot,
-        ShipboardPlayer,
-        StorageModule,
+use crate::client::{
+    gameplay::{
+        components::{
+            CurrentStation,
+            DestroyedModule,
+            HeldInteraction,
+            Integrity,
+            MissionState,
+            ModuleRuntimeState,
+            NearbyInteraction,
+            PlayerFieldState,
+            PlayerShip,
+            ProcessorModule,
+            RuntimeArchComputer,
+            RuntimeShipModule,
+            ShipAutomationState,
+            ShipRoot,
+            ShipboardPlayer,
+            StorageModule,
+        },
+        helpers::{
+            Fx,
+            danger_level,
+            format_fx1,
+            meter_bar,
+            module_condition,
+            module_condition_label,
+        },
+        systems::shared::{condition_severity, interaction_label, module_display_name},
     },
-    helpers::{
-        danger_level,
-        format_fx1,
-        meter_bar,
-        module_condition,
-        module_condition_label,
-        Fx,
-    },
-    systems::shared::{condition_severity, interaction_label, module_display_name},
+    state::{GameplayAlertsText, GameplayInspectionText},
 };
-use crate::client::state::{GameplayAlertsText, GameplayInspectionText};
 
 pub(crate) fn update_inspection_and_alerts_text(
     player_query: Single<
@@ -90,7 +92,9 @@ fn inspection_text(
     held: &HeldInteraction,
     automation_state: &ShipAutomationState,
 ) -> String {
-    let Some((runtime_module, integrity, runtime_state, computer, storage, processor, destroyed)) = current_module else {
+    let Some((runtime_module, integrity, runtime_state, computer, storage, processor, destroyed)) =
+        current_module
+    else {
         return "Module: unavailable".to_string();
     };
 
@@ -160,10 +164,18 @@ fn inspection_text(
         meter_bar(runtime_state.electrical_instability, Fx::from_num(14), 10),
         format_fx1(runtime_state.sampled_heat),
         format_fx1(runtime_state.sampled_electrical),
-        if runtime_state.needs_attention { "yes" } else { "no" },
+        if runtime_state.needs_attention {
+            "yes"
+        } else {
+            "no"
+        },
         logistics_line,
         automation_state.mode,
-        if automation_state.active { "active" } else { "standby" },
+        if automation_state.active {
+            "active"
+        } else {
+            "standby"
+        },
         interaction_line,
     )
 }
@@ -181,33 +193,43 @@ fn collect_alert_issues(
 ) -> Vec<(i32, String)> {
     module_query
         .iter()
-        .filter_map(|(runtime_module, integrity, runtime_state, _computer, storage, processor, destroyed)| {
-            let condition = module_condition(integrity, runtime_state, destroyed.is_some());
-            let severity = condition_severity(condition);
-            let logistics_issue = storage
-                .filter(|storage| storage.inventory.total_units() >= storage.capacity)
-                .map(|_| format!("{}: storage full", module_display_name(runtime_module.kind)))
-                .or_else(|| {
-                    processor.and_then(|processor| {
-                        processor.blocked_reason.as_ref().map(|reason| {
-                            format!("{}: {}", module_display_name(runtime_module.kind), reason)
+        .filter_map(
+            |(
+                runtime_module,
+                integrity,
+                runtime_state,
+                _computer,
+                storage,
+                processor,
+                destroyed,
+            )| {
+                let condition = module_condition(integrity, runtime_state, destroyed.is_some());
+                let severity = condition_severity(condition);
+                let logistics_issue = storage
+                    .filter(|storage| storage.inventory.total_units() >= storage.capacity)
+                    .map(|_| format!("{}: storage full", module_display_name(runtime_module.kind)))
+                    .or_else(|| {
+                        processor.and_then(|processor| {
+                            processor.blocked_reason.as_ref().map(|reason| {
+                                format!("{}: {}", module_display_name(runtime_module.kind), reason)
+                            })
                         })
-                    })
-                });
-            if let Some(line) = logistics_issue {
-                return Some((severity.max(1), line));
-            }
-            (severity > 0).then(|| {
-                (
-                    severity,
-                    format!(
-                        "{}: {}",
-                        module_display_name(runtime_module.kind),
-                        module_condition_label(condition)
-                    ),
-                )
-            })
-        })
+                    });
+                if let Some(line) = logistics_issue {
+                    return Some((severity.max(1), line));
+                }
+                (severity > 0).then(|| {
+                    (
+                        severity,
+                        format!(
+                            "{}: {}",
+                            module_display_name(runtime_module.kind),
+                            module_condition_label(condition)
+                        ),
+                    )
+                })
+            },
+        )
         .collect()
 }
 
@@ -235,7 +257,11 @@ fn alerts_text(
         format_fx1(player_fields.local_heat),
         danger_level(player_fields.local_heat, Fx::from_num(8), Fx::from_num(14)),
         format_fx1(player_fields.local_electrical),
-        danger_level(player_fields.local_electrical, Fx::from_num(7), Fx::from_num(12)),
+        danger_level(
+            player_fields.local_electrical,
+            Fx::from_num(7),
+            Fx::from_num(12)
+        ),
         summary,
         nearby
             .prompt

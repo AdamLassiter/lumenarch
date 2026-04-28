@@ -34,13 +34,13 @@ pub(crate) use systems::{
     tick_recent_action_feedback,
     toggle_debug_overlay,
     toggle_shipboard_control_mode,
-    update_station_command_input,
     update_destroyed_module_visuals,
     update_gameplay_status_text,
     update_inspection_and_alerts_text,
     update_mission_state,
     update_mission_telemetry,
     update_module_runtime_state,
+    update_station_command_input,
 };
 
 const RUNTIME_SHIP_ORIGIN: bevy::prelude::Vec3 = bevy::prelude::Vec3::new(0.0, 0.0, 10.0);

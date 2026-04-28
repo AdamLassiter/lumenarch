@@ -1,10 +1,7 @@
-use super::{fx_ratio, FieldOutput, FixedVec2, Fx};
-use crate::client::TILE_SIZE;
-use crate::client::gameplay::components::{
-    Integrity,
-    ModuleCondition,
-    ModuleFieldEmitter,
-    ModuleRuntimeState,
+use super::{FieldOutput, FixedVec2, Fx, fx_ratio};
+use crate::client::{
+    TILE_SIZE,
+    gameplay::components::{Integrity, ModuleCondition, ModuleFieldEmitter, ModuleRuntimeState},
 };
 
 pub(crate) fn module_effectiveness(

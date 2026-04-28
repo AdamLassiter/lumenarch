@@ -1,10 +1,8 @@
-use std::{
-    ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
-};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
 use bevy::prelude::*;
 use cordic::{cos, sin};
-use fixed::{types::extra::U16, FixedI32, FixedI64};
+use fixed::{FixedI32, FixedI64, types::extra::U16};
 
 pub(crate) type Fx = FixedI32<U16>;
 pub(crate) type WideFx = FixedI64<U16>;

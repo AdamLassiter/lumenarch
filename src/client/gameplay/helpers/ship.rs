@@ -1,9 +1,13 @@
 use bevy::prelude::*;
 
-use super::{fx_ratio, FixedVec2, Fx};
-use crate::client::{TILE_SIZE};
-use crate::client::gameplay::components::{ShipMovementModel, ShipPowerModel, ShipPowerState};
-use crate::ship::{ModuleKind, ShipDefinition, ShipModule};
+use super::{FixedVec2, Fx, fx_ratio};
+use crate::{
+    client::{
+        TILE_SIZE,
+        gameplay::components::{ShipMovementModel, ShipPowerModel, ShipPowerState},
+    },
+    ship::{ModuleKind, ShipDefinition, ShipModule},
+};
 
 pub(crate) fn module_local_translation(module: &ShipModule, center_x: f32, center_y: f32) -> Vec3 {
     Vec3::new(
@@ -109,11 +113,15 @@ fn power_draw_for_requested_systems(
     turn_input: Fx,
 ) -> (Fx, Fx, Fx) {
     let throttle = throttle_demand.clamp(Fx::from_num(0), Fx::from_num(1));
-    let steering_fraction = turn_input.abs().clamp(Fx::from_num(0), Fx::from_num(1)) * fx_ratio(2, 5);
-    let engine_requested =
-        power_model.engine_draw * throttle.max(steering_fraction);
+    let steering_fraction =
+        turn_input.abs().clamp(Fx::from_num(0), Fx::from_num(1)) * fx_ratio(2, 5);
+    let engine_requested = power_model.engine_draw * throttle.max(steering_fraction);
 
-    (power_model.passive_draw, power_model.weapon_draw, engine_requested)
+    (
+        power_model.passive_draw,
+        power_model.weapon_draw,
+        engine_requested,
+    )
 }
 
 pub(crate) fn update_ship_power_state(

@@ -1,22 +1,28 @@
+mod campaign;
+mod docked;
 mod editor;
 mod gameplay;
 mod menu;
 mod net;
+mod sector_map;
 mod state;
 
 use bevy::{app::AppExit, prelude::*};
 
 use self::state::{
+    CampaignLoadState,
     ClientAppState,
     ConnectionConfig,
     ConnectionMailbox,
     ConnectionStatus,
     DebugOverlayState,
     DemoProgression,
+    DockedState,
     EditorShip,
     EditorToolState,
     LastMissionReport,
     MainCamera,
+    SectorState,
 };
 use crate::ship::ModuleKind;
 
@@ -39,6 +45,9 @@ pub fn run_client() {
         .insert_resource(ConnectionMailbox::default())
         .insert_resource(EditorShip::default())
         .insert_resource(DemoProgression::default())
+        .insert_resource(DockedState::default())
+        .insert_resource(SectorState::default())
+        .insert_resource(CampaignLoadState::default())
         .insert_resource(DebugOverlayState::default())
         .insert_resource(LastMissionReport::default())
         .insert_resource(EditorToolState::default())
@@ -59,6 +68,7 @@ pub fn run_client() {
         .add_event::<gameplay::components::BeginHeldInteraction>()
         .add_event::<gameplay::components::CompleteHeldInteraction>()
         .add_systems(Startup, setup_camera)
+        .add_systems(Update, docked::persist_campaign_state)
         .add_systems(OnEnter(ClientAppState::Menu), menu::spawn_menu_ui)
         .add_systems(
             Update,
@@ -74,6 +84,35 @@ pub fn run_client() {
         )
         .add_systems(OnExit(ClientAppState::Menu), menu::cleanup_menu_ui)
         .add_systems(
+            OnEnter(ClientAppState::Docked),
+            (docked::initialize_campaign_state, docked::spawn_docked_ui),
+        )
+        .add_systems(
+            Update,
+            (
+                docked::docked_button_system.run_if(in_state(ClientAppState::Docked)),
+                docked::update_docked_status_text.run_if(in_state(ClientAppState::Docked)),
+            ),
+        )
+        .add_systems(OnExit(ClientAppState::Docked), docked::cleanup_docked_ui)
+        .add_systems(
+            OnEnter(ClientAppState::SectorMap),
+            sector_map::spawn_sector_map_ui,
+        )
+        .add_systems(
+            Update,
+            (
+                sector_map::sector_node_button_system.run_if(in_state(ClientAppState::SectorMap)),
+                sector_map::sector_navigation_button_system
+                    .run_if(in_state(ClientAppState::SectorMap)),
+                sector_map::update_sector_map_text.run_if(in_state(ClientAppState::SectorMap)),
+            ),
+        )
+        .add_systems(
+            OnExit(ClientAppState::SectorMap),
+            sector_map::cleanup_sector_map_ui,
+        )
+        .add_systems(
             OnEnter(ClientAppState::Editing),
             (
                 editor::initialize_editor_ship,
@@ -87,8 +126,8 @@ pub fn run_client() {
                 editor::draw_grid_overlay.run_if(in_state(ClientAppState::Editing)),
                 editor::toolbox_button_system.run_if(in_state(ClientAppState::Editing)),
                 editor::computer_program_button_system.run_if(in_state(ClientAppState::Editing)),
-                editor::launch_button_system.run_if(in_state(ClientAppState::Editing)),
-                editor::launch_keyboard_shortcut.run_if(in_state(ClientAppState::Editing)),
+                editor::leave_editor_button_system.run_if(in_state(ClientAppState::Editing)),
+                editor::leave_editor_keyboard_shortcut.run_if(in_state(ClientAppState::Editing)),
                 editor::rotate_selected_tool.run_if(in_state(ClientAppState::Editing)),
                 editor::place_or_remove_tile.run_if(in_state(ClientAppState::Editing)),
                 editor::save_editor_ship_shortcut.run_if(in_state(ClientAppState::Editing)),
@@ -106,15 +145,15 @@ pub fn run_client() {
             editor::cleanup_editor_entities,
         )
         .add_systems(
-            OnEnter(ClientAppState::Playing),
+            OnEnter(ClientAppState::Encounter),
             gameplay::spawn_runtime_scene,
         )
         .add_systems(
             Update,
             (
-                gameplay::return_button_system.run_if(in_state(ClientAppState::Playing)),
-                gameplay::return_keyboard_shortcut.run_if(in_state(ClientAppState::Playing)),
-                gameplay::toggle_debug_overlay.run_if(in_state(ClientAppState::Playing)),
+                gameplay::return_button_system.run_if(in_state(ClientAppState::Encounter)),
+                gameplay::return_keyboard_shortcut.run_if(in_state(ClientAppState::Encounter)),
+                gameplay::toggle_debug_overlay.run_if(in_state(ClientAppState::Encounter)),
                 (
                     gameplay::toggle_shipboard_control_mode,
                     gameplay::exit_focused_station,
@@ -134,7 +173,7 @@ pub fn run_client() {
                     gameplay::tick_recent_action_feedback,
                 )
                     .chain()
-                    .run_if(in_state(ClientAppState::Playing)),
+                    .run_if(in_state(ClientAppState::Encounter)),
                 (
                     gameplay::sync_runtime_ship_state,
                     gameplay::apply_player_ship_controls,
@@ -155,11 +194,11 @@ pub fn run_client() {
                     gameplay::update_inspection_and_alerts_text,
                 )
                     .chain()
-                    .run_if(in_state(ClientAppState::Playing)),
+                    .run_if(in_state(ClientAppState::Encounter)),
             ),
         )
         .add_systems(
-            OnExit(ClientAppState::Playing),
+            OnExit(ClientAppState::Encounter),
             gameplay::cleanup_runtime_entities,
         )
         .run();

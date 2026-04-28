@@ -1,30 +1,32 @@
 use bevy::prelude::*;
 use cordic::{acos, asin, atan, atan2, cos, sin, sqrt, tan};
 
-use crate::client::gameplay::{
-    components::{
-        ArchComputerModule,
-        ArchExecutionResult,
-        ArchLogisticsPreference,
-        DestroyedModule,
-        HostileTarget,
-        MissionState,
-        ModuleRuntimeState,
-        PlayerShip,
-        ProcessorModule,
-        RuntimeArchComputer,
-        RuntimeShipModule,
-        ShipArchCommandState,
-        ShipAutomationMode,
-        ShipAutomationState,
-        ShipRoot,
-        StorageModule,
+use crate::{
+    client::gameplay::{
+        components::{
+            ArchComputerModule,
+            ArchExecutionResult,
+            ArchLogisticsPreference,
+            DestroyedModule,
+            HostileTarget,
+            MissionState,
+            ModuleRuntimeState,
+            PlayerShip,
+            ProcessorModule,
+            RuntimeArchComputer,
+            RuntimeShipModule,
+            ShipArchCommandState,
+            ShipAutomationMode,
+            ShipAutomationState,
+            ShipRoot,
+            StorageModule,
+        },
+        helpers::{Fx, fx_from_time_delta},
     },
-    helpers::{fx_from_time_delta, Fx},
-};
-use crate::ship::{
-    arch::{ArchInstruction, ArchProgram, ArchProgramTemplate, ArchRegister, ArchValueRef},
-    ModuleKind,
+    ship::{
+        ModuleKind,
+        arch::{ArchInstruction, ArchProgram, ArchProgramTemplate, ArchRegister, ArchValueRef},
+    },
 };
 
 #[derive(Clone, Copy)]
@@ -147,7 +149,11 @@ pub(crate) fn run_arch_automation(
             || aggregate.logistics_enabled
             || aggregate.turret_assist
             || aggregate.turret_auto_fire;
-        let (result, outputs) = execute_program(&arch_runtime.program, arch_runtime.instruction_budget, snapshot);
+        let (result, outputs) = execute_program(
+            &arch_runtime.program,
+            arch_runtime.instruction_budget,
+            snapshot,
+        );
         let now_active = outputs.reactor_bias > Fx::from_num(0)
             || outputs.logistics_enabled
             || outputs.turret_assist
@@ -171,8 +177,8 @@ pub(crate) fn run_arch_automation(
         arch_runtime.last_result = result;
 
         if runtime_module.kind == ModuleKind::Computer && aggregate.reactor_bias > Fx::from_num(0) {
-            runtime_state.current_heat = (runtime_state.current_heat - Fx::from_num(0.4) * dt)
-                .max(Fx::from_num(0));
+            runtime_state.current_heat =
+                (runtime_state.current_heat - Fx::from_num(0.4) * dt).max(Fx::from_num(0));
         }
     }
 
@@ -604,64 +610,46 @@ fn execute_instruction(
             write_register(*dst, value, gp, commands, writes)?;
             Ok(pc + 1)
         }
-        ArchInstruction::Jmp { target } => {
-            jump_target(*target, pc)
-        }
-        ArchInstruction::Jeq { lhs, rhs, target } => {
-            jump_if(
-                resolve_value(lhs, snapshot, gp, commands)
-                    == resolve_value(rhs, snapshot, gp, commands),
-                *target,
-                pc,
-            )
-        }
-        ArchInstruction::Jne { lhs, rhs, target } => {
-            jump_if(
-                resolve_value(lhs, snapshot, gp, commands)
-                    != resolve_value(rhs, snapshot, gp, commands),
-                *target,
-                pc,
-            )
-        }
-        ArchInstruction::Jgt { lhs, rhs, target } => {
-            jump_if(
-                resolve_value(lhs, snapshot, gp, commands)
-                    > resolve_value(rhs, snapshot, gp, commands),
-                *target,
-                pc,
-            )
-        }
-        ArchInstruction::Jge { lhs, rhs, target } => {
-            jump_if(
-                resolve_value(lhs, snapshot, gp, commands)
-                    >= resolve_value(rhs, snapshot, gp, commands),
-                *target,
-                pc,
-            )
-        }
-        ArchInstruction::Jlt { lhs, rhs, target } => {
-            jump_if(
-                resolve_value(lhs, snapshot, gp, commands)
-                    < resolve_value(rhs, snapshot, gp, commands),
-                *target,
-                pc,
-            )
-        }
-        ArchInstruction::Jle { lhs, rhs, target } => {
-            jump_if(
-                resolve_value(lhs, snapshot, gp, commands)
-                    <= resolve_value(rhs, snapshot, gp, commands),
-                *target,
-                pc,
-            )
-        }
-        ArchInstruction::Jnz { cond, target } => {
-            jump_if(
-                is_truthy(resolve_value(cond, snapshot, gp, commands)),
-                *target,
-                pc,
-            )
-        }
+        ArchInstruction::Jmp { target } => jump_target(*target, pc),
+        ArchInstruction::Jeq { lhs, rhs, target } => jump_if(
+            resolve_value(lhs, snapshot, gp, commands)
+                == resolve_value(rhs, snapshot, gp, commands),
+            *target,
+            pc,
+        ),
+        ArchInstruction::Jne { lhs, rhs, target } => jump_if(
+            resolve_value(lhs, snapshot, gp, commands)
+                != resolve_value(rhs, snapshot, gp, commands),
+            *target,
+            pc,
+        ),
+        ArchInstruction::Jgt { lhs, rhs, target } => jump_if(
+            resolve_value(lhs, snapshot, gp, commands) > resolve_value(rhs, snapshot, gp, commands),
+            *target,
+            pc,
+        ),
+        ArchInstruction::Jge { lhs, rhs, target } => jump_if(
+            resolve_value(lhs, snapshot, gp, commands)
+                >= resolve_value(rhs, snapshot, gp, commands),
+            *target,
+            pc,
+        ),
+        ArchInstruction::Jlt { lhs, rhs, target } => jump_if(
+            resolve_value(lhs, snapshot, gp, commands) < resolve_value(rhs, snapshot, gp, commands),
+            *target,
+            pc,
+        ),
+        ArchInstruction::Jle { lhs, rhs, target } => jump_if(
+            resolve_value(lhs, snapshot, gp, commands)
+                <= resolve_value(rhs, snapshot, gp, commands),
+            *target,
+            pc,
+        ),
+        ArchInstruction::Jnz { cond, target } => jump_if(
+            is_truthy(resolve_value(cond, snapshot, gp, commands)),
+            *target,
+            pc,
+        ),
         ArchInstruction::Min { dst, lhs, rhs } => {
             let value = resolve_value(lhs, snapshot, gp, commands)
                 .min(resolve_value(rhs, snapshot, gp, commands));
@@ -817,14 +805,22 @@ fn write_register(
         ArchRegister::Gp3 => gp[3] = value,
         ArchRegister::CmdReactorBias => {
             commands.reactor_bias = value.clamp(Fx::from_num(0), Fx::from_num(3));
-            writes.push(format!("{} <- {:.1}", register.as_str(), value.to_num::<f32>()));
+            writes.push(format!(
+                "{} <- {:.1}",
+                register.as_str(),
+                value.to_num::<f32>()
+            ));
         }
         ArchRegister::CmdLogisticsEnable => {
             commands.logistics_enabled = value > Fx::from_num(0);
             writes.push(format!(
                 "{} <- {}",
                 register.as_str(),
-                if commands.logistics_enabled { "on" } else { "off" }
+                if commands.logistics_enabled {
+                    "on"
+                } else {
+                    "off"
+                }
             ));
         }
         ArchRegister::CmdLogisticsPreference => {
@@ -855,7 +851,11 @@ fn write_register(
             writes.push(format!(
                 "{} <- {}",
                 register.as_str(),
-                if commands.turret_auto_fire { "on" } else { "off" }
+                if commands.turret_auto_fire {
+                    "on"
+                } else {
+                    "off"
+                }
             ));
         }
         _ => {}

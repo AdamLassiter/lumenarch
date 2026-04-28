@@ -1,47 +1,51 @@
 use bevy::prelude::*;
 
-use crate::client::gameplay::{
-    components::{
-        DestroyedModule,
-        HostileTarget,
-        HostileTurretPlatform,
-        HostileWeaponState,
-        Integrity,
-        MissionState,
-        ModuleRuntimeState,
-        PlayerShip,
-        Projectile,
-        ProjectileFaction,
-        RuntimeShipModule,
-        ShipArchCommandState,
-        ShipControlMode,
-        ShipPowerState,
-        ShipRoot,
-        ShipWeaponState,
-        ShipboardControlState,
-        SimPosition,
-        SimRotation,
-        TurretCommandState,
-        WeaponModule,
+use crate::{
+    client::{
+        TILE_SIZE,
+        gameplay::{
+            HOSTILE_PROJECTILE_SPEED,
+            HOSTILE_TARGET_RADIUS,
+            MODULE_HIT_RADIUS,
+            PROJECTILE_RADIUS,
+            PROJECTILE_SPEED,
+            components::{
+                DestroyedModule,
+                HostileTarget,
+                HostileTurretPlatform,
+                HostileWeaponState,
+                Integrity,
+                MissionState,
+                ModuleRuntimeState,
+                PlayerShip,
+                Projectile,
+                ProjectileFaction,
+                RuntimeShipModule,
+                ShipArchCommandState,
+                ShipControlMode,
+                ShipPowerState,
+                ShipRoot,
+                ShipWeaponState,
+                ShipboardControlState,
+                SimPosition,
+                SimRotation,
+                TurretCommandState,
+                WeaponModule,
+            },
+            helpers::{
+                Fx,
+                angle_from_vector,
+                fixed_radius_sq,
+                fx_from_time_delta,
+                is_inside_arena,
+                render_translation,
+                spawn_player_projectile,
+                spawn_projectile_entity,
+            },
+        },
     },
-    helpers::{
-        angle_from_vector,
-        fixed_radius_sq,
-        fx_from_time_delta,
-        is_inside_arena,
-        render_translation,
-        spawn_player_projectile,
-        spawn_projectile_entity,
-        Fx,
-    },
-    HOSTILE_PROJECTILE_SPEED,
-    HOSTILE_TARGET_RADIUS,
-    MODULE_HIT_RADIUS,
-    PROJECTILE_RADIUS,
-    PROJECTILE_SPEED,
+    ship::ModuleKind,
 };
-use crate::client::TILE_SIZE;
-use crate::ship::ModuleKind;
 
 pub(crate) fn fire_player_weapons(
     mut commands: Commands,
@@ -70,17 +74,11 @@ pub(crate) fn fire_player_weapons(
 ) {
     let control_mode = control_mode_query.into_inner();
 
-    let (
-        children,
-        ship_position,
-        ship_rotation,
-        power_state,
-        arch_commands,
-        mut weapon_state,
-    ) =
+    let (children, ship_position, ship_rotation, power_state, arch_commands, mut weapon_state) =
         player_ship_query.into_inner();
 
-    let fire_requested = control_mode.mode == ShipControlMode::Turret || arch_commands.turret_auto_fire;
+    let fire_requested =
+        control_mode.mode == ShipControlMode::Turret || arch_commands.turret_auto_fire;
     if !fire_requested
         || !power_state.weapons_powered
         || weapon_state.turret_count == 0
@@ -99,8 +97,8 @@ pub(crate) fn fire_player_weapons(
         if destroyed.is_some() || runtime_state.is_disabled {
             continue;
         }
-        let is_manual_turret =
-            control_mode.mode == ShipControlMode::Turret && control_mode.focused_entity == Some(weapon_entity);
+        let is_manual_turret = control_mode.mode == ShipControlMode::Turret
+            && control_mode.focused_entity == Some(weapon_entity);
         if !is_manual_turret && !arch_commands.turret_auto_fire {
             continue;
         }
@@ -108,13 +106,13 @@ pub(crate) fn fire_player_weapons(
             continue;
         }
         let world_angle = ship_rotation.radians + turret_state.actual_angle;
-        let projectile_velocity =
-            crate::client::gameplay::helpers::facing_vector(world_angle) * Fx::from_num(PROJECTILE_SPEED);
+        let projectile_velocity = crate::client::gameplay::helpers::facing_vector(world_angle)
+            * Fx::from_num(PROJECTILE_SPEED);
         if projectile_velocity.is_near_zero() {
             continue;
         }
-        let muzzle_offset =
-            crate::client::gameplay::helpers::facing_vector(world_angle) * Fx::from_num(TILE_SIZE * 0.35);
+        let muzzle_offset = crate::client::gameplay::helpers::facing_vector(world_angle)
+            * Fx::from_num(TILE_SIZE * 0.35);
         let origin = ship_position.value
             + weapon_module.local_position.rotate(ship_rotation.radians)
             + muzzle_offset;
@@ -171,7 +169,10 @@ pub(crate) fn fire_hostile_targets(
 
 pub(crate) fn aim_hostile_turrets(
     player_ship_query: Single<&SimPosition, (With<PlayerShip>, With<ShipRoot>)>,
-    mut hostile_query: Query<(&SimPosition, &mut Transform), (With<HostileTarget>, With<HostileTurretPlatform>)>,
+    mut hostile_query: Query<
+        (&SimPosition, &mut Transform),
+        (With<HostileTarget>, With<HostileTurretPlatform>),
+    >,
 ) {
     let player_position = player_ship_query.into_inner().value;
 
@@ -218,7 +219,10 @@ pub(crate) fn handle_projectile_hits(
         ),
         Without<HostileTarget>,
     >,
-    player_ship_query: Single<(&SimPosition, &SimRotation, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,
+    player_ship_query: Single<
+        (&SimPosition, &SimRotation, &mut MissionState),
+        (With<PlayerShip>, With<ShipRoot>),
+    >,
 ) {
     let (ship_position, ship_rotation, mut mission_state) = player_ship_query.into_inner();
     let hostile_hit_distance_sq = fixed_radius_sq(HOSTILE_TARGET_RADIUS + PROJECTILE_RADIUS);
@@ -231,8 +235,12 @@ pub(crate) fn handle_projectile_hits(
                 let mut hit_target = None;
 
                 for (hostile_entity, hostile_position, hostile_integrity) in &mut hostile_query {
-                    if projectile_pos.distance_sq(hostile_position.value) <= hostile_hit_distance_sq {
-                        hit_target = Some((hostile_entity, hostile_integrity.current - projectile.damage));
+                    if projectile_pos.distance_sq(hostile_position.value) <= hostile_hit_distance_sq
+                    {
+                        hit_target = Some((
+                            hostile_entity,
+                            hostile_integrity.current - projectile.damage,
+                        ));
                         break;
                     }
                 }
@@ -250,7 +258,9 @@ pub(crate) fn handle_projectile_hits(
             ProjectileFaction::Hostile => {
                 let mut hit_module = None;
 
-                for (module_entity, runtime_module, integrity, _, destroyed) in &mut player_module_query {
+                for (module_entity, runtime_module, integrity, _, destroyed) in
+                    &mut player_module_query
+                {
                     if destroyed.is_some() || integrity.current <= 0 {
                         continue;
                     }
@@ -258,8 +268,11 @@ pub(crate) fn handle_projectile_hits(
                     let module_pos = ship_position.value
                         + runtime_module.local_position.rotate(ship_rotation.radians);
                     if projectile_pos.distance_sq(module_pos) <= module_hit_distance_sq {
-                        hit_module =
-                            Some((module_entity, runtime_module.kind, integrity.current - projectile.damage));
+                        hit_module = Some((
+                            module_entity,
+                            runtime_module.kind,
+                            integrity.current - projectile.damage,
+                        ));
                         break;
                     }
                 }
@@ -280,7 +293,9 @@ pub(crate) fn handle_projectile_hits(
                                 mission_state.encounter_cleared = false;
                                 mission_state.completed = false;
                                 mission_state.completion_reason = None;
-                                mission_state.return_delay_remaining.get_or_insert(Fx::from_num(2.5));
+                                mission_state
+                                    .return_delay_remaining
+                                    .get_or_insert(Fx::from_num(2.5));
                             }
                         }
                     }

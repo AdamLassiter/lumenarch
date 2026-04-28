@@ -1,9 +1,10 @@
 use bevy::prelude::*;
 
-use super::super::helpers::{FixedVec2, Fx};
-use super::logistics::ResourceKind;
-use crate::ship::arch::ArchProgram;
-use crate::ship::ModuleKind;
+use super::{
+    super::helpers::{FixedVec2, Fx},
+    logistics::ResourceKind,
+};
+use crate::ship::{ModuleKind, arch::ArchProgram};
 
 #[derive(Component)]
 pub(crate) struct RuntimeShipModule {
@@ -11,6 +12,7 @@ pub(crate) struct RuntimeShipModule {
     pub(crate) kind: ModuleKind,
     pub(crate) grid_x: i32,
     pub(crate) grid_y: i32,
+    pub(crate) rotation_quadrants: u8,
     pub(crate) local_position: FixedVec2,
 }
 

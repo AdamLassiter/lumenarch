@@ -10,16 +10,16 @@ use super::{
             DemoProgression,
             EditorShip,
             EditorToolState,
-            LaunchButton,
+            LeaveEditorButton,
             ProgramButtonAction,
             ToolboxButton,
         },
     },
-    helpers::{cursor_grid_position, is_cursor_over_toolbox, module_kind_cost},
+    helpers::{cursor_grid_position, is_cursor_over_editor_ui, module_kind_cost},
 };
 use crate::ship::{
-    arch::{ArchProgram, ArchProgramTemplate},
     ShipModule,
+    arch::{ArchProgram, ArchProgramTemplate},
     storage::{load_default_ship, save_default_ship},
 };
 
@@ -54,35 +54,35 @@ pub(crate) fn toolbox_button_system(
     }
 }
 
-pub(crate) fn launch_button_system(
+pub(crate) fn leave_editor_button_system(
     mut interaction_query: Query<
         (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<Button>, With<LaunchButton>),
+        (Changed<Interaction>, With<Button>, With<LeaveEditorButton>),
     >,
     mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
     for (interaction, mut background) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
-                *background = BackgroundColor(Color::srgb(0.12, 0.40, 0.24));
-                next_state.set(ClientAppState::Playing);
+                *background = BackgroundColor(Color::srgb(0.42, 0.30, 0.20));
+                next_state.set(ClientAppState::Docked);
             }
             Interaction::Hovered => {
-                *background = BackgroundColor(Color::srgb(0.24, 0.62, 0.38));
+                *background = BackgroundColor(Color::srgb(0.56, 0.40, 0.26));
             }
             Interaction::None => {
-                *background = BackgroundColor(Color::srgb(0.18, 0.50, 0.30));
+                *background = BackgroundColor(Color::srgb(0.46, 0.34, 0.22));
             }
         }
     }
 }
 
-pub(crate) fn launch_keyboard_shortcut(
+pub(crate) fn leave_editor_keyboard_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
-    if keys.just_pressed(KeyCode::KeyL) {
-        next_state.set(ClientAppState::Playing);
+    if keys.just_pressed(KeyCode::Tab) {
+        next_state.set(ClientAppState::Docked);
     }
 }
 
@@ -105,9 +105,9 @@ pub(crate) fn computer_program_button_system(
                 else {
                     continue;
                 };
-                let program = module
-                    .arch_program
-                    .get_or_insert_with(|| ArchProgram::from_template(ArchProgramTemplate::BalancedOps));
+                let program = module.arch_program.get_or_insert_with(|| {
+                    ArchProgram::from_template(ArchProgramTemplate::BalancedOps)
+                });
                 match button.action {
                     ProgramButtonAction::CycleTemplate => {
                         *program = ArchProgram::from_template(program.template.next());
@@ -150,7 +150,7 @@ pub(crate) fn place_or_remove_tile(
 ) {
     let window = window.into_inner();
 
-    if is_cursor_over_toolbox(window) {
+    if is_cursor_over_editor_ui(window) {
         return;
     }
 

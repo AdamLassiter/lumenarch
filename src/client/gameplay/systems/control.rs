@@ -1,7 +1,7 @@
 use bevy::{prelude::*, window::PrimaryWindow};
 
 use super::super::{
-    super::state::{ClientAppState, MainCamera, ReturnButton},
+    super::state::{AbortEncounterButton, ClientAppState, MainCamera},
     CAMERA_FOLLOW_LERP_RATE,
     components::{
         AngularVelocity,
@@ -55,7 +55,11 @@ const EXTERIOR_CAMERA_SCALE: f32 = 1.0;
 pub(crate) fn return_button_system(
     mut interaction_query: Query<
         (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<Button>, With<ReturnButton>),
+        (
+            Changed<Interaction>,
+            With<Button>,
+            With<AbortEncounterButton>,
+        ),
     >,
     mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
@@ -63,7 +67,7 @@ pub(crate) fn return_button_system(
         match *interaction {
             Interaction::Pressed => {
                 *background = BackgroundColor(Color::srgb(0.44, 0.20, 0.14));
-                next_state.set(ClientAppState::Editing);
+                next_state.set(ClientAppState::Docked);
             }
             Interaction::Hovered => {
                 *background = BackgroundColor(Color::srgb(0.64, 0.34, 0.22));
@@ -80,7 +84,7 @@ pub(crate) fn return_keyboard_shortcut(
     mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
     if keys.just_pressed(KeyCode::Tab) {
-        next_state.set(ClientAppState::Editing);
+        next_state.set(ClientAppState::Docked);
     }
 }
 
@@ -105,12 +109,10 @@ pub(crate) fn camera_follow_player_ship(
     let (desired_center, desired_rotation, desired_scale) = match control_state.mode {
         ShipControlMode::Interior => (
             ship_world + player_position.local_position.rotate(ship_rotation.radians),
-            -ship_rotation.radians.to_num::<f32>(),
+            ship_rotation.radians.to_num::<f32>(),
             INTERIOR_CAMERA_SCALE,
         ),
-        ShipControlMode::Reactor
-        | ShipControlMode::Logistics
-        | ShipControlMode::Computer => {
+        ShipControlMode::Reactor | ShipControlMode::Logistics | ShipControlMode::Computer => {
             let focus_pos = control_state
                 .focused_entity
                 .and_then(|entity| module_query.get(entity).ok())
@@ -120,7 +122,7 @@ pub(crate) fn camera_follow_player_ship(
                 .unwrap_or(ship_world);
             (
                 focus_pos,
-                -ship_rotation.radians.to_num::<f32>(),
+                ship_rotation.radians.to_num::<f32>(),
                 INTERIOR_CAMERA_SCALE,
             )
         }
@@ -141,14 +143,12 @@ pub(crate) fn camera_follow_player_ship(
 
 pub(crate) fn toggle_shipboard_control_mode(
     keys: Res<ButtonInput<KeyCode>>,
-    ship_query: Single<
-        (&mut ShipboardControlState, &Children),
-        (With<PlayerShip>, With<ShipRoot>),
-    >,
+    ship_query: Single<(&mut ShipboardControlState, &Children), (With<PlayerShip>, With<ShipRoot>)>,
     mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
+    station_query: Single<&CurrentStation, (With<ShipboardPlayer>, With<PlayerShipAssignment>)>,
     module_query: Query<(Entity, &RuntimeShipModule)>,
 ) {
-    if !keys.just_pressed(KeyCode::KeyC) {
+    if !keys.just_pressed(KeyCode::KeyE) {
         return;
     }
     let mission_state = mission_query.into_inner();
@@ -157,16 +157,12 @@ pub(crate) fn toggle_shipboard_control_mode(
     }
 
     let (mut control_state, children) = ship_query.into_inner();
+    let current_station = station_query.into_inner();
     match control_state.mode {
-        ShipControlMode::Cockpit => {
-            control_state.mode = ShipControlMode::Interior;
-            control_state.focus_mode = StationFocusMode::Internal;
-            control_state.focused_entity = None;
-            control_state.focused_module_id = None;
-            control_state.focused_kind = None;
-            control_state.focused_family = None;
-        }
         ShipControlMode::Interior => {
+            if current_station.kind != ModuleKind::Cockpit {
+                return;
+            }
             if let Some((entity, runtime_module)) = children
                 .iter()
                 .find_map(|entity| module_query.get(*entity).ok())
@@ -337,18 +333,14 @@ pub(crate) fn update_station_command_input(
         ShipControlMode::Interior => {}
         ShipControlMode::Cockpit => {
             if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
-                ship_controls.throttle_demand =
-                    (ship_controls.throttle_demand + dt * Fx::from_num(0.9)).clamp(
-                        Fx::from_num(0),
-                        Fx::from_num(1),
-                    );
+                ship_controls.throttle_demand = (ship_controls.throttle_demand
+                    + dt * Fx::from_num(0.9))
+                .clamp(Fx::from_num(0), Fx::from_num(1));
             }
             if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
-                ship_controls.throttle_demand =
-                    (ship_controls.throttle_demand - dt * Fx::from_num(0.9)).clamp(
-                        Fx::from_num(0),
-                        Fx::from_num(1),
-                    );
+                ship_controls.throttle_demand = (ship_controls.throttle_demand
+                    - dt * Fx::from_num(0.9))
+                .clamp(Fx::from_num(0), Fx::from_num(1));
             }
             ship_controls.turn_input = Fx::from_num(0);
             if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
@@ -362,10 +354,12 @@ pub(crate) fn update_station_command_input(
                 && let Some((cursor_x, cursor_y)) = cursor_normalized(&window_query)
             {
                 ship_controls.turn_input = Fx::from_num(-cursor_x);
-                ship_controls.throttle_demand = Fx::from_num(((1.0 - cursor_y) * 0.5).clamp(0.0, 1.0));
+                ship_controls.throttle_demand =
+                    Fx::from_num(((1.0 - cursor_y) * 0.5).clamp(0.0, 1.0));
             }
-            ship_controls.turn_input =
-                ship_controls.turn_input.clamp(Fx::from_num(-1), Fx::from_num(1));
+            ship_controls.turn_input = ship_controls
+                .turn_input
+                .clamp(Fx::from_num(-1), Fx::from_num(1));
         }
         ShipControlMode::Turret => {
             let Some(focused_entity) = control_state.focused_entity else {
@@ -380,12 +374,13 @@ pub(crate) fn update_station_command_input(
                 return;
             };
             if let Some(cursor_world) = cursor_world_position(&window_query, &camera_query) {
-                let turret_world =
-                    ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians);
+                let turret_world = ship_position.value
+                    + runtime_module.local_position.rotate(ship_rotation.radians);
                 let to_cursor = cursor_world - turret_world;
                 if !to_cursor.is_near_zero() {
-                    turret_state.desired_angle =
-                        wrap_radians(angle_from_vector(to_cursor) - ship_rotation.radians);
+                    turret_state.desired_angle = wrap_radians(
+                        angle_from_vector(to_cursor) - Fx::FRAC_PI_2 - ship_rotation.radians,
+                    );
                 }
             }
             if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
@@ -421,17 +416,21 @@ pub(crate) fn update_station_command_input(
             if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
                 reactor_state.turbine_load -= dt * Fx::from_num(0.45);
             }
-            reactor_state.reaction_rate =
-                reactor_state.reaction_rate.clamp(Fx::from_num(0), Fx::from_num(1));
-            reactor_state.turbine_load =
-                reactor_state.turbine_load.clamp(Fx::from_num(0), Fx::from_num(1));
+            reactor_state.reaction_rate = reactor_state
+                .reaction_rate
+                .clamp(Fx::from_num(0), Fx::from_num(1));
+            reactor_state.turbine_load = reactor_state
+                .turbine_load
+                .clamp(Fx::from_num(0), Fx::from_num(1));
         }
         ShipControlMode::Logistics => {
             let Some(focused_entity) = control_state.focused_entity else {
                 return;
             };
-            let candidate_ids =
-                nearby_logistics_target_ids(control_state.focused_module_id.unwrap_or_default(), &candidate_query);
+            let candidate_ids = nearby_logistics_target_ids(
+                control_state.focused_module_id.unwrap_or_default(),
+                &candidate_query,
+            );
             let Ok((_, runtime_module, _, _, storage_cmd, manipulator_cmd, processor_cmd, _)) =
                 module_query.get_mut(focused_entity)
             else {
@@ -504,8 +503,9 @@ pub(crate) fn update_station_command_input(
                 arch_runtime.enabled = !arch_runtime.enabled;
             }
             if keys.just_pressed(KeyCode::KeyT) {
-                arch_runtime.program =
-                    crate::ship::arch::ArchProgram::from_template(arch_runtime.program.template.next());
+                arch_runtime.program = crate::ship::arch::ArchProgram::from_template(
+                    arch_runtime.program.template.next(),
+                );
             }
         }
     }
@@ -550,7 +550,9 @@ pub(crate) fn apply_player_ship_controls(
         Fx::from_num(0)
     };
     let mut turn_input = if control_mode.mode == ShipControlMode::Cockpit {
-        control_state.turn_input.clamp(Fx::from_num(-1), Fx::from_num(1))
+        control_state
+            .turn_input
+            .clamp(Fx::from_num(-1), Fx::from_num(1))
     } else {
         Fx::from_num(0)
     };
@@ -664,7 +666,9 @@ fn cursor_world_position(
     let cursor = window.cursor_position()?;
     let (camera, camera_transform) = camera_query;
     let world = camera.viewport_to_world_2d(camera_transform, cursor).ok()?;
-    Some(crate::client::gameplay::helpers::FixedVec2::from_vec2(world))
+    Some(crate::client::gameplay::helpers::FixedVec2::from_vec2(
+        world,
+    ))
 }
 
 fn nearby_logistics_target_ids(

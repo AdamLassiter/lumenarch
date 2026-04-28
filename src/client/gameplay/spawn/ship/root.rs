@@ -1,45 +1,56 @@
 use bevy::prelude::*;
 
 use super::{interior::build_interior_nodes, modules::spawn_runtime_module};
-use crate::client::gameplay::{
-    components::{
-        AngularVelocity,
-        CurrentStation,
-        HeldInteraction,
-        InternalPosition,
-        LinearVelocity,
-        MissionState,
-        NearbyInteraction,
-        PlayerFieldState,
-        PlayerShip,
-        PlayerShipAssignment,
-        StationFocusMode,
-        ShipArchCommandState,
-        ShipAutomationMode,
-        ShipAutomationState,
-        ShipControlMode,
-        ShipControlState,
-        ShipInteriorMap,
-        ShipInteriorNode,
-        ShipPowerState,
-        ShipRoot,
-        ShipWeaponState,
-        ShipboardControlState,
-        ShipboardMarker,
-        ShipboardPlayer,
-        SimPosition,
-        SimRotation,
+use crate::{
+    client::{
+        gameplay::{
+            RUNTIME_SHIP_ORIGIN,
+            components::{
+                AngularVelocity,
+                CurrentStation,
+                HeldInteraction,
+                InternalPosition,
+                LinearVelocity,
+                MissionState,
+                NearbyInteraction,
+                PlayerFieldState,
+                PlayerShip,
+                PlayerShipAssignment,
+                ShipArchCommandState,
+                ShipAutomationMode,
+                ShipAutomationState,
+                ShipControlMode,
+                ShipControlState,
+                ShipInteriorMap,
+                ShipInteriorNode,
+                ShipPowerState,
+                ShipRoot,
+                ShipWeaponState,
+                ShipboardControlState,
+                ShipboardMarker,
+                ShipboardPlayer,
+                SimPosition,
+                SimRotation,
+                StationFocusMode,
+            },
+            helpers::{FixedVec2, Fx, count_modules, ship_movement_model, ship_power_model},
+        },
+        state::PlayingCleanup,
     },
-    helpers::{count_modules, ship_movement_model, ship_power_model, FixedVec2, Fx},
-    RUNTIME_SHIP_ORIGIN,
+    ship::{ModuleKind, ShipDefinition},
 };
-use crate::client::state::PlayingCleanup;
-use crate::ship::{ModuleKind, ShipDefinition};
 
 pub(crate) fn spawn_runtime_ship(
     commands: &mut Commands,
     asset_server: &AssetServer,
     ship: &ShipDefinition,
+    node_id: u32,
+    node_name: &str,
+    node_kind_name: &str,
+    reward_multiplier: u32,
+    ambient_heat_pressure: i32,
+    ambient_electrical_pressure: i32,
+    wear_penalty: u32,
 ) {
     let engine_count = count_modules(ship, ModuleKind::Engine);
     let reactor_count = count_modules(ship, ModuleKind::Reactor);
@@ -127,6 +138,12 @@ pub(crate) fn spawn_runtime_ship(
             },
             ShipArchCommandState::default(),
             MissionState {
+                node_id,
+                node_name: node_name.to_string(),
+                node_kind_name: node_kind_name.to_string(),
+                reward_multiplier,
+                ambient_heat_pressure: Fx::from_num(ambient_heat_pressure),
+                ambient_electrical_pressure: Fx::from_num(ambient_electrical_pressure),
                 failed: false,
                 failure_reason: None,
                 encounter_cleared: false,
@@ -189,6 +206,7 @@ pub(crate) fn spawn_runtime_ship(
                 center_y,
                 center_x_fixed,
                 center_y_fixed,
+                wear_penalty,
             )
         })
         .collect();

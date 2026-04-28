@@ -1,11 +1,14 @@
-# BUGS — Known issues in need of fixing
+# ISSUES — Known issues and bugs in need of fixing
 
-* [x] Turrets need an animated swiveling top section
-  * [x] Add separate `hardpoint.png` base and `turret.png` swivelling top
-  * [ ] Other components may need similar animated overlayed parts, e.g. airlock doors
-* [x] Saved ships are not loaded on returning from combat
-* [x] Suspect the future need for a debug overlay for field sizes
+* [ ] Components other than the turret may need similar animated overlayed parts, e.g. airlock doors
 * [ ] Player movement needs to be continuous rather than discrete
-* [ ] On-ship view should be oriented/rotated to be ship-local while pilot/turret view remains workspace
-* [x] Debug overlay hotkey to toggle diagnostics
 * [ ] Simulation stability testing for single player/multi player
+* [ ] Components need proper full-screen (or at least most-of-screen) UIs
+* [x] Rectors should stall below a certain internal heat
+* [ ] Need enemy ships rather than just single-point enemy turrets
+* [ ] Ship turn speed is too high and too immediate - should have an angular inertia calculation and should be driven by retrothrusters or side-mounted engines
+* [ ] No ability to write ARCH programs
+* [ ] Power usage of components should consider if the component is in use - primarily engines and turrets
+* [ ] tiles/README.md is missing docs for some tiles
+* [ ] Reactors don't generate enough power
+* [ ] Shots should be drawn over the top of the ship

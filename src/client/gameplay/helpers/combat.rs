@@ -3,13 +3,16 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::prelude::*;
 use cordic::{atan2, sin};
 
-use super::{fx_ratio, widen, wrap_radians, FixedVec2, Fx, WideFx};
-use crate::client::{state::PlayingCleanup, TILE_SIZE};
-use crate::client::gameplay::{
-    components::{Projectile, ProjectileFaction, SimPosition},
-    ARENA_HEIGHT_TILES,
-    ARENA_WIDTH_TILES,
-    PROJECTILE_LIFETIME,
+use super::{FixedVec2, Fx, WideFx, fx_ratio, widen, wrap_radians};
+use crate::client::{
+    TILE_SIZE,
+    gameplay::{
+        ARENA_HEIGHT_TILES,
+        ARENA_WIDTH_TILES,
+        PROJECTILE_LIFETIME,
+        components::{Projectile, ProjectileFaction, SimPosition},
+    },
+    state::PlayingCleanup,
 };
 
 pub(crate) fn spawn_player_projectile(

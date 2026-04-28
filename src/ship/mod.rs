@@ -4,6 +4,7 @@ pub mod storage;
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
+
 use self::arch::{ArchProgram, ArchProgramTemplate};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
