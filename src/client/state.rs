@@ -7,7 +7,6 @@ use crate::{
     protocol::ShipSnapshot,
     ship::{ModuleKind, ShipDefinition},
 };
-
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
 pub(crate) enum ClientAppState {
     #[default]
@@ -70,6 +69,11 @@ impl Default for DemoProgression {
     }
 }
 
+#[derive(Resource, Default)]
+pub(crate) struct DebugOverlayState {
+    pub(crate) enabled: bool,
+}
+
 #[derive(Resource, Default, Clone)]
 pub(crate) struct LastMissionReport {
     pub(crate) headline: Option<String>,
@@ -83,6 +87,16 @@ pub(crate) struct LastMissionReport {
     pub(crate) automation_used: bool,
     pub(crate) automation_triggers: u32,
     pub(crate) redesign_hints: Vec<String>,
+    pub(crate) recovered_raw_salvage: u32,
+    pub(crate) processed_repair_charge: u32,
+    pub(crate) consumed_repair_charge: u32,
+    pub(crate) transfer_count: u32,
+    pub(crate) processor_cycles: u32,
+    pub(crate) logistics_bottleneck: Option<String>,
+    pub(crate) logistics_automation_used: bool,
+    pub(crate) arch_primary_program: Option<String>,
+    pub(crate) arch_invalid_executions: u32,
+    pub(crate) arch_recent_writes: Vec<String>,
 }
 
 #[derive(Resource)]
@@ -139,6 +153,24 @@ pub(crate) struct GameplayAlertsText;
 #[derive(Component)]
 pub(crate) struct ToolboxButton {
     pub(crate) kind: ModuleKind,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum ProgramButtonAction {
+    CycleTemplate,
+    AdjustConstant { index: usize, delta: i32 },
+}
+
+#[derive(Component)]
+pub(crate) struct ComputerProgramPanel;
+
+#[derive(Component)]
+pub(crate) struct ComputerProgramEntry;
+
+#[derive(Component)]
+pub(crate) struct ComputerProgramButton {
+    pub(crate) module_id: u64,
+    pub(crate) action: ProgramButtonAction,
 }
 
 #[derive(Component)]

@@ -5,6 +5,9 @@ use super::{
         TOOLBOX_COMPONENTS,
         TOOLBOX_WIDTH,
         state::{
+            ComputerProgramButton,
+            ComputerProgramEntry,
+            ComputerProgramPanel,
             ConnectionStatus,
             DemoProgression,
             EditingCleanup,
@@ -14,11 +17,13 @@ use super::{
             EditorToolState,
             LastMissionReport,
             LaunchButton,
+            ProgramButtonAction,
         },
     },
     helpers::{editor_status_line, module_kind_cost},
 };
 use crate::ship::{
+    arch::{ArchProgram, ArchProgramTemplate},
     ModuleKind,
     ShipDefinition,
     storage::{load_default_ship, save_default_ship},
@@ -29,28 +34,23 @@ pub(crate) fn initialize_editor_ship(
     mut editor_ship: ResMut<EditorShip>,
     mut tool_state: ResMut<EditorToolState>,
 ) {
-    let has_existing_ship =
-        !editor_ship.ship.name.is_empty() || !editor_ship.ship.modules.is_empty();
-
-    if !has_existing_ship {
-        match load_default_ship() {
-            Ok(Some(saved_ship)) => {
-                editor_ship.ship = saved_ship;
+    match load_default_ship() {
+        Ok(Some(saved_ship)) => {
+            editor_ship.ship = saved_ship;
+        }
+        Ok(None) => {
+            if let Some(snapshot) = status.active_snapshot.as_ref() {
+                editor_ship.ship = snapshot.clone();
+            } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
+                editor_ship.ship = ShipDefinition::empty("Untitled Knot");
             }
-            Ok(None) => {
-                if let Some(snapshot) = status.active_snapshot.as_ref() {
-                    editor_ship.ship = snapshot.clone();
-                } else {
-                    editor_ship.ship = ShipDefinition::empty("Untitled Knot");
-                }
-            }
-            Err(error) => {
-                eprintln!("editor: failed to load saved ship: {error}");
-                if let Some(snapshot) = status.active_snapshot.as_ref() {
-                    editor_ship.ship = snapshot.clone();
-                } else {
-                    editor_ship.ship = ShipDefinition::empty("Untitled Knot");
-                }
+        }
+        Err(error) => {
+            eprintln!("editor: failed to load saved ship: {error}");
+            if let Some(snapshot) = status.active_snapshot.as_ref() {
+                editor_ship.ship = snapshot.clone();
+            } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
+                editor_ship.ship = ShipDefinition::empty("Untitled Knot");
             }
         }
     }
@@ -210,6 +210,22 @@ pub(crate) fn spawn_editor_ui(
             root.spawn((
                 Node {
                     position_type: PositionType::Absolute,
+                    left: Val::Px(TOOLBOX_WIDTH + 16.0),
+                    bottom: Val::Px(16.0),
+                    width: Val::Px(360.0),
+                    padding: UiRect::all(Val::Px(12.0)),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(10.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
+                BorderRadius::all(Val::Px(10.0)),
+                ComputerProgramPanel,
+            ));
+
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
                     right: Val::Px(16.0),
                     bottom: Val::Px(16.0),
                     padding: UiRect::all(Val::Px(12.0)),
@@ -269,6 +285,164 @@ pub(crate) fn cleanup_editor_entities(
     for entity in &query {
         commands.entity(entity).despawn_recursive();
     }
+}
+
+pub(crate) fn sync_computer_program_entries(
+    mut commands: Commands,
+    editor_ship: Res<EditorShip>,
+    asset_server: Res<AssetServer>,
+    panel_query: Single<Entity, With<ComputerProgramPanel>>,
+    existing_query: Query<Entity, With<ComputerProgramEntry>>,
+) {
+    if !editor_ship.is_changed() {
+        return;
+    }
+
+    for entity in &existing_query {
+        commands.entity(entity).despawn_recursive();
+    }
+
+    let panel = panel_query.into_inner();
+    let title_font = asset_server.load("fonts/FiraSans-Bold.ttf");
+    let mono_font = asset_server.load("fonts/FiraMono-Medium.ttf");
+
+    commands.entity(panel).with_children(|panel| {
+        panel.spawn((
+            Text::new("ARCH Programs"),
+            TextFont {
+                font: title_font,
+                font_size: 20.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            ComputerProgramEntry,
+        ));
+
+        let computers: Vec<_> = editor_ship
+            .ship
+            .modules
+            .iter()
+            .filter(|module| module.kind == ModuleKind::Computer)
+            .collect();
+
+        if computers.is_empty() {
+            panel.spawn((
+                Text::new("No computer modules installed"),
+                TextFont {
+                    font: mono_font,
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.76, 0.80, 0.86)),
+                ComputerProgramEntry,
+            ));
+            return;
+        }
+
+        for module in computers {
+            let program = module
+                .arch_program
+                .clone()
+                .unwrap_or_else(|| ArchProgram::from_template(ArchProgramTemplate::BalancedOps));
+            panel.spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    padding: UiRect::all(Val::Px(10.0)),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(6.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.12, 0.14, 0.18, 0.92)),
+                BorderRadius::all(Val::Px(8.0)),
+                ComputerProgramEntry,
+            ))
+            .with_children(|entry| {
+                entry.spawn((
+                    Text::new(format!(
+                        "Computer #{}\nProgram: {}\nConst A / B: {} / {}",
+                        module.id,
+                        program.template.as_str(),
+                        program.constants[0],
+                        program.constants[1]
+                    )),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: 14.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.92, 0.94, 0.98)),
+                ));
+                spawn_program_button(
+                    entry,
+                    &mono_font,
+                    "Cycle Template",
+                    module.id,
+                    ProgramButtonAction::CycleTemplate,
+                );
+                spawn_program_button(
+                    entry,
+                    &mono_font,
+                    "Const A +1",
+                    module.id,
+                    ProgramButtonAction::AdjustConstant { index: 0, delta: 1 },
+                );
+                spawn_program_button(
+                    entry,
+                    &mono_font,
+                    "Const A -1",
+                    module.id,
+                    ProgramButtonAction::AdjustConstant { index: 0, delta: -1 },
+                );
+                spawn_program_button(
+                    entry,
+                    &mono_font,
+                    "Const B +1",
+                    module.id,
+                    ProgramButtonAction::AdjustConstant { index: 1, delta: 1 },
+                );
+                spawn_program_button(
+                    entry,
+                    &mono_font,
+                    "Const B -1",
+                    module.id,
+                    ProgramButtonAction::AdjustConstant { index: 1, delta: -1 },
+                );
+            });
+        }
+    });
+}
+
+fn spawn_program_button(
+    entry: &mut ChildBuilder,
+    font: &Handle<Font>,
+    label: &str,
+    module_id: u64,
+    action: ProgramButtonAction,
+) {
+    entry
+        .spawn((
+            Button,
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(28.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.24, 0.47, 0.78)),
+            BorderRadius::all(Val::Px(6.0)),
+            ComputerProgramButton { module_id, action },
+            ComputerProgramEntry,
+        ))
+        .with_child((
+            Text::new(label),
+            TextFont {
+                font: font.clone(),
+                font_size: 13.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
 }
 
 #[allow(dead_code)]

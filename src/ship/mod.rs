@@ -1,8 +1,10 @@
+pub mod arch;
 pub mod storage;
 
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
+use self::arch::{ArchProgram, ArchProgramTemplate};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ModuleKind {
@@ -10,6 +12,7 @@ pub enum ModuleKind {
     Interior,
     Cockpit,
     Computer,
+    Processor,
     Reactor,
     Engine,
     Cargo,
@@ -21,11 +24,12 @@ pub enum ModuleKind {
 }
 
 impl ModuleKind {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::Core,
         Self::Interior,
         Self::Cockpit,
         Self::Computer,
+        Self::Processor,
         Self::Reactor,
         Self::Engine,
         Self::Cargo,
@@ -42,6 +46,7 @@ impl ModuleKind {
             Self::Interior => "interior",
             Self::Cockpit => "cockpit",
             Self::Computer => "computer",
+            Self::Processor => "processor",
             Self::Reactor => "reactor",
             Self::Engine => "engine",
             Self::Cargo => "cargo",
@@ -67,6 +72,8 @@ pub struct ShipModule {
     pub grid_x: i32,
     pub grid_y: i32,
     pub rotation_quadrants: u8,
+    #[serde(default)]
+    pub arch_program: Option<ArchProgram>,
 }
 
 impl ShipModule {
@@ -83,6 +90,8 @@ impl ShipModule {
             grid_x,
             grid_y,
             rotation_quadrants: rotation_quadrants % 4,
+            arch_program: (kind == ModuleKind::Computer)
+                .then(|| ArchProgram::from_template(ArchProgramTemplate::BalancedOps)),
         }
     }
 }

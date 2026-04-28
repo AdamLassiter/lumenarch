@@ -7,6 +7,7 @@ pub(crate) use input::{
     launch_button_system,
     launch_keyboard_shortcut,
     load_editor_ship_shortcut,
+    computer_program_button_system,
     persist_editor_ship,
     place_or_remove_tile,
     rotate_selected_tool,
@@ -23,6 +24,7 @@ pub(crate) use render::{
 pub(crate) use ui::{
     cleanup_editor_entities,
     initialize_editor_ship,
+    sync_computer_program_entries,
     spawn_editor_ui,
     update_editor_status_text,
 };

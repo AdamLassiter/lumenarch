@@ -96,11 +96,12 @@ fn sample_ship_snapshot() -> ShipSnapshot {
         ShipModule::new(11, ModuleKind::Reactor, 0, 0, 0),
         ShipModule::new(12, ModuleKind::Hull, 1, 0, 1),
         ShipModule::new(13, ModuleKind::HullCorner, -2, 1, 3),
-        ShipModule::new(14, ModuleKind::Computer, -1, 1, 0),
-        ShipModule::new(15, ModuleKind::Battery, 0, 1, 0),
+        ShipModule::new(14, ModuleKind::Cargo, -1, 1, 0),
+        ShipModule::new(15, ModuleKind::Processor, 0, 1, 0),
         ShipModule::new(16, ModuleKind::HullCorner, 1, 1, 2),
-        ShipModule::new(17, ModuleKind::Engine, -1, 2, 2),
-        ShipModule::new(18, ModuleKind::Engine, 0, 2, 2),
+        ShipModule::new(17, ModuleKind::Computer, 1, 1, 0),
+        ShipModule::new(18, ModuleKind::Engine, -1, 2, 2),
+        ShipModule::new(19, ModuleKind::Engine, 0, 2, 2),
     ];
     snapshot
 }

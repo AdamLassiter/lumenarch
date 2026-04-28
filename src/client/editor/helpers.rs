@@ -19,7 +19,7 @@ pub(super) fn editor_status_line(
     };
     let mission_summary = match (&last_mission_report.headline, &last_mission_report.detail) {
         (Some(headline), Some(detail)) => format!(
-            "\nLast Mission: {headline}\n{detail}\nScrap Awarded: {}\nTotal Scrap: {}\nHottest Module: {}\nFirst Disabled: {}\nRepairs / Stabilizations: {} / {}\nAutomation Used: {}{}",
+            "\nLast Mission: {headline}\n{detail}\nScrap Awarded: {}\nTotal Scrap: {}\nHottest Module: {}\nFirst Disabled: {}\nRepairs / Stabilizations: {} / {}\nAutomation Used: {}\nARCH Program: {}\nARCH Invalid / Recent Writes: {} / {}\nRecovered Raw: {}\nProcessed / Used Charges: {} / {}\nTransfers / Processor Cycles: {} / {}\nLogistics Bottleneck: {}{}",
             last_mission_report.scrap_awarded,
             last_mission_report.total_scrap,
             last_mission_report
@@ -37,6 +37,25 @@ pub(super) fn editor_status_line(
             } else {
                 "no"
             },
+            last_mission_report
+                .arch_primary_program
+                .as_deref()
+                .unwrap_or("n/a"),
+            last_mission_report.arch_invalid_executions,
+            if last_mission_report.arch_recent_writes.is_empty() {
+                "none".to_string()
+            } else {
+                last_mission_report.arch_recent_writes.join(", ")
+            },
+            last_mission_report.recovered_raw_salvage,
+            last_mission_report.processed_repair_charge,
+            last_mission_report.consumed_repair_charge,
+            last_mission_report.transfer_count,
+            last_mission_report.processor_cycles,
+            last_mission_report
+                .logistics_bottleneck
+                .as_deref()
+                .unwrap_or("none"),
             if last_mission_report.redesign_hints.is_empty() {
                 String::new()
             } else {
@@ -64,7 +83,7 @@ pub(super) fn module_kind_cost(kind: ModuleKind) -> u32 {
         ModuleKind::Hull | ModuleKind::HullCorner => 1,
         ModuleKind::Battery | ModuleKind::Cargo | ModuleKind::Airlock => 2,
         ModuleKind::Engine => 3,
-        ModuleKind::Cockpit | ModuleKind::Computer | ModuleKind::Turret => 4,
+        ModuleKind::Cockpit | ModuleKind::Computer | ModuleKind::Processor | ModuleKind::Turret => 4,
         ModuleKind::Reactor => 5,
         ModuleKind::Core => 6,
     }
@@ -96,6 +115,7 @@ pub(super) fn is_cursor_over_toolbox(window: &Window) -> bool {
 pub(super) fn sprite_path_for_kind(kind: &ModuleKind) -> String {
     match kind {
         ModuleKind::Computer => "tiles/battery.png".to_string(),
+        ModuleKind::Processor => "tiles/reactor.png".to_string(),
         _ => format!("tiles/{}.png", kind.as_str()),
     }
 }

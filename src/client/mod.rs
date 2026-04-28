@@ -11,6 +11,7 @@ use self::state::{
     ConnectionConfig,
     ConnectionMailbox,
     ConnectionStatus,
+    DebugOverlayState,
     DemoProgression,
     EditorShip,
     EditorToolState,
@@ -28,7 +29,7 @@ pub(crate) const HOVERED_BUTTON: Color = Color::srgb(0.30, 0.55, 0.88);
 pub(crate) const PRESSED_BUTTON: Color = Color::srgb(0.18, 0.36, 0.62);
 pub(crate) const SELECTED_BUTTON: Color = Color::srgb(0.78, 0.48, 0.20);
 pub(crate) const GRID_COLOR: Color = Color::srgba(0.38, 0.45, 0.56, 0.28);
-pub(crate) const TOOLBOX_COMPONENTS: [ModuleKind; 12] = ModuleKind::ALL;
+pub(crate) const TOOLBOX_COMPONENTS: [ModuleKind; 13] = ModuleKind::ALL;
 
 pub fn run_client() {
     App::new()
@@ -38,6 +39,7 @@ pub fn run_client() {
         .insert_resource(ConnectionMailbox::default())
         .insert_resource(EditorShip::default())
         .insert_resource(DemoProgression::default())
+        .insert_resource(DebugOverlayState::default())
         .insert_resource(LastMissionReport::default())
         .insert_resource(EditorToolState::default())
         .add_plugins(
@@ -84,6 +86,7 @@ pub fn run_client() {
             (
                 editor::draw_grid_overlay.run_if(in_state(ClientAppState::Editing)),
                 editor::toolbox_button_system.run_if(in_state(ClientAppState::Editing)),
+                editor::computer_program_button_system.run_if(in_state(ClientAppState::Editing)),
                 editor::launch_button_system.run_if(in_state(ClientAppState::Editing)),
                 editor::launch_keyboard_shortcut.run_if(in_state(ClientAppState::Editing)),
                 editor::rotate_selected_tool.run_if(in_state(ClientAppState::Editing)),
@@ -93,6 +96,7 @@ pub fn run_client() {
                 editor::persist_editor_ship.run_if(in_state(ClientAppState::Editing)),
                 editor::sync_preview_tile.run_if(in_state(ClientAppState::Editing)),
                 editor::sync_ship_tile_entities.run_if(in_state(ClientAppState::Editing)),
+                editor::sync_computer_program_entries.run_if(in_state(ClientAppState::Editing)),
                 editor::sync_toolbox_visuals.run_if(in_state(ClientAppState::Editing)),
                 editor::update_editor_status_text.run_if(in_state(ClientAppState::Editing)),
             ),
@@ -110,6 +114,7 @@ pub fn run_client() {
             (
                 gameplay::return_button_system.run_if(in_state(ClientAppState::Playing)),
                 gameplay::return_keyboard_shortcut.run_if(in_state(ClientAppState::Playing)),
+                gameplay::toggle_debug_overlay.run_if(in_state(ClientAppState::Playing)),
                 (
                     gameplay::toggle_shipboard_control_mode,
                     gameplay::move_shipboard_player,
@@ -121,6 +126,8 @@ pub fn run_client() {
                     gameplay::sample_ship_fields,
                     gameplay::update_module_runtime_state,
                     gameplay::run_arch_automation,
+                    gameplay::run_logistics_transfers,
+                    gameplay::run_processors,
                     gameplay::update_mission_telemetry,
                     gameplay::tick_recent_action_feedback,
                 )
@@ -141,6 +148,7 @@ pub fn run_client() {
                     gameplay::sync_shipboard_player_visual,
                     gameplay::integrate_player_ship_motion,
                     gameplay::camera_follow_player_ship,
+                    gameplay::draw_debug_overlay,
                     gameplay::update_gameplay_status_text,
                     gameplay::update_inspection_and_alerts_text,
                 )

@@ -1,0 +1,73 @@
+use bevy::prelude::*;
+
+use super::super::helpers::Fx;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ResourceKind {
+    RawSalvage,
+    RepairCharge,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct ResourceInventory {
+    pub(crate) raw_salvage: u32,
+    pub(crate) repair_charge: u32,
+}
+
+impl ResourceInventory {
+    pub(crate) fn get(self, kind: ResourceKind) -> u32 {
+        match kind {
+            ResourceKind::RawSalvage => self.raw_salvage,
+            ResourceKind::RepairCharge => self.repair_charge,
+        }
+    }
+
+    pub(crate) fn add(&mut self, kind: ResourceKind, amount: u32) {
+        match kind {
+            ResourceKind::RawSalvage => self.raw_salvage += amount,
+            ResourceKind::RepairCharge => self.repair_charge += amount,
+        }
+    }
+
+    pub(crate) fn remove(&mut self, kind: ResourceKind, amount: u32) -> u32 {
+        let available = self.get(kind);
+        let taken = available.min(amount);
+        match kind {
+            ResourceKind::RawSalvage => self.raw_salvage -= taken,
+            ResourceKind::RepairCharge => self.repair_charge -= taken,
+        }
+        taken
+    }
+
+    pub(crate) fn total_units(self) -> u32 {
+        self.raw_salvage + self.repair_charge
+    }
+}
+
+#[derive(Component)]
+pub(crate) struct StorageModule {
+    pub(crate) capacity: u32,
+    pub(crate) inventory: ResourceInventory,
+}
+
+#[derive(Component)]
+pub(crate) struct ManipulatorModule {
+    pub(crate) transfer_progress: Fx,
+    pub(crate) transfer_duration: Fx,
+    pub(crate) active: bool,
+    pub(crate) source_module_id: Option<u64>,
+    pub(crate) target_module_id: Option<u64>,
+    pub(crate) resource_kind: Option<ResourceKind>,
+    pub(crate) blocked_reason: Option<String>,
+}
+
+#[derive(Component)]
+pub(crate) struct ProcessorModule {
+    pub(crate) progress: Fx,
+    pub(crate) duration: Fx,
+    pub(crate) active: bool,
+    pub(crate) blocked_reason: Option<String>,
+    pub(crate) inventory: ResourceInventory,
+    pub(crate) input_required: u32,
+    pub(crate) output_amount: u32,
+}

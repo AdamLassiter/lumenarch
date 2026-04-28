@@ -1,0 +1,110 @@
+use bevy::prelude::*;
+
+use crate::client::gameplay::{
+    components::{HostileTarget, HostileTurretPlatform, HostileWeaponState, Integrity, SimPosition},
+    helpers::{angle_from_vector, render_translation, FixedVec2, Fx},
+    ARENA_HEIGHT_TILES,
+    ARENA_WIDTH_TILES,
+    HOSTILE_FIRE_COOLDOWN,
+};
+use crate::client::{state::PlayingCleanup, TILE_SIZE};
+
+pub(super) fn spawn_test_arena(commands: &mut Commands) {
+    let arena_width = ARENA_WIDTH_TILES as f32 * TILE_SIZE;
+    let arena_height = ARENA_HEIGHT_TILES as f32 * TILE_SIZE;
+
+    commands.spawn((
+        Sprite::from_color(
+            Color::srgb(0.07, 0.09, 0.13),
+            Vec2::new(arena_width, arena_height),
+        ),
+        Transform::from_xyz(0.0, 0.0, -20.0),
+        PlayingCleanup,
+    ));
+
+    spawn_arena_walls(commands, arena_width, arena_height);
+    spawn_hostile_platforms(commands);
+}
+
+fn spawn_arena_walls(commands: &mut Commands, arena_width: f32, arena_height: f32) {
+    let wall_thickness = 8.0;
+    let half_w = arena_width * 0.5;
+    let half_h = arena_height * 0.5;
+    let wall_color = Color::srgb(0.26, 0.30, 0.38);
+
+    for (translation, size) in [
+        (
+            Vec3::new(0.0, half_h + wall_thickness * 0.5, -19.0),
+            Vec2::new(arena_width + wall_thickness * 2.0, wall_thickness),
+        ),
+        (
+            Vec3::new(0.0, -(half_h + wall_thickness * 0.5), -19.0),
+            Vec2::new(arena_width + wall_thickness * 2.0, wall_thickness),
+        ),
+        (
+            Vec3::new(-(half_w + wall_thickness * 0.5), 0.0, -19.0),
+            Vec2::new(wall_thickness, arena_height),
+        ),
+        (
+            Vec3::new(half_w + wall_thickness * 0.5, 0.0, -19.0),
+            Vec2::new(wall_thickness, arena_height),
+        ),
+    ] {
+        commands.spawn((
+            Sprite::from_color(wall_color, size),
+            Transform::from_translation(translation),
+            PlayingCleanup,
+        ));
+    }
+}
+
+fn spawn_hostile_platforms(commands: &mut Commands) {
+    let platforms = [
+        (
+            FixedVec2::from_num(-220.0, 120.0),
+            Color::srgb(0.82, 0.28, 0.22),
+            Fx::from_num(3.0),
+            Fx::from_num(1.0),
+        ),
+        (
+            FixedVec2::from_num(210.0, 40.0),
+            Color::srgb(0.24, 0.72, 0.96),
+            Fx::from_num(0.8),
+            Fx::from_num(3.2),
+        ),
+        (
+            FixedVec2::from_num(160.0, -150.0),
+            Color::srgb(0.92, 0.58, 0.26),
+            Fx::from_num(2.2),
+            Fx::from_num(2.2),
+        ),
+    ];
+
+    for (position, color, heat_damage, electrical_damage) in platforms {
+        commands.spawn((
+            Sprite::from_color(color, Vec2::splat(30.0)),
+            Transform {
+                translation: render_translation(position, 4.0),
+                rotation: Quat::from_rotation_z(
+                    (angle_from_vector(FixedVec2::from_num(0.0, 1.0)) - Fx::FRAC_PI_2)
+                        .to_num::<f32>(),
+                ),
+                ..default()
+            },
+            SimPosition { value: position },
+            Integrity {
+                current: 8,
+                max: 8,
+            },
+            HostileTarget,
+            HostileTurretPlatform,
+            HostileWeaponState {
+                cooldown_remaining: Fx::from_num(0.4),
+                cooldown_duration: Fx::from_num(HOSTILE_FIRE_COOLDOWN),
+                heat_damage,
+                electrical_damage,
+            },
+            PlayingCleanup,
+        ));
+    }
+}

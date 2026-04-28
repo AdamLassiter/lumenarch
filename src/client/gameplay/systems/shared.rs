@@ -9,6 +9,8 @@ pub(super) fn interaction_label(kind: InteractionKind) -> &'static str {
     match kind {
         InteractionKind::Cockpit => "return to cockpit control",
         InteractionKind::Computer => "cycle automation mode",
+        InteractionKind::Storage => "inspect cargo hold",
+        InteractionKind::Processor => "inspect processor",
         InteractionKind::Reactor => "stabilize reactor",
         InteractionKind::Turret => "reset turret",
         InteractionKind::Engine => "reset engine",

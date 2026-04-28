@@ -6,16 +6,19 @@ use super::{
         PRESSED_BUTTON,
         state::{
             ClientAppState,
+            ComputerProgramButton,
             DemoProgression,
             EditorShip,
             EditorToolState,
             LaunchButton,
+            ProgramButtonAction,
             ToolboxButton,
         },
     },
     helpers::{cursor_grid_position, is_cursor_over_toolbox, module_kind_cost},
 };
 use crate::ship::{
+    arch::{ArchProgram, ArchProgramTemplate},
     ShipModule,
     storage::{load_default_ship, save_default_ship},
 };
@@ -80,6 +83,47 @@ pub(crate) fn launch_keyboard_shortcut(
 ) {
     if keys.just_pressed(KeyCode::KeyL) {
         next_state.set(ClientAppState::Playing);
+    }
+}
+
+pub(crate) fn computer_program_button_system(
+    mut interaction_query: Query<
+        (&Interaction, &ComputerProgramButton, &mut BackgroundColor),
+        (Changed<Interaction>, With<Button>),
+    >,
+    mut editor_ship: ResMut<EditorShip>,
+) {
+    for (interaction, button, mut background) in &mut interaction_query {
+        match *interaction {
+            Interaction::Pressed => {
+                *background = BackgroundColor(PRESSED_BUTTON);
+                let Some(module) = editor_ship
+                    .ship
+                    .modules
+                    .iter_mut()
+                    .find(|module| module.id == button.module_id)
+                else {
+                    continue;
+                };
+                let program = module
+                    .arch_program
+                    .get_or_insert_with(|| ArchProgram::from_template(ArchProgramTemplate::BalancedOps));
+                match button.action {
+                    ProgramButtonAction::CycleTemplate => {
+                        *program = ArchProgram::from_template(program.template.next());
+                    }
+                    ProgramButtonAction::AdjustConstant { index, delta } => {
+                        if let Some(constant) = program.constants.get_mut(index) {
+                            *constant = (*constant + delta).clamp(0, 20);
+                        }
+                    }
+                }
+            }
+            Interaction::Hovered => {
+                *background = BackgroundColor(HOVERED_BUTTON);
+            }
+            Interaction::None => {}
+        }
     }
 }
 
