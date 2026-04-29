@@ -8,12 +8,15 @@ pub(crate) use control::{
     apply_player_ship_controls,
     camera_follow_player_ship,
     exit_focused_station,
+    handle_player_cargo_interaction,
     integrate_player_ship_motion,
     move_shipboard_player,
     return_button_system,
     return_keyboard_shortcut,
     sync_shipboard_player_visual,
     toggle_shipboard_control_mode,
+    update_current_station,
+    update_player_reference_frame,
     update_station_command_input,
 };
 pub(crate) use interactions::{

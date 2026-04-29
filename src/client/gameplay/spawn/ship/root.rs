@@ -8,6 +8,7 @@ use crate::{
             RUNTIME_SHIP_ORIGIN,
             components::{
                 AngularVelocity,
+                CarriedResource,
                 CurrentStation,
                 HeldInteraction,
                 HostileShip,
@@ -17,6 +18,8 @@ use crate::{
                 MissionState,
                 NearbyInteraction,
                 PlayerFieldState,
+                PlayerMotionState,
+                PlayerReferenceFrame,
                 PlayerShip,
                 PlayerShipAssignment,
                 ShipArchCommandState,
@@ -24,6 +27,7 @@ use crate::{
                 ShipAutomationState,
                 ShipControlMode,
                 ShipControlState,
+                ShipInertiaField,
                 ShipInteriorMap,
                 ShipInteriorNode,
                 ShipPowerState,
@@ -36,7 +40,14 @@ use crate::{
                 SimRotation,
                 StationFocusMode,
             },
-            helpers::{FixedVec2, Fx, count_modules, ship_movement_model, ship_power_model},
+            helpers::{
+                FixedVec2,
+                Fx,
+                count_modules,
+                module_local_position,
+                ship_movement_model,
+                ship_power_model,
+            },
         },
         state::PlayingCleanup,
     },
@@ -70,6 +81,18 @@ pub(crate) fn spawn_runtime_ship(
         turret_count,
         balance,
     );
+    let (min_x, max_x, min_y, max_y) = ship.bounds().unwrap_or((0, 0, 0, 0));
+    let center_x = (min_x + max_x) as f32 * 0.5;
+    let center_y = (min_y + max_y) as f32 * 0.5;
+    let center_x_fixed = Fx::from_num(center_x);
+    let center_y_fixed = Fx::from_num(center_y);
+    let inertia_radius = ship
+        .modules
+        .iter()
+        .map(|module| module_local_position(module, center_x_fixed, center_y_fixed).length())
+        .fold(Fx::from_num(96), |acc, value| {
+            acc.max(value + Fx::from_num(56))
+        });
 
     let root_entity = commands
         .spawn((
@@ -80,6 +103,9 @@ pub(crate) fn spawn_runtime_ship(
             ViewVisibility::default(),
             PlayerShip,
             ShipRoot,
+            ShipInertiaField {
+                radius: inertia_radius,
+            },
             PlayingCleanup,
         ))
         .insert((
@@ -177,19 +203,10 @@ pub(crate) fn spawn_runtime_ship(
         ))
         .id();
 
-    let (min_x, max_x, min_y, max_y) = ship.bounds().unwrap_or((0, 0, 0, 0));
-    let center_x = (min_x + max_x) as f32 * 0.5;
-    let center_y = (min_y + max_y) as f32 * 0.5;
-    let center_x_fixed = Fx::from_num(center_x);
-    let center_y_fixed = Fx::from_num(center_y);
-
     let interior_nodes = build_interior_nodes(ship, center_x_fixed, center_y_fixed);
-    let start_node = interior_nodes
-        .iter()
-        .position(|node| node.kind == ModuleKind::Cockpit)
-        .unwrap_or(0);
     let start_station = interior_nodes
-        .get(start_node)
+        .iter()
+        .find(|node| node.kind == ModuleKind::Cockpit)
         .cloned()
         .unwrap_or(ShipInteriorNode {
             module_id: 0,
@@ -222,8 +239,8 @@ pub(crate) fn spawn_runtime_ship(
         .spawn((
             Sprite::from_color(Color::srgb(0.82, 0.96, 0.62), Vec2::splat(12.0)),
             Transform::from_xyz(
-                start_station.local_position.x.to_num::<f32>(),
-                start_station.local_position.y.to_num::<f32>(),
+                RUNTIME_SHIP_ORIGIN.x + start_station.local_position.x.to_num::<f32>(),
+                RUNTIME_SHIP_ORIGIN.y + start_station.local_position.y.to_num::<f32>(),
                 6.0,
             ),
             ShipboardPlayer,
@@ -232,11 +249,20 @@ pub(crate) fn spawn_runtime_ship(
                 _ship_entity: root_entity,
             },
             InternalPosition {
-                node_index: start_node,
                 grid_x: start_station.grid_x,
                 grid_y: start_station.grid_y,
                 local_position: start_station.local_position,
             },
+            PlayerMotionState {
+                frame: PlayerReferenceFrame::Ship(root_entity),
+                world_position: FixedVec2::from_vec2(
+                    RUNTIME_SHIP_ORIGIN.truncate() + start_station.local_position.to_vec2(),
+                ),
+                world_velocity: FixedVec2::zero(),
+                local_position: start_station.local_position,
+                local_velocity: FixedVec2::zero(),
+            },
+            CarriedResource::default(),
             CurrentStation {
                 module_id: start_station.module_id,
                 kind: start_station.kind,
@@ -253,13 +279,12 @@ pub(crate) fn spawn_runtime_ship(
         ))
         .id();
 
-    commands
-        .entity(root_entity)
-        .insert(ShipInteriorMap {
-            walkable_nodes: interior_nodes,
-        })
-        .add_children(&child_entities)
-        .add_child(shipboard_marker);
+    commands.entity(root_entity).insert(ShipInteriorMap {
+        walkable_nodes: interior_nodes,
+    });
+    commands.entity(root_entity).add_children(&child_entities);
+
+    let _ = shipboard_marker;
 }
 
 pub(crate) fn spawn_hostile_ship(
@@ -285,6 +310,19 @@ pub(crate) fn spawn_hostile_ship(
         turret_count,
         balance,
     );
+    let (min_x, max_x, min_y, max_y) = ship.bounds().unwrap_or((0, 0, 0, 0));
+    let center_x = (min_x + max_x) as f32 * 0.5;
+    let center_y = (min_y + max_y) as f32 * 0.5;
+    let center_x_fixed = Fx::from_num(center_x);
+    let center_y_fixed = Fx::from_num(center_y);
+    let inertia_radius = ship
+        .modules
+        .iter()
+        .map(|module| module_local_position(module, center_x_fixed, center_y_fixed).length())
+        .fold(Fx::from_num(96), |acc, value| {
+            acc.max(value + Fx::from_num(56))
+        });
+    let interior_nodes = build_interior_nodes(ship, center_x_fixed, center_y_fixed);
 
     let root_entity = commands
         .spawn((
@@ -299,6 +337,9 @@ pub(crate) fn spawn_hostile_ship(
             ViewVisibility::default(),
             HostileShip,
             ShipRoot,
+            ShipInertiaField {
+                radius: inertia_radius,
+            },
             crate::client::gameplay::components::HostileTarget,
             HostileShipAi {
                 preferred_range,
@@ -349,12 +390,6 @@ pub(crate) fn spawn_hostile_ship(
         ))
         .id();
 
-    let (min_x, max_x, min_y, max_y) = ship.bounds().unwrap_or((0, 0, 0, 0));
-    let center_x = (min_x + max_x) as f32 * 0.5;
-    let center_y = (min_y + max_y) as f32 * 0.5;
-    let center_x_fixed = Fx::from_num(center_x);
-    let center_y_fixed = Fx::from_num(center_y);
-
     let child_entities: Vec<_> = ship
         .modules
         .iter()
@@ -374,5 +409,10 @@ pub(crate) fn spawn_hostile_ship(
         })
         .collect();
 
-    commands.entity(root_entity).add_children(&child_entities);
+    commands
+        .entity(root_entity)
+        .insert(ShipInteriorMap {
+            walkable_nodes: interior_nodes,
+        })
+        .add_children(&child_entities);
 }

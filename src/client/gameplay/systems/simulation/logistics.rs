@@ -28,7 +28,6 @@ use crate::{
             helpers::{
                 FixedVec2,
                 Fx,
-                fixed_radius_sq,
                 fx_from_time_delta,
                 local_field_distance,
                 resource_kind_label,
@@ -39,98 +38,24 @@ use crate::{
 };
 
 pub(crate) fn collect_salvage(
-    mut commands: Commands,
-    balance: Res<BalanceConfig>,
-    keys: Res<ButtonInput<KeyCode>>,
-    player_ship_query: Single<
+    _commands: Commands,
+    _balance: Res<BalanceConfig>,
+    _keys: Res<ButtonInput<KeyCode>>,
+    _player_ship_query: Single<
         (&SimPosition, &mut MissionState),
         (With<PlayerShip>, With<ShipRoot>),
     >,
-    mut storage_query: Query<(
+    _storage_query: Query<(
         &RuntimeShipModule,
         &mut StorageModule,
         Option<&DestroyedModule>,
     )>,
-    salvage_query: Query<
+    _salvage_query: Query<
         (Entity, &SimPosition, &SalvagePickup),
         (With<SalvageWreck>, Without<CollectedSalvage>),
     >,
 ) {
-    let (ship_position, mut mission_state) = player_ship_query.into_inner();
-    if !mission_state.encounter_cleared || mission_state.failed || mission_state.salvage_collected {
-        return;
-    }
-    if !keys.just_pressed(KeyCode::KeyF) {
-        return;
-    }
-
-    let pickup_radius_sq = fixed_radius_sq(balance.combat.salvage_pickup_radius);
-    for (entity, salvage_position, salvage_pickup) in &salvage_query {
-        if ship_position.value.distance_sq(salvage_position.value) <= pickup_radius_sq {
-            let mut best_target = None;
-            for (runtime_module, storage, destroyed) in &storage_query {
-                if destroyed.is_some() {
-                    continue;
-                }
-                if runtime_module.kind != ModuleKind::Airlock
-                    && runtime_module.kind != ModuleKind::Cargo
-                {
-                    continue;
-                }
-                if storage.inventory.total_units() >= storage.capacity {
-                    continue;
-                }
-                let priority = if runtime_module.kind == ModuleKind::Airlock {
-                    0
-                } else {
-                    1
-                };
-                best_target = Some((priority, runtime_module.module_id));
-                if priority == 0 {
-                    break;
-                }
-            }
-
-            let Some((_, target_module_id)) = best_target else {
-                mission_state.recent_action =
-                    Some("No free intake/storage for recovered salvage".to_string());
-                mission_state.recent_action_timer = Fx::from_num(2);
-                mission_state.logistics_bottleneck =
-                    Some("salvage recovery blocked by full intake".to_string());
-                break;
-            };
-
-            for (runtime_module, mut storage, destroyed) in &mut storage_query {
-                if destroyed.is_some() || runtime_module.module_id != target_module_id {
-                    continue;
-                }
-                let free = storage
-                    .capacity
-                    .saturating_sub(storage.inventory.total_units());
-                let moved = salvage_pickup.scrap_value.min(free);
-                if moved == 0 {
-                    mission_state.logistics_bottleneck =
-                        Some("salvage recovery blocked by full storage".to_string());
-                    break;
-                }
-                storage.inventory.add(ResourceKind::RawSalvage, moved);
-                mission_state.recovered_raw_salvage += moved;
-                mission_state.salvage_scrap_awarded = moved;
-                mission_state.logistics_bottleneck = None;
-                mission_state.recent_action =
-                    Some(format!("Recovered {moved} raw salvage into ship stores"));
-                mission_state.recent_action_timer = Fx::from_num(2);
-                break;
-            }
-            mission_state.salvage_collected = true;
-            mission_state.completed = false;
-            mission_state.completion_reason = Some("Salvage recovered onboard".to_string());
-            mission_state.return_delay_remaining = None;
-            commands.entity(entity).insert(CollectedSalvage);
-            commands.entity(entity).despawn_recursive();
-            break;
-        }
-    }
+    // Salvage recovery is handled through the boarding-era carried-cargo loop.
 }
 
 pub(crate) fn run_logistics_transfers(

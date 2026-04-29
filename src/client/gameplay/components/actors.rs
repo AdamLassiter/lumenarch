@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 
-use super::super::helpers::{FixedVec2, Fx};
+use super::{
+    super::helpers::{FixedVec2, Fx},
+    logistics::ResourceKind,
+};
 use crate::ship::ModuleKind;
 
 #[derive(Component)]
@@ -26,8 +29,34 @@ pub(crate) struct ShipboardPlayer;
 pub(crate) struct ShipboardMarker;
 
 #[derive(Component)]
+pub(crate) struct ShipInertiaField {
+    pub(crate) radius: Fx,
+}
+
+#[derive(Component)]
 pub(crate) struct PlayerShipAssignment {
     pub(crate) _ship_entity: Entity,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PlayerReferenceFrame {
+    World,
+    Ship(Entity),
+}
+
+#[derive(Component)]
+pub(crate) struct PlayerMotionState {
+    pub(crate) frame: PlayerReferenceFrame,
+    pub(crate) world_position: FixedVec2,
+    pub(crate) world_velocity: FixedVec2,
+    pub(crate) local_position: FixedVec2,
+    pub(crate) local_velocity: FixedVec2,
+}
+
+#[derive(Component, Default)]
+pub(crate) struct CarriedResource {
+    pub(crate) kind: Option<ResourceKind>,
+    pub(crate) amount: u32,
 }
 
 #[derive(Clone)]
@@ -46,7 +75,6 @@ pub(crate) struct ShipInteriorMap {
 
 #[derive(Component)]
 pub(crate) struct InternalPosition {
-    pub(crate) node_index: usize,
     pub(crate) grid_x: i32,
     pub(crate) grid_y: i32,
     pub(crate) local_position: FixedVec2,

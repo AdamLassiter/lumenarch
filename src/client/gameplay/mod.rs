@@ -20,6 +20,7 @@ pub(crate) use systems::{
     fire_hostile_ship_weapons,
     fire_hostile_targets,
     fire_player_weapons,
+    handle_player_cargo_interaction,
     handle_projectile_hits,
     integrate_hostile_ship_motion,
     integrate_player_ship_motion,
@@ -38,12 +39,14 @@ pub(crate) use systems::{
     tick_recent_action_feedback,
     toggle_debug_overlay,
     toggle_shipboard_control_mode,
+    update_current_station,
     update_destroyed_module_visuals,
     update_gameplay_status_text,
     update_inspection_and_alerts_text,
     update_mission_state,
     update_mission_telemetry,
     update_module_runtime_state,
+    update_player_reference_frame,
     update_station_command_input,
 };
 

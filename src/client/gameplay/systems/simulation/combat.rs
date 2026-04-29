@@ -774,6 +774,10 @@ fn spawn_hostile_salvage(commands: &mut Commands, position: SimVec, salvage_rewa
         crate::client::gameplay::components::SalvagePickup {
             scrap_value: salvage_reward,
         },
+        crate::client::gameplay::components::LooseCargo {
+            kind: crate::client::gameplay::components::ResourceKind::RawSalvage,
+            amount: salvage_reward,
+        },
         crate::client::gameplay::components::SalvageWreck,
         PlayingCleanup,
     ));

@@ -5,9 +5,11 @@ use crate::client::{
     gameplay::{
         components::{
             AngularVelocity,
+            CarriedResource,
             CollectedSalvage,
             CurrentStation,
             DestroyedModule,
+            HostileShip,
             HostileTarget,
             Integrity,
             LinearVelocity,
@@ -17,6 +19,8 @@ use crate::client::{
             ModuleCondition,
             ModuleRuntimeState,
             PlayerFieldState,
+            PlayerMotionState,
+            PlayerReferenceFrame,
             PlayerShip,
             ProcessorCommandState,
             ProcessorModule,
@@ -75,7 +79,17 @@ pub(crate) fn update_gameplay_status_text(
         ),
         (With<PlayerShip>, With<ShipRoot>),
     >,
-    player_query: Single<(&CurrentStation, &PlayerFieldState), With<ShipboardPlayer>>,
+    player_query: Single<
+        (
+            &CurrentStation,
+            &PlayerFieldState,
+            &PlayerMotionState,
+            &CarriedResource,
+        ),
+        With<ShipboardPlayer>,
+    >,
+    ship_identity_query: Query<(Entity, Option<&PlayerShip>, Option<&HostileShip>), With<ShipRoot>>,
+    module_parent_query: Query<&Parent, With<RuntimeShipModule>>,
     hostile_query: Query<Entity, With<HostileTarget>>,
     projectile_query: Query<Entity, With<Projectile>>,
     module_query: Query<
@@ -118,10 +132,17 @@ pub(crate) fn update_gameplay_status_text(
         control_mode,
         ship_controls,
     ) = ship_query.into_inner();
-    let (current_station, player_fields) = player_query.into_inner();
+    let (current_station, player_fields, player_motion, carried_resource) =
+        player_query.into_inner();
+    let frame_label = reference_frame_label(player_motion, &ship_identity_query);
+    let focused_station_context = control_mode
+        .focused_entity
+        .and_then(|entity| module_parent_query.get(entity).ok())
+        .map(|parent| ship_affiliation_label(parent.get(), &ship_identity_query))
+        .unwrap_or("Unattached");
 
     let salvage_line = salvage_status_line(
-        ship_position.value,
+        player_motion.world_position,
         mission_state,
         &salvage_query,
         balance.combat.salvage_pickup_radius,
@@ -137,14 +158,19 @@ pub(crate) fn update_gameplay_status_text(
             None => mission_status_line(mission_state).to_string(),
         };
         **text = format!(
-            "Mission Status\nOutcome: {}\nMode: {}\nFocus: {}\nStation: {}\nPosition: {}, {}\nVelocity: {}\nTurn Rate: {}\nIntegrity\nHull / Systems: {} / {}\nActive Modules: {}\nDegraded / Disabled: {} / {}\nPower\nEngine Output: {} ({}%)\nGeneration / Draw: {} / {}\nBattery Reserve: {}\nWeapons Online: {}\nARCH\nMode: {:?}\nStatus: {}\nProgram: {}\nExec / Invalid: {} / {}\nWrites: {}\nCombat\nTurrets: {}  Cooldown: {}\nProjectiles: {}  Hostiles: {}\nLogistics\nRecovered Raw: {}\nProcessed / Used Charges: {} / {}\nTransfers / Cycles: {} / {}\nBottleneck: {}\nInterventions\nRepairs / Stabilizations: {} / {}\nRecent: {}\nHelm\nThrottle: {}%\nTurn Demand: {}\nInterior\nLocal Heat: {} {} ({})\nLocal Electrical: {} {} ({})\nSalvage: {}\nScrap Total: {}",
+            "Mission Status\nOutcome: {}\nMode: {}\nFocus: {}\nFrame: {}\nFocused Context: {}\nStation: {}\nPlayer Position: {}, {}\nPlayer Velocity: {}\nShip Position: {}, {}\nShip Velocity: {}\nTurn Rate: {}\nIntegrity\nHull / Systems: {} / {}\nActive Modules: {}\nDegraded / Disabled: {} / {}\nPower\nEngine Output: {} ({}%)\nGeneration / Draw: {} / {}\nBattery Reserve: {}\nWeapons Online: {}\nARCH\nMode: {:?}\nStatus: {}\nProgram: {}\nExec / Invalid: {} / {}\nWrites: {}\nCombat\nTurrets: {}  Cooldown: {}\nProjectiles: {}  Hostiles: {}\nLogistics\nRecovered Raw: {}\nProcessed / Used Charges: {} / {}\nTransfers / Cycles: {} / {}\nBottleneck: {}\nInterventions\nRepairs / Stabilizations: {} / {}\nRecent: {}\nHelm\nThrottle: {}%\nTurn Demand: {}\nInterior\nLocal Heat: {} {} ({})\nLocal Electrical: {} {} ({})\nCarried Cargo: {}\nSalvage: {}\nScrap Total: {}",
             status_line,
             control_mode.mode.as_str(),
             control_mode
                 .focused_family
                 .map(|family| family.as_str())
                 .unwrap_or("None"),
+            frame_label,
+            focused_station_context,
             module_display_name(current_station.kind),
+            format_fx0(player_motion.world_position.x),
+            format_fx0(player_motion.world_position.y),
+            format_fx1(player_motion.world_velocity.length()),
             format_fx0(ship_position.value.x),
             format_fx0(ship_position.value.y),
             format_fx1(linear_velocity.value.length()),
@@ -202,6 +228,14 @@ pub(crate) fn update_gameplay_status_text(
                 Fx::from_num(7),
                 Fx::from_num(12)
             ),
+            carried_resource
+                .kind
+                .map(|kind| format!(
+                    "{} {}",
+                    carried_resource.amount,
+                    crate::client::gameplay::helpers::resource_kind_label(kind)
+                ))
+                .unwrap_or_else(|| "none".to_string()),
             salvage_line,
             progression.scrap,
         );
@@ -228,11 +262,15 @@ pub(crate) fn update_gameplay_status_text(
                 _,
             )| {
                 if destroyed.is_some() {
-                    return "Focused Station\nDestroyed module".to_string();
+                    return format!(
+                        "Focused Station\nContext: {}\nDestroyed module",
+                        focused_station_context
+                    );
                 }
                 if let Some(reactor) = reactor {
                     return format!(
-                        "Focused Station\nReactor Controls\nRate: {}%\nTurbine: {}%\nPower Output: {}\nFuel: {}\nHeat: {}\nControls: W/S reaction, A/D turbine, Q leave",
+                        "Focused Station\nContext: {}\nReactor Controls\nRate: {}%\nTurbine: {}%\nPower Output: {}\nFuel: {}\nHeat: {}\nControls: W/S reaction, A/D turbine, Q leave",
+                        focused_station_context,
                         format_fx0(reactor.reaction_rate * Fx::from_num(100)),
                         format_fx0(reactor.turbine_load * Fx::from_num(100)),
                         format_fx1(reactor.power_output),
@@ -242,7 +280,8 @@ pub(crate) fn update_gameplay_status_text(
                 }
                 if let Some(turret) = turret {
                     return format!(
-                        "Focused Station\nTurret Controls\nDesired Angle: {}\nActual Angle: {}\nFire Gate: {}\nCooldown: {}\nControls: mouse or A/D aim, Space or left mouse fire, Q leave",
+                        "Focused Station\nContext: {}\nTurret Controls\nDesired Angle: {}\nActual Angle: {}\nFire Gate: {}\nCooldown: {}\nControls: mouse or A/D aim, Space or left mouse fire, Q leave",
+                        focused_station_context,
                         format_fx1(turret.desired_angle),
                         format_fx1(turret.actual_angle),
                         if turret.fire_intent { "open" } else { "hold" },
@@ -251,7 +290,8 @@ pub(crate) fn update_gameplay_status_text(
                 }
                 if let Some(storage) = storage {
                     return format!(
-                        "Focused Station\nStorage Panel\nRaw: {}  Charge: {}\nFill: {}/{}\nIntake: {}\nControls: Space toggles intake, Q leave",
+                        "Focused Station\nContext: {}\nStorage Panel\nRaw: {}  Charge: {}\nFill: {}/{}\nIntake: {}\nControls: Space toggles intake, F deposit/extract, G drop cargo, Q leave",
+                        focused_station_context,
                         storage.inventory.raw_salvage,
                         storage.inventory.repair_charge,
                         storage.inventory.total_units(),
@@ -265,7 +305,8 @@ pub(crate) fn update_gameplay_status_text(
                 }
                 if let Some(manipulator) = manipulator {
                     return format!(
-                        "Focused Station\nManipulator Panel\nManual: {}\nTarget: {}\nResource: {:?}\nArmed: {}\nStatus: {}\nControls: M manual, [/] target, R resource, Space arm, Q leave",
+                        "Focused Station\nContext: {}\nManipulator Panel\nManual: {}\nTarget: {}\nResource: {:?}\nArmed: {}\nStatus: {}\nControls: M manual, [/] target, R resource, Space arm, Q leave",
+                        focused_station_context,
                         if manipulator_command.is_some_and(|command| command.manual_mode) {
                             "yes"
                         } else {
@@ -293,7 +334,8 @@ pub(crate) fn update_gameplay_status_text(
                         Fx::from_num(0)
                     };
                     return format!(
-                        "Focused Station\nProcessor Panel\nRecipe: {}\nEnabled: {}\nProgress: {}%\nRaw: {}  Charge: {}\nState: {}\nControls: Space enable, R recipe, Q leave",
+                        "Focused Station\nContext: {}\nProcessor Panel\nRecipe: {}\nEnabled: {}\nProgress: {}%\nRaw: {}  Charge: {}\nState: {}\nControls: Space enable, R recipe, Q leave",
+                        focused_station_context,
                         processor_command
                             .map(|command| command.selected_recipe.as_str())
                             .unwrap_or("Repair Charge"),
@@ -310,7 +352,8 @@ pub(crate) fn update_gameplay_status_text(
                 }
                 if let Some(computer) = computer {
                     return format!(
-                        "Focused Station\nComputer Console\nProgram: {}\nOnline: {}\nExec: {}/{}\nLast: {}\nControls: Space power, T cycle template, Q leave",
+                        "Focused Station\nContext: {}\nComputer Console\nProgram: {}\nOnline: {}\nExec: {}/{}\nLast: {}\nControls: Space power, T cycle template, Q leave",
+                        focused_station_context,
                         computer.program.name,
                         if computer.enabled { "yes" } else { "no" },
                         computer.last_result.executed,
@@ -318,7 +361,11 @@ pub(crate) fn update_gameplay_status_text(
                         computer.last_result.halted_reason.as_deref().unwrap_or("ok"),
                     );
                 }
-                format!("Focused Station\n{} ready", runtime_module.kind.as_str())
+                format!(
+                    "Focused Station\nContext: {}\n{} ready",
+                    focused_station_context,
+                    runtime_module.kind.as_str()
+                )
             },
         )
         .unwrap_or_else(|| controls_help_text(control_mode.mode));
@@ -443,7 +490,7 @@ fn summarize_arch(
 fn controls_help_text(mode: crate::client::gameplay::components::ShipControlMode) -> String {
     match mode {
         crate::client::gameplay::components::ShipControlMode::Interior => {
-            "Controls\nW/A/S/D: move between ship tiles\nE: enter nearby station\nQ or Esc: leave focused station\nF: collect salvage\nF3: diagnostics\nTab: return to station".to_string()
+            "Controls\nW/A/S/D: move continuously or EVA thrust\nE: enter nearby station\nF: pick up or deposit cargo\nG: drop carried cargo\nQ or Esc: leave focused station\nF3: diagnostics\nTab: return to station".to_string()
         }
         crate::client::gameplay::components::ShipControlMode::Cockpit => {
             "Cockpit Controls\nW/S or mouse: throttle demand\nA/D or mouse: steering\nQ or Esc: leave cockpit".to_string()
@@ -461,4 +508,43 @@ fn controls_help_text(mode: crate::client::gameplay::components::ShipControlMode
             "Computer Controls\nSpace: online/offline\nT: cycle starter template\nQ or Esc: leave console".to_string()
         }
     }
+}
+
+fn reference_frame_label(
+    player_motion: &PlayerMotionState,
+    ship_identity_query: &Query<
+        (Entity, Option<&PlayerShip>, Option<&HostileShip>),
+        With<ShipRoot>,
+    >,
+) -> String {
+    match player_motion.frame {
+        PlayerReferenceFrame::World => "EVA / World".to_string(),
+        PlayerReferenceFrame::Ship(ship_entity) => {
+            format!(
+                "Ship Local ({})",
+                ship_affiliation_label(ship_entity, ship_identity_query)
+            )
+        }
+    }
+}
+
+fn ship_affiliation_label(
+    ship_entity: Entity,
+    ship_identity_query: &Query<
+        (Entity, Option<&PlayerShip>, Option<&HostileShip>),
+        With<ShipRoot>,
+    >,
+) -> &'static str {
+    ship_identity_query
+        .get(ship_entity)
+        .map(|(_, player_ship, hostile_ship)| {
+            if player_ship.is_some() {
+                "Player Ship"
+            } else if hostile_ship.is_some() {
+                "Hostile Ship"
+            } else {
+                "Unmarked Ship"
+            }
+        })
+        .unwrap_or("Unknown Ship")
 }

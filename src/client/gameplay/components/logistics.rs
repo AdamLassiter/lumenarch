@@ -71,3 +71,9 @@ pub(crate) struct ProcessorModule {
     pub(crate) input_required: u32,
     pub(crate) output_amount: u32,
 }
+
+#[derive(Component)]
+pub(crate) struct LooseCargo {
+    pub(crate) kind: ResourceKind,
+    pub(crate) amount: u32,
+}

@@ -7,6 +7,8 @@ use crate::client::gameplay::{
         Integrity,
         ModuleRuntimeState,
         NearbyInteraction,
+        PlayerMotionState,
+        PlayerReferenceFrame,
         RuntimeShipModule,
         ShipboardPlayer,
     },
@@ -17,21 +19,36 @@ pub(crate) fn detect_nearby_interactions(
     module_query: Query<(
         Entity,
         &RuntimeShipModule,
+        &Parent,
         &Integrity,
         &ModuleRuntimeState,
         Option<&DestroyedModule>,
     )>,
-    player_query: Single<(&CurrentStation, &mut NearbyInteraction), With<ShipboardPlayer>>,
+    player_query: Single<
+        (&CurrentStation, &PlayerMotionState, &mut NearbyInteraction),
+        With<ShipboardPlayer>,
+    >,
 ) {
-    let (station, mut nearby) = player_query.into_inner();
+    let (station, player_motion, mut nearby) = player_query.into_inner();
     nearby.target = None;
     nearby.kind = None;
     nearby.prompt = None;
     nearby.unavailable_reason = None;
 
-    let Some((entity, _, integrity, runtime_state, destroyed)) = module_query
-        .iter()
-        .find(|(_, runtime_module, _, _, _)| runtime_module.module_id == station.module_id)
+    let Some(active_ship) = (match player_motion.frame {
+        PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
+        PlayerReferenceFrame::World => None,
+    }) else {
+        nearby.unavailable_reason = Some("EVA: no nearby station".to_string());
+        return;
+    };
+
+    let Some((entity, _, _, integrity, runtime_state, destroyed)) =
+        module_query
+            .iter()
+            .find(|(_, runtime_module, parent, _, _, _)| {
+                parent.get() == active_ship && runtime_module.module_id == station.module_id
+            })
     else {
         nearby.unavailable_reason = Some("no reachable station".to_string());
         return;

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::client::{
     gameplay::{
-        components::{SalvagePickup, SalvageWreck, SimPosition},
+        components::{LooseCargo, ResourceKind, SalvagePickup, SalvageWreck, SimPosition},
         helpers::{FixedVec2, render_translation},
     },
     state::PlayingCleanup,
@@ -19,6 +19,10 @@ pub(super) fn spawn_salvage_wreck(commands: &mut Commands, salvage_value: u32) {
         SimPosition { value: position },
         SalvagePickup {
             scrap_value: salvage_value,
+        },
+        LooseCargo {
+            kind: ResourceKind::RawSalvage,
+            amount: salvage_value,
         },
         SalvageWreck,
         PlayingCleanup,

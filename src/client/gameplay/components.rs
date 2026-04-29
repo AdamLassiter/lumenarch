@@ -6,14 +6,18 @@ mod ship;
 mod simulation;
 
 pub(crate) use actors::{
+    CarriedResource,
     CurrentStation,
     HostileShip,
     HostileShipAi,
     InternalPosition,
     PlayerFieldState,
+    PlayerMotionState,
+    PlayerReferenceFrame,
     PlayerShip,
     PlayerShipAssignment,
     ShipControlMode,
+    ShipInertiaField,
     ShipInteriorMap,
     ShipInteriorNode,
     ShipRoot,
@@ -33,6 +37,7 @@ pub(crate) use interactions::{
     NearbyInteraction,
 };
 pub(crate) use logistics::{
+    LooseCargo,
     ManipulatorModule,
     ProcessorModule,
     ResourceInventory,

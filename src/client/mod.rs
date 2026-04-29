@@ -177,9 +177,12 @@ pub fn run_client() {
                 (
                     gameplay::toggle_shipboard_control_mode,
                     gameplay::exit_focused_station,
+                    gameplay::update_player_reference_frame,
                     gameplay::move_shipboard_player,
+                    gameplay::update_current_station,
                     gameplay::detect_nearby_interactions,
                     gameplay::run_shipboard_interaction_input,
+                    gameplay::handle_player_cargo_interaction,
                     gameplay::begin_held_interactions,
                     gameplay::complete_held_interactions,
                     gameplay::apply_module_interactions,
