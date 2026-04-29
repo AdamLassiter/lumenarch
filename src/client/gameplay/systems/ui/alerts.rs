@@ -16,6 +16,7 @@ use crate::client::{
             ProcessorModule,
             RuntimeArchComputer,
             RuntimeShipModule,
+            ShipAtmosphereState,
             ShipAutomationState,
             ShipRoot,
             ShipboardPlayer,
@@ -45,7 +46,10 @@ pub(crate) fn update_inspection_and_alerts_text(
         ),
         With<ShipboardPlayer>,
     >,
-    ship_query: Single<(&ShipAutomationState, &MissionState), (With<PlayerShip>, With<ShipRoot>)>,
+    ship_query: Single<
+        (&ShipAutomationState, &MissionState, &ShipAtmosphereState),
+        (With<PlayerShip>, With<ShipRoot>),
+    >,
     module_query: Query<(
         &RuntimeShipModule,
         &Integrity,
@@ -62,7 +66,7 @@ pub(crate) fn update_inspection_and_alerts_text(
     mut alerts_query: Query<&mut Text, (With<GameplayAlertsText>, Without<GameplayInspectionText>)>,
 ) {
     let (station, nearby, held, player_fields) = player_query.into_inner();
-    let (automation_state, mission_state) = ship_query.into_inner();
+    let (automation_state, mission_state, atmosphere_state) = ship_query.into_inner();
     let current_module = module_query
         .iter()
         .find(|(runtime_module, _, _, _, _, _, _)| runtime_module.module_id == station.module_id);
@@ -76,7 +80,13 @@ pub(crate) fn update_inspection_and_alerts_text(
     issues.truncate(3);
 
     for mut text in &mut alerts_query {
-        **text = alerts_text(player_fields, nearby, mission_state, &issues);
+        **text = alerts_text(
+            player_fields,
+            nearby,
+            mission_state,
+            atmosphere_state,
+            &issues,
+        );
     }
 }
 
@@ -242,6 +252,7 @@ fn alerts_text(
     player_fields: &PlayerFieldState,
     nearby: &NearbyInteraction,
     mission_state: &MissionState,
+    atmosphere_state: &ShipAtmosphereState,
     issues: &[(i32, String)],
 ) -> String {
     let summary = if issues.is_empty() {
@@ -258,7 +269,7 @@ fn alerts_text(
     };
 
     format!(
-        "Local Heat: {} ({})\nLocal Electrical: {} ({})\n{}\nPrompt: {}\nHottest: {}\nFirst Disabled: {}\nRecent: {}\nFlow: raw {}  charge {}  transfers {}",
+        "Local Heat: {} ({})\nLocal Electrical: {} ({})\nLocal Oxygen: {} ({})\nShip Atmosphere: avg {}  min {}  venting {}\n{}\nPrompt: {}\nHottest: {}\nFirst Disabled: {}\nRecent: {}\nFlow: raw {}  charge {}  transfers {}",
         format_fx1(player_fields.local_heat),
         danger_level(player_fields.local_heat, Fx::from_num(8), Fx::from_num(14)),
         format_fx1(player_fields.local_electrical),
@@ -267,6 +278,17 @@ fn alerts_text(
             Fx::from_num(7),
             Fx::from_num(12)
         ),
+        format_fx1(player_fields.local_oxygen),
+        if player_fields.oxygen_critical {
+            "critical"
+        } else if player_fields.oxygen_warning {
+            "warning"
+        } else {
+            "stable"
+        },
+        format_fx1(atmosphere_state.average_oxygen),
+        format_fx1(atmosphere_state.minimum_oxygen),
+        atmosphere_state.venting_tiles,
         summary,
         nearby
             .prompt

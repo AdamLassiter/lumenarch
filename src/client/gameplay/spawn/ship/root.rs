@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 
-use super::{interior::build_interior_nodes, modules::spawn_runtime_module};
+use super::{
+    interior::{build_atmosphere_tiles, build_interior_nodes},
+    modules::spawn_runtime_module,
+};
 use crate::{
     client::{
         balance::BalanceConfig,
@@ -23,6 +26,7 @@ use crate::{
                 PlayerShip,
                 PlayerShipAssignment,
                 ShipArchCommandState,
+                ShipAtmosphereState,
                 ShipAutomationMode,
                 ShipAutomationState,
                 ShipControlMode,
@@ -199,11 +203,16 @@ pub(crate) fn spawn_runtime_ship(
                 processor_cycles: 0,
                 logistics_bottleneck: None,
                 logistics_automation_used: false,
+                lowest_player_oxygen: Fx::from_num(balance.atmosphere.initial_tile_oxygen),
+                hostile_decompression_events: 0,
+                player_ship_breached: false,
+                airlocks_cycled: 0,
             },
         ))
         .id();
 
     let interior_nodes = build_interior_nodes(ship, center_x_fixed, center_y_fixed);
+    let atmosphere_tiles = build_atmosphere_tiles(ship, center_x_fixed, center_y_fixed, balance);
     let start_station = interior_nodes
         .iter()
         .find(|node| node.kind == ModuleKind::Cockpit)
@@ -239,8 +248,8 @@ pub(crate) fn spawn_runtime_ship(
         .spawn((
             Sprite::from_color(Color::srgb(0.82, 0.96, 0.62), Vec2::splat(12.0)),
             Transform::from_xyz(
-                RUNTIME_SHIP_ORIGIN.x + start_station.local_position.x.to_num::<f32>(),
-                RUNTIME_SHIP_ORIGIN.y + start_station.local_position.y.to_num::<f32>(),
+                start_station.local_position.x.to_num::<f32>(),
+                start_station.local_position.y.to_num::<f32>(),
                 6.0,
             ),
             ShipboardPlayer,
@@ -272,17 +281,30 @@ pub(crate) fn spawn_runtime_ship(
             PlayerFieldState {
                 local_heat: Fx::from_num(0),
                 local_electrical: Fx::from_num(0),
+                local_oxygen: Fx::from_num(balance.atmosphere.initial_tile_oxygen),
                 heat_danger: false,
                 electrical_danger: false,
+                oxygen_warning: false,
+                oxygen_critical: false,
             },
             PlayingCleanup,
         ))
         .id();
 
-    commands.entity(root_entity).insert(ShipInteriorMap {
-        walkable_nodes: interior_nodes,
-    });
+    commands.entity(root_entity).insert((
+        ShipInteriorMap {
+            walkable_nodes: interior_nodes,
+        },
+        ShipAtmosphereState {
+            tiles: atmosphere_tiles,
+            average_oxygen: Fx::from_num(balance.atmosphere.initial_tile_oxygen),
+            minimum_oxygen: Fx::from_num(balance.atmosphere.initial_tile_oxygen),
+            venting_tiles: 0,
+            decompression_reported: false,
+        },
+    ));
     commands.entity(root_entity).add_children(&child_entities);
+    commands.entity(root_entity).add_child(shipboard_marker);
 
     let _ = shipboard_marker;
 }
@@ -323,6 +345,7 @@ pub(crate) fn spawn_hostile_ship(
             acc.max(value + Fx::from_num(56))
         });
     let interior_nodes = build_interior_nodes(ship, center_x_fixed, center_y_fixed);
+    let atmosphere_tiles = build_atmosphere_tiles(ship, center_x_fixed, center_y_fixed, balance);
 
     let root_entity = commands
         .spawn((
@@ -411,8 +434,17 @@ pub(crate) fn spawn_hostile_ship(
 
     commands
         .entity(root_entity)
-        .insert(ShipInteriorMap {
-            walkable_nodes: interior_nodes,
-        })
+        .insert((
+            ShipInteriorMap {
+                walkable_nodes: interior_nodes,
+            },
+            ShipAtmosphereState {
+                tiles: atmosphere_tiles,
+                average_oxygen: Fx::from_num(balance.atmosphere.initial_tile_oxygen),
+                minimum_oxygen: Fx::from_num(balance.atmosphere.initial_tile_oxygen),
+                venting_tiles: 0,
+                decompression_reported: false,
+            },
+        ))
         .add_children(&child_entities);
 }

@@ -1,3 +1,4 @@
+mod atmosphere;
 mod automation;
 mod combat;
 mod fields;
@@ -5,6 +6,7 @@ mod logistics;
 mod mission;
 mod visuals;
 
+pub(crate) use atmosphere::{sample_player_atmosphere, update_ship_atmosphere};
 pub(crate) use automation::{run_arch_automation, tick_recent_action_feedback};
 pub(crate) use combat::{
     advance_projectiles,

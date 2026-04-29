@@ -303,15 +303,32 @@ pub(crate) fn return_after_mission_resolution(
                 .unwrap_or_else(|| "The ship was lost.".to_string()),
         )
     } else {
-        let detail = if mission_state.salvage_collected {
+        let atmosphere_suffix = if mission_state.hostile_decompression_events > 0
+            || mission_state.player_ship_breached
+        {
             format!(
-                "Recovered {} raw salvage and returned {} repair charge worth {} scrap.",
-                mission_state.recovered_raw_salvage,
-                repair_charge_returned,
-                mission_state.salvage_scrap_awarded
+                " Atmosphere: hostile ships vented {}, own breaches {}, lowest player oxygen {}.",
+                mission_state.hostile_decompression_events,
+                if mission_state.player_ship_breached {
+                    "yes"
+                } else {
+                    "no"
+                },
+                mission_state.lowest_player_oxygen.to_num::<f32>().round()
             )
         } else {
-            "Encounter cleared, but no salvage was recovered.".to_string()
+            String::new()
+        };
+        let detail = if mission_state.salvage_collected {
+            format!(
+                "Recovered {} raw salvage and returned {} repair charge worth {} scrap.{}",
+                mission_state.recovered_raw_salvage,
+                repair_charge_returned,
+                mission_state.salvage_scrap_awarded,
+                atmosphere_suffix
+            )
+        } else {
+            format!("Encounter cleared, but no salvage was recovered.{atmosphere_suffix}")
         };
         ("Mission Complete".to_string(), detail)
     };
@@ -369,6 +386,24 @@ pub(crate) fn return_after_mission_resolution(
     if mission_state.transfer_count <= 1 && mission_state.recovered_raw_salvage > 0 {
         hints.push(
             "Cargo flow barely moved. Manipulator reach or automation priority may be wrong."
+                .to_string(),
+        );
+    }
+    if mission_state.player_ship_breached {
+        hints.push(
+            "Player ship vented during the run. Airlock placement or edge protection may be weak."
+                .to_string(),
+        );
+    }
+    if mission_state.hostile_decompression_events > 0 {
+        hints.push(
+            "Hostile decompression proved useful. Breach access and boarding routing are becoming tactical."
+                .to_string(),
+        );
+    }
+    if mission_state.lowest_player_oxygen <= Fx::from_num(3) {
+        hints.push(
+            "Player oxygen dipped critically low. Compartments or seal control may need improvement."
                 .to_string(),
         );
     }

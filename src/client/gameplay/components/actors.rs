@@ -73,6 +73,26 @@ pub(crate) struct ShipInteriorMap {
     pub(crate) walkable_nodes: Vec<ShipInteriorNode>,
 }
 
+#[derive(Clone)]
+pub(crate) struct ShipAtmosphereTile {
+    pub(crate) module_id: u64,
+    pub(crate) kind: ModuleKind,
+    pub(crate) grid_x: i32,
+    pub(crate) grid_y: i32,
+    pub(crate) local_position: FixedVec2,
+    pub(crate) oxygen: Fx,
+    pub(crate) exterior_edges: u8,
+}
+
+#[derive(Component, Default)]
+pub(crate) struct ShipAtmosphereState {
+    pub(crate) tiles: Vec<ShipAtmosphereTile>,
+    pub(crate) average_oxygen: Fx,
+    pub(crate) minimum_oxygen: Fx,
+    pub(crate) venting_tiles: u32,
+    pub(crate) decompression_reported: bool,
+}
+
 #[derive(Component)]
 pub(crate) struct InternalPosition {
     pub(crate) grid_x: i32,
@@ -163,6 +183,9 @@ pub(crate) struct ShipboardControlState {
 pub(crate) struct PlayerFieldState {
     pub(crate) local_heat: Fx,
     pub(crate) local_electrical: Fx,
+    pub(crate) local_oxygen: Fx,
     pub(crate) heat_danger: bool,
     pub(crate) electrical_danger: bool,
+    pub(crate) oxygen_warning: bool,
+    pub(crate) oxygen_critical: bool,
 }

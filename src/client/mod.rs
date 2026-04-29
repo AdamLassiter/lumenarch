@@ -11,6 +11,7 @@ mod state;
 use bevy::{app::AppExit, prelude::*};
 
 use self::state::{
+    ArchEditorState,
     CampaignLoadState,
     ClientAppState,
     ConnectionConfig,
@@ -64,6 +65,7 @@ pub fn run_client() {
         .insert_resource(DebugOverlayState::default())
         .insert_resource(LastMissionReport::default())
         .insert_resource(EditorToolState::default())
+        .insert_resource(ArchEditorState::default())
         .insert_resource(EditorViewState::default())
         .insert_resource(SectorMapViewState::default())
         .add_plugins(
@@ -143,6 +145,7 @@ pub fn run_client() {
                 editor::draw_grid_overlay.run_if(in_state(ClientAppState::Editing)),
                 editor::toolbox_button_system.run_if(in_state(ClientAppState::Editing)),
                 editor::computer_program_button_system.run_if(in_state(ClientAppState::Editing)),
+                editor::arch_editor_button_system.run_if(in_state(ClientAppState::Editing)),
                 editor::enemy_library_button_system.run_if(in_state(ClientAppState::Editing)),
                 editor::enemy_library_keyboard_shortcuts.run_if(in_state(ClientAppState::Editing)),
                 editor::leave_editor_button_system.run_if(in_state(ClientAppState::Editing)),
@@ -175,28 +178,36 @@ pub fn run_client() {
                 gameplay::return_keyboard_shortcut.run_if(in_state(ClientAppState::Encounter)),
                 gameplay::toggle_debug_overlay.run_if(in_state(ClientAppState::Encounter)),
                 (
-                    gameplay::toggle_shipboard_control_mode,
-                    gameplay::exit_focused_station,
-                    gameplay::update_player_reference_frame,
-                    gameplay::move_shipboard_player,
-                    gameplay::update_current_station,
-                    gameplay::detect_nearby_interactions,
-                    gameplay::run_shipboard_interaction_input,
-                    gameplay::handle_player_cargo_interaction,
-                    gameplay::begin_held_interactions,
-                    gameplay::complete_held_interactions,
-                    gameplay::apply_module_interactions,
-                    gameplay::update_station_command_input,
-                    gameplay::sample_ship_fields,
-                    gameplay::update_module_runtime_state,
-                    gameplay::run_arch_automation,
-                    gameplay::run_logistics_transfers,
-                    gameplay::run_processors,
-                    gameplay::update_mission_telemetry,
-                    gameplay::tick_recent_action_feedback,
-                    gameplay::sync_hostile_ship_state,
+                    (
+                        gameplay::toggle_shipboard_control_mode,
+                        gameplay::exit_focused_station,
+                        gameplay::update_player_reference_frame,
+                        gameplay::sync_player_reference_frame_parenting,
+                        gameplay::update_ship_atmosphere,
+                        gameplay::sample_player_atmosphere,
+                        gameplay::move_shipboard_player,
+                        gameplay::update_current_station,
+                        gameplay::detect_nearby_interactions,
+                        gameplay::run_shipboard_interaction_input,
+                        gameplay::handle_player_cargo_interaction,
+                        gameplay::begin_held_interactions,
+                        gameplay::complete_held_interactions,
+                        gameplay::apply_module_interactions,
+                        gameplay::update_station_command_input,
+                    )
+                        .chain(),
+                    (
+                        gameplay::sample_ship_fields,
+                        gameplay::update_module_runtime_state,
+                        gameplay::run_arch_automation,
+                        gameplay::run_logistics_transfers,
+                        gameplay::run_processors,
+                        gameplay::update_mission_telemetry,
+                        gameplay::tick_recent_action_feedback,
+                        gameplay::sync_hostile_ship_state,
+                    )
+                        .chain(),
                 )
-                    .chain()
                     .run_if(in_state(ClientAppState::Encounter)),
                 (
                     gameplay::sync_runtime_ship_state,
@@ -217,11 +228,13 @@ pub fn run_client() {
                     gameplay::integrate_hostile_ship_motion,
                     gameplay::camera_follow_player_ship,
                     gameplay::draw_debug_overlay,
-                    gameplay::update_gameplay_status_text,
-                    gameplay::update_inspection_and_alerts_text,
                 )
                     .chain()
                     .run_if(in_state(ClientAppState::Encounter)),
+                gameplay::update_gameplay_status_text.run_if(in_state(ClientAppState::Encounter)),
+                gameplay::update_inspection_and_alerts_text
+                    .run_if(in_state(ClientAppState::Encounter)),
+                gameplay::station_panel_button_system.run_if(in_state(ClientAppState::Encounter)),
             ),
         )
         .add_systems(

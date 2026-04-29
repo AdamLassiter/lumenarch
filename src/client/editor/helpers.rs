@@ -138,8 +138,8 @@ pub(super) fn is_cursor_over_editor_ui(window: &Window) -> bool {
     let height = window.height();
 
     let over_arch_panel = cursor.x >= TOOLBOX_WIDTH + 16.0
-        && cursor.x <= TOOLBOX_WIDTH + 16.0 + 360.0
-        && cursor.y >= height - 280.0;
+        && cursor.x <= TOOLBOX_WIDTH + 16.0 + 640.0
+        && cursor.y >= height - 360.0;
     let over_status_panel = cursor.x >= width - 360.0 && cursor.y <= 220.0;
     let over_controls_panel = cursor.x >= width - 340.0 && cursor.y >= height - 200.0;
 

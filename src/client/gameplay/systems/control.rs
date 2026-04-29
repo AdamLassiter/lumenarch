@@ -3,14 +3,17 @@ use bevy::{prelude::*, window::PrimaryWindow};
 use super::super::{
     super::state::{AbortEncounterButton, ClientAppState, MainCamera, PlayingCleanup},
     components::{
+        AirlockCommandState,
         AngularVelocity,
         CarriedResource,
         CurrentStation,
+        DestroyedModule,
         InternalPosition,
         LinearVelocity,
         LooseCargo,
         ManipulatorCommandState,
         MissionState,
+        PlayerFieldState,
         PlayerMotionState,
         PlayerReferenceFrame,
         PlayerShip,
@@ -21,6 +24,7 @@ use super::super::{
         RuntimeArchComputer,
         RuntimeShipModule,
         ShipArchCommandState,
+        ShipAtmosphereState,
         ShipControlMode,
         ShipControlState,
         ShipInertiaField,
@@ -66,6 +70,7 @@ const PLAYER_EVA_MAX_SPEED: f32 = 140.0;
 const PLAYER_EVA_DAMPING: f32 = 1.6;
 const PLAYER_INTERACT_RADIUS: f32 = 28.0;
 const PLAYER_CARGO_PICKUP_RADIUS: f32 = 20.0;
+const PLAYER_COLLISION_RADIUS: f32 = 7.0;
 
 pub(crate) fn return_button_system(
     mut interaction_query: Query<
@@ -262,6 +267,7 @@ pub(crate) fn update_player_reference_frame(
     >,
 ) {
     let (mut motion, mut internal_position) = player_query.into_inner();
+    let previous_frame = motion.frame;
     let mut best_ship = None;
     let mut best_distance_sq = None;
 
@@ -282,13 +288,22 @@ pub(crate) fn update_player_reference_frame(
     match best_ship {
         Some((ship_entity, local_position, local_velocity)) => {
             motion.frame = PlayerReferenceFrame::Ship(ship_entity);
-            motion.local_position = local_position;
-            motion.local_velocity = local_velocity;
+            if !matches!(previous_frame, PlayerReferenceFrame::Ship(current) if current == ship_entity)
+            {
+                motion.local_position = local_position;
+                motion.local_velocity = local_velocity;
+            }
             internal_position.local_position = local_position;
             internal_position.grid_x = (local_position.x / Fx::from_num(32)).to_num::<i32>();
             internal_position.grid_y = (-local_position.y / Fx::from_num(32)).to_num::<i32>();
         }
         None => {
+            if let PlayerReferenceFrame::Ship(ship_entity) = previous_frame
+                && let Ok((_, _, ship_rotation, ship_velocity, _)) = ship_query.get(ship_entity)
+            {
+                motion.world_velocity =
+                    ship_velocity.value + motion.local_velocity.rotate(ship_rotation.radians);
+            }
             motion.frame = PlayerReferenceFrame::World;
             motion.local_velocity = FixedVec2::zero();
         }
@@ -297,16 +312,49 @@ pub(crate) fn update_player_reference_frame(
 
 pub(crate) fn move_shipboard_player(
     time: Res<Time>,
+    balance: Res<BalanceConfig>,
     keys: Res<ButtonInput<KeyCode>>,
-    ship_query: Query<(Entity, &SimPosition, &SimRotation, &LinearVelocity), With<ShipRoot>>,
+    ship_query: Query<
+        (
+            Entity,
+            &SimPosition,
+            &SimRotation,
+            &LinearVelocity,
+            &ShipAtmosphereState,
+        ),
+        With<ShipRoot>,
+    >,
+    module_query: Query<
+        (
+            &Parent,
+            &RuntimeShipModule,
+            Option<&AirlockCommandState>,
+            Option<&DestroyedModule>,
+        ),
+        With<RuntimeShipModule>,
+    >,
     mode_query: Single<&ShipboardControlState, (With<PlayerShip>, With<ShipRoot>)>,
     mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     player_query: Single<
-        (&mut PlayerMotionState, &mut InternalPosition),
+        (
+            &mut PlayerMotionState,
+            &mut InternalPosition,
+            &PlayerFieldState,
+        ),
         (With<ShipboardPlayer>, With<PlayerShipAssignment>),
     >,
 ) {
-    if mode_query.into_inner().mode != ShipControlMode::Interior {
+    let control_state = mode_query.into_inner();
+    let (mut motion, mut position, player_fields) = player_query.into_inner();
+
+    if control_state.mode != ShipControlMode::Interior {
+        anchor_player_to_focused_station(
+            &mut motion,
+            &mut position,
+            control_state,
+            &ship_query,
+            &module_query,
+        );
         return;
     }
     let mission_state = mission_query.into_inner();
@@ -314,7 +362,6 @@ pub(crate) fn move_shipboard_player(
         return;
     }
 
-    let (mut motion, mut position) = player_query.into_inner();
     let dt = fx_from_time_delta(&time);
     let mut input = FixedVec2::zero();
     if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
@@ -333,17 +380,33 @@ pub(crate) fn move_shipboard_player(
 
     match motion.frame {
         PlayerReferenceFrame::Ship(ship_entity) => {
-            let Ok((_, ship_position, ship_rotation, ship_velocity)) = ship_query.get(ship_entity)
+            let Ok((_, ship_position, ship_rotation, ship_velocity, atmosphere_state)) =
+                ship_query.get(ship_entity)
             else {
                 motion.frame = PlayerReferenceFrame::World;
                 return;
             };
-            motion.local_velocity += input * Fx::from_num(PLAYER_WALK_ACCELERATION) * dt;
+            let movement_multiplier = if player_fields.oxygen_critical {
+                Fx::from_num(balance.atmosphere.critical_oxygen_speed_multiplier)
+            } else if player_fields.oxygen_warning {
+                Fx::from_num(balance.atmosphere.low_oxygen_speed_multiplier)
+            } else {
+                Fx::from_num(1)
+            };
+            motion.local_velocity +=
+                input * Fx::from_num(PLAYER_WALK_ACCELERATION) * movement_multiplier * dt;
             motion.local_velocity =
                 damp_vec2(motion.local_velocity, Fx::from_num(PLAYER_WALK_DAMPING), dt)
-                    .clamp_length(Fx::from_num(PLAYER_WALK_MAX_SPEED));
+                    .clamp_length(Fx::from_num(PLAYER_WALK_MAX_SPEED) * movement_multiplier);
             let local_velocity = motion.local_velocity;
-            motion.local_position += local_velocity * dt;
+            let desired_local_position = motion.local_position + local_velocity * dt;
+            let collision_tiles =
+                ship_collision_tiles(ship_entity, atmosphere_state, &module_query);
+            motion.local_position = resolve_ship_local_motion(
+                motion.local_position,
+                desired_local_position,
+                &collision_tiles,
+            );
             motion.world_position =
                 ship_position.value + motion.local_position.rotate(ship_rotation.radians);
             motion.world_velocity =
@@ -379,7 +442,14 @@ pub(crate) fn sync_shipboard_player_visual(
 ) {
     let control_state = ship_query.into_inner();
     let (position, carried, mut transform, mut sprite, mut visibility) = player_query.into_inner();
-    transform.translation = render_translation(position.world_position, 6.0);
+    transform.translation = match position.frame {
+        PlayerReferenceFrame::Ship(_) => Vec3::new(
+            position.local_position.x.to_num::<f32>(),
+            position.local_position.y.to_num::<f32>(),
+            6.0,
+        ),
+        PlayerReferenceFrame::World => render_translation(position.world_position, 6.0),
+    };
     sprite.color = match control_state.mode {
         ShipControlMode::Interior if carried.kind.is_some() => Color::srgb(0.98, 0.88, 0.52),
         ShipControlMode::Interior => Color::srgb(0.82, 0.96, 0.62),
@@ -396,6 +466,27 @@ pub(crate) fn sync_shipboard_player_visual(
     } else {
         Visibility::Visible
     };
+}
+
+pub(crate) fn sync_player_reference_frame_parenting(
+    mut commands: Commands,
+    player_query: Single<(Entity, &PlayerMotionState, Option<&Parent>), With<ShipboardPlayer>>,
+) {
+    let (player_entity, motion, parent) = player_query.into_inner();
+    match motion.frame {
+        PlayerReferenceFrame::Ship(ship_entity) => {
+            if parent.map(Parent::get) != Some(ship_entity) {
+                commands
+                    .entity(player_entity)
+                    .set_parent_in_place(ship_entity);
+            }
+        }
+        PlayerReferenceFrame::World => {
+            if parent.is_some() {
+                commands.entity(player_entity).remove_parent_in_place();
+            }
+        }
+    }
 }
 
 pub(crate) fn update_current_station(
@@ -587,9 +678,9 @@ pub(crate) fn update_station_command_input(
         (
             &SimPosition,
             &SimRotation,
-            &MissionState,
             &mut ShipboardControlState,
             &mut ShipControlState,
+            &mut MissionState,
         ),
         (With<PlayerShip>, With<ShipRoot>),
     >,
@@ -601,16 +692,17 @@ pub(crate) fn update_station_command_input(
         Option<&mut StorageCommandState>,
         Option<&mut ManipulatorCommandState>,
         Option<&mut ProcessorCommandState>,
+        Option<&mut AirlockCommandState>,
         Option<&mut RuntimeArchComputer>,
     )>,
     candidate_query: Query<&RuntimeShipModule>,
 ) {
     let dt = fx_from_time_delta(&time);
-    let (ship_position, ship_rotation, mission_state, control_state, mut ship_controls) =
+    let (ship_position, ship_rotation, control_state, mut ship_controls, mut mission_runtime) =
         ship_query.into_inner();
 
     ship_controls.fire_pressed = false;
-    if mission_state.failed || mission_state.completed {
+    if mission_runtime.failed || mission_runtime.completed {
         ship_controls.throttle_demand = Fx::from_num(0);
         ship_controls.turn_input = Fx::from_num(0);
         return;
@@ -657,7 +749,7 @@ pub(crate) fn update_station_command_input(
             let Some(focused_entity) = control_state.focused_entity else {
                 return;
             };
-            let Ok((_, runtime_module, turret_state, _, _, _, _, _)) =
+            let Ok((_, runtime_module, turret_state, _, _, _, _, _, _)) =
                 module_query.get_mut(focused_entity)
             else {
                 return;
@@ -690,7 +782,7 @@ pub(crate) fn update_station_command_input(
             let Some(focused_entity) = control_state.focused_entity else {
                 return;
             };
-            let Ok((_, _, _, reactor_state, _, _, _, _)) = module_query.get_mut(focused_entity)
+            let Ok((_, _, _, reactor_state, _, _, _, _, _)) = module_query.get_mut(focused_entity)
             else {
                 return;
             };
@@ -728,12 +820,26 @@ pub(crate) fn update_station_command_input(
                 control_state.focused_module_id.unwrap_or_default(),
                 &candidate_query,
             );
-            let Ok((_, runtime_module, _, _, storage_cmd, manipulator_cmd, processor_cmd, _)) =
-                module_query.get_mut(focused_entity)
+            let Ok((
+                _,
+                runtime_module,
+                _,
+                _,
+                storage_cmd,
+                manipulator_cmd,
+                processor_cmd,
+                airlock_state,
+                _,
+            )) = module_query.get_mut(focused_entity)
             else {
                 return;
             };
-            if let Some(mut storage_cmd) = storage_cmd
+            if let Some(mut airlock_state) = airlock_state {
+                if keys.just_pressed(KeyCode::Space) {
+                    airlock_state.open = !airlock_state.open;
+                    mission_runtime.airlocks_cycled += 1;
+                }
+            } else if let Some(mut storage_cmd) = storage_cmd
                 && keys.just_pressed(KeyCode::Space)
             {
                 storage_cmd.allow_intake = !storage_cmd.allow_intake;
@@ -789,7 +895,7 @@ pub(crate) fn update_station_command_input(
             let Some(focused_entity) = control_state.focused_entity else {
                 return;
             };
-            let Ok((_, _, _, _, _, _, _, arch_runtime)) = module_query.get_mut(focused_entity)
+            let Ok((_, _, _, _, _, _, _, _, arch_runtime)) = module_query.get_mut(focused_entity)
             else {
                 return;
             };
@@ -1021,4 +1127,191 @@ fn cargo_color(kind: ResourceKind) -> Color {
         ResourceKind::RawSalvage => Color::srgb(0.90, 0.78, 0.34),
         ResourceKind::RepairCharge => Color::srgb(0.38, 0.88, 0.98),
     }
+}
+
+fn anchor_player_to_focused_station(
+    motion: &mut PlayerMotionState,
+    position: &mut InternalPosition,
+    control_state: &ShipboardControlState,
+    ship_query: &Query<
+        (
+            Entity,
+            &SimPosition,
+            &SimRotation,
+            &LinearVelocity,
+            &ShipAtmosphereState,
+        ),
+        With<ShipRoot>,
+    >,
+    module_query: &Query<
+        (
+            &Parent,
+            &RuntimeShipModule,
+            Option<&AirlockCommandState>,
+            Option<&DestroyedModule>,
+        ),
+        With<RuntimeShipModule>,
+    >,
+) {
+    let Some(focused_entity) = control_state.focused_entity else {
+        return;
+    };
+    let Ok((parent, runtime_module, _, _)) = module_query.get(focused_entity) else {
+        return;
+    };
+    let Ok((ship_entity, ship_position, ship_rotation, ship_velocity, _)) =
+        ship_query.get(parent.get())
+    else {
+        return;
+    };
+
+    motion.frame = PlayerReferenceFrame::Ship(ship_entity);
+    motion.local_position = runtime_module.local_position;
+    motion.local_velocity = FixedVec2::zero();
+    motion.world_position =
+        ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians);
+    motion.world_velocity = ship_velocity.value;
+
+    position.grid_x = runtime_module.grid_x;
+    position.grid_y = runtime_module.grid_y;
+    position.local_position = runtime_module.local_position;
+}
+
+#[derive(Clone, Copy)]
+struct ShipCollisionTile {
+    center: FixedVec2,
+    exterior_edges: u8,
+    solid: bool,
+    opening: bool,
+}
+
+fn ship_collision_tiles(
+    ship_entity: Entity,
+    atmosphere_state: &ShipAtmosphereState,
+    module_query: &Query<
+        (
+            &Parent,
+            &RuntimeShipModule,
+            Option<&AirlockCommandState>,
+            Option<&DestroyedModule>,
+        ),
+        With<RuntimeShipModule>,
+    >,
+) -> Vec<ShipCollisionTile> {
+    let module_state = module_query
+        .iter()
+        .filter(|(parent, _, _, _)| parent.get() == ship_entity)
+        .map(|(_, runtime_module, airlock_state, destroyed)| {
+            (
+                runtime_module.module_id,
+                (
+                    destroyed.is_some(),
+                    airlock_state.is_some_and(|state| state.open),
+                ),
+            )
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+
+    atmosphere_state
+        .tiles
+        .iter()
+        .map(|tile| {
+            let (destroyed, airlock_open) = module_state
+                .get(&tile.module_id)
+                .copied()
+                .unwrap_or((false, false));
+            let solid = is_hull_kind(tile.kind) && !destroyed;
+            let opening = tile.exterior_edges != 0 && (destroyed || airlock_open);
+            ShipCollisionTile {
+                center: tile.local_position,
+                exterior_edges: tile.exterior_edges,
+                solid,
+                opening,
+            }
+        })
+        .collect()
+}
+
+fn resolve_ship_local_motion(
+    start: FixedVec2,
+    desired: FixedVec2,
+    collision_tiles: &[ShipCollisionTile],
+) -> FixedVec2 {
+    let mut resolved = start;
+    let try_x = FixedVec2::new(desired.x, resolved.y);
+    if !movement_blocked(resolved, try_x, collision_tiles) {
+        resolved.x = desired.x;
+    }
+    let try_y = FixedVec2::new(resolved.x, desired.y);
+    if !movement_blocked(resolved, try_y, collision_tiles) {
+        resolved.y = desired.y;
+    }
+    resolved
+}
+
+fn movement_blocked(from: FixedVec2, to: FixedVec2, collision_tiles: &[ShipCollisionTile]) -> bool {
+    if collision_tiles.iter().any(|tile| {
+        tile.solid && point_overlaps_tile(to, tile.center, Fx::from_num(PLAYER_COLLISION_RADIUS))
+    }) {
+        return true;
+    }
+
+    let from_tile = collision_tiles
+        .iter()
+        .find(|tile| !tile.solid && point_inside_tile(from, tile.center));
+    let to_tile = collision_tiles
+        .iter()
+        .find(|tile| !tile.solid && point_inside_tile(to, tile.center));
+
+    match (from_tile, to_tile) {
+        (None, Some(tile)) => !allows_exterior_crossing(from, tile),
+        (Some(tile), None) => !allows_exterior_crossing(to, tile),
+        _ => false,
+    }
+}
+
+fn point_overlaps_tile(point: FixedVec2, tile_center: FixedVec2, radius: Fx) -> bool {
+    let tile_half = Fx::from_num(16);
+    (point.x - tile_center.x).abs() <= tile_half + radius
+        && (point.y - tile_center.y).abs() <= tile_half + radius
+}
+
+fn point_inside_tile(point: FixedVec2, tile_center: FixedVec2) -> bool {
+    let tile_half = Fx::from_num(16);
+    (point.x - tile_center.x).abs() <= tile_half && (point.y - tile_center.y).abs() <= tile_half
+}
+
+fn allows_exterior_crossing(point: FixedVec2, tile: &ShipCollisionTile) -> bool {
+    if !tile.opening || tile.exterior_edges == 0 {
+        return false;
+    }
+
+    let tile_half = Fx::from_num(16);
+    let left = tile.center.x - tile_half;
+    let right = tile.center.x + tile_half;
+    let top = tile.center.y + tile_half;
+    let bottom = tile.center.y - tile_half;
+
+    let mut exterior_mask = 0u8;
+    if point.y > top {
+        exterior_mask |= 1;
+    }
+    if point.x > right {
+        exterior_mask |= 1 << 1;
+    }
+    if point.y < bottom {
+        exterior_mask |= 1 << 2;
+    }
+    if point.x < left {
+        exterior_mask |= 1 << 3;
+    }
+
+    exterior_mask != 0 && (tile.exterior_edges & exterior_mask) != 0
+}
+
+fn is_hull_kind(kind: ModuleKind) -> bool {
+    matches!(
+        kind,
+        ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner
+    )
 }

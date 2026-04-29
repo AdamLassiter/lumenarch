@@ -7,6 +7,7 @@ use crate::{
         balance::BalanceConfig,
         gameplay::{
             components::{
+                AirlockCommandState,
                 ArchComputerModule,
                 ArchExecutionResult,
                 EngineModule,
@@ -123,6 +124,7 @@ pub(super) fn spawn_runtime_module(
         }
         ModuleKind::Airlock => {
             entity.insert((
+                AirlockCommandState { open: false },
                 StorageModule {
                     capacity: 4,
                     inventory: ResourceInventory::default(),

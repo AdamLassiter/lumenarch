@@ -63,5 +63,4 @@ pub(crate) use status::{
     meter_bar,
     mission_return_line,
     mission_status_line,
-    salvage_status_line,
 };

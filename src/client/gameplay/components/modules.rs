@@ -100,6 +100,11 @@ pub(crate) struct StorageCommandState {
 }
 
 #[derive(Component)]
+pub(crate) struct AirlockCommandState {
+    pub(crate) open: bool,
+}
+
+#[derive(Component)]
 pub(crate) struct ManipulatorCommandState {
     pub(crate) manual_mode: bool,
     pub(crate) transfer_enabled: bool,
@@ -163,7 +168,7 @@ pub(crate) struct MemoryBankState {
     pub(crate) words: [i32; 4],
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ModuleCondition {
     Healthy,
     Degraded,

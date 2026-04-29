@@ -16,6 +16,8 @@ pub(crate) use actors::{
     PlayerReferenceFrame,
     PlayerShip,
     PlayerShipAssignment,
+    ShipAtmosphereState,
+    ShipAtmosphereTile,
     ShipControlMode,
     ShipInertiaField,
     ShipInteriorMap,
@@ -46,6 +48,7 @@ pub(crate) use logistics::{
 };
 #[allow(unused_imports)]
 pub(crate) use modules::{
+    AirlockCommandState,
     ArchComputerModule,
     ArchExecutionResult,
     DestroyedModule,

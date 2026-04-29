@@ -10,6 +10,7 @@ pub(crate) struct BalanceConfig {
     pub(crate) ship: ShipBalanceConfig,
     pub(crate) reactor: ReactorBalanceConfig,
     pub(crate) fields: FieldBalanceConfig,
+    pub(crate) atmosphere: AtmosphereBalanceConfig,
     pub(crate) combat: CombatBalanceConfig,
     pub(crate) hostile_ai: HostileAiBalanceConfig,
     pub(crate) logistics: LogisticsBalanceConfig,
@@ -99,6 +100,20 @@ pub(crate) struct FieldBalanceConfig {
     pub(crate) emitter_hull_cooling: f32,
     pub(crate) emitter_hull_grounding: f32,
     pub(crate) emitter_generic_grounding: f32,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub(crate) struct AtmosphereBalanceConfig {
+    pub(crate) initial_tile_oxygen: f32,
+    pub(crate) max_tile_oxygen: f32,
+    pub(crate) equalization_rate: f32,
+    pub(crate) leak_rate_per_edge: f32,
+    pub(crate) destroyed_leak_multiplier: f32,
+    pub(crate) player_warning_threshold: f32,
+    pub(crate) player_critical_threshold: f32,
+    pub(crate) low_oxygen_speed_multiplier: f32,
+    pub(crate) critical_oxygen_speed_multiplier: f32,
+    pub(crate) hostile_decompression_threshold: f32,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -226,6 +241,18 @@ impl Default for BalanceConfig {
                 emitter_hull_cooling: 2.0,
                 emitter_hull_grounding: 2.8,
                 emitter_generic_grounding: 0.8,
+            },
+            atmosphere: AtmosphereBalanceConfig {
+                initial_tile_oxygen: 10.0,
+                max_tile_oxygen: 10.0,
+                equalization_rate: 2.2,
+                leak_rate_per_edge: 2.6,
+                destroyed_leak_multiplier: 1.8,
+                player_warning_threshold: 5.0,
+                player_critical_threshold: 2.2,
+                low_oxygen_speed_multiplier: 0.72,
+                critical_oxygen_speed_multiplier: 0.48,
+                hostile_decompression_threshold: 2.0,
             },
             combat: CombatBalanceConfig {
                 camera_follow_lerp_rate: 8.0,

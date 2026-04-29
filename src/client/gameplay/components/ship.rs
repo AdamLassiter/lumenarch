@@ -129,4 +129,8 @@ pub(crate) struct MissionState {
     pub(crate) processor_cycles: u32,
     pub(crate) logistics_bottleneck: Option<String>,
     pub(crate) logistics_automation_used: bool,
+    pub(crate) lowest_player_oxygen: Fx,
+    pub(crate) hostile_decompression_events: u32,
+    pub(crate) player_ship_breached: bool,
+    pub(crate) airlocks_cycled: u32,
 }

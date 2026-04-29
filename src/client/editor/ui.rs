@@ -5,6 +5,9 @@ use super::{
         TOOLBOX_COMPONENTS,
         TOOLBOX_WIDTH,
         state::{
+            ArchEditorButton,
+            ArchEditorButtonAction,
+            ArchEditorState,
             ComputerProgramButton,
             ComputerProgramEntry,
             ComputerProgramPanel,
@@ -42,6 +45,7 @@ pub(crate) fn initialize_editor_ship(
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
     mut editor_ship: ResMut<EditorShip>,
     mut tool_state: ResMut<EditorToolState>,
+    mut arch_editor_state: ResMut<ArchEditorState>,
 ) {
     match editor_session.mode {
         EditorMode::Player => match load_default_ship() {
@@ -92,6 +96,13 @@ pub(crate) fn initialize_editor_ship(
 
     tool_state.selected_kind = ModuleKind::Hull;
     tool_state.selected_rotation = 0;
+    arch_editor_state.selected_module_id = editor_ship
+        .ship
+        .modules
+        .iter()
+        .find(|module| module.kind == ModuleKind::Computer)
+        .map(|module| module.id);
+    arch_editor_state.selected_line = 0;
 }
 
 pub(crate) fn spawn_editor_ui(
@@ -313,7 +324,9 @@ pub(crate) fn spawn_editor_ui(
                     position_type: PositionType::Absolute,
                     left: Val::Px(TOOLBOX_WIDTH + 16.0),
                     bottom: Val::Px(16.0),
-                    width: Val::Px(360.0),
+                    width: Val::Px(640.0),
+                    max_height: Val::Px(340.0),
+                    overflow: Overflow::clip_y(),
                     padding: UiRect::all(Val::Px(12.0)),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(10.0),
@@ -410,11 +423,12 @@ pub(crate) fn cleanup_editor_entities(
 pub(crate) fn sync_computer_program_entries(
     mut commands: Commands,
     editor_ship: Res<EditorShip>,
+    arch_editor_state: Res<ArchEditorState>,
     asset_server: Res<AssetServer>,
     panel_query: Single<Entity, With<ComputerProgramPanel>>,
     existing_query: Query<Entity, With<ComputerProgramEntry>>,
 ) {
-    if !editor_ship.is_changed() {
+    if !editor_ship.is_changed() && !arch_editor_state.is_changed() {
         return;
     }
 
@@ -428,7 +442,7 @@ pub(crate) fn sync_computer_program_entries(
 
     commands.entity(panel).with_children(|panel| {
         panel.spawn((
-            Text::new("ARCH Programs"),
+            Text::new("ARCH Workshop"),
             TextFont {
                 font: title_font,
                 font_size: 20.0,
@@ -459,83 +473,325 @@ pub(crate) fn sync_computer_program_entries(
             return;
         }
 
-        for module in computers {
-            let program = module
-                .arch_program
-                .clone()
-                .unwrap_or_else(|| ArchProgram::from_template(ArchProgramTemplate::BalancedOps));
-            panel
-                .spawn((
-                    Node {
-                        width: Val::Percent(100.0),
-                        padding: UiRect::all(Val::Px(10.0)),
-                        flex_direction: FlexDirection::Column,
-                        row_gap: Val::Px(6.0),
+        panel.spawn((
+            Text::new("Select a computer, then edit its instruction list with buttons. This is a first-pass workshop: opcode cycling, register cycling, immediate/jump tweaks, line add/remove, plus template and constant controls."),
+            TextFont {
+                font: mono_font.clone(),
+                font_size: 13.0,
+                ..default()
+            },
+            TextColor(Color::srgb(0.76, 0.80, 0.86)),
+            ComputerProgramEntry,
+        ));
+
+        panel
+            .spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    flex_wrap: FlexWrap::Wrap,
+                    column_gap: Val::Px(8.0),
+                    row_gap: Val::Px(8.0),
+                    ..default()
+                },
+                ComputerProgramEntry,
+            ))
+            .with_children(|buttons| {
+                for module in &computers {
+                    spawn_arch_editor_button(
+                        buttons,
+                        &mono_font,
+                        &format!(
+                            "{}CPU #{}",
+                            if arch_editor_state.selected_module_id == Some(module.id) {
+                                "Selected "
+                            } else {
+                                ""
+                            },
+                            module.id
+                        ),
+                        ArchEditorButtonAction::SelectModule(module.id),
+                    );
+                }
+            });
+
+        let selected_module = arch_editor_state
+            .selected_module_id
+            .and_then(|module_id| computers.iter().find(|module| module.id == module_id).copied())
+            .unwrap_or(computers[0]);
+        let program = selected_module
+            .arch_program
+            .clone()
+            .unwrap_or_else(|| ArchProgram::from_template(ArchProgramTemplate::BalancedOps));
+
+        panel
+            .spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    padding: UiRect::all(Val::Px(12.0)),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(8.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.12, 0.14, 0.18, 0.92)),
+                BorderRadius::all(Val::Px(8.0)),
+                ComputerProgramEntry,
+            ))
+            .with_children(|entry| {
+                entry.spawn((
+                    Text::new(format!(
+                        "Computer #{}\nProgram: {}\nTemplate: {}\nConst A / B: {} / {}\nValidation: {}",
+                        selected_module.id,
+                        program.name,
+                        program.template.as_str(),
+                        program.constants[0],
+                        program.constants[1],
+                        program_validation_summary(&program),
+                    )),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: 14.0,
                         ..default()
                     },
-                    BackgroundColor(Color::srgba(0.12, 0.14, 0.18, 0.92)),
-                    BorderRadius::all(Val::Px(8.0)),
-                    ComputerProgramEntry,
-                ))
-                .with_children(|entry| {
-                    entry.spawn((
-                        Text::new(format!(
-                            "Computer #{}\nProgram: {}\nConst A / B: {} / {}",
-                            module.id,
-                            program.template.as_str(),
-                            program.constants[0],
-                            program.constants[1]
-                        )),
-                        TextFont {
-                            font: mono_font.clone(),
-                            font_size: 14.0,
-                            ..default()
-                        },
-                        TextColor(Color::srgb(0.92, 0.94, 0.98)),
-                    ));
-                    spawn_program_button(
-                        entry,
-                        &mono_font,
-                        "Cycle Template",
-                        module.id,
-                        ProgramButtonAction::CycleTemplate,
-                    );
-                    spawn_program_button(
-                        entry,
-                        &mono_font,
-                        "Const A +1",
-                        module.id,
-                        ProgramButtonAction::AdjustConstant { index: 0, delta: 1 },
-                    );
-                    spawn_program_button(
-                        entry,
-                        &mono_font,
-                        "Const A -1",
-                        module.id,
-                        ProgramButtonAction::AdjustConstant {
-                            index: 0,
-                            delta: -1,
-                        },
-                    );
-                    spawn_program_button(
-                        entry,
-                        &mono_font,
-                        "Const B +1",
-                        module.id,
-                        ProgramButtonAction::AdjustConstant { index: 1, delta: 1 },
-                    );
-                    spawn_program_button(
-                        entry,
-                        &mono_font,
-                        "Const B -1",
-                        module.id,
-                        ProgramButtonAction::AdjustConstant {
-                            index: 1,
-                            delta: -1,
-                        },
-                    );
-                });
-        }
+                    TextColor(Color::srgb(0.92, 0.94, 0.98)),
+                ));
+                entry
+                    .spawn(Node {
+                        width: Val::Percent(100.0),
+                        flex_wrap: FlexWrap::Wrap,
+                        column_gap: Val::Px(8.0),
+                        row_gap: Val::Px(8.0),
+                        ..default()
+                    })
+                    .with_children(|buttons| {
+                        spawn_program_button(
+                            buttons,
+                            &mono_font,
+                            "Cycle Template",
+                            selected_module.id,
+                            ProgramButtonAction::CycleTemplate,
+                        );
+                        spawn_program_button(
+                            buttons,
+                            &mono_font,
+                            "Const A +1",
+                            selected_module.id,
+                            ProgramButtonAction::AdjustConstant { index: 0, delta: 1 },
+                        );
+                        spawn_program_button(
+                            buttons,
+                            &mono_font,
+                            "Const A -1",
+                            selected_module.id,
+                            ProgramButtonAction::AdjustConstant { index: 0, delta: -1 },
+                        );
+                        spawn_program_button(
+                            buttons,
+                            &mono_font,
+                            "Const B +1",
+                            selected_module.id,
+                            ProgramButtonAction::AdjustConstant { index: 1, delta: 1 },
+                        );
+                        spawn_program_button(
+                            buttons,
+                            &mono_font,
+                            "Const B -1",
+                            selected_module.id,
+                            ProgramButtonAction::AdjustConstant { index: 1, delta: -1 },
+                        );
+                        spawn_arch_editor_button(
+                            buttons,
+                            &mono_font,
+                            "Add Line",
+                            ArchEditorButtonAction::AddLine(selected_module.id),
+                        );
+                    });
+
+                for (line_index, instruction) in program.instructions.iter().enumerate() {
+                    let selected = arch_editor_state.selected_line == line_index;
+                    entry
+                        .spawn((
+                            Node {
+                                width: Val::Percent(100.0),
+                                padding: UiRect::all(Val::Px(10.0)),
+                                flex_direction: FlexDirection::Column,
+                                row_gap: Val::Px(6.0),
+                                ..default()
+                            },
+                            BackgroundColor(if selected {
+                                Color::srgba(0.22, 0.28, 0.37, 0.98)
+                            } else {
+                                Color::srgba(0.15, 0.18, 0.24, 0.92)
+                            }),
+                            BorderRadius::all(Val::Px(8.0)),
+                            ComputerProgramEntry,
+                        ))
+                        .with_children(|line| {
+                            line.spawn((
+                                Text::new(format!(
+                                    "L{:02}  {}",
+                                    line_index,
+                                    instruction_summary(instruction)
+                                )),
+                                TextFont {
+                                    font: mono_font.clone(),
+                                    font_size: 13.0,
+                                    ..default()
+                                },
+                                TextColor(Color::WHITE),
+                            ));
+                            line.spawn(Node {
+                                width: Val::Percent(100.0),
+                                flex_wrap: FlexWrap::Wrap,
+                                column_gap: Val::Px(6.0),
+                                row_gap: Val::Px(6.0),
+                                ..default()
+                            })
+                            .with_children(|buttons| {
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    if selected { "Selected" } else { "Select" },
+                                    ArchEditorButtonAction::SelectLine {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Opcode",
+                                    ArchEditorButtonAction::CycleOpcode {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Dst",
+                                    ArchEditorButtonAction::CycleDst {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Src A",
+                                    ArchEditorButtonAction::CycleSrcA {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Src B",
+                                    ArchEditorButtonAction::CycleSrcB {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Imm A +",
+                                    ArchEditorButtonAction::AdjustImmediateA {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                        delta: 1,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Imm A -",
+                                    ArchEditorButtonAction::AdjustImmediateA {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                        delta: -1,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Imm B +",
+                                    ArchEditorButtonAction::AdjustImmediateB {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                        delta: 1,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Imm B -",
+                                    ArchEditorButtonAction::AdjustImmediateB {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                        delta: -1,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Jump +",
+                                    ArchEditorButtonAction::AdjustJump {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                        delta: 1,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Jump -",
+                                    ArchEditorButtonAction::AdjustJump {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                        delta: -1,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Insert",
+                                    ArchEditorButtonAction::InsertLineAfter {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Up",
+                                    ArchEditorButtonAction::MoveLineUp {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Down",
+                                    ArchEditorButtonAction::MoveLineDown {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                    },
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Remove",
+                                    ArchEditorButtonAction::RemoveLine {
+                                        module_id: selected_module.id,
+                                        line: line_index,
+                                    },
+                                );
+                            });
+                        });
+                }
+            });
     });
 }
 
@@ -570,6 +826,170 @@ fn spawn_program_button(
             },
             TextColor(Color::WHITE),
         ));
+}
+
+fn spawn_arch_editor_button(
+    entry: &mut ChildBuilder,
+    font: &Handle<Font>,
+    label: &str,
+    action: ArchEditorButtonAction,
+) {
+    entry
+        .spawn((
+            Button,
+            Node {
+                height: Val::Px(28.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                padding: UiRect::horizontal(Val::Px(8.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.20, 0.40, 0.62)),
+            BorderRadius::all(Val::Px(6.0)),
+            ArchEditorButton { action },
+            ComputerProgramEntry,
+        ))
+        .with_child((
+            Text::new(label),
+            TextFont {
+                font: font.clone(),
+                font_size: 12.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+}
+
+fn instruction_summary(instruction: &crate::ship::arch::ArchInstruction) -> String {
+    use crate::ship::arch::{ArchInstruction, ArchValueRef};
+
+    let value_ref = |value: &ArchValueRef| match value {
+        ArchValueRef::Register(register) => register.as_str().to_string(),
+        ArchValueRef::Immediate(value) => format!("#{value}"),
+    };
+
+    match instruction {
+        ArchInstruction::Nop => "NOP".to_string(),
+        ArchInstruction::Mov { dst, src } => format!("MOV {} <- {}", dst.as_str(), value_ref(src)),
+        ArchInstruction::Add { dst, lhs, rhs } => {
+            format!(
+                "ADD {} <- {} + {}",
+                dst.as_str(),
+                value_ref(lhs),
+                value_ref(rhs)
+            )
+        }
+        ArchInstruction::Sub { dst, lhs, rhs } => {
+            format!(
+                "SUB {} <- {} - {}",
+                dst.as_str(),
+                value_ref(lhs),
+                value_ref(rhs)
+            )
+        }
+        ArchInstruction::Gt { dst, lhs, rhs } => {
+            format!(
+                "GT {} <- {} > {}",
+                dst.as_str(),
+                value_ref(lhs),
+                value_ref(rhs)
+            )
+        }
+        ArchInstruction::Lt { dst, lhs, rhs } => {
+            format!(
+                "LT {} <- {} < {}",
+                dst.as_str(),
+                value_ref(lhs),
+                value_ref(rhs)
+            )
+        }
+        ArchInstruction::Jnz { cond, target } => format!("JNZ {} -> {}", value_ref(cond), target),
+        ArchInstruction::Jmp { target } => format!("JMP {}", target),
+        other => format!("{other:?}"),
+    }
+}
+
+fn program_validation_summary(program: &ArchProgram) -> String {
+    let mut warnings = Vec::new();
+
+    for (index, instruction) in program.instructions.iter().enumerate() {
+        if let Some(dst) = instruction_destination(instruction)
+            && !dst.is_writable()
+        {
+            warnings.push(format!("L{index:02} writes read-only {}", dst.as_str()));
+        }
+        if let Some(target) = instruction_jump_target(instruction)
+            && target >= program.instructions.len()
+        {
+            warnings.push(format!("L{index:02} jumps past end"));
+        }
+    }
+
+    if warnings.is_empty() {
+        "ready".to_string()
+    } else {
+        warnings.join(" | ")
+    }
+}
+
+fn instruction_destination(
+    instruction: &crate::ship::arch::ArchInstruction,
+) -> Option<crate::ship::arch::ArchRegister> {
+    use crate::ship::arch::ArchInstruction;
+
+    match instruction {
+        ArchInstruction::Mov { dst, .. }
+        | ArchInstruction::Clp { dst, .. }
+        | ArchInstruction::Abs { dst, .. }
+        | ArchInstruction::Neg { dst, .. }
+        | ArchInstruction::Add { dst, .. }
+        | ArchInstruction::Sub { dst, .. }
+        | ArchInstruction::Mul { dst, .. }
+        | ArchInstruction::Div { dst, .. }
+        | ArchInstruction::Mod { dst, .. }
+        | ArchInstruction::Pow { dst, .. }
+        | ArchInstruction::Sqrt { dst, .. }
+        | ArchInstruction::Log { dst, .. }
+        | ArchInstruction::Sin { dst, .. }
+        | ArchInstruction::Cos { dst, .. }
+        | ArchInstruction::Tan { dst, .. }
+        | ArchInstruction::Asin { dst, .. }
+        | ArchInstruction::Acos { dst, .. }
+        | ArchInstruction::Atan { dst, .. }
+        | ArchInstruction::Atn2 { dst, .. }
+        | ArchInstruction::Gt { dst, .. }
+        | ArchInstruction::Gte { dst, .. }
+        | ArchInstruction::Lt { dst, .. }
+        | ArchInstruction::Lte { dst, .. }
+        | ArchInstruction::Eq { dst, .. }
+        | ArchInstruction::Neq { dst, .. }
+        | ArchInstruction::And { dst, .. }
+        | ArchInstruction::Or { dst, .. }
+        | ArchInstruction::Xor { dst, .. }
+        | ArchInstruction::Not { dst, .. }
+        | ArchInstruction::Min { dst, .. }
+        | ArchInstruction::Max { dst, .. }
+        | ArchInstruction::Avg { dst, .. }
+        | ArchInstruction::Sgn { dst, .. }
+        | ArchInstruction::Lerp { dst, .. } => Some(*dst),
+        _ => None,
+    }
+}
+
+fn instruction_jump_target(instruction: &crate::ship::arch::ArchInstruction) -> Option<usize> {
+    use crate::ship::arch::ArchInstruction;
+
+    match instruction {
+        ArchInstruction::Jmp { target }
+        | ArchInstruction::Jeq { target, .. }
+        | ArchInstruction::Jne { target, .. }
+        | ArchInstruction::Jgt { target, .. }
+        | ArchInstruction::Jge { target, .. }
+        | ArchInstruction::Jlt { target, .. }
+        | ArchInstruction::Jle { target, .. }
+        | ArchInstruction::Jnz { target, .. } => Some(*target),
+        _ => None,
+    }
 }
 
 #[allow(dead_code)]

@@ -79,6 +79,18 @@
     "emitter_hull_grounding": 2.8,
     "emitter_generic_grounding": 0.8
   },
+  "atmosphere": {
+    "initial_tile_oxygen": 10.0,
+    "max_tile_oxygen": 10.0,
+    "equalization_rate": 2.2,
+    "leak_rate_per_edge": 2.6,
+    "destroyed_leak_multiplier": 1.8,
+    "player_warning_threshold": 5.0,
+    "player_critical_threshold": 2.2,
+    "low_oxygen_speed_multiplier": 0.72,
+    "critical_oxygen_speed_multiplier": 0.48,
+    "hostile_decompression_threshold": 2.0
+  },
   "combat": {
     "camera_follow_lerp_rate": 8.0,
     "projectile_speed": 420.0,

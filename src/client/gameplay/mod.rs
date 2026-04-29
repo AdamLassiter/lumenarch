@@ -32,8 +32,11 @@ pub(crate) use systems::{
     run_logistics_transfers,
     run_processors,
     run_shipboard_interaction_input,
+    sample_player_atmosphere,
     sample_ship_fields,
+    station_panel_button_system,
     sync_hostile_ship_state,
+    sync_player_reference_frame_parenting,
     sync_runtime_ship_state,
     sync_shipboard_player_visual,
     tick_recent_action_feedback,
@@ -47,6 +50,7 @@ pub(crate) use systems::{
     update_mission_telemetry,
     update_module_runtime_state,
     update_player_reference_frame,
+    update_ship_atmosphere,
     update_station_command_input,
 };
 

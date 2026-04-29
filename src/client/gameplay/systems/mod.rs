@@ -13,6 +13,7 @@ pub(crate) use control::{
     move_shipboard_player,
     return_button_system,
     return_keyboard_shortcut,
+    sync_player_reference_frame_parenting,
     sync_shipboard_player_visual,
     toggle_shipboard_control_mode,
     update_current_station,
@@ -41,6 +42,7 @@ pub(crate) use simulation::{
     run_arch_automation,
     run_logistics_transfers,
     run_processors,
+    sample_player_atmosphere,
     sample_ship_fields,
     sync_hostile_ship_state,
     sync_runtime_ship_state,
@@ -50,5 +52,10 @@ pub(crate) use simulation::{
     update_mission_state,
     update_mission_telemetry,
     update_module_runtime_state,
+    update_ship_atmosphere,
 };
-pub(crate) use ui::{update_gameplay_status_text, update_inspection_and_alerts_text};
+pub(crate) use ui::{
+    station_panel_button_system,
+    update_gameplay_status_text,
+    update_inspection_and_alerts_text,
+};

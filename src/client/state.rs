@@ -184,6 +184,12 @@ impl Default for EditorToolState {
     }
 }
 
+#[derive(Resource, Default)]
+pub(crate) struct ArchEditorState {
+    pub(crate) selected_module_id: Option<u64>,
+    pub(crate) selected_line: usize,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum SectorNodeStatus {
     #[default]
@@ -603,6 +609,82 @@ pub(crate) enum ProgramButtonAction {
     AdjustConstant { index: usize, delta: i32 },
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum ArchEditorButtonAction {
+    SelectModule(u64),
+    SelectLine {
+        module_id: u64,
+        line: usize,
+    },
+    AddLine(u64),
+    InsertLineAfter {
+        module_id: u64,
+        line: usize,
+    },
+    RemoveLine {
+        module_id: u64,
+        line: usize,
+    },
+    MoveLineUp {
+        module_id: u64,
+        line: usize,
+    },
+    MoveLineDown {
+        module_id: u64,
+        line: usize,
+    },
+    CycleOpcode {
+        module_id: u64,
+        line: usize,
+    },
+    CycleDst {
+        module_id: u64,
+        line: usize,
+    },
+    CycleSrcA {
+        module_id: u64,
+        line: usize,
+    },
+    CycleSrcB {
+        module_id: u64,
+        line: usize,
+    },
+    AdjustImmediateA {
+        module_id: u64,
+        line: usize,
+        delta: i32,
+    },
+    AdjustImmediateB {
+        module_id: u64,
+        line: usize,
+        delta: i32,
+    },
+    AdjustJump {
+        module_id: u64,
+        line: usize,
+        delta: i32,
+    },
+    RenameModuleProgram(u64),
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum StationPanelButtonAction {
+    HelmThrottle { delta: f32 },
+    HelmTurn { value: f32 },
+    TurretAdjustAim { delta: f32 },
+    TurretFireToggle,
+    ReactorAdjustRate { delta: f32 },
+    ReactorAdjustTurbine { delta: f32 },
+    LogisticsToggleStorageIntake,
+    LogisticsToggleAirlock,
+    LogisticsToggleManipulator,
+    LogisticsCycleManipulatorTarget { direction: i32 },
+    LogisticsCycleResource,
+    LogisticsToggleProcessor,
+    ComputerToggleEnabled,
+    ComputerCycleTemplate,
+}
+
 #[derive(Component)]
 pub(crate) struct ComputerProgramPanel;
 
@@ -613,6 +695,56 @@ pub(crate) struct ComputerProgramEntry;
 pub(crate) struct ComputerProgramButton {
     pub(crate) module_id: u64,
     pub(crate) action: ProgramButtonAction,
+}
+
+#[derive(Component)]
+pub(crate) struct ArchEditorButton {
+    pub(crate) action: ArchEditorButtonAction,
+}
+
+#[derive(Component)]
+pub(crate) struct GameplayPanelTitleText;
+
+#[derive(Component)]
+pub(crate) struct GameplayPanelBodyText;
+
+#[derive(Component)]
+pub(crate) struct GameplayCompactStatusText;
+
+#[derive(Component)]
+pub(crate) struct GameplayTopBannerText;
+
+#[derive(Component)]
+pub(crate) struct GameplayStationPanel;
+
+#[derive(Component)]
+pub(crate) struct GameplayStationPanelButton {
+    pub(crate) action: StationPanelButtonAction,
+}
+
+#[derive(Component)]
+pub(crate) struct GameplayStationPanelButtonLabel {
+    pub(crate) action: StationPanelButtonAction,
+}
+
+#[derive(Component)]
+pub(crate) struct GameplayBarFill {
+    pub(crate) kind: GameplayBarKind,
+}
+
+#[derive(Component)]
+pub(crate) struct GameplayBarLabel {
+    pub(crate) kind: GameplayBarKind,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum GameplayBarKind {
+    Hull,
+    Power,
+    Battery,
+    Oxygen,
+    Heat,
+    Electrical,
 }
 
 #[derive(Component)]
