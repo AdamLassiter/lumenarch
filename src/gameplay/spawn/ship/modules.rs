@@ -1,0 +1,331 @@
+use std::f32::consts::FRAC_PI_2;
+
+use bevy::prelude::*;
+
+use crate::{
+    {
+        balance::BalanceConfig,
+        gameplay::{
+            components::{
+                AirlockCommandState,
+                ArchComputerModule,
+                ArchExecutionResult,
+                EngineModule,
+                HostileShipModule,
+                Integrity,
+                Interactable,
+                ManipulatorCommandState,
+                ManipulatorModule,
+                ModuleFieldEmitter,
+                ModuleRuntimeState,
+                PowerConsumer,
+                PowerProducer,
+                ProcessorCommandState,
+                ProcessorModule,
+                ProcessorRecipe,
+                ReactorCommandState,
+                ResourceInventory,
+                RuntimeArchComputer,
+                RuntimeShipModule,
+                StorageCommandState,
+                StorageModule,
+                TurretCommandState,
+                TurretTopSprite,
+                WeaponModule,
+            },
+            helpers::{
+                Fx,
+                module_integrity,
+                module_local_position,
+                module_local_translation,
+                sprite_path_for_kind,
+            },
+        },
+    },
+    ship::{ModuleKind, ModuleSpec, ModuleVariant, ShipModule},
+};
+
+pub(super) fn spawn_runtime_module(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    module: &ShipModule,
+    balance: &BalanceConfig,
+    center_x: f32,
+    center_y: f32,
+    center_x_fixed: Fx,
+    center_y_fixed: Fx,
+    wear_penalty: u32,
+    hostile: bool,
+) -> Entity {
+    let local_position = module_local_position(module, center_x_fixed, center_y_fixed);
+    let spec = ModuleSpec::for_module(module.kind, module.variant);
+    let max_integrity = module_integrity(module.kind, module.variant);
+    let applied_wear = i32::min(wear_penalty as i32, max_integrity.saturating_sub(1)).max(0);
+    let mut entity = commands.spawn((
+        Sprite::from_image(asset_server.load(sprite_path_for_kind(&module.kind, module.variant))),
+        Transform {
+            translation: module_local_translation(module, center_x, center_y),
+            rotation: Quat::from_rotation_z(-(module.rotation_quadrants as f32) * FRAC_PI_2),
+            ..default()
+        },
+        RuntimeShipModule {
+            module_id: module.id,
+            kind: module.kind,
+            variant: module.variant,
+            grid_x: module.grid_x,
+            grid_y: module.grid_y,
+            rotation_quadrants: module.rotation_quadrants,
+            local_position,
+        },
+        Integrity {
+            current: max_integrity - applied_wear,
+            max: max_integrity,
+        },
+        ModuleRuntimeState {
+            current_heat: Fx::from_num(0),
+            electrical_instability: Fx::from_num(0),
+            sampled_heat: Fx::from_num(0),
+            sampled_electrical: Fx::from_num(0),
+            is_disabled: false,
+            was_disabled_last_frame: false,
+            needs_attention: false,
+            last_interaction_age: Fx::from_num(0),
+        },
+        module_field_emitter(module.kind, balance),
+        Interactable,
+        crate::state::PlayingCleanup,
+    ));
+
+    if hostile {
+        entity.insert(HostileShipModule);
+    }
+
+    match module.kind {
+        ModuleKind::Reactor => {
+            entity.insert((
+                PowerProducer { output: 10 },
+                ReactorCommandState {
+                    variant: module.variant,
+                    reaction_rate: Fx::from_num(balance.reactor.starting_reaction_rate),
+                    turbine_load: Fx::from_num(balance.reactor.starting_turbine_load),
+                    confinement: Fx::from_num(0.5),
+                    power_output: Fx::from_num(balance.reactor.starting_power_output),
+                    fuel_remaining: Fx::from_num(balance.reactor.starting_fuel * 0.35),
+                },
+            ));
+        }
+        ModuleKind::Battery => {
+            entity.insert(PowerProducer { output: 4 });
+        }
+        ModuleKind::Cargo => {
+            entity.insert((
+                StorageModule {
+                    capacity: spec.storage_capacity,
+                    inventory: {
+                        let mut inventory = ResourceInventory::default();
+                        match module.variant {
+                            ModuleVariant::FuelTank => inventory.fuel = spec.storage_capacity / 2,
+                            ModuleVariant::AmmoRack => {
+                                inventory.ammunition = spec.storage_capacity * 2
+                            }
+                            _ => {}
+                        }
+                        inventory
+                    },
+                    accepts_fuel: module.variant == ModuleVariant::FuelTank,
+                    accepts_ammunition: module.variant == ModuleVariant::AmmoRack,
+                    accepts_general: module.variant == ModuleVariant::GeneralCargo,
+                },
+                StorageCommandState { allow_intake: true },
+            ));
+        }
+        ModuleKind::Airlock => {
+            entity.insert((
+                AirlockCommandState { open: false },
+                StorageModule {
+                    capacity: spec.storage_capacity,
+                    inventory: ResourceInventory::default(),
+                    accepts_fuel: false,
+                    accepts_ammunition: false,
+                    accepts_general: true,
+                },
+                StorageCommandState { allow_intake: true },
+                ManipulatorModule {
+                    transfer_progress: Fx::from_num(0),
+                    transfer_duration: Fx::from_num(
+                        balance.logistics.manipulator_transfer_duration,
+                    ),
+                    active: false,
+                    source_module_id: None,
+                    target_module_id: None,
+                    resource_kind: None,
+                    blocked_reason: None,
+                },
+                ManipulatorCommandState {
+                    manual_mode: false,
+                    transfer_enabled: false,
+                    source_module_id: Some(module.id),
+                    target_module_id: None,
+                    resource_kind: crate::gameplay::components::ResourceKind::RawSalvage,
+                },
+            ));
+        }
+        ModuleKind::Engine => {
+            entity.insert((
+                PowerConsumer { draw: 3 },
+                EngineModule {
+                    thrust_multiplier: Fx::from_num(spec.engine_multiplier.max(1.0)),
+                },
+            ));
+        }
+        ModuleKind::Computer => {
+            entity.insert((
+                ArchComputerModule,
+                RuntimeArchComputer {
+                    enabled: true,
+                    instruction_budget: 24,
+                    program: module.arch_program.clone().unwrap_or_else(|| {
+                        crate::ship::arch::ArchProgram::from_template(
+                            crate::ship::arch::ArchProgramTemplate::BalancedOps,
+                        )
+                    }),
+                    last_result: ArchExecutionResult::default(),
+                },
+            ));
+        }
+        ModuleKind::Processor => {
+            entity.insert((
+                PowerConsumer { draw: 2 },
+                ProcessorModule {
+                    progress: Fx::from_num(0),
+                    duration: Fx::from_num(
+                        balance.logistics.processor_duration / spec.processor_speed_multiplier,
+                    ),
+                    active: false,
+                    blocked_reason: None,
+                    inventory: ResourceInventory::default(),
+                    input_required: 2,
+                    output_amount: 1,
+                },
+                ProcessorCommandState {
+                    selected_recipe: ProcessorRecipe::RepairCharge,
+                    enabled: true,
+                },
+            ));
+        }
+        ModuleKind::Turret => {
+            entity
+                .insert((
+                    PowerConsumer { draw: 2 },
+                    WeaponModule {
+                        damage: spec.projectile_damage,
+                        requires_ammo: spec.ammo_per_shot > 0,
+                        ammo_per_shot: spec.ammo_per_shot,
+                        projectile_speed_multiplier: Fx::from_num(
+                            spec.projectile_speed_multiplier.max(0.1),
+                        ),
+                        cooldown_multiplier: Fx::from_num(spec.weapon_cooldown_multiplier),
+                        automation_difficulty: Fx::from_num(
+                            if module.variant == ModuleVariant::BallisticTurret {
+                                1.35
+                            } else {
+                                1.0
+                            },
+                        ),
+                    },
+                    TurretCommandState {
+                        desired_angle: Fx::from_num(0),
+                        actual_angle: Fx::from_num(0),
+                        fire_intent: false,
+                    },
+                ))
+                .with_children(|parent| {
+                    parent.spawn((
+                        Sprite::from_image(asset_server.load("tiles/turret.png")),
+                        Transform::from_xyz(0.0, 0.0, 0.2),
+                        TurretTopSprite,
+                    ));
+                });
+        }
+        ModuleKind::Shield => {
+            entity.insert((
+                PowerConsumer { draw: 2 },
+                crate::gameplay::components::ShieldCommandState {
+                    desired_angle: Fx::from_num(0),
+                    width: Fx::from_num(spec.shield_arc_degrees),
+                    strength: Fx::from_num(spec.shield_capacity),
+                    max_strength: Fx::from_num(spec.shield_capacity),
+                    regen_rate: Fx::from_num(spec.shield_regen),
+                    directional: module.variant == ModuleVariant::DirectionalShield,
+                },
+            ));
+        }
+        _ => {}
+    }
+
+    entity.id()
+}
+
+fn module_field_emitter(kind: ModuleKind, balance: &BalanceConfig) -> ModuleFieldEmitter {
+    match kind {
+        ModuleKind::Reactor => ModuleFieldEmitter {
+            heat_output: Fx::from_num(balance.fields.emitter_reactor_heat),
+            cooling_output: Fx::from_num(0),
+            electrical_output: Fx::from_num(balance.fields.emitter_reactor_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_reactor_grounding),
+        },
+        ModuleKind::Engine => ModuleFieldEmitter {
+            heat_output: Fx::from_num(balance.fields.emitter_engine_heat),
+            cooling_output: Fx::from_num(0),
+            electrical_output: Fx::from_num(balance.fields.emitter_engine_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_engine_grounding),
+        },
+        ModuleKind::Turret => ModuleFieldEmitter {
+            heat_output: Fx::from_num(balance.fields.emitter_turret_heat),
+            cooling_output: Fx::from_num(0),
+            electrical_output: Fx::from_num(balance.fields.emitter_turret_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_turret_grounding),
+        },
+        ModuleKind::Battery => ModuleFieldEmitter {
+            heat_output: Fx::from_num(balance.fields.emitter_battery_heat),
+            cooling_output: Fx::from_num(0),
+            electrical_output: Fx::from_num(balance.fields.emitter_battery_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_battery_grounding),
+        },
+        ModuleKind::Computer => ModuleFieldEmitter {
+            heat_output: Fx::from_num(balance.fields.emitter_computer_heat),
+            cooling_output: Fx::from_num(0),
+            electrical_output: Fx::from_num(balance.fields.emitter_computer_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_computer_grounding),
+        },
+        ModuleKind::Processor => ModuleFieldEmitter {
+            heat_output: Fx::from_num(balance.fields.emitter_processor_heat),
+            cooling_output: Fx::from_num(0),
+            electrical_output: Fx::from_num(balance.fields.emitter_processor_electrical),
+            grounding_output: Fx::from_num(balance.fields.emitter_processor_grounding),
+        },
+        ModuleKind::Hull
+        | ModuleKind::HullInnerCorner
+        | ModuleKind::HullOuterCorner
+        | ModuleKind::Airlock => ModuleFieldEmitter {
+            heat_output: Fx::from_num(0),
+            cooling_output: Fx::from_num(balance.fields.emitter_hull_cooling),
+            electrical_output: Fx::from_num(0),
+            grounding_output: Fx::from_num(balance.fields.emitter_hull_grounding),
+        },
+        ModuleKind::Shield => ModuleFieldEmitter {
+            heat_output: Fx::from_num(0.6),
+            cooling_output: Fx::from_num(0),
+            electrical_output: Fx::from_num(1.2),
+            grounding_output: Fx::from_num(0.5),
+        },
+        ModuleKind::Core | ModuleKind::Cockpit | ModuleKind::Cargo | ModuleKind::Interior => {
+            ModuleFieldEmitter {
+                heat_output: Fx::from_num(0),
+                cooling_output: Fx::from_num(0),
+                electrical_output: Fx::from_num(0),
+                grounding_output: Fx::from_num(balance.fields.emitter_generic_grounding),
+            }
+        }
+    }
+}

@@ -8,21 +8,20 @@ use std::{
 };
 
 use crate::{
-    client::{
-        campaign::{CampaignSave, load_campaign, save_campaign},
-        state::{DemoProgression, LastMissionReport, SectorNodeStatus, SectorState},
-    },
+    campaign::{CampaignSave, load_campaign, save_campaign},
     protocol::{
         ClientHello,
         ClientMessage,
         CommittedInputBatch,
         DriftDetectedMessage,
+        EncounterRegisterState,
         HashStatusMessage,
         PlayerInputFrame,
         PlayerPresenceSnapshot,
         ServerMessage,
         SessionAppState,
         SessionCommand,
+        SessionControlMode,
         SessionPeerInfo,
         SessionSnapshot,
         SessionWelcome,
@@ -30,11 +29,12 @@ use crate::{
     },
     session::snapshot_with_hash,
     ship::storage::{load_default_ship, save_default_ship},
+    state::{DemoProgression, LastMissionReport, SectorNodeStatus, SectorState},
 };
 
 const DEFAULT_HOST_ADDR: &str = "127.0.0.1:5000";
-const HOST_TICK_MILLIS: u64 = 100;
-const SNAPSHOT_BROADCAST_INTERVAL: u64 = 5;
+pub const TICK_MILLIS: u64 = 50;
+pub const SNAPSHOT_INTERVAL: u64 = 50;
 
 pub fn run_host() -> Result<(), String> {
     let listener = TcpListener::bind(DEFAULT_HOST_ADDR)
@@ -87,8 +87,12 @@ struct HostSession {
     progression: DemoProgression,
     sector: SectorState,
     last_mission_report: LastMissionReport,
+    encounter_registers: EncounterRegisterState,
     peers: BTreeMap<u32, ConnectedPeer>,
     pending_inputs: BTreeMap<u64, Vec<PlayerInputFrame>>,
+    station_locks: BTreeMap<u64, u32>,
+    player_station_focus: BTreeMap<u32, Option<u64>>,
+    player_control_modes: BTreeMap<u32, SessionControlMode>,
 }
 
 impl HostSession {
@@ -127,8 +131,12 @@ impl HostSession {
             progression,
             sector,
             last_mission_report,
+            encounter_registers: EncounterRegisterState::default(),
             peers: BTreeMap::new(),
             pending_inputs: BTreeMap::new(),
+            station_locks: BTreeMap::new(),
+            player_station_focus: BTreeMap::new(),
+            player_control_modes: BTreeMap::new(),
         }
     }
 
@@ -140,6 +148,7 @@ impl HostSession {
             progression: self.progression.clone(),
             sector: self.sector.clone(),
             last_mission_report: self.last_mission_report.clone(),
+            encounter_registers: self.encounter_registers.clone(),
             peers: self
                 .peers
                 .iter()
@@ -173,8 +182,11 @@ impl HostSession {
 
 fn spawn_host_tick_thread(session: Arc<Mutex<HostSession>>) {
     thread::spawn(move || {
+        let mut frame_time = std::time::Instant::now();
         loop {
-            thread::sleep(Duration::from_millis(HOST_TICK_MILLIS));
+            let next_frametime = frame_time + Duration::from_millis(TICK_MILLIS);
+            thread::sleep(next_frametime.saturating_duration_since(std::time::Instant::now()));
+            frame_time = next_frametime;
 
             let (snapshot, input_batch, recipients) = {
                 let Ok(mut session) = session.lock() else {
@@ -182,9 +194,10 @@ fn spawn_host_tick_thread(session: Arc<Mutex<HostSession>>) {
                 };
                 session.tick += 1;
                 let tick = session.tick;
-                let frames = session.pending_inputs.remove(&tick).unwrap_or_default();
+                let pending_frames = session.pending_inputs.remove(&tick).unwrap_or_default();
+                let frames = resolve_committed_inputs(&mut session, pending_frames);
                 let batch = CommittedInputBatch { tick, frames };
-                let snapshot = if session.tick % SNAPSHOT_BROADCAST_INTERVAL == 0 {
+                let snapshot = if session.tick % SNAPSHOT_INTERVAL == 0 {
                     Some(session.snapshot())
                 } else {
                     None
@@ -255,6 +268,10 @@ fn handle_client(stream: TcpStream, session: Arc<Mutex<HostSession>>) -> Result<
                 },
             },
         );
+        session.player_station_focus.insert(player_id, None);
+        session
+            .player_control_modes
+            .insert(player_id, SessionControlMode::Interior);
         let snapshot = session.snapshot();
         let welcome = SessionWelcome {
             local_player_id: player_id,
@@ -284,6 +301,12 @@ fn handle_client(stream: TcpStream, session: Arc<Mutex<HostSession>>) -> Result<
                     .lock()
                     .map_err(|_| "failed to lock host session".to_string())?;
                 session.peers.remove(&player_id);
+                if let Some(Some(module_id)) = session.player_station_focus.remove(&player_id)
+                    && session.station_locks.get(&module_id) == Some(&player_id)
+                {
+                    session.station_locks.remove(&module_id);
+                }
+                session.player_control_modes.remove(&player_id);
                 let snapshot = session.snapshot();
                 let recipients = session
                     .peers
@@ -408,6 +431,11 @@ fn apply_command(session: &mut HostSession, command: SessionCommand) {
     match command {
         SessionCommand::SetAppState(state) => {
             session.app_state = state;
+            if state != SessionAppState::Encounter {
+                session.station_locks.clear();
+                session.player_station_focus.clear();
+                session.player_control_modes.clear();
+            }
         }
         SessionCommand::UpdateShip(ship) => {
             session.ship = ship;
@@ -457,5 +485,176 @@ fn apply_command(session: &mut HostSession, command: SessionCommand) {
                 session.progression.hull_wear = 0;
             }
         }
+        SessionCommand::UpdateEncounterRegisters(registers) => {
+            session.encounter_registers = registers;
+        }
+    }
+}
+
+fn resolve_committed_inputs(
+    session: &mut HostSession,
+    mut frames: Vec<PlayerInputFrame>,
+) -> Vec<PlayerInputFrame> {
+    frames.sort_by_key(|frame| frame.player_id);
+
+    for frame in frames.iter_mut() {
+        let previous_focus = session
+            .player_station_focus
+            .get(&frame.player_id)
+            .copied()
+            .flatten();
+        let previous_mode = session
+            .player_control_modes
+            .get(&frame.player_id)
+            .copied()
+            .unwrap_or(SessionControlMode::Interior);
+
+        let requested_mode = input_mode(frame).unwrap_or(previous_mode);
+        let requested_focus = input_focus_module_id(frame).or(previous_focus);
+        let wants_release =
+            requested_mode == SessionControlMode::Interior || requested_focus.is_none();
+        if wants_release {
+            if let Some(module_id) = previous_focus
+                && session.station_locks.get(&module_id) == Some(&frame.player_id)
+            {
+                session.station_locks.remove(&module_id);
+            }
+            session.player_station_focus.insert(frame.player_id, None);
+            session
+                .player_control_modes
+                .insert(frame.player_id, SessionControlMode::Interior);
+            set_or_replace_write(
+                frame,
+                "player.ctrl.mode",
+                crate::protocol::RegisterValue::Symbol("Interior".to_string()),
+            );
+            remove_write(frame, "player.ctrl.focus_module_id");
+            continue;
+        }
+
+        let Some(requested_module_id) = requested_focus else {
+            set_or_replace_write(
+                frame,
+                "player.ctrl.mode",
+                crate::protocol::RegisterValue::Symbol("Interior".to_string()),
+            );
+            continue;
+        };
+
+        let lock_holder = session.station_locks.get(&requested_module_id).copied();
+        if lock_holder.is_none() || lock_holder == Some(frame.player_id) {
+            if let Some(old_module_id) = previous_focus
+                && old_module_id != requested_module_id
+                && session.station_locks.get(&old_module_id) == Some(&frame.player_id)
+            {
+                session.station_locks.remove(&old_module_id);
+            }
+            session
+                .station_locks
+                .insert(requested_module_id, frame.player_id);
+            session
+                .player_station_focus
+                .insert(frame.player_id, Some(requested_module_id));
+            session
+                .player_control_modes
+                .insert(frame.player_id, requested_mode);
+            set_or_replace_write(
+                frame,
+                "player.ctrl.focus_module_id",
+                crate::protocol::RegisterValue::Int(requested_module_id as i64),
+            );
+            set_or_replace_write(
+                frame,
+                "player.ctrl.mode",
+                crate::protocol::RegisterValue::Symbol(
+                    session_control_mode_name(requested_mode).to_string(),
+                ),
+            );
+        } else {
+            if let Some(previous_focus) = previous_focus {
+                set_or_replace_write(
+                    frame,
+                    "player.ctrl.focus_module_id",
+                    crate::protocol::RegisterValue::Int(previous_focus as i64),
+                );
+            } else {
+                remove_write(frame, "player.ctrl.focus_module_id");
+            }
+            set_or_replace_write(
+                frame,
+                "player.ctrl.mode",
+                crate::protocol::RegisterValue::Symbol(
+                    session_control_mode_name(previous_mode).to_string(),
+                ),
+            );
+        }
+    }
+
+    frames
+}
+
+fn input_focus_module_id(frame: &PlayerInputFrame) -> Option<u64> {
+    frame
+        .writes
+        .iter()
+        .find_map(|entry| match (entry.key.as_str(), &entry.value) {
+            ("player.ctrl.focus_module_id", crate::protocol::RegisterValue::Int(value)) => {
+                Some(*value as u64)
+            }
+            _ => None,
+        })
+}
+
+fn input_mode(frame: &PlayerInputFrame) -> Option<SessionControlMode> {
+    frame
+        .writes
+        .iter()
+        .find_map(|entry| match (entry.key.as_str(), &entry.value) {
+            ("player.ctrl.mode", crate::protocol::RegisterValue::Symbol(value)) => {
+                parse_session_control_mode(value)
+            }
+            _ => None,
+        })
+}
+
+fn set_or_replace_write(
+    frame: &mut PlayerInputFrame,
+    key: &str,
+    value: crate::protocol::RegisterValue,
+) {
+    if let Some(entry) = frame.writes.iter_mut().find(|entry| entry.key == key) {
+        entry.value = value;
+    } else {
+        frame.writes.push(crate::protocol::RegisterStateEntry {
+            key: key.to_string(),
+            value,
+        });
+    }
+}
+
+fn remove_write(frame: &mut PlayerInputFrame, key: &str) {
+    frame.writes.retain(|entry| entry.key != key);
+}
+
+fn session_control_mode_name(mode: SessionControlMode) -> &'static str {
+    match mode {
+        SessionControlMode::Interior => "Interior",
+        SessionControlMode::Cockpit => "Cockpit",
+        SessionControlMode::Turret => "Turret",
+        SessionControlMode::Reactor => "Reactor",
+        SessionControlMode::Logistics => "Logistics",
+        SessionControlMode::Computer => "Computer",
+    }
+}
+
+fn parse_session_control_mode(value: &str) -> Option<SessionControlMode> {
+    match value {
+        "Interior" => Some(SessionControlMode::Interior),
+        "Cockpit" => Some(SessionControlMode::Cockpit),
+        "Turret" => Some(SessionControlMode::Turret),
+        "Reactor" => Some(SessionControlMode::Reactor),
+        "Logistics" => Some(SessionControlMode::Logistics),
+        "Computer" => Some(SessionControlMode::Computer),
+        _ => None,
     }
 }

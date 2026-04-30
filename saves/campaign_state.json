@@ -1,8 +1,8 @@
 {
   "progression": {
-    "scrap": 64,
+    "scrap": 31,
     "hull_wear": 0,
-    "jump_count": 40
+    "jump_count": 72
   },
   "sector": {
     "seed": 66790,
@@ -190,10 +190,10 @@
     ]
   },
   "last_mission_report": {
-    "headline": "Mission Complete",
-    "detail": "Recovered 1 raw salvage and returned 0 repair charge worth 1 scrap.",
-    "scrap_awarded": 1,
-    "total_scrap": 68,
+    "headline": "Mission Failed",
+    "detail": "Station service restored your ship for 24 scrap.",
+    "scrap_awarded": 0,
+    "total_scrap": 55,
     "hottest_module": "reactor",
     "first_disabled_module": null,
     "repairs_performed": 0,
@@ -202,10 +202,9 @@
     "automation_triggers": 0,
     "redesign_hints": [
       "Reactor ran hottest. Consider more spacing or cooler hull nearby.",
-      "Recovered cargo never reached a useful processor cycle.",
-      "Cargo flow barely moved. Manipulator reach or automation priority may be wrong."
+      "Player ship vented during the run. Airlock placement or edge protection may be weak."
     ],
-    "recovered_raw_salvage": 1,
+    "recovered_raw_salvage": 0,
     "processed_repair_charge": 0,
     "consumed_repair_charge": 0,
     "transfer_count": 0,
@@ -218,8 +217,8 @@
       "WTA0 <- off",
       "WTF0 <- off"
     ],
-    "node_name": "Calibration Ring",
-    "node_kind": "Test Range",
-    "travel_outcome": "Calibration Ring cleared, +1 scrap, +0 hull wear"
+    "node_name": "Latchline Debris",
+    "node_kind": "Salvage Field",
+    "travel_outcome": "Latchline Debris failed, +3 hull wear"
   }
 }

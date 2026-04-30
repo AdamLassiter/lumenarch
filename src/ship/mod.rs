@@ -68,7 +68,9 @@ impl ModuleKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ModuleVariant {
+    #[default]
     Standard,
     AdvancedHelm,
     Fission,
@@ -178,12 +180,6 @@ impl ModuleVariant {
             .unwrap_or(0);
         let next = ((index as i32 + direction).rem_euclid(variants.len() as i32)) as usize;
         variants[next]
-    }
-}
-
-impl Default for ModuleVariant {
-    fn default() -> Self {
-        Self::Standard
     }
 }
 

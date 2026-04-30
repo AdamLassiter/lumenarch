@@ -29,19 +29,19 @@ pub enum SessionAppState {
     Encounter,
 }
 
-impl From<crate::client::state::ClientAppState> for SessionAppState {
-    fn from(value: crate::client::state::ClientAppState) -> Self {
+impl From<crate::state::ClientAppState> for SessionAppState {
+    fn from(value: crate::state::ClientAppState) -> Self {
         match value {
-            crate::client::state::ClientAppState::Menu => Self::Menu,
-            crate::client::state::ClientAppState::Docked => Self::Docked,
-            crate::client::state::ClientAppState::SectorMap => Self::SectorMap,
-            crate::client::state::ClientAppState::Editing => Self::Editing,
-            crate::client::state::ClientAppState::Encounter => Self::Encounter,
+            crate::state::ClientAppState::Menu => Self::Menu,
+            crate::state::ClientAppState::Docked => Self::Docked,
+            crate::state::ClientAppState::SectorMap => Self::SectorMap,
+            crate::state::ClientAppState::Editing => Self::Editing,
+            crate::state::ClientAppState::Encounter => Self::Encounter,
         }
     }
 }
 
-impl From<SessionAppState> for crate::client::state::ClientAppState {
+impl From<SessionAppState> for crate::state::ClientAppState {
     fn from(value: SessionAppState) -> Self {
         match value {
             SessionAppState::Menu => Self::Menu,
@@ -85,17 +85,30 @@ pub struct PlayerPresenceSnapshot {
     pub control_mode: SessionControlMode,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RegisterValue {
+    Int(i64),
+    Bool(bool),
+    Symbol(String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RegisterStateEntry {
+    pub key: String,
+    pub value: RegisterValue,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PlayerInputFrame {
     pub player_id: u32,
     pub tick: u64,
-    pub throttle_milli: i32,
-    pub turn_milli: i32,
-    pub fire_pressed: bool,
-    pub focus_module_id: Option<u64>,
-    pub control_mode: SessionControlMode,
-    pub carrying: bool,
-    pub interaction_active: bool,
+    #[serde(default)]
+    pub writes: Vec<RegisterStateEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct EncounterRegisterState {
+    pub entries: Vec<RegisterStateEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -112,9 +125,10 @@ pub struct SessionSnapshot {
     pub tick: u64,
     pub app_state: SessionAppState,
     pub ship: ShipSnapshot,
-    pub progression: crate::client::state::DemoProgression,
-    pub sector: crate::client::state::SectorState,
-    pub last_mission_report: crate::client::state::LastMissionReport,
+    pub progression: crate::state::DemoProgression,
+    pub sector: crate::state::SectorState,
+    pub last_mission_report: crate::state::LastMissionReport,
+    pub encounter_registers: EncounterRegisterState,
     pub peers: Vec<SessionPeerInfo>,
     pub state_hash: u64,
 }
@@ -129,13 +143,14 @@ pub struct SessionWelcome {
 pub enum SessionCommand {
     SetAppState(SessionAppState),
     UpdateShip(ShipSnapshot),
-    UpdateProgression(crate::client::state::DemoProgression),
-    UpdateSector(crate::client::state::SectorState),
-    UpdateMissionReport(crate::client::state::LastMissionReport),
+    UpdateProgression(crate::state::DemoProgression),
+    UpdateSector(crate::state::SectorState),
+    UpdateMissionReport(crate::state::LastMissionReport),
     SelectSectorNode(Option<u32>),
     SetActiveEncounterNode(Option<u32>),
-    ApplyTravelOutcome(crate::client::state::TravelOutcome),
+    ApplyTravelOutcome(crate::state::TravelOutcome),
     RepairShip,
+    UpdateEncounterRegisters(EncounterRegisterState),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -202,9 +217,10 @@ mod tests {
             tick: 7,
             app_state: SessionAppState::Docked,
             ship: ShipSnapshot::empty("Test"),
-            progression: crate::client::state::DemoProgression::default(),
-            sector: crate::client::state::SectorState::default(),
-            last_mission_report: crate::client::state::LastMissionReport::default(),
+            progression: crate::state::DemoProgression::default(),
+            sector: crate::state::SectorState::default(),
+            last_mission_report: crate::state::LastMissionReport::default(),
+            encounter_registers: EncounterRegisterState::default(),
             peers: vec![SessionPeerInfo {
                 player_id: 1,
                 display_name: "Host".to_string(),

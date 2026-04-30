@@ -1,0 +1,843 @@
+use std::sync::{Arc, Mutex};
+
+use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
+
+use super::DEFAULT_HOST_ADDR;
+use crate::{
+    protocol::ShipSnapshot,
+    ship::{ModuleKind, ModuleVariant, ShipDefinition, enemy::EnemyShipLibrary},
+};
+
+#[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
+pub(crate) enum ClientAppState {
+    #[default]
+    Menu,
+    Docked,
+    SectorMap,
+    Editing,
+    Encounter,
+}
+
+#[derive(Resource)]
+pub(crate) struct ConnectionConfig {
+    pub(crate) server_addr: String,
+}
+
+impl Default for ConnectionConfig {
+    fn default() -> Self {
+        Self {
+            server_addr: DEFAULT_HOST_ADDR.to_string(),
+        }
+    }
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct ConnectionStatus {
+    pub(crate) phase: ConnectionPhase,
+    pub(crate) active_snapshot: Option<ShipSnapshot>,
+    pub(crate) local_player_id: Option<u32>,
+}
+
+#[derive(Default)]
+pub(crate) enum ConnectionPhase {
+    #[default]
+    Idle,
+    Connecting,
+    Connected,
+    Failed(String),
+}
+
+#[derive(Resource, Clone, Default)]
+pub(crate) struct ConnectionMailbox {
+    pub(crate) events: Arc<Mutex<Vec<ConnectionEvent>>>,
+}
+
+pub(crate) enum ConnectionEvent {
+    Connected(crate::protocol::SessionWelcome),
+    Snapshot(crate::protocol::SessionSnapshot),
+    CommittedInputs(crate::protocol::CommittedInputBatch),
+    HashStatus(crate::protocol::HashStatusMessage),
+    Drift(crate::protocol::DriftDetectedMessage),
+    Failed(String),
+}
+
+#[derive(Resource, Clone, Default)]
+pub(crate) struct NetworkCommandSender {
+    pub(crate) sender: Arc<Mutex<Option<std::sync::mpsc::Sender<crate::protocol::ClientMessage>>>>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum MultiplayerPlayerRole {
+    #[default]
+    Local,
+    Remote,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub(crate) struct RemotePlayerState {
+    pub(crate) player_id: u32,
+    pub(crate) display_name: String,
+    pub(crate) role: MultiplayerPlayerRole,
+    pub(crate) connected: bool,
+    pub(crate) presence: crate::protocol::PlayerPresenceSnapshot,
+}
+
+#[derive(Resource, Clone, Default, Serialize, Deserialize)]
+pub(crate) struct MultiplayerSessionState {
+    pub(crate) connected: bool,
+    pub(crate) session_tick: u64,
+    pub(crate) local_player_id: Option<u32>,
+    pub(crate) remote_players: Vec<RemotePlayerState>,
+    pub(crate) last_committed_inputs: Vec<crate::protocol::PlayerInputFrame>,
+    pub(crate) last_local_committed_input: Option<crate::protocol::PlayerInputFrame>,
+    pub(crate) authoritative_registers: crate::protocol::EncounterRegisterState,
+}
+
+#[derive(Resource, Clone, Default, Serialize, Deserialize)]
+pub(crate) struct MultiplayerDiagnosticsState {
+    pub(crate) local_hash: u64,
+    pub(crate) host_hash: u64,
+    pub(crate) last_matching_tick: Option<u64>,
+    pub(crate) first_mismatching_tick: Option<u64>,
+    pub(crate) mismatch_count: u32,
+    pub(crate) last_category: Option<String>,
+    pub(crate) last_message: Option<String>,
+    pub(crate) waiting_for_resync: bool,
+    pub(crate) last_resync_tick: Option<u64>,
+}
+
+#[derive(Resource, Clone, Copy, Default, Serialize, Deserialize)]
+pub(crate) struct MultiplayerTickState {
+    pub(crate) current_tick: u64,
+}
+
+#[derive(Resource, Clone, Default)]
+pub(crate) struct MultiplayerAppliedInputState {
+    pub(crate) last_applied_tick: u64,
+}
+
+#[derive(Resource, Clone, Copy, Default)]
+pub(crate) struct MultiplayerMovementIntentState {
+    pub(crate) move_x_milli: i32,
+    pub(crate) move_y_milli: i32,
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct MultiplayerSyncGuard {
+    pub(crate) suppress_outbound_once: bool,
+}
+
+#[derive(Resource, Default, Clone)]
+pub(crate) struct EditorShip {
+    pub(crate) ship: ShipDefinition,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum EditorMode {
+    #[default]
+    Player,
+    Enemy,
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct EditorSessionState {
+    pub(crate) mode: EditorMode,
+}
+
+#[derive(Resource, Clone)]
+pub(crate) struct EnemyShipLibraryState {
+    pub(crate) library: EnemyShipLibrary,
+    pub(crate) selected_index: usize,
+}
+
+impl Default for EnemyShipLibraryState {
+    fn default() -> Self {
+        Self {
+            library: EnemyShipLibrary::seeded(),
+            selected_index: 0,
+        }
+    }
+}
+
+#[derive(Resource, Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct DemoProgression {
+    pub(crate) scrap: u32,
+    pub(crate) hull_wear: u32,
+    pub(crate) jump_count: u32,
+}
+
+impl Default for DemoProgression {
+    fn default() -> Self {
+        Self {
+            scrap: 100,
+            hull_wear: 0,
+            jump_count: 0,
+        }
+    }
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct DebugOverlayState {
+    pub(crate) enabled: bool,
+}
+
+#[derive(Resource, Clone, Copy)]
+pub(crate) struct EditorViewState {
+    pub(crate) center: Vec2,
+    pub(crate) zoom: f32,
+}
+
+impl Default for EditorViewState {
+    fn default() -> Self {
+        Self {
+            center: Vec2::ZERO,
+            zoom: 1.0,
+        }
+    }
+}
+
+#[derive(Resource, Default, Clone, Copy)]
+pub(crate) struct EditorPanState {
+    pub(crate) last_cursor: Option<Vec2>,
+}
+
+#[derive(Resource, Clone, Copy)]
+pub(crate) struct SectorMapViewState {
+    pub(crate) offset: Vec2,
+    pub(crate) zoom: f32,
+}
+
+impl Default for SectorMapViewState {
+    fn default() -> Self {
+        Self {
+            offset: Vec2::ZERO,
+            zoom: 1.0,
+        }
+    }
+}
+
+#[derive(Resource, Default, Clone, Copy)]
+pub(crate) struct SectorMapPanState {
+    pub(crate) last_cursor: Option<Vec2>,
+}
+
+#[derive(Resource, Default, Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct LastMissionReport {
+    pub(crate) headline: Option<String>,
+    pub(crate) detail: Option<String>,
+    pub(crate) scrap_awarded: u32,
+    pub(crate) total_scrap: u32,
+    pub(crate) hottest_module: Option<String>,
+    pub(crate) first_disabled_module: Option<String>,
+    pub(crate) repairs_performed: u32,
+    pub(crate) stabilizations_performed: u32,
+    pub(crate) automation_used: bool,
+    pub(crate) automation_triggers: u32,
+    pub(crate) redesign_hints: Vec<String>,
+    pub(crate) recovered_raw_salvage: u32,
+    pub(crate) processed_repair_charge: u32,
+    pub(crate) consumed_repair_charge: u32,
+    pub(crate) transfer_count: u32,
+    pub(crate) processor_cycles: u32,
+    pub(crate) logistics_bottleneck: Option<String>,
+    pub(crate) logistics_automation_used: bool,
+    pub(crate) arch_primary_program: Option<String>,
+    pub(crate) arch_invalid_executions: u32,
+    pub(crate) arch_recent_writes: Vec<String>,
+    pub(crate) node_name: Option<String>,
+    pub(crate) node_kind: Option<String>,
+    pub(crate) travel_outcome: Option<String>,
+}
+
+#[derive(Resource)]
+pub(crate) struct EditorToolState {
+    pub(crate) selected_kind: ModuleKind,
+    pub(crate) selected_variant: ModuleVariant,
+    pub(crate) selected_rotation: u8,
+}
+
+impl Default for EditorToolState {
+    fn default() -> Self {
+        Self {
+            selected_kind: ModuleKind::Hull,
+            selected_variant: ModuleVariant::default_for_kind(ModuleKind::Hull),
+            selected_rotation: 0,
+        }
+    }
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct ArchEditorState {
+    pub(crate) selected_module_id: Option<u64>,
+    pub(crate) selected_line: usize,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum SectorNodeStatus {
+    #[default]
+    Fresh,
+    Completed,
+    Exhausted,
+    Failed,
+}
+
+impl SectorNodeStatus {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Fresh => "Fresh",
+            Self::Completed => "Completed",
+            Self::Exhausted => "Exhausted",
+            Self::Failed => "Failed",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum SectorNodeKind {
+    HubStation,
+    TestRange,
+    SalvageField,
+    HostileHold,
+    UnstableDerelict,
+}
+
+impl SectorNodeKind {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::HubStation => "Hub Station",
+            Self::TestRange => "Test Range",
+            Self::SalvageField => "Salvage Field",
+            Self::HostileHold => "Hostile Hold",
+            Self::UnstableDerelict => "Unstable Derelict",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct EncounterSpec {
+    #[serde(default)]
+    pub(crate) enemy_ship_ids: Vec<String>,
+    pub(crate) hostile_count: u32,
+    pub(crate) salvage_value: u32,
+    pub(crate) ambient_heat_pressure: i32,
+    pub(crate) ambient_electrical_pressure: i32,
+    pub(crate) reward_multiplier: u32,
+    pub(crate) arena_variant: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct TravelOutcome {
+    pub(crate) node_id: u32,
+    pub(crate) success: bool,
+    pub(crate) failed: bool,
+    pub(crate) scrap_awarded: u32,
+    pub(crate) hull_wear_delta: u32,
+    pub(crate) exhausted: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct SectorNode {
+    pub(crate) id: u32,
+    pub(crate) label: String,
+    pub(crate) kind: SectorNodeKind,
+    pub(crate) risk_tier: u8,
+    pub(crate) reward_hint: String,
+    pub(crate) neighbors: Vec<u32>,
+    pub(crate) status: SectorNodeStatus,
+    pub(crate) position: [f32; 2],
+    pub(crate) encounter: EncounterSpec,
+}
+
+#[derive(Resource, Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct SectorState {
+    pub(crate) seed: u64,
+    pub(crate) current_node_id: u32,
+    pub(crate) selected_node_id: Option<u32>,
+    pub(crate) active_encounter_node_id: Option<u32>,
+    pub(crate) nodes: Vec<SectorNode>,
+}
+
+impl Default for SectorState {
+    fn default() -> Self {
+        Self::from_seed(0x10_4E6)
+    }
+}
+
+impl SectorState {
+    pub(crate) fn from_seed(seed: u64) -> Self {
+        let nodes = vec![
+            SectorNode {
+                id: 0,
+                label: "Needle Rest".to_string(),
+                kind: SectorNodeKind::HubStation,
+                risk_tier: 0,
+                reward_hint: "Safe dock, refit, relaunch".to_string(),
+                neighbors: vec![1, 2, 3, 6],
+                status: SectorNodeStatus::Fresh,
+                position: [0.0, 0.0],
+                encounter: EncounterSpec {
+                    enemy_ship_ids: Vec::new(),
+                    hostile_count: 0,
+                    salvage_value: 0,
+                    ambient_heat_pressure: 0,
+                    ambient_electrical_pressure: 0,
+                    reward_multiplier: 1,
+                    arena_variant: "station".to_string(),
+                },
+            },
+            SectorNode {
+                id: 1,
+                label: "Latchline Debris".to_string(),
+                kind: SectorNodeKind::SalvageField,
+                risk_tier: 1,
+                reward_hint: "Low threat, strong salvage".to_string(),
+                neighbors: vec![0, 4],
+                status: SectorNodeStatus::Fresh,
+                position: [-260.0, 150.0],
+                encounter: EncounterSpec {
+                    enemy_ship_ids: vec!["raider_skiff".to_string()],
+                    hostile_count: 1,
+                    salvage_value: 10,
+                    ambient_heat_pressure: 0,
+                    ambient_electrical_pressure: 0,
+                    reward_multiplier: 2,
+                    arena_variant: "salvage".to_string(),
+                },
+            },
+            SectorNode {
+                id: 6,
+                label: "Calibration Ring".to_string(),
+                kind: SectorNodeKind::TestRange,
+                risk_tier: 0,
+                reward_hint: "No hostiles, no salvage, pure ship testing".to_string(),
+                neighbors: vec![0],
+                status: SectorNodeStatus::Fresh,
+                position: [320.0, 220.0],
+                encounter: EncounterSpec {
+                    enemy_ship_ids: Vec::new(),
+                    hostile_count: 0,
+                    salvage_value: 1,
+                    ambient_heat_pressure: 0,
+                    ambient_electrical_pressure: 0,
+                    reward_multiplier: 1,
+                    arena_variant: "test".to_string(),
+                },
+            },
+            SectorNode {
+                id: 2,
+                label: "Gravehook Nest".to_string(),
+                kind: SectorNodeKind::HostileHold,
+                risk_tier: 3,
+                reward_hint: "Heavy guns, middling haul".to_string(),
+                neighbors: vec![0, 4, 5],
+                status: SectorNodeStatus::Fresh,
+                position: [0.0, 200.0],
+                encounter: EncounterSpec {
+                    enemy_ship_ids: vec!["scrap_brigand".to_string()],
+                    hostile_count: 3,
+                    salvage_value: 8,
+                    ambient_heat_pressure: 1,
+                    ambient_electrical_pressure: 0,
+                    reward_multiplier: 3,
+                    arena_variant: "hostile".to_string(),
+                },
+            },
+            SectorNode {
+                id: 3,
+                label: "Blueglass Hush".to_string(),
+                kind: SectorNodeKind::UnstableDerelict,
+                risk_tier: 2,
+                reward_hint: "System stress, moderate reward".to_string(),
+                neighbors: vec![0, 5],
+                status: SectorNodeStatus::Fresh,
+                position: [250.0, 120.0],
+                encounter: EncounterSpec {
+                    enemy_ship_ids: vec!["raider_skiff".to_string(), "raider_skiff".to_string()],
+                    hostile_count: 2,
+                    salvage_value: 9,
+                    ambient_heat_pressure: 1,
+                    ambient_electrical_pressure: 2,
+                    reward_multiplier: 3,
+                    arena_variant: "unstable".to_string(),
+                },
+            },
+            SectorNode {
+                id: 4,
+                label: "Forked Cache".to_string(),
+                kind: SectorNodeKind::SalvageField,
+                risk_tier: 2,
+                reward_hint: "Branch route, better payout".to_string(),
+                neighbors: vec![1, 2],
+                status: SectorNodeStatus::Fresh,
+                position: [-320.0, -70.0],
+                encounter: EncounterSpec {
+                    enemy_ship_ids: vec!["raider_skiff".to_string(), "scrap_brigand".to_string()],
+                    hostile_count: 2,
+                    salvage_value: 12,
+                    ambient_heat_pressure: 1,
+                    ambient_electrical_pressure: 1,
+                    reward_multiplier: 4,
+                    arena_variant: "cache".to_string(),
+                },
+            },
+            SectorNode {
+                id: 5,
+                label: "Static Wake".to_string(),
+                kind: SectorNodeKind::UnstableDerelict,
+                risk_tier: 4,
+                reward_hint: "Brutal branch, rich recovery".to_string(),
+                neighbors: vec![2, 3],
+                status: SectorNodeStatus::Fresh,
+                position: [300.0, -90.0],
+                encounter: EncounterSpec {
+                    enemy_ship_ids: vec!["scrap_brigand".to_string(), "raider_skiff".to_string()],
+                    hostile_count: 4,
+                    salvage_value: 14,
+                    ambient_heat_pressure: 2,
+                    ambient_electrical_pressure: 3,
+                    reward_multiplier: 5,
+                    arena_variant: "storm".to_string(),
+                },
+            },
+        ];
+
+        Self {
+            seed,
+            current_node_id: 0,
+            selected_node_id: Some(1),
+            active_encounter_node_id: None,
+            nodes,
+        }
+    }
+
+    pub(crate) fn ensure_latest_layout(&mut self) {
+        let default_state = Self::from_seed(self.seed);
+
+        for default_node in default_state.nodes {
+            if self.nodes.iter().all(|node| node.id != default_node.id) {
+                self.nodes.push(default_node);
+            }
+        }
+
+        self.nodes.sort_by_key(|node| node.id);
+
+        if let Some(hub) = self.node_mut(0)
+            && !hub.neighbors.contains(&6)
+        {
+            hub.neighbors.push(6);
+            hub.neighbors.sort_unstable();
+        }
+
+        if self.selected_node_id.is_none() {
+            self.selected_node_id = Some(1);
+        }
+    }
+
+    pub(crate) fn node(&self, node_id: u32) -> Option<&SectorNode> {
+        self.nodes.iter().find(|node| node.id == node_id)
+    }
+
+    pub(crate) fn node_mut(&mut self, node_id: u32) -> Option<&mut SectorNode> {
+        self.nodes.iter_mut().find(|node| node.id == node_id)
+    }
+
+    pub(crate) fn current_node(&self) -> Option<&SectorNode> {
+        self.node(self.current_node_id)
+    }
+
+    pub(crate) fn selected_node(&self) -> Option<&SectorNode> {
+        self.selected_node_id.and_then(|node_id| self.node(node_id))
+    }
+
+    pub(crate) fn active_node(&self) -> Option<&SectorNode> {
+        self.active_encounter_node_id
+            .and_then(|node_id| self.node(node_id))
+    }
+
+    pub(crate) fn is_reachable(&self, node_id: u32) -> bool {
+        self.current_node()
+            .map(|node| node.neighbors.contains(&node_id))
+            .unwrap_or(false)
+    }
+
+    pub(crate) fn available_neighbors(&self) -> Vec<&SectorNode> {
+        let Some(current) = self.current_node() else {
+            return Vec::new();
+        };
+
+        current
+            .neighbors
+            .iter()
+            .filter_map(|neighbor_id| self.node(*neighbor_id))
+            .collect()
+    }
+}
+
+#[derive(Resource, Clone, Serialize, Deserialize)]
+pub(crate) struct DockedState {
+    pub(crate) station_title: String,
+}
+
+impl Default for DockedState {
+    fn default() -> Self {
+        Self {
+            station_title: "Needle Rest".to_string(),
+        }
+    }
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct CampaignLoadState {
+    pub(crate) hydrated: bool,
+}
+
+#[derive(Component)]
+pub(crate) struct MenuRoot;
+
+#[derive(Component)]
+pub(crate) struct DockedRoot;
+
+#[derive(Component)]
+pub(crate) struct SectorMapRoot;
+
+#[derive(Component)]
+pub(crate) struct SectorMapCanvas;
+
+#[derive(Component)]
+pub(crate) struct EditorRoot;
+
+#[derive(Component)]
+pub(crate) struct MainCamera;
+
+#[derive(Component)]
+pub(crate) struct JoinButton;
+
+#[derive(Component)]
+pub(crate) struct DebugEnemyEditorButton;
+
+#[derive(Component)]
+pub(crate) struct RefitButton;
+
+#[derive(Component)]
+pub(crate) struct OpenSectorMapButton;
+
+#[derive(Component)]
+pub(crate) struct RepairShipButton;
+
+#[derive(Component)]
+pub(crate) struct LeaveEditorButton;
+
+#[derive(Component)]
+pub(crate) struct EnemyPrevButton;
+
+#[derive(Component)]
+pub(crate) struct EnemyNextButton;
+
+#[derive(Component)]
+pub(crate) struct EnemyNewButton;
+
+#[derive(Component)]
+pub(crate) struct AbortEncounterButton;
+
+#[derive(Component)]
+pub(crate) struct BackToStationButton;
+
+#[derive(Component)]
+pub(crate) struct LaunchEncounterButton;
+
+#[derive(Component)]
+pub(crate) struct StatusText;
+
+#[derive(Component)]
+pub(crate) struct HostAddressText;
+
+#[derive(Component)]
+pub(crate) struct EditorStatusText;
+
+#[derive(Component)]
+pub(crate) struct DockedStatusText;
+
+#[derive(Component)]
+pub(crate) struct SectorMapStatusText;
+
+#[derive(Component)]
+pub(crate) struct SectorMapDetailText;
+
+#[derive(Component)]
+pub(crate) struct GameplayStatusText;
+
+#[derive(Component)]
+pub(crate) struct GameplayInspectionText;
+
+#[derive(Component)]
+pub(crate) struct GameplayAlertsText;
+
+#[derive(Component)]
+pub(crate) struct GameplayControlsText;
+
+#[derive(Component)]
+pub(crate) struct ToolboxButton {
+    pub(crate) kind: ModuleKind,
+}
+
+#[derive(Component)]
+pub(crate) struct SectorNodeButton {
+    pub(crate) node_id: u32,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum ProgramButtonAction {
+    CycleTemplate,
+    AdjustConstant { index: usize, delta: i32 },
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum ArchEditorButtonAction {
+    SelectModule(u64),
+    SelectLine {
+        module_id: u64,
+        line: usize,
+    },
+    AddLine(u64),
+    InsertLineAfter {
+        module_id: u64,
+        line: usize,
+    },
+    RemoveLine {
+        module_id: u64,
+        line: usize,
+    },
+    MoveLineUp {
+        module_id: u64,
+        line: usize,
+    },
+    MoveLineDown {
+        module_id: u64,
+        line: usize,
+    },
+    CycleOpcode {
+        module_id: u64,
+        line: usize,
+    },
+    CycleDst {
+        module_id: u64,
+        line: usize,
+    },
+    CycleSrcA {
+        module_id: u64,
+        line: usize,
+    },
+    CycleSrcB {
+        module_id: u64,
+        line: usize,
+    },
+    AdjustImmediateA {
+        module_id: u64,
+        line: usize,
+        delta: i32,
+    },
+    AdjustImmediateB {
+        module_id: u64,
+        line: usize,
+        delta: i32,
+    },
+    AdjustJump {
+        module_id: u64,
+        line: usize,
+        delta: i32,
+    },
+    RenameModuleProgram(u64),
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum StationPanelButtonAction {
+    HelmThrottle { delta: f32 },
+    HelmTurn { value: f32 },
+    TurretAdjustAim { delta: f32 },
+    TurretFireToggle,
+    ReactorAdjustRate { delta: f32 },
+    ReactorAdjustTurbine { delta: f32 },
+    LogisticsToggleStorageIntake,
+    LogisticsToggleAirlock,
+    LogisticsToggleManipulator,
+    LogisticsCycleManipulatorTarget { direction: i32 },
+    LogisticsCycleResource,
+    LogisticsToggleProcessor,
+    ComputerToggleEnabled,
+    ComputerCycleTemplate,
+}
+
+#[derive(Component)]
+pub(crate) struct ComputerProgramPanel;
+
+#[derive(Component)]
+pub(crate) struct ComputerProgramEntry;
+
+#[derive(Component)]
+pub(crate) struct ComputerProgramButton {
+    pub(crate) module_id: u64,
+    pub(crate) action: ProgramButtonAction,
+}
+
+#[derive(Component)]
+pub(crate) struct ArchEditorButton {
+    pub(crate) action: ArchEditorButtonAction,
+}
+
+#[derive(Component)]
+pub(crate) struct GameplayPanelTitleText;
+
+#[derive(Component)]
+pub(crate) struct GameplayPanelBodyText;
+
+#[derive(Component)]
+pub(crate) struct GameplayCompactStatusText;
+
+#[derive(Component)]
+pub(crate) struct GameplayTopBannerText;
+
+#[derive(Component)]
+pub(crate) struct GameplayStationPanel;
+
+#[derive(Component)]
+pub(crate) struct GameplayStationPanelButton {
+    pub(crate) action: StationPanelButtonAction,
+}
+
+#[derive(Component)]
+pub(crate) struct GameplayStationPanelButtonLabel {
+    pub(crate) action: StationPanelButtonAction,
+}
+
+#[derive(Component)]
+pub(crate) struct GameplayBarFill {
+    pub(crate) kind: GameplayBarKind,
+}
+
+#[derive(Component)]
+pub(crate) struct GameplayBarLabel {
+    pub(crate) kind: GameplayBarKind,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum GameplayBarKind {
+    Hull,
+    Power,
+    Battery,
+    Oxygen,
+    Heat,
+    Electrical,
+}
+
+#[derive(Component)]
+pub(crate) struct ShipTileSprite;
+
+#[derive(Component)]
+pub(crate) struct PreviewTile;
+
+#[derive(Component)]
+pub(crate) struct EditingCleanup;
+
+#[derive(Component)]
+pub(crate) struct PlayingCleanup;
