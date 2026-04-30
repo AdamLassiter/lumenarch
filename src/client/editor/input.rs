@@ -32,6 +32,7 @@ use super::{
     helpers::{cursor_grid_position, is_cursor_over_editor_ui, module_kind_cost},
 };
 use crate::ship::{
+    ModuleVariant,
     ShipModule,
     arch::{ArchInstruction, ArchProgram, ArchProgramTemplate, ArchRegister, ArchValueRef},
     enemy::{load_default_enemy_library, save_default_enemy_library},
@@ -47,10 +48,12 @@ pub(crate) fn toolbox_button_system(
     mut tool_state: ResMut<EditorToolState>,
 ) {
     for (interaction, button, mut background) in &mut interaction_query {
-        let affordable = progression.scrap >= module_kind_cost(button.kind);
+        let affordable = progression.scrap
+            >= module_kind_cost(button.kind, ModuleVariant::default_for_kind(button.kind));
         match *interaction {
             Interaction::Pressed => {
                 tool_state.selected_kind = button.kind;
+                tool_state.selected_variant = ModuleVariant::default_for_kind(button.kind);
                 *background = BackgroundColor(if affordable {
                     PRESSED_BUTTON
                 } else {
@@ -183,6 +186,18 @@ pub(crate) fn rotate_selected_tool(
     if keys.just_pressed(KeyCode::KeyE) {
         tool_state.selected_rotation = (tool_state.selected_rotation + 1) % 4;
     }
+
+    if keys.just_pressed(KeyCode::KeyZ) {
+        tool_state.selected_variant = tool_state
+            .selected_variant
+            .cycle_for_kind(tool_state.selected_kind, -1);
+    }
+
+    if keys.just_pressed(KeyCode::KeyX) {
+        tool_state.selected_variant = tool_state
+            .selected_variant
+            .cycle_for_kind(tool_state.selected_kind, 1);
+    }
 }
 
 pub(crate) fn place_or_remove_tile(
@@ -206,18 +221,20 @@ pub(crate) fn place_or_remove_tile(
 
     if buttons.just_pressed(MouseButton::Left) {
         let selected_cost = if editor_session.mode == EditorMode::Player {
-            module_kind_cost(tool_state.selected_kind)
+            module_kind_cost(tool_state.selected_kind, tool_state.selected_variant)
         } else {
             0
         };
         if let Some(existing) = editor_ship.ship.module_at_mut(grid_x, grid_y) {
-            if existing.kind == tool_state.selected_kind {
+            if existing.kind == tool_state.selected_kind
+                && existing.variant == tool_state.selected_variant
+            {
                 existing.rotation_quadrants = tool_state.selected_rotation;
                 return;
             }
 
             let existing_cost = if editor_session.mode == EditorMode::Player {
-                module_kind_cost(existing.kind)
+                module_kind_cost(existing.kind, existing.variant)
             } else {
                 0
             };
@@ -228,6 +245,9 @@ pub(crate) fn place_or_remove_tile(
 
             progression.scrap -= additional_cost;
             existing.kind = tool_state.selected_kind;
+            existing.variant = tool_state
+                .selected_variant
+                .normalize_for_kind(tool_state.selected_kind);
             existing.rotation_quadrants = tool_state.selected_rotation;
         } else {
             if progression.scrap < selected_cost {
@@ -242,6 +262,11 @@ pub(crate) fn place_or_remove_tile(
                 grid_y,
                 tool_state.selected_rotation,
             ));
+            if let Some(module) = editor_ship.ship.module_at_mut(grid_x, grid_y) {
+                module.variant = tool_state
+                    .selected_variant
+                    .normalize_for_kind(tool_state.selected_kind);
+            }
         }
     }
 

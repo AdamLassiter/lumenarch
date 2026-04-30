@@ -47,16 +47,86 @@ use crate::{
             helpers::{
                 FixedVec2,
                 Fx,
-                count_modules,
                 module_local_position,
-                ship_movement_model,
-                ship_power_model,
+                ship_movement_model_with_effective,
+                ship_power_model_with_effective,
             },
         },
         state::PlayingCleanup,
     },
-    ship::{ModuleKind, ShipDefinition},
+    ship::{ModuleKind, ModuleSpec, ShipDefinition},
 };
+
+#[derive(Default)]
+struct ShipVariantTotals {
+    engine_count: u32,
+    reactor_count: u32,
+    battery_count: u32,
+    turret_count: u32,
+    shield_count: u32,
+    computer_count: u32,
+    effective_engines: Fx,
+    effective_reactors: Fx,
+    effective_batteries: Fx,
+    effective_charge_rate: Fx,
+    effective_discharge_rate: Fx,
+    effective_turrets: Fx,
+    effective_helm: Fx,
+    inertia_multiplier: Fx,
+}
+
+fn accumulate_ship_variant_totals(ship: &ShipDefinition) -> ShipVariantTotals {
+    let mut totals = ShipVariantTotals {
+        effective_helm: Fx::from_num(1),
+        inertia_multiplier: Fx::from_num(1),
+        ..Default::default()
+    };
+
+    for module in &ship.modules {
+        let spec = ModuleSpec::for_module(module.kind, module.variant);
+        match module.kind {
+            ModuleKind::Engine => {
+                totals.engine_count += 1;
+                totals.effective_engines += Fx::from_num(spec.engine_multiplier.max(0.0));
+            }
+            ModuleKind::Reactor => {
+                totals.reactor_count += 1;
+                totals.effective_reactors += Fx::from_num(spec.reactor_output_multiplier.max(0.0));
+            }
+            ModuleKind::Battery => {
+                totals.battery_count += 1;
+                totals.effective_batteries +=
+                    Fx::from_num(spec.battery_capacity_multiplier.max(0.0));
+                totals.effective_charge_rate += Fx::from_num(spec.battery_flow_multiplier.max(0.0));
+                totals.effective_discharge_rate +=
+                    Fx::from_num(spec.battery_flow_multiplier.max(0.0));
+            }
+            ModuleKind::Turret => {
+                totals.turret_count += 1;
+                totals.effective_turrets += Fx::from_num(1);
+            }
+            ModuleKind::Shield => {
+                totals.shield_count += 1;
+            }
+            ModuleKind::Computer => {
+                totals.computer_count += 1;
+            }
+            ModuleKind::Cockpit => {
+                totals.effective_helm = totals
+                    .effective_helm
+                    .max(Fx::from_num(spec.helm_multiplier.max(1.0)));
+            }
+            ModuleKind::Core => {
+                totals.inertia_multiplier = totals
+                    .inertia_multiplier
+                    .max(Fx::from_num(spec.inertia_multiplier.max(1.0)));
+            }
+            _ => {}
+        }
+    }
+
+    totals
+}
 
 pub(crate) fn spawn_runtime_ship(
     commands: &mut Commands,
@@ -71,18 +141,32 @@ pub(crate) fn spawn_runtime_ship(
     ambient_electrical_pressure: i32,
     wear_penalty: u32,
 ) {
-    let engine_count = count_modules(ship, ModuleKind::Engine);
-    let reactor_count = count_modules(ship, ModuleKind::Reactor);
-    let battery_count = count_modules(ship, ModuleKind::Battery);
-    let turret_count = count_modules(ship, ModuleKind::Turret);
-    let computer_count = count_modules(ship, ModuleKind::Computer);
-    let movement_model = ship_movement_model(ship.modules.len(), engine_count, balance);
-    let power_model = ship_power_model(
+    let totals = accumulate_ship_variant_totals(ship);
+    let movement_model = ship_movement_model_with_variant_totals(ship, &totals, balance);
+    let power_model = ship_power_model_with_effective(
         ship.modules.len(),
-        reactor_count,
-        battery_count,
-        engine_count,
-        turret_count,
+        totals.reactor_count,
+        totals.battery_count,
+        totals.engine_count,
+        totals.turret_count,
+        totals
+            .effective_reactors
+            .max(Fx::from_num(totals.reactor_count.max(1))),
+        totals
+            .effective_batteries
+            .max(Fx::from_num(totals.battery_count)),
+        totals
+            .effective_charge_rate
+            .max(Fx::from_num(totals.battery_count.max(1))),
+        totals
+            .effective_discharge_rate
+            .max(Fx::from_num(totals.battery_count.max(1))),
+        totals
+            .effective_engines
+            .max(Fx::from_num(totals.engine_count.max(1))),
+        totals
+            .effective_turrets
+            .max(Fx::from_num(totals.turret_count.max(1))),
         balance,
     );
     let (min_x, max_x, min_y, max_y) = ship.bounds().unwrap_or((0, 0, 0, 0));
@@ -96,7 +180,8 @@ pub(crate) fn spawn_runtime_ship(
         .map(|module| module_local_position(module, center_x_fixed, center_y_fixed).length())
         .fold(Fx::from_num(96), |acc, value| {
             acc.max(value + Fx::from_num(56))
-        });
+        })
+        * totals.inertia_multiplier.max(Fx::from_num(1));
 
     let root_entity = commands
         .spawn((
@@ -131,13 +216,13 @@ pub(crate) fn spawn_runtime_ship(
                 generation: power_model.reactor_output,
                 draw: power_model.passive_draw,
                 surplus: power_model.reactor_output - power_model.passive_draw,
-                engine_power_ratio: if engine_count > 0 {
+                engine_power_ratio: if totals.engine_count > 0 {
                     Fx::from_num(1)
                 } else {
                     Fx::from_num(0)
                 },
-                weapons_powered: turret_count > 0,
-                engines_powered: engine_count > 0,
+                weapons_powered: totals.turret_count > 0,
+                engines_powered: totals.engine_count > 0,
             },
             power_model,
             ShipControlState::default(),
@@ -150,16 +235,17 @@ pub(crate) fn spawn_runtime_ship(
                 focused_family: None,
             },
             ShipWeaponState {
-                turret_count,
+                turret_count: totals.turret_count,
                 cooldown_remaining: Fx::from_num(0),
-                cooldown_duration: if turret_count > 0 {
+                cooldown_duration: if totals.turret_count > 0 {
                     Fx::from_num(balance.combat.player_weapon_cooldown)
                 } else {
                     Fx::from_num(0)
                 },
+                shield_count: totals.shield_count,
             },
             ShipAutomationState {
-                mode: if computer_count > 0 {
+                mode: if totals.computer_count > 0 {
                     ShipAutomationMode::BalancedOps
                 } else {
                     ShipAutomationMode::Off
@@ -319,17 +405,32 @@ pub(crate) fn spawn_hostile_ship(
     aggression: Fx,
     salvage_reward: u32,
 ) {
-    let engine_count = count_modules(ship, ModuleKind::Engine);
-    let reactor_count = count_modules(ship, ModuleKind::Reactor);
-    let battery_count = count_modules(ship, ModuleKind::Battery);
-    let turret_count = count_modules(ship, ModuleKind::Turret);
-    let movement_model = ship_movement_model(ship.modules.len(), engine_count, balance);
-    let power_model = ship_power_model(
+    let totals = accumulate_ship_variant_totals(ship);
+    let movement_model = ship_movement_model_with_variant_totals(ship, &totals, balance);
+    let power_model = ship_power_model_with_effective(
         ship.modules.len(),
-        reactor_count,
-        battery_count,
-        engine_count,
-        turret_count,
+        totals.reactor_count,
+        totals.battery_count,
+        totals.engine_count,
+        totals.turret_count,
+        totals
+            .effective_reactors
+            .max(Fx::from_num(totals.reactor_count.max(1))),
+        totals
+            .effective_batteries
+            .max(Fx::from_num(totals.battery_count)),
+        totals
+            .effective_charge_rate
+            .max(Fx::from_num(totals.battery_count.max(1))),
+        totals
+            .effective_discharge_rate
+            .max(Fx::from_num(totals.battery_count.max(1))),
+        totals
+            .effective_engines
+            .max(Fx::from_num(totals.engine_count.max(1))),
+        totals
+            .effective_turrets
+            .max(Fx::from_num(totals.turret_count.max(1))),
         balance,
     );
     let (min_x, max_x, min_y, max_y) = ship.bounds().unwrap_or((0, 0, 0, 0));
@@ -343,7 +444,8 @@ pub(crate) fn spawn_hostile_ship(
         .map(|module| module_local_position(module, center_x_fixed, center_y_fixed).length())
         .fold(Fx::from_num(96), |acc, value| {
             acc.max(value + Fx::from_num(56))
-        });
+        })
+        * totals.inertia_multiplier.max(Fx::from_num(1));
     let interior_nodes = build_interior_nodes(ship, center_x_fixed, center_y_fixed);
     let atmosphere_tiles = build_atmosphere_tiles(ship, center_x_fixed, center_y_fixed, balance);
 
@@ -390,24 +492,25 @@ pub(crate) fn spawn_hostile_ship(
                 generation: power_model.reactor_output,
                 draw: power_model.passive_draw,
                 surplus: power_model.reactor_output - power_model.passive_draw,
-                engine_power_ratio: if engine_count > 0 {
+                engine_power_ratio: if totals.engine_count > 0 {
                     Fx::from_num(1)
                 } else {
                     Fx::from_num(0)
                 },
-                weapons_powered: turret_count > 0,
-                engines_powered: engine_count > 0,
+                weapons_powered: totals.turret_count > 0,
+                engines_powered: totals.engine_count > 0,
             },
             power_model,
             ShipControlState::default(),
             ShipWeaponState {
-                turret_count,
+                turret_count: totals.turret_count,
                 cooldown_remaining: Fx::from_num(balance.combat.hostile_fire_cooldown * 0.22),
-                cooldown_duration: if turret_count > 0 {
+                cooldown_duration: if totals.turret_count > 0 {
                     Fx::from_num(balance.combat.hostile_fire_cooldown * 0.31)
                 } else {
                     Fx::from_num(0)
                 },
+                shield_count: totals.shield_count,
             },
             ShipArchCommandState::default(),
         ))
@@ -447,4 +550,20 @@ pub(crate) fn spawn_hostile_ship(
             },
         ))
         .add_children(&child_entities);
+}
+
+fn ship_movement_model_with_variant_totals(
+    ship: &ShipDefinition,
+    totals: &ShipVariantTotals,
+    balance: &BalanceConfig,
+) -> crate::client::gameplay::components::ShipMovementModel {
+    ship_movement_model_with_effective(
+        ship.modules.len(),
+        totals.engine_count,
+        totals
+            .effective_engines
+            .max(Fx::from_num(totals.engine_count.max(1))),
+        totals.effective_helm,
+        balance,
+    )
 }

@@ -6,19 +6,20 @@ use super::super::{
     TOOLBOX_WIDTH,
     state::{EditorMode, LastMissionReport},
 };
-use crate::ship::ModuleKind;
+use crate::ship::{ModuleKind, ModuleSpec, ModuleVariant};
 
 pub(super) fn editor_status_line(
     mode: EditorMode,
     entry_label: &str,
     ship_name: &str,
     selected_kind: &ModuleKind,
+    selected_variant: ModuleVariant,
     selected_rotation: u8,
     module_count: usize,
     scrap_total: u32,
     last_mission_report: &LastMissionReport,
 ) -> String {
-    let selected_cost = module_kind_cost(*selected_kind);
+    let selected_cost = module_kind_cost(*selected_kind, selected_variant);
     let affordability = if scrap_total >= selected_cost {
         "ready"
     } else {
@@ -80,26 +81,17 @@ pub(super) fn editor_status_line(
     };
 
     format!(
-        "{}\nEntry: {entry_label}\nShip: {ship_name}\nSelected Tool: {selected_kind}\nRotation: {selected_rotation}\nPlaced Modules: {module_count}\nScrap: {scrap_total}\nPlacement Cost: {selected_cost} ({affordability}){mission_summary}",
+        "{}\nEntry: {entry_label}\nShip: {ship_name}\nSelected Tool: {selected_kind} / {}\nRotation: {selected_rotation}\nPlaced Modules: {module_count}\nScrap: {scrap_total}\nPlacement Cost: {selected_cost} ({affordability}){mission_summary}",
         match mode {
             EditorMode::Player => "Player Refit",
             EditorMode::Enemy => "Enemy Ship Debug Editor",
-        }
+        },
+        selected_variant.display_name(),
     )
 }
 
-pub(super) fn module_kind_cost(kind: ModuleKind) -> u32 {
-    match kind {
-        ModuleKind::Interior => 0,
-        ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner => 1,
-        ModuleKind::Battery | ModuleKind::Cargo | ModuleKind::Airlock => 2,
-        ModuleKind::Engine => 3,
-        ModuleKind::Cockpit | ModuleKind::Computer | ModuleKind::Processor | ModuleKind::Turret => {
-            4
-        }
-        ModuleKind::Reactor => 5,
-        ModuleKind::Core => 6,
-    }
+pub(super) fn module_kind_cost(kind: ModuleKind, variant: ModuleVariant) -> u32 {
+    ModuleSpec::for_module(kind, variant).placement_cost
 }
 
 pub(super) fn cursor_grid_position(
@@ -146,6 +138,11 @@ pub(super) fn is_cursor_over_editor_ui(window: &Window) -> bool {
     over_arch_panel || over_status_panel || over_controls_panel
 }
 
-pub(super) fn sprite_path_for_kind(kind: &ModuleKind) -> String {
-    format!("tiles/{}.png", kind.as_str())
+pub(super) fn sprite_path_for_kind(kind: &ModuleKind, variant: ModuleVariant) -> String {
+    let _ = variant;
+    let asset_name = match kind {
+        ModuleKind::Shield => "battery",
+        _ => kind.as_str(),
+    };
+    format!("tiles/{asset_name}.png")
 }

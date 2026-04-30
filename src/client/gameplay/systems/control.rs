@@ -1,7 +1,13 @@
 use bevy::{prelude::*, window::PrimaryWindow};
 
 use super::super::{
-    super::state::{AbortEncounterButton, ClientAppState, MainCamera, PlayingCleanup},
+    super::state::{
+        AbortEncounterButton,
+        ClientAppState,
+        MainCamera,
+        MultiplayerSessionState,
+        PlayingCleanup,
+    },
     components::{
         AirlockCommandState,
         AngularVelocity,
@@ -20,6 +26,7 @@ use super::super::{
         PlayerShipAssignment,
         ProcessorCommandState,
         ReactorCommandState,
+        RemoteSessionPlayer,
         ResourceKind,
         RuntimeArchComputer,
         RuntimeShipModule,
@@ -468,6 +475,53 @@ pub(crate) fn sync_shipboard_player_visual(
     };
 }
 
+pub(crate) fn sync_remote_session_players(
+    mut commands: Commands,
+    multiplayer_session: Res<MultiplayerSessionState>,
+    mut query: Query<(Entity, &RemoteSessionPlayer, &mut Transform)>,
+) {
+    let mut seen = std::collections::BTreeSet::new();
+    for remote in &multiplayer_session.remote_players {
+        if Some(remote.player_id) == multiplayer_session.local_player_id || !remote.connected {
+            continue;
+        }
+        seen.insert(remote.player_id);
+        let mut matched = false;
+        for (_entity, marker, mut transform) in &mut query {
+            if marker.player_id != remote.player_id {
+                continue;
+            }
+            transform.translation = Vec3::new(
+                remote.presence.world_position[0],
+                remote.presence.world_position[1],
+                7.0,
+            );
+            matched = true;
+            break;
+        }
+        if !matched {
+            commands.spawn((
+                Sprite::from_color(Color::srgb(0.40, 0.82, 0.96), Vec2::splat(10.0)),
+                Transform::from_xyz(
+                    remote.presence.world_position[0],
+                    remote.presence.world_position[1],
+                    7.0,
+                ),
+                RemoteSessionPlayer {
+                    player_id: remote.player_id,
+                },
+                PlayingCleanup,
+            ));
+        }
+    }
+
+    for (entity, marker, _) in &query {
+        if !seen.contains(&marker.player_id) {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+}
+
 pub(crate) fn sync_player_reference_frame_parenting(
     mut commands: Commands,
     player_query: Single<(Entity, &PlayerMotionState, Option<&Parent>), With<ShipboardPlayer>>,
@@ -854,6 +908,12 @@ pub(crate) fn update_station_command_input(
                             crate::client::gameplay::components::ResourceKind::RepairCharge
                         }
                         crate::client::gameplay::components::ResourceKind::RepairCharge => {
+                            crate::client::gameplay::components::ResourceKind::Fuel
+                        }
+                        crate::client::gameplay::components::ResourceKind::Fuel => {
+                            crate::client::gameplay::components::ResourceKind::Ammunition
+                        }
+                        crate::client::gameplay::components::ResourceKind::Ammunition => {
                             crate::client::gameplay::components::ResourceKind::RawSalvage
                         }
                     };
@@ -886,8 +946,17 @@ pub(crate) fn update_station_command_input(
                     processor_cmd.enabled = !processor_cmd.enabled;
                 }
                 if keys.just_pressed(KeyCode::KeyR) {
-                    processor_cmd.selected_recipe =
-                        crate::client::gameplay::components::ProcessorRecipe::RepairCharge;
+                    processor_cmd.selected_recipe = match processor_cmd.selected_recipe {
+                        crate::client::gameplay::components::ProcessorRecipe::RepairCharge => {
+                            crate::client::gameplay::components::ProcessorRecipe::Ammunition
+                        }
+                        crate::client::gameplay::components::ProcessorRecipe::Ammunition => {
+                            crate::client::gameplay::components::ProcessorRecipe::Fuel
+                        }
+                        crate::client::gameplay::components::ProcessorRecipe::Fuel => {
+                            crate::client::gameplay::components::ProcessorRecipe::RepairCharge
+                        }
+                    };
                 }
             }
         }
@@ -1110,6 +1179,12 @@ fn take_first_available(
     } else if inventory.repair_charge > 0 {
         inventory.repair_charge -= 1;
         Some((ResourceKind::RepairCharge, 1))
+    } else if inventory.fuel > 0 {
+        inventory.fuel -= 1;
+        Some((ResourceKind::Fuel, 1))
+    } else if inventory.ammunition > 0 {
+        inventory.ammunition -= 1;
+        Some((ResourceKind::Ammunition, 1))
     } else {
         None
     }
@@ -1119,6 +1194,8 @@ fn resource_label(kind: ResourceKind) -> &'static str {
     match kind {
         ResourceKind::RawSalvage => "raw salvage",
         ResourceKind::RepairCharge => "repair charge",
+        ResourceKind::Fuel => "fuel",
+        ResourceKind::Ammunition => "ammunition",
     }
 }
 
@@ -1126,6 +1203,8 @@ fn cargo_color(kind: ResourceKind) -> Color {
     match kind {
         ResourceKind::RawSalvage => Color::srgb(0.90, 0.78, 0.34),
         ResourceKind::RepairCharge => Color::srgb(0.38, 0.88, 0.98),
+        ResourceKind::Fuel => Color::srgb(0.98, 0.52, 0.22),
+        ResourceKind::Ammunition => Color::srgb(0.86, 0.86, 0.90),
     }
 }
 

@@ -14,6 +14,7 @@ pub(crate) use control::{
     return_button_system,
     return_keyboard_shortcut,
     sync_player_reference_frame_parenting,
+    sync_remote_session_players,
     sync_shipboard_player_visual,
     toggle_shipboard_control_mode,
     update_current_station,

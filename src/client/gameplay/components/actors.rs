@@ -29,6 +29,11 @@ pub(crate) struct ShipboardPlayer;
 pub(crate) struct ShipboardMarker;
 
 #[derive(Component)]
+pub(crate) struct RemoteSessionPlayer {
+    pub(crate) player_id: u32,
+}
+
+#[derive(Component)]
 pub(crate) struct ShipInertiaField {
     pub(crate) radius: Fx,
 }

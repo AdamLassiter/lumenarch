@@ -20,6 +20,7 @@ use super::{
         HostAddressText,
         JoinButton,
         MenuRoot,
+        NetworkCommandSender,
         StatusText,
     },
 };
@@ -222,6 +223,7 @@ pub(crate) fn menu_button_system(
     config: Res<ConnectionConfig>,
     mut status: ResMut<ConnectionStatus>,
     mailbox: Res<ConnectionMailbox>,
+    command_sender: Res<NetworkCommandSender>,
     mut editor_session: ResMut<EditorSessionState>,
     mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
@@ -231,7 +233,12 @@ pub(crate) fn menu_button_system(
                 if join.is_some() {
                     *background = BackgroundColor(PRESSED_BUTTON);
                     editor_session.mode = EditorMode::Player;
-                    net::begin_connection_attempt(&config.server_addr, &mut status, &mailbox);
+                    net::begin_connection_attempt(
+                        &config.server_addr,
+                        &mut status,
+                        &mailbox,
+                        &command_sender,
+                    );
                 } else if debug_enemy.is_some() {
                     *background = BackgroundColor(Color::srgb(0.36, 0.24, 0.16));
                     editor_session.mode = EditorMode::Enemy;
@@ -257,9 +264,10 @@ pub(crate) fn menu_keyboard_shortcuts(
     config: Res<ConnectionConfig>,
     mut status: ResMut<ConnectionStatus>,
     mailbox: Res<ConnectionMailbox>,
+    command_sender: Res<NetworkCommandSender>,
 ) {
     if keys.just_pressed(KeyCode::Enter) {
-        net::begin_connection_attempt(&config.server_addr, &mut status, &mailbox);
+        net::begin_connection_attempt(&config.server_addr, &mut status, &mailbox, &command_sender);
     }
 }
 
@@ -295,7 +303,9 @@ fn menu_status_line(phase: &ConnectionPhase, server_addr: &str) -> String {
     match phase {
         ConnectionPhase::Idle => format!("Ready to connect to {server_addr}."),
         ConnectionPhase::Connecting => format!("Connecting to {server_addr}..."),
-        ConnectionPhase::Connected => "Connected. Loading ship editor...".to_string(),
+        ConnectionPhase::Connected => {
+            "Connected to multiplayer host. Synchronizing authoritative session...".to_string()
+        }
         ConnectionPhase::Failed(message) => format!("Connection failed: {message}"),
     }
 }

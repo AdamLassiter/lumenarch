@@ -6,12 +6,16 @@ use super::super::helpers::Fx;
 pub(crate) enum ResourceKind {
     RawSalvage,
     RepairCharge,
+    Fuel,
+    Ammunition,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct ResourceInventory {
     pub(crate) raw_salvage: u32,
     pub(crate) repair_charge: u32,
+    pub(crate) fuel: u32,
+    pub(crate) ammunition: u32,
 }
 
 impl ResourceInventory {
@@ -19,6 +23,8 @@ impl ResourceInventory {
         match kind {
             ResourceKind::RawSalvage => self.raw_salvage,
             ResourceKind::RepairCharge => self.repair_charge,
+            ResourceKind::Fuel => self.fuel,
+            ResourceKind::Ammunition => self.ammunition,
         }
     }
 
@@ -26,6 +32,8 @@ impl ResourceInventory {
         match kind {
             ResourceKind::RawSalvage => self.raw_salvage += amount,
             ResourceKind::RepairCharge => self.repair_charge += amount,
+            ResourceKind::Fuel => self.fuel += amount,
+            ResourceKind::Ammunition => self.ammunition += amount,
         }
     }
 
@@ -35,12 +43,14 @@ impl ResourceInventory {
         match kind {
             ResourceKind::RawSalvage => self.raw_salvage -= taken,
             ResourceKind::RepairCharge => self.repair_charge -= taken,
+            ResourceKind::Fuel => self.fuel -= taken,
+            ResourceKind::Ammunition => self.ammunition -= taken,
         }
         taken
     }
 
     pub(crate) fn total_units(self) -> u32 {
-        self.raw_salvage + self.repair_charge
+        self.raw_salvage + self.repair_charge + self.fuel + self.ammunition
     }
 }
 
@@ -48,6 +58,19 @@ impl ResourceInventory {
 pub(crate) struct StorageModule {
     pub(crate) capacity: u32,
     pub(crate) inventory: ResourceInventory,
+    pub(crate) accepts_fuel: bool,
+    pub(crate) accepts_ammunition: bool,
+    pub(crate) accepts_general: bool,
+}
+
+impl StorageModule {
+    pub(crate) fn accepts(&self, kind: ResourceKind) -> bool {
+        match kind {
+            ResourceKind::Fuel => self.accepts_fuel,
+            ResourceKind::Ammunition => self.accepts_ammunition,
+            ResourceKind::RawSalvage | ResourceKind::RepairCharge => self.accepts_general,
+        }
+    }
 }
 
 #[derive(Component)]

@@ -4,12 +4,13 @@ use super::{
     super::helpers::{FixedVec2, Fx},
     logistics::ResourceKind,
 };
-use crate::ship::{ModuleKind, arch::ArchProgram};
+use crate::ship::{ModuleKind, ModuleVariant, arch::ArchProgram};
 
 #[derive(Component)]
 pub(crate) struct RuntimeShipModule {
     pub(crate) module_id: u64,
     pub(crate) kind: ModuleKind,
+    pub(crate) variant: ModuleVariant,
     pub(crate) grid_x: i32,
     pub(crate) grid_y: i32,
     pub(crate) rotation_quadrants: u8,
@@ -38,10 +39,19 @@ pub(crate) struct PowerConsumer {
 }
 
 #[derive(Component)]
-pub(crate) struct EngineModule;
+pub(crate) struct EngineModule {
+    pub(crate) thrust_multiplier: Fx,
+}
 
 #[derive(Component)]
-pub(crate) struct WeaponModule;
+pub(crate) struct WeaponModule {
+    pub(crate) damage: i32,
+    pub(crate) requires_ammo: bool,
+    pub(crate) ammo_per_shot: u32,
+    pub(crate) projectile_speed_multiplier: Fx,
+    pub(crate) cooldown_multiplier: Fx,
+    pub(crate) automation_difficulty: Fx,
+}
 
 #[derive(Component)]
 pub(crate) struct ArchComputerModule;
@@ -75,8 +85,10 @@ pub(crate) struct TurretCommandState {
 
 #[derive(Component)]
 pub(crate) struct ReactorCommandState {
+    pub(crate) variant: ModuleVariant,
     pub(crate) reaction_rate: Fx,
     pub(crate) turbine_load: Fx,
+    pub(crate) confinement: Fx,
     pub(crate) power_output: Fx,
     pub(crate) fuel_remaining: Fx,
 }
@@ -84,12 +96,16 @@ pub(crate) struct ReactorCommandState {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ProcessorRecipe {
     RepairCharge,
+    Ammunition,
+    Fuel,
 }
 
 impl ProcessorRecipe {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::RepairCharge => "Repair Charge",
+            Self::Ammunition => "Ammunition",
+            Self::Fuel => "Fuel",
         }
     }
 }
@@ -125,6 +141,9 @@ pub(crate) struct ShieldCommandState {
     pub(crate) desired_angle: Fx,
     pub(crate) width: Fx,
     pub(crate) strength: Fx,
+    pub(crate) max_strength: Fx,
+    pub(crate) regen_rate: Fx,
+    pub(crate) directional: bool,
 }
 
 #[allow(dead_code)]

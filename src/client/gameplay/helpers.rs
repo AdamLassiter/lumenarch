@@ -14,7 +14,6 @@ pub(crate) use combat::{
     fixed_radius_sq,
     is_inside_arena,
     render_translation,
-    spawn_player_projectile,
     spawn_projectile_entity,
 };
 pub(crate) use fields::{
@@ -47,13 +46,10 @@ pub(crate) use math::{
     wrap_radians,
 };
 pub(crate) use ship::{
-    count_modules,
     module_integrity,
     module_local_position,
     module_local_translation,
-    ship_movement_model,
     ship_movement_model_with_effective,
-    ship_power_model,
     ship_power_model_with_effective,
     update_ship_power_state,
 };

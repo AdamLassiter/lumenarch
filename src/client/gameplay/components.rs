@@ -16,6 +16,7 @@ pub(crate) use actors::{
     PlayerReferenceFrame,
     PlayerShip,
     PlayerShipAssignment,
+    RemoteSessionPlayer,
     ShipAtmosphereState,
     ShipAtmosphereTile,
     ShipControlMode,

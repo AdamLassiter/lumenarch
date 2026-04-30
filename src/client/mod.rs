@@ -1,12 +1,12 @@
 mod balance;
-mod campaign;
+pub(crate) mod campaign;
 mod docked;
 mod editor;
-mod gameplay;
+pub(crate) mod gameplay;
 mod menu;
 mod net;
 mod sector_map;
-mod state;
+pub(crate) mod state;
 
 use bevy::{app::AppExit, prelude::*};
 
@@ -27,6 +27,11 @@ use self::state::{
     EnemyShipLibraryState,
     LastMissionReport,
     MainCamera,
+    MultiplayerDiagnosticsState,
+    MultiplayerSessionState,
+    MultiplayerSyncGuard,
+    MultiplayerTickState,
+    NetworkCommandSender,
     SectorMapViewState,
     SectorState,
 };
@@ -41,7 +46,7 @@ pub(crate) const HOVERED_BUTTON: Color = Color::srgb(0.30, 0.55, 0.88);
 pub(crate) const PRESSED_BUTTON: Color = Color::srgb(0.18, 0.36, 0.62);
 pub(crate) const SELECTED_BUTTON: Color = Color::srgb(0.78, 0.48, 0.20);
 pub(crate) const GRID_COLOR: Color = Color::srgba(0.38, 0.45, 0.56, 0.28);
-pub(crate) const TOOLBOX_COMPONENTS: [ModuleKind; 14] = ModuleKind::ALL;
+pub(crate) const TOOLBOX_COMPONENTS: [ModuleKind; 15] = ModuleKind::ALL;
 
 pub fn run_client() {
     let balance_config = balance::load_or_create_default_balance().unwrap_or_else(|error| {
@@ -55,6 +60,7 @@ pub fn run_client() {
         .insert_resource(ConnectionConfig::default())
         .insert_resource(ConnectionStatus::default())
         .insert_resource(ConnectionMailbox::default())
+        .insert_resource(NetworkCommandSender::default())
         .insert_resource(EditorShip::default())
         .insert_resource(EditorSessionState::default())
         .insert_resource(EnemyShipLibraryState::default())
@@ -64,6 +70,10 @@ pub fn run_client() {
         .insert_resource(CampaignLoadState::default())
         .insert_resource(DebugOverlayState::default())
         .insert_resource(LastMissionReport::default())
+        .insert_resource(MultiplayerSessionState::default())
+        .insert_resource(MultiplayerDiagnosticsState::default())
+        .insert_resource(MultiplayerTickState::default())
+        .insert_resource(MultiplayerSyncGuard::default())
         .insert_resource(EditorToolState::default())
         .insert_resource(ArchEditorState::default())
         .insert_resource(EditorViewState::default())
@@ -111,6 +121,13 @@ pub fn run_client() {
                 docked::update_docked_status_text.run_if(in_state(ClientAppState::Docked)),
             ),
         )
+        .add_systems(
+            Update,
+            (
+                net::sync_app_state_to_host.run_if(in_state(ClientAppState::Docked)),
+                net::sync_campaign_to_host.run_if(in_state(ClientAppState::Docked)),
+            ),
+        )
         .add_systems(OnExit(ClientAppState::Docked), docked::cleanup_docked_ui)
         .add_systems(
             OnEnter(ClientAppState::SectorMap),
@@ -125,6 +142,13 @@ pub fn run_client() {
                 sector_map::pan_and_zoom_sector_map.run_if(in_state(ClientAppState::SectorMap)),
                 sector_map::sync_sector_map_layout.run_if(in_state(ClientAppState::SectorMap)),
                 sector_map::update_sector_map_text.run_if(in_state(ClientAppState::SectorMap)),
+            ),
+        )
+        .add_systems(
+            Update,
+            (
+                net::sync_app_state_to_host.run_if(in_state(ClientAppState::SectorMap)),
+                net::sync_campaign_to_host.run_if(in_state(ClientAppState::SectorMap)),
             ),
         )
         .add_systems(
@@ -161,6 +185,14 @@ pub fn run_client() {
                 editor::sync_computer_program_entries.run_if(in_state(ClientAppState::Editing)),
                 editor::sync_toolbox_visuals.run_if(in_state(ClientAppState::Editing)),
                 editor::update_editor_status_text.run_if(in_state(ClientAppState::Editing)),
+            ),
+        )
+        .add_systems(
+            Update,
+            (
+                net::sync_app_state_to_host.run_if(in_state(ClientAppState::Editing)),
+                net::sync_ship_to_host.run_if(in_state(ClientAppState::Editing)),
+                net::sync_campaign_to_host.run_if(in_state(ClientAppState::Editing)),
             ),
         )
         .add_systems(
@@ -224,6 +256,7 @@ pub fn run_client() {
                     gameplay::return_after_mission_resolution,
                     gameplay::update_destroyed_module_visuals,
                     gameplay::sync_shipboard_player_visual,
+                    gameplay::sync_remote_session_players,
                     gameplay::integrate_player_ship_motion,
                     gameplay::integrate_hostile_ship_motion,
                     gameplay::camera_follow_player_ship,
@@ -235,6 +268,18 @@ pub fn run_client() {
                 gameplay::update_inspection_and_alerts_text
                     .run_if(in_state(ClientAppState::Encounter)),
                 gameplay::station_panel_button_system.run_if(in_state(ClientAppState::Encounter)),
+            ),
+        )
+        .add_systems(
+            Update,
+            (
+                net::advance_multiplayer_tick.run_if(in_state(ClientAppState::Encounter)),
+                net::send_local_multiplayer_presence.run_if(in_state(ClientAppState::Encounter)),
+                net::send_local_multiplayer_input.run_if(in_state(ClientAppState::Encounter)),
+                net::send_multiplayer_hash_report.run_if(in_state(ClientAppState::Encounter)),
+                net::request_resync_when_waiting.run_if(in_state(ClientAppState::Encounter)),
+                net::sync_app_state_to_host.run_if(in_state(ClientAppState::Encounter)),
+                net::sync_campaign_to_host.run_if(in_state(ClientAppState::Encounter)),
             ),
         )
         .add_systems(

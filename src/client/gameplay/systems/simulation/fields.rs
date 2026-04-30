@@ -15,9 +15,12 @@ use crate::{
                 PlayerReferenceFrame,
                 PlayerShip,
                 ReactorCommandState,
+                ResourceKind,
                 RuntimeShipModule,
+                ShieldCommandState,
                 ShipRoot,
                 ShipboardPlayer,
+                StorageModule,
                 TurretCommandState,
             },
             helpers::{
@@ -164,17 +167,28 @@ pub(crate) fn update_module_runtime_state(
     balance: Res<BalanceConfig>,
     mut module_query: Query<(
         &RuntimeShipModule,
+        &Parent,
         &Integrity,
         &mut ModuleRuntimeState,
         Option<&mut ReactorCommandState>,
+        Option<&mut ShieldCommandState>,
         Option<&mut TurretCommandState>,
         Option<&DestroyedModule>,
     )>,
+    mut storage_query: Query<(&RuntimeShipModule, &Parent, &mut StorageModule)>,
 ) {
     let dt = fx_from_time_delta(&time);
 
-    for (runtime_module, integrity, mut runtime_state, reactor_state, turret_state, destroyed) in
-        &mut module_query
+    for (
+        runtime_module,
+        parent,
+        integrity,
+        mut runtime_state,
+        reactor_state,
+        shield_state,
+        turret_state,
+        destroyed,
+    ) in &mut module_query
     {
         runtime_state.was_disabled_last_frame = runtime_state.is_disabled;
         if destroyed.is_some() || integrity.current <= 0 {
@@ -195,14 +209,39 @@ pub(crate) fn update_module_runtime_state(
         runtime_state.last_interaction_age += dt;
         let mut reactor_heat_bonus = Fx::from_num(0);
         if let Some(mut reactor_state) = reactor_state {
+            if reactor_state.fuel_remaining < Fx::from_num(balance.reactor.starting_fuel * 0.25) {
+                for (storage_runtime, storage_parent, mut storage) in &mut storage_query {
+                    if storage_parent.get() != parent.get()
+                        || !storage.accepts_fuel
+                        || local_field_distance(
+                            runtime_module.local_position,
+                            storage_runtime.local_position,
+                        ) > Fx::from_num(64)
+                    {
+                        continue;
+                    }
+                    if storage.inventory.remove(ResourceKind::Fuel, 1) > 0 {
+                        reactor_state.fuel_remaining +=
+                            Fx::from_num(balance.reactor.starting_fuel * 0.5);
+                        break;
+                    }
+                }
+            }
             let warmup_threshold = Fx::from_num(balance.reactor.warmup_threshold);
             let full_power_threshold = Fx::from_num(balance.reactor.full_power_threshold);
             if reactor_state.fuel_remaining > Fx::from_num(0) {
+                let variant_fuel_scalar =
+                    if reactor_state.variant == crate::ship::ModuleVariant::Fusion {
+                        Fx::from_num(1.25)
+                    } else {
+                        Fx::from_num(1)
+                    };
                 reactor_state.fuel_remaining = (reactor_state.fuel_remaining
                     - reactor_state.reaction_rate
                         * dt
-                        * Fx::from_num(balance.reactor.fuel_burn_rate))
-                .max(Fx::from_num(0));
+                        * Fx::from_num(balance.reactor.fuel_burn_rate)
+                        * variant_fuel_scalar)
+                    .max(Fx::from_num(0));
             } else {
                 reactor_state.reaction_rate = Fx::from_num(0);
             }
@@ -220,14 +259,31 @@ pub(crate) fn update_module_runtime_state(
                         * Fx::from_num(0.5))
                 .clamp(Fx::from_num(0), Fx::from_num(1))
             };
-            reactor_state.power_output = ((reactor_state.reaction_rate
+            let mut power_output = (reactor_state.reaction_rate
                 * Fx::from_num(balance.reactor.reaction_power_factor)
                 + reactor_state.turbine_load * Fx::from_num(balance.reactor.turbine_power_factor))
-            .min(Fx::from_num(balance.reactor.max_power_output)))
-                * warmup_ratio;
-            reactor_heat_bonus = reactor_state.reaction_rate
-                * Fx::from_num(balance.reactor.reaction_heat_factor)
-                - reactor_state.turbine_load * Fx::from_num(balance.reactor.turbine_cooling_factor);
+            .min(Fx::from_num(balance.reactor.max_power_output));
+            if reactor_state.variant == crate::ship::ModuleVariant::Fusion {
+                let confinement = reactor_state
+                    .confinement
+                    .clamp(Fx::from_num(0), Fx::from_num(1));
+                let stability = Fx::from_num(1)
+                    - (reactor_state.reaction_rate - confinement)
+                        .abs()
+                        .min(Fx::from_num(1));
+                power_output *= Fx::from_num(0.7) + stability * Fx::from_num(0.9);
+                reactor_heat_bonus = reactor_state.reaction_rate
+                    * Fx::from_num(balance.reactor.reaction_heat_factor * 1.25)
+                    + (Fx::from_num(1) - stability) * Fx::from_num(1.5)
+                    - reactor_state.turbine_load
+                        * Fx::from_num(balance.reactor.turbine_cooling_factor * 0.85);
+            } else {
+                reactor_heat_bonus = reactor_state.reaction_rate
+                    * Fx::from_num(balance.reactor.reaction_heat_factor)
+                    - reactor_state.turbine_load
+                        * Fx::from_num(balance.reactor.turbine_cooling_factor);
+            }
+            reactor_state.power_output = power_output * warmup_ratio;
         }
         if let Some(mut turret_state) = turret_state {
             let angle_delta = wrap_radians(turret_state.desired_angle - turret_state.actual_angle);
@@ -239,6 +295,18 @@ pub(crate) fn update_module_runtime_state(
             } else {
                 wrap_radians(turret_state.desired_angle)
             };
+        }
+        if let Some(mut shield_state) = shield_state {
+            let regen_factor = if runtime_state.current_heat
+                >= Fx::from_num(balance.fields.degraded_heat_threshold)
+            {
+                Fx::from_num(0.4)
+            } else {
+                Fx::from_num(1)
+            };
+            shield_state.strength = (shield_state.strength
+                + shield_state.regen_rate * regen_factor * dt)
+                .min(shield_state.max_strength);
         }
         let target_heat = base_heat
             + reactor_heat_bonus.max(Fx::from_num(balance.fields.reactor_heat_min_bonus))

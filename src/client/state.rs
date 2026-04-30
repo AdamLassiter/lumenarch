@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 use super::DEFAULT_HOST_ADDR;
 use crate::{
     protocol::ShipSnapshot,
-    ship::{ModuleKind, ShipDefinition, enemy::EnemyShipLibrary},
+    ship::{ModuleKind, ModuleVariant, ShipDefinition, enemy::EnemyShipLibrary},
 };
 
-#[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default)]
+#[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 pub(crate) enum ClientAppState {
     #[default]
     Menu,
@@ -36,6 +36,7 @@ impl Default for ConnectionConfig {
 pub(crate) struct ConnectionStatus {
     pub(crate) phase: ConnectionPhase,
     pub(crate) active_snapshot: Option<ShipSnapshot>,
+    pub(crate) local_player_id: Option<u32>,
 }
 
 #[derive(Default)]
@@ -53,8 +54,65 @@ pub(crate) struct ConnectionMailbox {
 }
 
 pub(crate) enum ConnectionEvent {
-    Connected(ShipSnapshot),
+    Connected(crate::protocol::SessionWelcome),
+    Snapshot(crate::protocol::SessionSnapshot),
+    CommittedInputs(crate::protocol::CommittedInputBatch),
+    HashStatus(crate::protocol::HashStatusMessage),
+    Drift(crate::protocol::DriftDetectedMessage),
     Failed(String),
+}
+
+#[derive(Resource, Clone, Default)]
+pub(crate) struct NetworkCommandSender {
+    pub(crate) sender: Arc<Mutex<Option<std::sync::mpsc::Sender<crate::protocol::ClientMessage>>>>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum MultiplayerPlayerRole {
+    #[default]
+    Local,
+    Remote,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub(crate) struct RemotePlayerState {
+    pub(crate) player_id: u32,
+    pub(crate) display_name: String,
+    pub(crate) role: MultiplayerPlayerRole,
+    pub(crate) connected: bool,
+    pub(crate) presence: crate::protocol::PlayerPresenceSnapshot,
+}
+
+#[derive(Resource, Clone, Default, Serialize, Deserialize)]
+pub(crate) struct MultiplayerSessionState {
+    pub(crate) connected: bool,
+    pub(crate) session_tick: u64,
+    pub(crate) local_player_id: Option<u32>,
+    pub(crate) remote_players: Vec<RemotePlayerState>,
+    pub(crate) last_committed_inputs: Vec<crate::protocol::PlayerInputFrame>,
+}
+
+#[derive(Resource, Clone, Default, Serialize, Deserialize)]
+pub(crate) struct MultiplayerDiagnosticsState {
+    pub(crate) local_hash: u64,
+    pub(crate) host_hash: u64,
+    pub(crate) last_matching_tick: Option<u64>,
+    pub(crate) first_mismatching_tick: Option<u64>,
+    pub(crate) mismatch_count: u32,
+    pub(crate) last_category: Option<String>,
+    pub(crate) last_message: Option<String>,
+    pub(crate) waiting_for_resync: bool,
+    pub(crate) last_resync_tick: Option<u64>,
+}
+
+#[derive(Resource, Clone, Copy, Default, Serialize, Deserialize)]
+pub(crate) struct MultiplayerTickState {
+    pub(crate) current_tick: u64,
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct MultiplayerSyncGuard {
+    pub(crate) suppress_outbound_once: bool,
 }
 
 #[derive(Resource, Default, Clone)]
@@ -89,7 +147,7 @@ impl Default for EnemyShipLibraryState {
     }
 }
 
-#[derive(Resource, Clone, Serialize, Deserialize)]
+#[derive(Resource, Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct DemoProgression {
     pub(crate) scrap: u32,
     pub(crate) hull_wear: u32,
@@ -141,7 +199,7 @@ impl Default for SectorMapViewState {
     }
 }
 
-#[derive(Resource, Default, Clone, Serialize, Deserialize)]
+#[derive(Resource, Default, Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct LastMissionReport {
     pub(crate) headline: Option<String>,
     pub(crate) detail: Option<String>,
@@ -172,6 +230,7 @@ pub(crate) struct LastMissionReport {
 #[derive(Resource)]
 pub(crate) struct EditorToolState {
     pub(crate) selected_kind: ModuleKind,
+    pub(crate) selected_variant: ModuleVariant,
     pub(crate) selected_rotation: u8,
 }
 
@@ -179,6 +238,7 @@ impl Default for EditorToolState {
     fn default() -> Self {
         Self {
             selected_kind: ModuleKind::Hull,
+            selected_variant: ModuleVariant::default_for_kind(ModuleKind::Hull),
             selected_rotation: 0,
         }
     }
@@ -266,7 +326,7 @@ pub(crate) struct SectorNode {
     pub(crate) encounter: EncounterSpec,
 }
 
-#[derive(Resource, Clone, Serialize, Deserialize)]
+#[derive(Resource, Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct SectorState {
     pub(crate) seed: u64,
     pub(crate) current_node_id: u32,

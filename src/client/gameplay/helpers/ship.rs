@@ -7,7 +7,7 @@ use crate::{
         balance::BalanceConfig,
         gameplay::components::{ShipMovementModel, ShipPowerModel, ShipPowerState},
     },
-    ship::{ModuleKind, ShipDefinition, ShipModule},
+    ship::{ModuleKind, ModuleSpec, ShipDefinition, ShipModule},
 };
 
 pub(crate) fn module_local_translation(module: &ShipModule, center_x: f32, center_y: f32) -> Vec3 {
@@ -25,21 +25,8 @@ pub(crate) fn module_local_position(module: &ShipModule, center_x: Fx, center_y:
     )
 }
 
-pub(crate) fn module_integrity(kind: ModuleKind) -> i32 {
-    match kind {
-        ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner => 12,
-        ModuleKind::Core => 20,
-        ModuleKind::Cockpit => 10,
-        ModuleKind::Computer => 8,
-        ModuleKind::Reactor => 14,
-        ModuleKind::Engine => 10,
-        ModuleKind::Cargo => 10,
-        ModuleKind::Battery => 8,
-        ModuleKind::Airlock => 8,
-        ModuleKind::Turret => 8,
-        ModuleKind::Processor => 8,
-        ModuleKind::Interior => 6,
-    }
+pub(crate) fn module_integrity(kind: ModuleKind, variant: crate::ship::ModuleVariant) -> i32 {
+    ModuleSpec::for_module(kind, variant).integrity
 }
 
 pub(crate) fn ship_movement_model(
@@ -51,6 +38,7 @@ pub(crate) fn ship_movement_model(
         module_count,
         engine_count,
         Fx::from_num(engine_count.max(1)),
+        Fx::from_num(1),
         balance,
     )
 }
@@ -59,21 +47,26 @@ pub(crate) fn ship_movement_model_with_effective(
     module_count: usize,
     engine_count: u32,
     effective_engines: Fx,
+    helm_multiplier: Fx,
     balance: &BalanceConfig,
 ) -> ShipMovementModel {
     let engine_scalar = effective_engines.max(fx_ratio(1, 4)).to_num::<f32>();
     let mass_factor = (module_count.max(1) as f32).sqrt();
+    let helm_scalar = helm_multiplier.max(Fx::from_num(1)).to_num::<f32>();
 
     ShipMovementModel {
         engine_count,
+        helm_multiplier,
         thrust_acceleration: Fx::from_num(
-            balance.ship.thrust_base_acceleration * engine_scalar / mass_factor,
+            balance.ship.thrust_base_acceleration * engine_scalar * helm_scalar / mass_factor,
         ),
         turn_speed: Fx::from_num(
-            balance.ship.turn_speed_base + balance.ship.turn_speed_per_engine * engine_scalar,
+            (balance.ship.turn_speed_base + balance.ship.turn_speed_per_engine * engine_scalar)
+                * helm_scalar,
         ),
         max_speed: Fx::from_num(
-            balance.ship.max_speed_base + balance.ship.max_speed_per_engine * engine_scalar,
+            (balance.ship.max_speed_base + balance.ship.max_speed_per_engine * engine_scalar)
+                * (0.9 + helm_scalar * 0.1),
         ),
         linear_damping: Fx::from_num(balance.ship.linear_damping),
         angular_damping: Fx::from_num(balance.ship.angular_damping),
@@ -96,6 +89,8 @@ pub(crate) fn ship_power_model(
         turret_count,
         Fx::from_num(reactor_count.max(1)),
         Fx::from_num(battery_count),
+        Fx::from_num(battery_count.max(1)),
+        Fx::from_num(battery_count.max(1)),
         Fx::from_num(engine_count),
         Fx::from_num(turret_count),
         balance,
@@ -110,6 +105,8 @@ pub(crate) fn ship_power_model_with_effective(
     turret_count: u32,
     effective_reactors: Fx,
     effective_batteries: Fx,
+    effective_charge_rate: Fx,
+    effective_discharge_rate: Fx,
     effective_engines: Fx,
     effective_turrets: Fx,
     balance: &BalanceConfig,
@@ -117,6 +114,10 @@ pub(crate) fn ship_power_model_with_effective(
     ShipPowerModel {
         reactor_output: effective_reactors * Fx::from_num(balance.ship.reactor_output_per_reactor),
         battery_capacity: effective_batteries.max(Fx::from_num(battery_count))
+            * Fx::from_num(balance.ship.battery_capacity_per_battery),
+        battery_charge_rate: effective_charge_rate.max(Fx::from_num(1))
+            * Fx::from_num(balance.ship.battery_capacity_per_battery),
+        battery_discharge_rate: effective_discharge_rate.max(Fx::from_num(1))
             * Fx::from_num(balance.ship.battery_capacity_per_battery),
         passive_draw: Fx::from_num(
             balance.ship.passive_draw_base
@@ -126,6 +127,7 @@ pub(crate) fn ship_power_model_with_effective(
             * Fx::from_num(balance.ship.engine_draw_per_engine),
         weapon_draw: effective_turrets.max(Fx::from_num(turret_count))
             * Fx::from_num(balance.ship.weapon_draw_per_turret),
+        shield_draw: Fx::from_num(0),
     }
 }
 
@@ -168,7 +170,8 @@ pub(crate) fn update_ship_power_state(
     } else {
         fx_ratio(1, 1000)
     };
-    let available_energy = power_model.reactor_output + power_state.stored_energy / safe_dt;
+    let discharge_limit = (power_model.battery_discharge_rate * safe_dt).max(Fx::from_num(0));
+    let available_energy = power_model.reactor_output + discharge_limit / safe_dt;
 
     let weapons_powered = if effective_draw > available_energy {
         effective_draw -= weapon_draw;
@@ -190,7 +193,12 @@ pub(crate) fn update_ship_power_state(
     }
 
     let net_power = power_model.reactor_output - effective_draw;
-    let new_stored_energy = (power_state.stored_energy + net_power * dt)
+    let charge_delta = if net_power >= Fx::from_num(0) {
+        (net_power * dt).min(power_model.battery_charge_rate * dt)
+    } else {
+        (net_power * dt).max(-power_model.battery_discharge_rate * dt)
+    };
+    let new_stored_energy = (power_state.stored_energy + charge_delta)
         .clamp(Fx::from_num(0), power_model.battery_capacity);
 
     power_state.stored_energy = new_stored_energy;

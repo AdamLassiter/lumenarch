@@ -42,17 +42,17 @@ Define what a multiplayer session must synchronize.
 
 ### Tasks
 
-- [ ] Audit the current host/client bootstrap and protocol.
-- [ ] Define session state boundaries for:
+- [x] Audit the current host/client bootstrap and protocol.
+- [x] Define session state boundaries for:
   - campaign / sector state
   - ship state
   - player presence
   - encounter state
-- [ ] Decide what is:
+- [x] Decide what is:
   - authoritative host state
   - deterministic client-simulated state
   - replicated presentation-only state
-- [ ] Update protocol notes/types accordingly.
+- [x] Update protocol notes/types accordingly.
 
 Definition of done:
 
@@ -68,10 +68,10 @@ Represent more than one player in the same simulation cleanly.
 
 ### Tasks
 
-- [ ] Add runtime support for multiple player entities.
-- [ ] Distinguish local player from remote players.
-- [ ] Represent boarding/EVA/onboard state per player.
-- [ ] Ensure player visuals and interaction targeting scale beyond one actor.
+- [x] Add runtime support for multiple player entities.
+- [x] Distinguish local player from remote players.
+- [x] Represent boarding/EVA/onboard state per player.
+- [x] Ensure player visuals and interaction targeting scale beyond one actor.
 
 Definition of done:
 
@@ -87,14 +87,14 @@ Synchronize player intent rather than raw outcomes where possible.
 
 ### Tasks
 
-- [ ] Define per-tick replicated input payloads.
-- [ ] Replicate manual control inputs for:
+- [x] Define per-tick replicated input payloads.
+- [x] Replicate manual control inputs for:
   - movement
   - station use
   - cockpit/turret control
   - cargo interaction
-- [ ] Commit inputs on the simulation tick model.
-- [ ] Ensure locally-hosted single-player still follows the same path.
+- [x] Commit inputs on the simulation tick model.
+- [x] Ensure locally-hosted single-player still follows the same path.
 
 Definition of done:
 
@@ -110,10 +110,10 @@ Keep both peers aligned through the outer and inner loop.
 
 ### Tasks
 
-- [ ] Sync docked/sector/encounter state transitions.
-- [ ] Sync selected sector nodes and encounter specs.
-- [ ] Sync mission return flow and results.
-- [ ] Ensure save/load-backed session progression remains coherent for the host.
+- [x] Sync docked/sector/encounter state transitions.
+- [x] Sync selected sector nodes and encounter specs.
+- [x] Sync mission return flow and results.
+- [x] Ensure save/load-backed session progression remains coherent for the host.
 
 Definition of done:
 
@@ -129,8 +129,8 @@ Make component/station interactions safe under multiplayer pressure.
 
 ### Tasks
 
-- [ ] Decide first-pass authority/locking semantics for stations.
-- [ ] Prevent conflicting writes from causing undefined behavior.
+- [x] Decide first-pass authority/locking semantics for stations.
+- [x] Prevent conflicting writes from causing undefined behavior.
 - [ ] Ensure interactions on hostile ships work for multiple players.
 - [ ] Ensure shared-player-ship operation remains deterministic.
 
@@ -148,14 +148,14 @@ Make drift visible rather than speculative.
 
 ### Tasks
 
-- [ ] Define deterministic state-hash boundaries.
-- [ ] Compute periodic hashes for:
+- [x] Define deterministic state-hash boundaries.
+- [x] Compute periodic hashes for:
   - ship runtime state
   - player state
   - encounter state
   - campaign state where appropriate
-- [ ] Compare host/client hashes.
-- [ ] Log mismatches with enough context to debug them.
+- [x] Compare host/client hashes.
+- [x] Log mismatches with enough context to debug them.
 
 Definition of done:
 
@@ -171,10 +171,10 @@ Make it practical to investigate determinism failures.
 
 ### Tasks
 
-- [ ] Add debug output for last matching / first mismatching tick.
-- [ ] Add readable mismatch categories where possible.
-- [ ] Surface hash/drift status in a debug overlay or diagnostics panel.
-- [ ] Keep this tooling available in local-host development flows.
+- [x] Add debug output for last matching / first mismatching tick.
+- [x] Add readable mismatch categories where possible.
+- [x] Surface hash/drift status in a debug overlay or diagnostics panel.
+- [x] Keep this tooling available in local-host development flows.
 
 Definition of done:
 
@@ -190,10 +190,10 @@ Recover from drift pragmatically without requiring a whole rollback architecture
 
 ### Tasks
 
-- [ ] Define first-pass resync payloads.
-- [ ] Support reapplying authoritative host state when mismatch is detected.
-- [ ] Limit the first pass to scoped or encounter-level resync if needed.
-- [ ] Ensure resync restores continued play rather than forcing full restart.
+- [x] Define first-pass resync payloads.
+- [x] Support reapplying authoritative host state when mismatch is detected.
+- [x] Limit the first pass to scoped or encounter-level resync if needed.
+- [x] Ensure resync restores continued play rather than forcing full restart.
 
 Definition of done:
 
@@ -217,7 +217,7 @@ Add repeatable testing around the simulation contract.
   - logistics
   - combat
 - [ ] Add host/client consistency checks in integration-style tests.
-- [ ] Preserve repeatable seeds and inputs for debugging.
+- [x] Preserve repeatable seeds and inputs for debugging.
 
 Definition of done:
 
@@ -233,10 +233,10 @@ Make the multiplayer flow understandable for humans, not only technically functi
 
 ### Tasks
 
-- [ ] Improve join/connect state messaging.
-- [ ] Show peer presence/state where useful.
-- [ ] Show sync or waiting states clearly.
-- [ ] Keep local-host single-player flow painless.
+- [x] Improve join/connect state messaging.
+- [x] Show peer presence/state where useful.
+- [x] Show sync or waiting states clearly.
+- [x] Keep local-host single-player flow painless.
 
 Definition of done:
 
@@ -278,8 +278,8 @@ Decide whether the current deterministic multiplayer model is sufficient.
 - [ ] Tune input delay / synchronization cadence.
 - [ ] Tune hash/resync frequency.
 - [ ] Verify play remains coherent under realistic interaction load.
-- [ ] Decide whether rollback is still avoidable for the current design.
-- [ ] Capture the remaining known limits honestly.
+- [x] Decide whether rollback is still avoidable for the current design.
+- [x] Capture the remaining known limits honestly.
 
 Definition of done:
 
@@ -294,4 +294,3 @@ Start with **Phase 1**:
 * identify what needs hashing and what does not
 
 That foundation determines whether the later multiplayer work stays coherent.
-

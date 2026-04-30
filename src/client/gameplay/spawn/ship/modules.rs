@@ -42,7 +42,7 @@ use crate::{
             },
         },
     },
-    ship::{ModuleKind, ShipModule},
+    ship::{ModuleKind, ModuleSpec, ModuleVariant, ShipModule},
 };
 
 pub(super) fn spawn_runtime_module(
@@ -58,10 +58,11 @@ pub(super) fn spawn_runtime_module(
     hostile: bool,
 ) -> Entity {
     let local_position = module_local_position(module, center_x_fixed, center_y_fixed);
-    let max_integrity = module_integrity(module.kind);
+    let spec = ModuleSpec::for_module(module.kind, module.variant);
+    let max_integrity = module_integrity(module.kind, module.variant);
     let applied_wear = i32::min(wear_penalty as i32, max_integrity.saturating_sub(1)).max(0);
     let mut entity = commands.spawn((
-        Sprite::from_image(asset_server.load(sprite_path_for_kind(&module.kind))),
+        Sprite::from_image(asset_server.load(sprite_path_for_kind(&module.kind, module.variant))),
         Transform {
             translation: module_local_translation(module, center_x, center_y),
             rotation: Quat::from_rotation_z(-(module.rotation_quadrants as f32) * FRAC_PI_2),
@@ -70,6 +71,7 @@ pub(super) fn spawn_runtime_module(
         RuntimeShipModule {
             module_id: module.id,
             kind: module.kind,
+            variant: module.variant,
             grid_x: module.grid_x,
             grid_y: module.grid_y,
             rotation_quadrants: module.rotation_quadrants,
@@ -103,10 +105,12 @@ pub(super) fn spawn_runtime_module(
             entity.insert((
                 PowerProducer { output: 10 },
                 ReactorCommandState {
+                    variant: module.variant,
                     reaction_rate: Fx::from_num(balance.reactor.starting_reaction_rate),
                     turbine_load: Fx::from_num(balance.reactor.starting_turbine_load),
+                    confinement: Fx::from_num(0.5),
                     power_output: Fx::from_num(balance.reactor.starting_power_output),
-                    fuel_remaining: Fx::from_num(balance.reactor.starting_fuel),
+                    fuel_remaining: Fx::from_num(balance.reactor.starting_fuel * 0.35),
                 },
             ));
         }
@@ -116,8 +120,21 @@ pub(super) fn spawn_runtime_module(
         ModuleKind::Cargo => {
             entity.insert((
                 StorageModule {
-                    capacity: 8,
-                    inventory: ResourceInventory::default(),
+                    capacity: spec.storage_capacity,
+                    inventory: {
+                        let mut inventory = ResourceInventory::default();
+                        match module.variant {
+                            ModuleVariant::FuelTank => inventory.fuel = spec.storage_capacity / 2,
+                            ModuleVariant::AmmoRack => {
+                                inventory.ammunition = spec.storage_capacity * 2
+                            }
+                            _ => {}
+                        }
+                        inventory
+                    },
+                    accepts_fuel: module.variant == ModuleVariant::FuelTank,
+                    accepts_ammunition: module.variant == ModuleVariant::AmmoRack,
+                    accepts_general: module.variant == ModuleVariant::GeneralCargo,
                 },
                 StorageCommandState { allow_intake: true },
             ));
@@ -126,8 +143,11 @@ pub(super) fn spawn_runtime_module(
             entity.insert((
                 AirlockCommandState { open: false },
                 StorageModule {
-                    capacity: 4,
+                    capacity: spec.storage_capacity,
                     inventory: ResourceInventory::default(),
+                    accepts_fuel: false,
+                    accepts_ammunition: false,
+                    accepts_general: true,
                 },
                 StorageCommandState { allow_intake: true },
                 ManipulatorModule {
@@ -151,7 +171,12 @@ pub(super) fn spawn_runtime_module(
             ));
         }
         ModuleKind::Engine => {
-            entity.insert((PowerConsumer { draw: 3 }, EngineModule));
+            entity.insert((
+                PowerConsumer { draw: 3 },
+                EngineModule {
+                    thrust_multiplier: Fx::from_num(spec.engine_multiplier.max(1.0)),
+                },
+            ));
         }
         ModuleKind::Computer => {
             entity.insert((
@@ -173,7 +198,9 @@ pub(super) fn spawn_runtime_module(
                 PowerConsumer { draw: 2 },
                 ProcessorModule {
                     progress: Fx::from_num(0),
-                    duration: Fx::from_num(balance.logistics.processor_duration),
+                    duration: Fx::from_num(
+                        balance.logistics.processor_duration / spec.processor_speed_multiplier,
+                    ),
                     active: false,
                     blocked_reason: None,
                     inventory: ResourceInventory::default(),
@@ -190,7 +217,22 @@ pub(super) fn spawn_runtime_module(
             entity
                 .insert((
                     PowerConsumer { draw: 2 },
-                    WeaponModule,
+                    WeaponModule {
+                        damage: spec.projectile_damage,
+                        requires_ammo: spec.ammo_per_shot > 0,
+                        ammo_per_shot: spec.ammo_per_shot,
+                        projectile_speed_multiplier: Fx::from_num(
+                            spec.projectile_speed_multiplier.max(0.1),
+                        ),
+                        cooldown_multiplier: Fx::from_num(spec.weapon_cooldown_multiplier),
+                        automation_difficulty: Fx::from_num(
+                            if module.variant == ModuleVariant::BallisticTurret {
+                                1.35
+                            } else {
+                                1.0
+                            },
+                        ),
+                    },
                     TurretCommandState {
                         desired_angle: Fx::from_num(0),
                         actual_angle: Fx::from_num(0),
@@ -204,6 +246,19 @@ pub(super) fn spawn_runtime_module(
                         TurretTopSprite,
                     ));
                 });
+        }
+        ModuleKind::Shield => {
+            entity.insert((
+                PowerConsumer { draw: 2 },
+                crate::client::gameplay::components::ShieldCommandState {
+                    desired_angle: Fx::from_num(0),
+                    width: Fx::from_num(spec.shield_arc_degrees),
+                    strength: Fx::from_num(spec.shield_capacity),
+                    max_strength: Fx::from_num(spec.shield_capacity),
+                    regen_rate: Fx::from_num(spec.shield_regen),
+                    directional: module.variant == ModuleVariant::DirectionalShield,
+                },
+            ));
         }
         _ => {}
     }
@@ -257,6 +312,12 @@ fn module_field_emitter(kind: ModuleKind, balance: &BalanceConfig) -> ModuleFiel
             cooling_output: Fx::from_num(balance.fields.emitter_hull_cooling),
             electrical_output: Fx::from_num(0),
             grounding_output: Fx::from_num(balance.fields.emitter_hull_grounding),
+        },
+        ModuleKind::Shield => ModuleFieldEmitter {
+            heat_output: Fx::from_num(0.6),
+            cooling_output: Fx::from_num(0),
+            electrical_output: Fx::from_num(1.2),
+            grounding_output: Fx::from_num(0.5),
         },
         ModuleKind::Core | ModuleKind::Cockpit | ModuleKind::Cargo | ModuleKind::Interior => {
             ModuleFieldEmitter {

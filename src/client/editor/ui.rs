@@ -95,6 +95,7 @@ pub(crate) fn initialize_editor_ship(
     }
 
     tool_state.selected_kind = ModuleKind::Hull;
+    tool_state.selected_variant = crate::ship::ModuleVariant::default_for_kind(ModuleKind::Hull);
     tool_state.selected_rotation = 0;
     arch_editor_state.selected_module_id = editor_ship
         .ship
@@ -193,7 +194,10 @@ pub(crate) fn spawn_editor_ui(
                                 Text::new(format!(
                                     "{} [{}]",
                                     kind.as_str(),
-                                    module_kind_cost(kind)
+                                    module_kind_cost(
+                                        kind,
+                                        crate::ship::ModuleVariant::default_for_kind(kind),
+                                    )
                                 )),
                                 TextFont {
                                     font: mono_font.clone(),
@@ -304,6 +308,7 @@ pub(crate) fn spawn_editor_ui(
                         enemy_entry_label(&editor_session, &enemy_library_state),
                         &editor_ship.ship.name,
                         &TOOLBOX_COMPONENTS[0],
+                        crate::ship::ModuleVariant::default_for_kind(TOOLBOX_COMPONENTS[0]),
                         0,
                         editor_ship.ship.modules.len(),
                         progression.scrap,
@@ -388,6 +393,7 @@ pub(crate) fn update_editor_status_text(
             enemy_entry_label(&editor_session, &enemy_library_state),
             &editor_ship.ship.name,
             &tool_state.selected_kind,
+            tool_state.selected_variant,
             tool_state.selected_rotation,
             editor_ship.ship.modules.len(),
             progression.scrap,

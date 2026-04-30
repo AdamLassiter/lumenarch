@@ -71,6 +71,8 @@ use crate::client::{
         GameplayStationPanelButton,
         GameplayStationPanelButtonLabel,
         GameplayTopBannerText,
+        MultiplayerDiagnosticsState,
+        MultiplayerSessionState,
         StationPanelButtonAction,
     },
 };
@@ -107,6 +109,8 @@ pub(crate) fn update_gameplay_status_text(
     >,
     status_world: GameplayStatusWorldQueries,
     progression: Res<DemoProgression>,
+    multiplayer_session: Res<MultiplayerSessionState>,
+    multiplayer_diagnostics: Res<MultiplayerDiagnosticsState>,
     mut hud_ui: GameplayHudUiQueries,
 ) {
     let (
@@ -162,6 +166,8 @@ pub(crate) fn update_gameplay_status_text(
         mission_state,
         progression.scrap,
         &arch_summary,
+        &multiplayer_session,
+        &multiplayer_diagnostics,
     );
     let controls_text = controls_help_text(control_mode.mode);
     let (panel_title, panel_body, active_station_kind, active_station_flags) =
@@ -524,6 +530,12 @@ pub(crate) fn station_panel_button_system(
                                     crate::client::gameplay::components::ResourceKind::RepairCharge
                                 }
                                 crate::client::gameplay::components::ResourceKind::RepairCharge => {
+                                    crate::client::gameplay::components::ResourceKind::Fuel
+                                }
+                                crate::client::gameplay::components::ResourceKind::Fuel => {
+                                    crate::client::gameplay::components::ResourceKind::Ammunition
+                                }
+                                crate::client::gameplay::components::ResourceKind::Ammunition => {
                                     crate::client::gameplay::components::ResourceKind::RawSalvage
                                 }
                             };
@@ -596,9 +608,11 @@ fn build_compact_status(
     mission_state: &MissionState,
     scrap_total: u32,
     arch_summary: &ArchSummary,
+    multiplayer_session: &MultiplayerSessionState,
+    multiplayer_diagnostics: &MultiplayerDiagnosticsState,
 ) -> String {
     format!(
-        "Mode: {}  |  Focus: {}\nFrame: {}\nContext: {}\nStation: {}\nPlayer: {}, {} @ {}\nShip: {}, {} @ {}\nTurn: {}\nModules: {} active  |  {} degraded  |  {} disabled\nIntegrity: {} / {}\nAtmosphere: {} avg / {} min  |  venting {}\nCargo: {}\nMission Ops: repairs {}  stabs {}  transfers {}  cycles {}\nARCH: {}  [{}]  writes {}  invalid {}\nScrap: {}",
+        "Mode: {}  |  Focus: {}\nFrame: {}\nContext: {}\nStation: {}\nPlayer: {}, {} @ {}\nShip: {}, {} @ {}\nTurn: {}\nModules: {} active  |  {} degraded  |  {} disabled\nIntegrity: {} / {}\nAtmosphere: {} avg / {} min  |  venting {}\nCargo: {}\nMission Ops: repairs {}  stabs {}  transfers {}  cycles {}\nARCH: {}  [{}]  writes {}  invalid {}\nSession: tick {}  peers {}  host {:016x}  local {:016x}\nScrap: {}",
         control_mode.mode.as_str(),
         control_mode
             .focused_family
@@ -634,6 +648,10 @@ fn build_compact_status(
         arch_summary.exec_summary,
         arch_summary.recent_writes,
         arch_summary.invalid_count,
+        multiplayer_session.session_tick,
+        multiplayer_session.remote_players.len(),
+        multiplayer_diagnostics.host_hash,
+        multiplayer_diagnostics.local_hash,
         scrap_total,
     )
 }

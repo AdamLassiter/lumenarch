@@ -160,7 +160,10 @@ pub(crate) fn sync_runtime_ship_state(
     let mut effective_reactors = Fx::from_num(0);
     let mut effective_reactor_output = Fx::from_num(0);
     let mut effective_batteries = Fx::from_num(0);
+    let mut effective_battery_flow = Fx::from_num(0);
     let mut effective_turrets = Fx::from_num(0);
+    let mut effective_helm = Fx::from_num(1);
+    let mut shield_count = 0u32;
 
     for child in children.iter() {
         let Ok((runtime_module, integrity, runtime_state, reactor_state, destroyed, weapon_module)) =
@@ -190,12 +193,19 @@ pub(crate) fn sync_runtime_ship_state(
             ModuleKind::Battery => {
                 battery_count += 1;
                 effective_batteries += effectiveness;
+                effective_battery_flow += effectiveness;
             }
             ModuleKind::Turret => {
                 turret_count += 1;
                 if weapon_module.is_some() && !runtime_state.is_disabled {
                     effective_turrets += effectiveness;
                 }
+            }
+            ModuleKind::Cockpit => {
+                effective_helm = effective_helm.max(effectiveness.max(Fx::from_num(1)));
+            }
+            ModuleKind::Shield => {
+                shield_count += 1;
             }
             _ => {}
         }
@@ -205,6 +215,7 @@ pub(crate) fn sync_runtime_ship_state(
         live_modules.max(1),
         engine_count,
         effective_engines,
+        effective_helm,
         &balance,
     );
     *power_model = ship_power_model_with_effective(
@@ -215,6 +226,8 @@ pub(crate) fn sync_runtime_ship_state(
         turret_count,
         effective_reactors,
         effective_batteries,
+        effective_battery_flow.max(Fx::from_num(battery_count.max(1))),
+        effective_battery_flow.max(Fx::from_num(battery_count.max(1))),
         effective_engines,
         effective_turrets,
         &balance,
@@ -227,6 +240,7 @@ pub(crate) fn sync_runtime_ship_state(
     }
     power_model.reactor_output *= automation_state.output_scale;
     weapon_state.turret_count = effective_turrets.to_num::<u32>();
+    weapon_state.shield_count = shield_count;
     if weapon_state.turret_count == 0 {
         weapon_state.cooldown_remaining = Fx::from_num(0);
     }

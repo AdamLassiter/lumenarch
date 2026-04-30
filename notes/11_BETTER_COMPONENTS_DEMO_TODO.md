@@ -44,13 +44,13 @@ Teach the ship/editor/runtime data model how to distinguish component variants c
 
 ### Tasks
 
-- [ ] Decide how variants are represented:
+- [x] Decide how variants are represented:
   - expanded `ModuleKind`
   - subtype field
   - spec lookup table
-- [ ] Add save/load support for variant identity.
-- [ ] Keep existing ships migrating safely to sensible defaults.
-- [ ] Update editor/tooling to display variant identity clearly.
+- [x] Add save/load support for variant identity.
+- [x] Keep existing ships migrating safely to sensible defaults.
+- [x] Update editor/tooling to display variant identity clearly.
 
 Definition of done:
 
@@ -66,15 +66,15 @@ Avoid hardcoding every new part as unrelated bespoke behavior.
 
 ### Tasks
 
-- [ ] Define shared spec/config data for major families.
-- [ ] Move variant-tunable values into config or data tables where practical.
-- [ ] Distinguish:
+- [x] Define shared spec/config data for major families.
+- [x] Move variant-tunable values into config or data tables where practical.
+- [x] Distinguish:
   - integrity
   - power use/output
   - heat behavior
   - logistics needs
   - control complexity
-- [ ] Keep the first pass compatible with deterministic runtime use.
+- [x] Keep the first pass compatible with deterministic runtime use.
 
 Definition of done:
 
@@ -90,12 +90,12 @@ Add multiple turret behaviors with real gameplay consequences.
 
 ### Tasks
 
-- [ ] Add **hitscan laser turret** as the baseline weapon.
-- [ ] Add **projectile ballistic turret** as the stronger/more complex upgrade.
-- [ ] Add ammunition requirement for ballistic turrets.
-- [ ] Add nearby ammo storage dependency and consumption rules.
-- [ ] Differentiate manual and automated use difficulty between the two.
-- [ ] Update UI and combat logic accordingly.
+- [x] Add **hitscan laser turret** as the baseline weapon.
+- [x] Add **projectile ballistic turret** as the stronger/more complex upgrade.
+- [x] Add ammunition requirement for ballistic turrets.
+- [x] Add nearby ammo storage dependency and consumption rules.
+- [x] Differentiate manual and automated use difficulty between the two.
+- [x] Update UI and combat logic accordingly.
 
 Definition of done:
 
@@ -111,12 +111,12 @@ Split reactor families into meaningfully different control problems.
 
 ### Tasks
 
-- [ ] Add **fission reactor** baseline behavior.
-- [ ] Add **fusion reactor** with more interdependent control variables.
-- [ ] Move fuel storage out of the reactor body and into neighboring fuel storage.
-- [ ] Add first-pass fuel transfer/consumption rules.
-- [ ] Keep both systems manually operable and automatable.
-- [ ] Update UI to reflect the different control surfaces.
+- [x] Add **fission reactor** baseline behavior.
+- [x] Add **fusion reactor** with more interdependent control variables.
+- [x] Move fuel storage out of the reactor body and into neighboring fuel storage.
+- [x] Add first-pass fuel transfer/consumption rules.
+- [x] Keep both systems manually operable and automatable.
+- [x] Update UI to reflect the different control surfaces.
 
 Definition of done:
 
@@ -132,14 +132,14 @@ Make helm quality a real design choice.
 
 ### Tasks
 
-- [ ] Add at least one improved cockpit/helm variant.
-- [ ] Decide what “better control” means mechanically:
+- [x] Add at least one improved cockpit/helm variant.
+- [x] Decide what “better control” means mechanically:
   - faster response
   - better damping
   - improved turn authority
   - better visibility / HUD support
-- [ ] Reflect those benefits in the helm UI and flight model.
-- [ ] Keep manual and future automated control paths compatible.
+- [x] Reflect those benefits in the helm UI and flight model.
+- [x] Keep manual and future automated control paths compatible.
 
 Definition of done:
 
@@ -155,11 +155,11 @@ Make energy storage about more than total capacity.
 
 ### Tasks
 
-- [ ] Add maximum charge/discharge rate to storage devices.
-- [ ] Rework batteries around capacity plus rate.
-- [ ] Add **capacitors** with lower capacity but much higher throughput.
-- [ ] Ensure power simulation respects these transfer limits.
-- [ ] Update UI/readouts to show not only stored energy but flow constraints.
+- [x] Add maximum charge/discharge rate to storage devices.
+- [x] Rework batteries around capacity plus rate.
+- [x] Add **capacitors** with lower capacity but much higher throughput.
+- [x] Ensure power simulation respects these transfer limits.
+- [x] Update UI/readouts to show not only stored energy but flow constraints.
 
 Definition of done:
 
@@ -175,11 +175,11 @@ Make the core the anchor for vessel scale and inertia field size.
 
 ### Tasks
 
-- [ ] Add better core variants with higher ship-size allowance.
-- [ ] Define and enforce first-pass maximum supported ship size.
-- [ ] Link inertia-field size more explicitly to core quality.
-- [ ] Reflect size/field limits in the editor and runtime.
-- [ ] Keep current small-core behavior as the baseline.
+- [x] Add better core variants with higher ship-size allowance.
+- [x] Define and enforce first-pass maximum supported ship size.
+- [x] Link inertia-field size more explicitly to core quality.
+- [x] Reflect size/field limits in the editor and runtime.
+- [x] Keep current small-core behavior as the baseline.
 
 Definition of done:
 
@@ -195,13 +195,13 @@ Expand logistics into real onboard production choices.
 
 ### Tasks
 
-- [ ] Add slower and faster fabricator variants.
-- [ ] Add recipes to turn scrap into:
+- [x] Add slower and faster fabricator variants.
+- [x] Add recipes to turn scrap into:
   - ammunition
   - fuel
-- [ ] Feed these outputs back into existing storage/logistics systems.
-- [ ] Show throughput and bottleneck behavior clearly.
-- [ ] Keep the first recipe set intentionally small.
+- [x] Feed these outputs back into existing storage/logistics systems.
+- [x] Show throughput and bottleneck behavior clearly.
+- [x] Keep the first recipe set intentionally small.
 
 Definition of done:
 
@@ -217,12 +217,12 @@ Introduce the first shield variants with distinct control demands.
 
 ### Tasks
 
-- [ ] Add **radial shield generator**.
-- [ ] Add **directional shield generator**.
-- [ ] Decide first-pass shield damage/coverage semantics.
-- [ ] Make directional shielding meaningfully stronger but harder to use.
-- [ ] Expose command surfaces that future automation can target.
-- [ ] Add UI/readouts for shield state and directionality.
+- [x] Add **radial shield generator**.
+- [x] Add **directional shield generator**.
+- [x] Decide first-pass shield damage/coverage semantics.
+- [x] Make directional shielding meaningfully stronger but harder to use.
+- [x] Expose command surfaces that future automation can target.
+- [x] Add UI/readouts for shield state and directionality.
 
 Definition of done:
 
@@ -238,11 +238,11 @@ Make sure the richer machinery can still be automated coherently.
 
 ### Tasks
 
-- [ ] Identify writable command surfaces for the new variants.
-- [ ] Keep hitscan vs ballistic turret commands structurally coherent.
-- [ ] Keep fission vs fusion reactor controls consistent where possible.
-- [ ] Add the minimum register/readout support needed for future fuller ARCH work.
-- [ ] Avoid creating manual-only mechanics that block later automation.
+- [x] Identify writable command surfaces for the new variants.
+- [x] Keep hitscan vs ballistic turret commands structurally coherent.
+- [x] Keep fission vs fusion reactor controls consistent where possible.
+- [x] Add the minimum register/readout support needed for future fuller ARCH work.
+- [x] Avoid creating manual-only mechanics that block later automation.
 
 Definition of done:
 
@@ -258,11 +258,11 @@ Keep the expanded part set understandable in refit and operation.
 
 ### Tasks
 
-- [ ] Update the editor toolbox/panels for variant families.
-- [ ] Add clear naming and grouping for variants.
-- [ ] Update station UIs to reflect variant-specific controls and readouts.
-- [ ] Show logistical dependencies like ammo/fuel adjacency clearly.
-- [ ] Keep the interface usable despite the larger content surface.
+- [x] Update the editor toolbox/panels for variant families.
+- [x] Add clear naming and grouping for variants.
+- [x] Update station UIs to reflect variant-specific controls and readouts.
+- [x] Show logistical dependencies like ammo/fuel adjacency clearly.
+- [x] Keep the interface usable despite the larger content surface.
 
 Definition of done:
 
@@ -278,10 +278,10 @@ Let the new components appear in normal play, not only test setups.
 
 ### Tasks
 
-- [ ] Add some enemy and/or node content that uses the new variants.
-- [ ] Ensure salvage and refit loops can surface the new parts naturally.
-- [ ] Tune reward and threat so upgraded parts matter in practice.
-- [ ] Ensure boarding and station-use still work on the new variants.
+- [x] Add some enemy and/or node content that uses the new variants.
+- [x] Ensure salvage and refit loops can surface the new parts naturally.
+- [x] Tune reward and threat so upgraded parts matter in practice.
+- [x] Ensure boarding and station-use still work on the new variants.
 
 Definition of done:
 
@@ -316,4 +316,3 @@ Start with **Phase 1**:
 * decide how much of the behavior should be data-driven from the outset
 
 That decision shapes every later part of the slice.
-

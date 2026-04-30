@@ -1,6 +1,7 @@
 mod client;
 mod host;
 mod protocol;
+mod session;
 mod ship;
 
 fn main() {

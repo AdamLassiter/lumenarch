@@ -2,7 +2,7 @@ use std::{fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 
-use super::{ModuleKind, ShipDefinition, ShipModule};
+use super::{ModuleKind, ModuleVariant, ShipDefinition, ShipModule};
 
 pub const DEFAULT_ENEMY_SHIPS_PATH: &str = "saves/enemy_ships.json";
 
@@ -125,6 +125,21 @@ fn save_enemy_library_to_path(path: &Path, library: &EnemyShipLibrary) -> Result
 }
 
 fn raider_skiff() -> EnemyShipEntry {
+    let mut modules = vec![
+        ShipModule::new(1, ModuleKind::Core, 0, 0, 0),
+        ShipModule::new(2, ModuleKind::Cockpit, 0, 1, 0),
+        ShipModule::new(3, ModuleKind::Reactor, -1, 0, 3),
+        ShipModule::new(4, ModuleKind::Engine, 0, -1, 2),
+        ShipModule::new(5, ModuleKind::Engine, 1, -1, 2),
+        ShipModule::new(6, ModuleKind::Turret, 1, 0, 1),
+        ShipModule::new(7, ModuleKind::Hull, -1, 1, 3),
+        ShipModule::new(8, ModuleKind::Hull, 1, 1, 1),
+        ShipModule::new(9, ModuleKind::Cargo, -2, 0, 3),
+    ];
+    modules[1].variant = ModuleVariant::AdvancedHelm;
+    modules[2].variant = ModuleVariant::Fission;
+    modules[5].variant = ModuleVariant::LaserTurret;
+    modules[8].variant = ModuleVariant::AmmoRack;
     EnemyShipEntry {
         id: "raider_skiff".to_string(),
         display_name: "Raider Skiff".to_string(),
@@ -132,21 +147,34 @@ fn raider_skiff() -> EnemyShipEntry {
         behavior_tag: "skirmisher".to_string(),
         ship: ShipDefinition {
             name: "Raider Skiff".to_string(),
-            modules: vec![
-                ShipModule::new(1, ModuleKind::Core, 0, 0, 0),
-                ShipModule::new(2, ModuleKind::Cockpit, 0, 1, 0),
-                ShipModule::new(3, ModuleKind::Reactor, -1, 0, 3),
-                ShipModule::new(4, ModuleKind::Engine, 0, -1, 2),
-                ShipModule::new(5, ModuleKind::Engine, 1, -1, 2),
-                ShipModule::new(6, ModuleKind::Turret, 1, 0, 1),
-                ShipModule::new(7, ModuleKind::Hull, -1, 1, 3),
-                ShipModule::new(8, ModuleKind::Hull, 1, 1, 1),
-            ],
+            modules,
         },
     }
 }
 
 fn scrap_brigand() -> EnemyShipEntry {
+    let mut modules = vec![
+        ShipModule::new(1, ModuleKind::Core, 0, 0, 0),
+        ShipModule::new(2, ModuleKind::Cockpit, 0, 1, 0),
+        ShipModule::new(3, ModuleKind::Reactor, -1, 0, 3),
+        ShipModule::new(4, ModuleKind::Battery, -2, 0, 3),
+        ShipModule::new(5, ModuleKind::Engine, 0, -1, 2),
+        ShipModule::new(6, ModuleKind::Engine, 1, -1, 2),
+        ShipModule::new(7, ModuleKind::Turret, 1, 0, 1),
+        ShipModule::new(8, ModuleKind::Turret, 2, 0, 1),
+        ShipModule::new(9, ModuleKind::Cargo, -1, 1, 0),
+        ShipModule::new(10, ModuleKind::Hull, -2, 1, 3),
+        ShipModule::new(11, ModuleKind::Hull, 2, 1, 1),
+        ShipModule::new(12, ModuleKind::HullInnerCorner, 2, -1, 2),
+        ShipModule::new(13, ModuleKind::Shield, -2, -1, 0),
+    ];
+    modules[0].variant = ModuleVariant::ExpandedCore;
+    modules[2].variant = ModuleVariant::Fusion;
+    modules[3].variant = ModuleVariant::Capacitor;
+    modules[6].variant = ModuleVariant::BallisticTurret;
+    modules[7].variant = ModuleVariant::LaserTurret;
+    modules[8].variant = ModuleVariant::FuelTank;
+    modules[12].variant = ModuleVariant::DirectionalShield;
     EnemyShipEntry {
         id: "scrap_brigand".to_string(),
         display_name: "Scrap Brigand".to_string(),
@@ -154,20 +182,7 @@ fn scrap_brigand() -> EnemyShipEntry {
         behavior_tag: "brawler".to_string(),
         ship: ShipDefinition {
             name: "Scrap Brigand".to_string(),
-            modules: vec![
-                ShipModule::new(1, ModuleKind::Core, 0, 0, 0),
-                ShipModule::new(2, ModuleKind::Cockpit, 0, 1, 0),
-                ShipModule::new(3, ModuleKind::Reactor, -1, 0, 3),
-                ShipModule::new(4, ModuleKind::Battery, -2, 0, 3),
-                ShipModule::new(5, ModuleKind::Engine, 0, -1, 2),
-                ShipModule::new(6, ModuleKind::Engine, 1, -1, 2),
-                ShipModule::new(7, ModuleKind::Turret, 1, 0, 1),
-                ShipModule::new(8, ModuleKind::Turret, 2, 0, 1),
-                ShipModule::new(9, ModuleKind::Cargo, -1, 1, 0),
-                ShipModule::new(10, ModuleKind::Hull, -2, 1, 3),
-                ShipModule::new(11, ModuleKind::Hull, 2, 1, 1),
-                ShipModule::new(12, ModuleKind::HullInnerCorner, 2, -1, 2),
-            ],
+            modules,
         },
     }
 }

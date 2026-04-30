@@ -6,6 +6,7 @@ use crate::ship::ModuleKind;
 #[derive(Component)]
 pub(crate) struct ShipMovementModel {
     pub(crate) engine_count: u32,
+    pub(crate) helm_multiplier: Fx,
     pub(crate) thrust_acceleration: Fx,
     pub(crate) turn_speed: Fx,
     pub(crate) max_speed: Fx,
@@ -17,9 +18,12 @@ pub(crate) struct ShipMovementModel {
 pub(crate) struct ShipPowerModel {
     pub(crate) reactor_output: Fx,
     pub(crate) battery_capacity: Fx,
+    pub(crate) battery_charge_rate: Fx,
+    pub(crate) battery_discharge_rate: Fx,
     pub(crate) passive_draw: Fx,
     pub(crate) engine_draw: Fx,
     pub(crate) weapon_draw: Fx,
+    pub(crate) shield_draw: Fx,
 }
 
 #[derive(Component)]
@@ -46,6 +50,7 @@ pub(crate) struct ShipWeaponState {
     pub(crate) turret_count: u32,
     pub(crate) cooldown_remaining: Fx,
     pub(crate) cooldown_duration: Fx,
+    pub(crate) shield_count: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

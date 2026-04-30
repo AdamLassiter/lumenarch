@@ -15,6 +15,7 @@ use crate::{
                 PlayerShip,
                 ProcessorCommandState,
                 ProcessorModule,
+                ProcessorRecipe,
                 ResourceKind,
                 RuntimeShipModule,
                 SalvagePickup,
@@ -103,7 +104,15 @@ pub(crate) fn run_logistics_transfers(
                     runtime_module.module_id,
                     runtime_module.kind,
                     runtime_module.local_position,
-                    storage.map(|s| (s.capacity, s.inventory)),
+                    storage.map(|s| {
+                        (
+                            s.capacity,
+                            s.inventory,
+                            s.accepts_fuel,
+                            s.accepts_ammunition,
+                            s.accepts_general,
+                        )
+                    }),
                     processor.map(|p| (p.input_required, p.output_amount, p.inventory)),
                     destroyed.is_some(),
                 )
@@ -221,7 +230,8 @@ pub(crate) fn run_logistics_transfers(
         }
 
         if let Some(storage) = target_storage.as_mut() {
-            if storage.inventory.total_units() < storage.capacity {
+            if storage.inventory.total_units() < storage.capacity && storage.accepts(resource_kind)
+            {
                 storage.inventory.add(resource_kind, 1);
                 moved = true;
             }
@@ -283,8 +293,16 @@ pub(crate) fn run_processors(
             processor.blocked_reason = Some("manual hold".to_string());
             continue;
         }
+        let output_kind = match command_state
+            .map(|command_state| command_state.selected_recipe)
+            .unwrap_or(ProcessorRecipe::RepairCharge)
+        {
+            ProcessorRecipe::RepairCharge => ResourceKind::RepairCharge,
+            ProcessorRecipe::Ammunition => ResourceKind::Ammunition,
+            ProcessorRecipe::Fuel => ResourceKind::Fuel,
+        };
         let output_cap = processor.output_amount * 3;
-        if processor.inventory.repair_charge >= output_cap {
+        if processor.inventory.get(output_kind) >= output_cap {
             processor.active = false;
             processor.progress = Fx::from_num(0);
             processor.blocked_reason = Some("output buffer full".to_string());
@@ -322,14 +340,15 @@ pub(crate) fn run_processors(
             processor.blocked_reason = Some("input lost before cycle complete".to_string());
             continue;
         }
-        processor
-            .inventory
-            .add(ResourceKind::RepairCharge, output_amount);
-        mission_state.processed_repair_charge += output_amount;
+        processor.inventory.add(output_kind, output_amount);
+        if output_kind == ResourceKind::RepairCharge {
+            mission_state.processed_repair_charge += output_amount;
+        }
         mission_state.processor_cycles += 1;
         mission_state.recent_action = Some(format!(
-            "{} converted salvage into repair charge",
-            runtime_module.kind.as_str()
+            "{} fabricated {}",
+            runtime_module.kind.as_str(),
+            resource_kind_label(output_kind)
         ));
         mission_state.recent_action_timer = Fx::from_num(1.8);
     }
@@ -341,7 +360,13 @@ fn find_automation_transfer_task(
         u64,
         ModuleKind,
         FixedVec2,
-        Option<(u32, crate::client::gameplay::components::ResourceInventory)>,
+        Option<(
+            u32,
+            crate::client::gameplay::components::ResourceInventory,
+            bool,
+            bool,
+            bool,
+        )>,
         Option<(
             u32,
             u32,
@@ -356,7 +381,7 @@ fn find_automation_transfer_task(
         if *source_destroyed || !in_range(*source_pos) {
             continue;
         }
-        let Some((_, source_inventory)) = storage else {
+        let Some((_, source_inventory, _, _, _)) = storage else {
             continue;
         };
         if source_inventory.raw_salvage == 0 {
@@ -399,14 +424,58 @@ fn find_automation_transfer_task(
             if *target_destroyed || !in_range(*target_pos) || source_id == target_id {
                 continue;
             }
-            let Some((capacity, storage_inventory)) = storage else {
+            let Some((capacity, storage_inventory, _, _, accepts_general)) = storage else {
                 continue;
             };
-            if *target_kind != ModuleKind::Cargo || storage_inventory.total_units() >= *capacity {
+            if *target_kind != ModuleKind::Cargo
+                || !accepts_general
+                || storage_inventory.total_units() >= *capacity
+            {
                 continue;
             }
             return Some((*source_id, *target_id, ResourceKind::RepairCharge));
         }
+    }
+
+    for (_, source_id, source_kind, source_pos, _, processor, source_destroyed) in snapshots {
+        if *source_destroyed || !in_range(*source_pos) {
+            continue;
+        }
+        let Some((_, _, processor_inventory)) = processor else {
+            continue;
+        };
+        let outputs = [
+            (ResourceKind::Fuel, processor_inventory.fuel),
+            (ResourceKind::Ammunition, processor_inventory.ammunition),
+        ];
+        for (resource_kind, amount) in outputs {
+            if amount == 0 {
+                continue;
+            }
+            for (_, target_id, target_kind, target_pos, storage, _, target_destroyed) in snapshots {
+                if *target_destroyed || !in_range(*target_pos) || source_id == target_id {
+                    continue;
+                }
+                let Some((capacity, storage_inventory, accepts_fuel, accepts_ammunition, _)) =
+                    storage
+                else {
+                    continue;
+                };
+                let accepts = match resource_kind {
+                    ResourceKind::Fuel => *accepts_fuel,
+                    ResourceKind::Ammunition => *accepts_ammunition,
+                    _ => false,
+                };
+                if !accepts
+                    || *target_kind != ModuleKind::Cargo
+                    || storage_inventory.total_units() >= *capacity
+                {
+                    continue;
+                }
+                return Some((*source_id, *target_id, resource_kind));
+            }
+        }
+        let _ = source_kind;
     }
 
     None
@@ -418,7 +487,13 @@ fn find_airlock_to_cargo_transfer(
         u64,
         ModuleKind,
         FixedVec2,
-        Option<(u32, crate::client::gameplay::components::ResourceInventory)>,
+        Option<(
+            u32,
+            crate::client::gameplay::components::ResourceInventory,
+            bool,
+            bool,
+            bool,
+        )>,
         Option<(
             u32,
             u32,
@@ -432,23 +507,48 @@ fn find_airlock_to_cargo_transfer(
         if *source_destroyed || !in_range(*source_pos) {
             continue;
         }
-        let Some((_, source_inventory)) = storage else {
+        let Some((_, source_inventory, _, _, _)) = storage else {
             continue;
         };
-        if *source_kind != ModuleKind::Airlock || source_inventory.raw_salvage == 0 {
+        if *source_kind != ModuleKind::Airlock {
             continue;
         }
-        for (_, target_id, target_kind, target_pos, storage, _, target_destroyed) in snapshots {
-            if *target_destroyed || !in_range(*target_pos) || source_id == target_id {
+        for (resource_kind, amount) in [
+            (ResourceKind::RawSalvage, source_inventory.raw_salvage),
+            (ResourceKind::RepairCharge, source_inventory.repair_charge),
+            (ResourceKind::Fuel, source_inventory.fuel),
+            (ResourceKind::Ammunition, source_inventory.ammunition),
+        ] {
+            if amount == 0 {
                 continue;
             }
-            let Some((capacity, storage_inventory)) = storage else {
-                continue;
-            };
-            if *target_kind != ModuleKind::Cargo || storage_inventory.total_units() >= *capacity {
-                continue;
+            for (_, target_id, target_kind, target_pos, storage, _, target_destroyed) in snapshots {
+                if *target_destroyed || !in_range(*target_pos) || source_id == target_id {
+                    continue;
+                }
+                let Some((
+                    capacity,
+                    storage_inventory,
+                    accepts_fuel,
+                    accepts_ammunition,
+                    accepts_general,
+                )) = storage
+                else {
+                    continue;
+                };
+                let accepts = match resource_kind {
+                    ResourceKind::Fuel => *accepts_fuel,
+                    ResourceKind::Ammunition => *accepts_ammunition,
+                    ResourceKind::RawSalvage | ResourceKind::RepairCharge => *accepts_general,
+                };
+                if *target_kind != ModuleKind::Cargo
+                    || !accepts
+                    || storage_inventory.total_units() >= *capacity
+                {
+                    continue;
+                }
+                return Some((*source_id, *target_id, resource_kind));
             }
-            return Some((*source_id, *target_id, ResourceKind::RawSalvage));
         }
     }
 

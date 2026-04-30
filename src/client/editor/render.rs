@@ -37,7 +37,10 @@ pub(crate) fn spawn_preview_tile(
     commands.spawn((
         Sprite {
             color: Color::srgba(1.0, 1.0, 1.0, 0.72),
-            ..Sprite::from_image(asset_server.load(sprite_path_for_kind(&tool_state.selected_kind)))
+            ..Sprite::from_image(asset_server.load(sprite_path_for_kind(
+                &tool_state.selected_kind,
+                tool_state.selected_variant,
+            )))
         },
         Transform::from_xyz(0.0, 0.0, 5.0),
         Visibility::Hidden,
@@ -67,7 +70,10 @@ pub(crate) fn sync_preview_tile(
     };
 
     *visibility = Visibility::Visible;
-    sprite.image = asset_server.load(sprite_path_for_kind(&tool_state.selected_kind));
+    sprite.image = asset_server.load(sprite_path_for_kind(
+        &tool_state.selected_kind,
+        tool_state.selected_variant,
+    ));
     transform.translation = grid_to_world(grid_x, grid_y, 5.0);
     transform.rotation = Quat::from_rotation_z(-(tool_state.selected_rotation as f32) * FRAC_PI_2);
 }
@@ -88,7 +94,9 @@ pub(crate) fn sync_ship_tile_entities(
 
     for module in &editor_ship.ship.modules {
         commands.spawn((
-            Sprite::from_image(asset_server.load(sprite_path_for_kind(&module.kind))),
+            Sprite::from_image(
+                asset_server.load(sprite_path_for_kind(&module.kind, module.variant)),
+            ),
             Transform {
                 translation: grid_to_world(module.grid_x, module.grid_y, 1.0),
                 rotation: Quat::from_rotation_z(-(module.rotation_quadrants as f32) * FRAC_PI_2),
@@ -110,7 +118,11 @@ pub(crate) fn sync_toolbox_visuals(
     }
 
     for (button, mut background) in &mut query {
-        let affordable = progression.scrap >= module_kind_cost(button.kind);
+        let affordable = progression.scrap
+            >= module_kind_cost(
+                button.kind,
+                crate::ship::ModuleVariant::default_for_kind(button.kind),
+            );
         if button.kind == tool_state.selected_kind {
             *background = BackgroundColor(if affordable {
                 SELECTED_BUTTON

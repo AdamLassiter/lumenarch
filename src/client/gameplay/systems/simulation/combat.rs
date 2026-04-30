@@ -22,6 +22,7 @@ use crate::{
                 Projectile,
                 ProjectileFaction,
                 RuntimeShipModule,
+                ShieldCommandState,
                 ShipArchCommandState,
                 ShipControlMode,
                 ShipMovementModel,
@@ -32,6 +33,7 @@ use crate::{
                 ShipboardControlState,
                 SimPosition,
                 SimRotation,
+                StorageModule,
                 TurretCommandState,
                 WeaponModule,
             },
@@ -49,7 +51,6 @@ use crate::{
                 render_translation,
                 ship_movement_model_with_effective,
                 ship_power_model_with_effective,
-                spawn_player_projectile,
                 spawn_projectile_entity,
                 update_ship_power_state,
                 wrap_radians,
@@ -80,11 +81,13 @@ pub(crate) fn fire_player_weapons(
             Entity,
             &RuntimeShipModule,
             &ModuleRuntimeState,
+            &WeaponModule,
             &TurretCommandState,
             Option<&DestroyedModule>,
         ),
         With<WeaponModule>,
     >,
+    mut storage_query: Query<(&Parent, &mut StorageModule)>,
 ) {
     let control_mode = control_mode_query.into_inner();
 
@@ -102,9 +105,16 @@ pub(crate) fn fire_player_weapons(
     }
 
     let mut fired_any = false;
+    let mut cooldown_after_shot = Fx::from_num(0);
     for child in children.iter() {
-        let Ok((weapon_entity, weapon_module, runtime_state, turret_state, destroyed)) =
-            weapon_query.get(*child)
+        let Ok((
+            weapon_entity,
+            weapon_module,
+            runtime_state,
+            weapon_stats,
+            turret_state,
+            destroyed,
+        )) = weapon_query.get(*child)
         else {
             continue;
         };
@@ -119,9 +129,20 @@ pub(crate) fn fire_player_weapons(
         if is_manual_turret && !turret_state.fire_intent {
             continue;
         }
+        if weapon_stats.requires_ammo
+            && !consume_ship_resource(
+                &mut storage_query,
+                children,
+                crate::client::gameplay::components::ResourceKind::Ammunition,
+                weapon_stats.ammo_per_shot.max(1),
+            )
+        {
+            continue;
+        }
         let world_angle = ship_rotation.radians + turret_state.actual_angle;
-        let projectile_velocity =
-            facing_vector(world_angle) * Fx::from_num(balance.combat.projectile_speed);
+        let projectile_velocity = facing_vector(world_angle)
+            * Fx::from_num(balance.combat.projectile_speed)
+            * weapon_stats.projectile_speed_multiplier;
         if projectile_velocity.is_near_zero() {
             continue;
         }
@@ -130,12 +151,29 @@ pub(crate) fn fire_player_weapons(
         let origin = ship_position.value
             + weapon_module.local_position.rotate(ship_rotation.radians)
             + muzzle_offset;
-        spawn_player_projectile(&mut commands, origin, projectile_velocity, &balance);
+        spawn_projectile_entity(
+            &mut commands,
+            origin,
+            projectile_velocity,
+            &balance,
+            ProjectileFaction::Player,
+            weapon_stats.damage,
+            Fx::from_num(0),
+            Fx::from_num(0),
+            if weapon_stats.requires_ammo {
+                Color::srgb(0.98, 0.64, 0.24)
+            } else {
+                Color::srgb(0.98, 0.84, 0.30)
+            },
+        );
         fired_any = true;
+        cooldown_after_shot = cooldown_after_shot.max(
+            Fx::from_num(balance.combat.player_weapon_cooldown) * weapon_stats.cooldown_multiplier,
+        );
     }
 
     if fired_any {
-        weapon_state.cooldown_remaining = weapon_state.cooldown_duration;
+        weapon_state.cooldown_remaining = cooldown_after_shot.max(weapon_state.cooldown_duration);
     }
 }
 
@@ -170,7 +208,10 @@ pub(crate) fn sync_hostile_ship_state(
         let mut effective_engines = Fx::from_num(0);
         let mut effective_reactors = Fx::from_num(0);
         let mut effective_batteries = Fx::from_num(0);
+        let mut effective_battery_flow = Fx::from_num(0);
         let mut effective_turrets = Fx::from_num(0);
+        let mut effective_helm = Fx::from_num(1);
+        let mut shield_count = 0u32;
 
         for child in children.iter() {
             let Ok((runtime_module, integrity, runtime_state, destroyed, weapon_module)) =
@@ -196,12 +237,19 @@ pub(crate) fn sync_hostile_ship_state(
                 ModuleKind::Battery => {
                     battery_count += 1;
                     effective_batteries += effectiveness;
+                    effective_battery_flow += effectiveness;
                 }
                 ModuleKind::Turret => {
                     turret_count += 1;
                     if weapon_module.is_some() && !runtime_state.is_disabled {
                         effective_turrets += effectiveness;
                     }
+                }
+                ModuleKind::Cockpit => {
+                    effective_helm = effective_helm.max(effectiveness.max(Fx::from_num(1)));
+                }
+                ModuleKind::Shield => {
+                    shield_count += 1;
                 }
                 _ => {}
             }
@@ -211,6 +259,7 @@ pub(crate) fn sync_hostile_ship_state(
             live_modules.max(1),
             engine_count,
             effective_engines,
+            effective_helm,
             &balance,
         );
         *power_model = ship_power_model_with_effective(
@@ -221,11 +270,14 @@ pub(crate) fn sync_hostile_ship_state(
             turret_count,
             effective_reactors,
             effective_batteries,
+            effective_battery_flow.max(Fx::from_num(battery_count.max(1))),
+            effective_battery_flow.max(Fx::from_num(battery_count.max(1))),
             effective_engines,
             effective_turrets,
             &balance,
         );
         weapon_state.turret_count = effective_turrets.to_num::<u32>();
+        weapon_state.shield_count = shield_count;
         if weapon_state.turret_count == 0 {
             weapon_state.cooldown_remaining = Fx::from_num(0);
         }
@@ -418,11 +470,13 @@ pub(crate) fn fire_hostile_ship_weapons(
             &Parent,
             &RuntimeShipModule,
             &ModuleRuntimeState,
+            &WeaponModule,
             &TurretCommandState,
             Option<&DestroyedModule>,
         ),
         With<WeaponModule>,
     >,
+    mut storage_query: Query<(&Parent, &mut StorageModule)>,
 ) {
     let mission_state = mission_query.into_inner();
     if mission_state.failed || mission_state.completed {
@@ -440,8 +494,9 @@ pub(crate) fn fire_hostile_ship_weapons(
         }
 
         let mut fired_any = false;
+        let mut cooldown_after_shot = Fx::from_num(0);
         for child in children.iter() {
-            let Ok((parent, weapon_module, runtime_state, turret_state, destroyed)) =
+            let Ok((parent, weapon_module, runtime_state, weapon_stats, turret_state, destroyed)) =
                 weapon_query.get(*child)
             else {
                 continue;
@@ -453,10 +508,21 @@ pub(crate) fn fire_hostile_ship_weapons(
             {
                 continue;
             }
+            if weapon_stats.requires_ammo
+                && !consume_ship_resource(
+                    &mut storage_query,
+                    children,
+                    crate::client::gameplay::components::ResourceKind::Ammunition,
+                    weapon_stats.ammo_per_shot.max(1),
+                )
+            {
+                continue;
+            }
 
             let world_angle = ship_rotation.radians + turret_state.actual_angle;
-            let projectile_velocity =
-                facing_vector(world_angle) * Fx::from_num(balance.combat.hostile_projectile_speed);
+            let projectile_velocity = facing_vector(world_angle)
+                * Fx::from_num(balance.combat.hostile_projectile_speed)
+                * weapon_stats.projectile_speed_multiplier;
             if projectile_velocity.is_near_zero() {
                 continue;
             }
@@ -471,16 +537,27 @@ pub(crate) fn fire_hostile_ship_weapons(
                 projectile_velocity,
                 &balance,
                 ProjectileFaction::Hostile,
-                balance.combat.hostile_projectile_damage,
+                weapon_stats
+                    .damage
+                    .max(balance.combat.hostile_projectile_damage),
                 Fx::from_num(balance.combat.hostile_projectile_heat_damage),
                 Fx::from_num(balance.combat.hostile_projectile_electrical_damage),
-                Color::srgb(0.96, 0.38, 0.24),
+                if weapon_stats.requires_ammo {
+                    Color::srgb(0.90, 0.46, 0.30)
+                } else {
+                    Color::srgb(0.96, 0.38, 0.24)
+                },
             );
             fired_any = true;
+            cooldown_after_shot = cooldown_after_shot.max(
+                Fx::from_num(balance.combat.hostile_fire_cooldown)
+                    * weapon_stats.cooldown_multiplier,
+            );
         }
 
         if fired_any {
-            weapon_state.cooldown_remaining = weapon_state.cooldown_duration;
+            weapon_state.cooldown_remaining =
+                cooldown_after_shot.max(weapon_state.cooldown_duration);
         }
     }
 }
@@ -592,6 +669,7 @@ pub(crate) fn handle_projectile_hits(
         ),
         With<HostileShipModule>,
     >,
+    mut hostile_shield_query: Query<(&Parent, &mut ShieldCommandState), With<HostileShipModule>>,
     mut static_hostile_query: Query<
         (Entity, &SimPosition, &mut Integrity),
         (
@@ -609,6 +687,14 @@ pub(crate) fn handle_projectile_hits(
             Option<&DestroyedModule>,
         ),
         (With<RuntimeShipModule>, Without<HostileShipModule>),
+    >,
+    mut player_shield_query: Query<
+        (&RuntimeShipModule, &mut ShieldCommandState),
+        (
+            With<RuntimeShipModule>,
+            Without<HostileShipModule>,
+            With<ShieldCommandState>,
+        ),
     >,
     player_ship_query: Single<
         (&SimPosition, &SimRotation, &mut MissionState),
@@ -629,6 +715,23 @@ pub(crate) fn handle_projectile_hits(
                 for (root_entity, children, hostile_position, hostile_rotation, ai) in
                     &hostile_root_query
                 {
+                    if absorb_hostile_shield_hit(
+                        root_entity,
+                        hostile_rotation.radians,
+                        projectile,
+                        &mut hostile_shield_query,
+                    ) {
+                        commands.entity(projectile_entity).despawn();
+                        hit_hostile_module = Some((
+                            root_entity,
+                            Entity::PLACEHOLDER,
+                            ModuleKind::Shield,
+                            0,
+                            hostile_position.value,
+                            ai.salvage_reward,
+                        ));
+                        break;
+                    }
                     for child in children.iter() {
                         let Ok((module_entity, parent, runtime_module, integrity, _, destroyed)) =
                             hostile_module_query.get(*child)
@@ -671,6 +774,9 @@ pub(crate) fn handle_projectile_hits(
                     salvage_reward,
                 )) = hit_hostile_module
                 {
+                    if module_entity == Entity::PLACEHOLDER {
+                        continue;
+                    }
                     if let Ok((_, _, _, mut integrity, mut runtime_state, destroyed)) =
                         hostile_module_query.get_mut(module_entity)
                     {
@@ -716,6 +822,14 @@ pub(crate) fn handle_projectile_hits(
                 }
             }
             ProjectileFaction::Hostile => {
+                if absorb_player_shield_hit(
+                    ship_rotation.radians,
+                    projectile,
+                    &mut player_shield_query,
+                ) {
+                    commands.entity(projectile_entity).despawn();
+                    continue;
+                }
                 let mut hit_module = None;
 
                 for (module_entity, runtime_module, integrity, _, destroyed) in
@@ -784,3 +898,84 @@ fn spawn_hostile_salvage(commands: &mut Commands, position: SimVec, salvage_rewa
 }
 
 type SimVec = crate::client::gameplay::helpers::FixedVec2;
+
+fn consume_ship_resource(
+    storage_query: &mut Query<(&Parent, &mut StorageModule)>,
+    children: &Children,
+    resource_kind: crate::client::gameplay::components::ResourceKind,
+    amount: u32,
+) -> bool {
+    for child in children.iter() {
+        let Ok((_parent, mut storage)) = storage_query.get_mut(*child) else {
+            continue;
+        };
+        if !storage.accepts(resource_kind) {
+            continue;
+        }
+        if storage.inventory.remove(resource_kind, amount) >= amount {
+            return true;
+        }
+    }
+    false
+}
+
+fn absorb_hostile_shield_hit(
+    root_entity: Entity,
+    ship_rotation: Fx,
+    projectile: &Projectile,
+    shield_query: &mut Query<(&Parent, &mut ShieldCommandState), With<HostileShipModule>>,
+) -> bool {
+    for (parent, mut shield) in shield_query.iter_mut() {
+        if parent.get() != root_entity || shield.strength <= Fx::from_num(0) {
+            continue;
+        }
+        if !shield_covers_direction(&shield, ship_rotation, projectile.velocity) {
+            continue;
+        }
+        shield.strength =
+            (shield.strength - Fx::from_num(projectile.damage.max(1))).max(Fx::from_num(0));
+        return true;
+    }
+    false
+}
+
+fn absorb_player_shield_hit(
+    ship_rotation: Fx,
+    projectile: &Projectile,
+    shield_query: &mut Query<
+        (&RuntimeShipModule, &mut ShieldCommandState),
+        (
+            With<RuntimeShipModule>,
+            Without<HostileShipModule>,
+            With<ShieldCommandState>,
+        ),
+    >,
+) -> bool {
+    for (_runtime_module, mut shield) in shield_query.iter_mut() {
+        if shield.strength <= Fx::from_num(0) {
+            continue;
+        }
+        if !shield_covers_direction(&shield, ship_rotation, projectile.velocity) {
+            continue;
+        }
+        shield.strength =
+            (shield.strength - Fx::from_num(projectile.damage.max(1))).max(Fx::from_num(0));
+        return true;
+    }
+    false
+}
+
+fn shield_covers_direction(
+    shield: &ShieldCommandState,
+    ship_rotation: Fx,
+    velocity: SimVec,
+) -> bool {
+    if !shield.directional {
+        return true;
+    }
+    let incoming_angle =
+        wrap_radians(angle_from_vector(velocity * Fx::from_num(-1)) - ship_rotation);
+    let desired = wrap_radians(shield.desired_angle);
+    let half_arc = Fx::from_num(shield.width.to_num::<f32>().to_radians()) * Fx::from_num(0.5);
+    wrap_radians(incoming_angle - desired).abs() <= half_arc
+}
