@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use super::super::helpers::Fx;
 use crate::ship::ModuleKind;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ShipMovementModel {
     pub(crate) engine_count: u32,
     pub(crate) helm_multiplier: Fx,
@@ -14,7 +14,7 @@ pub(crate) struct ShipMovementModel {
     pub(crate) angular_damping: Fx,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ShipPowerModel {
     pub(crate) reactor_output: Fx,
     pub(crate) battery_capacity: Fx,
@@ -26,7 +26,7 @@ pub(crate) struct ShipPowerModel {
     pub(crate) shield_draw: Fx,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ShipPowerState {
     pub(crate) stored_energy: Fx,
     pub(crate) generation: Fx,
@@ -37,7 +37,7 @@ pub(crate) struct ShipPowerState {
     pub(crate) engines_powered: bool,
 }
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Clone)]
 pub(crate) struct ShipControlState {
     pub(crate) throttle_demand: Fx,
     pub(crate) thrust_active: bool,
@@ -45,7 +45,7 @@ pub(crate) struct ShipControlState {
     pub(crate) fire_pressed: bool,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ShipWeaponState {
     pub(crate) turret_count: u32,
     pub(crate) cooldown_remaining: Fx,
@@ -63,7 +63,7 @@ pub(crate) enum ShipAutomationMode {
     Mixed,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ShipAutomationState {
     pub(crate) mode: ShipAutomationMode,
     pub(crate) active: bool,
@@ -81,7 +81,7 @@ pub(crate) enum ArchLogisticsPreference {
     StoreCharges,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ShipArchCommandState {
     pub(crate) reactor_cooling_bias: Fx,
     pub(crate) logistics_enabled: bool,
@@ -102,7 +102,7 @@ impl Default for ShipArchCommandState {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct MissionState {
     pub(crate) node_id: u32,
     pub(crate) node_name: String,

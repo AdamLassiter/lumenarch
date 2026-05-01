@@ -8,6 +8,7 @@ use super::{
     super::{
         HOVERED_BUTTON,
         PRESSED_BUTTON,
+        netcode,
         state::{
             ArchEditorButton,
             ArchEditorButtonAction,
@@ -79,12 +80,21 @@ pub(crate) fn leave_editor_button_system(
         (Changed<Interaction>, With<Button>, With<LeaveEditorButton>),
     >,
     editor_session: Res<EditorSessionState>,
+    status: Res<netcode::SessionStatus>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
     mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     for (interaction, mut background) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
                 *background = BackgroundColor(Color::srgb(0.42, 0.30, 0.20));
+                rollback_state.phase = match editor_session.mode {
+                    EditorMode::Player => netcode::RollbackPhase::Docked,
+                    EditorMode::Enemy => netcode::RollbackPhase::Menu,
+                };
                 next_state.set(match editor_session.mode {
                     EditorMode::Player => ClientAppState::Docked,
                     EditorMode::Enemy => ClientAppState::Menu,
@@ -103,9 +113,18 @@ pub(crate) fn leave_editor_button_system(
 pub(crate) fn leave_editor_keyboard_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     editor_session: Res<EditorSessionState>,
+    status: Res<netcode::SessionStatus>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
     mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     if keys.just_pressed(KeyCode::Tab) {
+        rollback_state.phase = match editor_session.mode {
+            EditorMode::Player => netcode::RollbackPhase::Docked,
+            EditorMode::Enemy => netcode::RollbackPhase::Menu,
+        };
         next_state.set(match editor_session.mode {
             EditorMode::Player => ClientAppState::Docked,
             EditorMode::Enemy => ClientAppState::Menu,
@@ -119,7 +138,12 @@ pub(crate) fn computer_program_button_system(
         (Changed<Interaction>, With<Button>),
     >,
     mut editor_ship: ResMut<EditorShip>,
+    status: Res<netcode::SessionStatus>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     for (interaction, button, mut background) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
@@ -145,6 +169,7 @@ pub(crate) fn computer_program_button_system(
                         }
                     }
                 }
+                rollback_state.editor_ship = editor_ship.ship.clone();
             }
             Interaction::Hovered => {
                 *background = BackgroundColor(HOVERED_BUTTON);
@@ -161,12 +186,18 @@ pub(crate) fn arch_editor_button_system(
     >,
     mut arch_editor_state: ResMut<ArchEditorState>,
     mut editor_ship: ResMut<EditorShip>,
+    status: Res<netcode::SessionStatus>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     for (interaction, button, mut background) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
                 *background = BackgroundColor(PRESSED_BUTTON);
                 apply_arch_editor_action(&mut arch_editor_state, &mut editor_ship, button.action);
+                rollback_state.editor_ship = editor_ship.ship.clone();
             }
             Interaction::Hovered => {
                 *background = BackgroundColor(HOVERED_BUTTON);
@@ -207,9 +238,14 @@ pub(crate) fn place_or_remove_tile(
     camera_query: Single<(&Camera, &GlobalTransform)>,
     mut editor_ship: ResMut<EditorShip>,
     mut progression: ResMut<DemoProgression>,
+    status: Res<netcode::SessionStatus>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
     editor_session: Res<EditorSessionState>,
     tool_state: Res<EditorToolState>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     let window = window.into_inner();
 
     if is_cursor_over_editor_ui(window) {
@@ -269,10 +305,13 @@ pub(crate) fn place_or_remove_tile(
                     .normalize_for_kind(tool_state.selected_kind);
             }
         }
+        rollback_state.editor_ship = editor_ship.ship.clone();
+        rollback_state.progression = progression.clone();
     }
 
     if buttons.just_pressed(MouseButton::Right) {
         editor_ship.ship.remove_module_at(grid_x, grid_y);
+        rollback_state.editor_ship = editor_ship.ship.clone();
     }
 }
 
@@ -339,8 +378,13 @@ pub(crate) fn load_editor_ship_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     editor_session: Res<EditorSessionState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
+    status: Res<netcode::SessionStatus>,
     mut editor_ship: ResMut<EditorShip>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     if !keys.just_pressed(KeyCode::F9) {
         return;
     }
@@ -349,6 +393,7 @@ pub(crate) fn load_editor_ship_shortcut(
         EditorMode::Player => match load_default_ship() {
             Ok(Some(saved_ship)) => {
                 editor_ship.ship = saved_ship;
+                rollback_state.editor_ship = editor_ship.ship.clone();
             }
             Ok(None) => {
                 eprintln!("editor: no saved ship file was found to load");
@@ -369,6 +414,7 @@ pub(crate) fn load_editor_ship_shortcut(
                     .selected_or_first(enemy_library_state.selected_index)
                 {
                     editor_ship.ship = entry.ship.clone();
+                    rollback_state.editor_ship = editor_ship.ship.clone();
                 }
             }
             Ok(None) => {
@@ -384,11 +430,17 @@ pub(crate) fn load_editor_ship_shortcut(
 pub(crate) fn persist_editor_ship(
     editor_ship: Res<EditorShip>,
     editor_session: Res<EditorSessionState>,
+    status: Res<netcode::SessionStatus>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     if !editor_ship.is_changed() {
         return;
     }
+    rollback_state.editor_ship = editor_ship.ship.clone();
 
     let result = match editor_session.mode {
         EditorMode::Player => save_default_ship(&editor_ship.ship),
@@ -425,7 +477,12 @@ pub(crate) fn enemy_library_button_system(
     editor_session: Res<EditorSessionState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
     mut editor_ship: ResMut<EditorShip>,
+    status: Res<netcode::SessionStatus>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     if editor_session.mode != EditorMode::Enemy {
         return;
     }
@@ -451,6 +508,7 @@ pub(crate) fn enemy_library_button_system(
                     .selected_or_first(enemy_library_state.selected_index)
                 {
                     editor_ship.ship = entry.ship.clone();
+                    rollback_state.editor_ship = editor_ship.ship.clone();
                 }
             }
             Interaction::Hovered => {
@@ -468,7 +526,12 @@ pub(crate) fn enemy_library_keyboard_shortcuts(
     editor_session: Res<EditorSessionState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
     mut editor_ship: ResMut<EditorShip>,
+    status: Res<netcode::SessionStatus>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     if editor_session.mode != EditorMode::Enemy {
         return;
     }
@@ -496,6 +559,7 @@ pub(crate) fn enemy_library_keyboard_shortcuts(
             .selected_or_first(enemy_library_state.selected_index)
     {
         editor_ship.ship = entry.ship.clone();
+        rollback_state.editor_ship = editor_ship.ship.clone();
     }
 }
 

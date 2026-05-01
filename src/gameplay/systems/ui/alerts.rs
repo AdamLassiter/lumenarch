@@ -11,6 +11,7 @@ use crate::{
             MissionState,
             ModuleRuntimeState,
             NearbyInteraction,
+            ObservedLocalPlayerMarker,
             PlayerFieldState,
             PlayerShip,
             ProcessorModule,
@@ -19,7 +20,6 @@ use crate::{
             ShipAtmosphereState,
             ShipAutomationState,
             ShipRoot,
-            ShipboardPlayer,
             StorageModule,
         },
         helpers::{
@@ -44,7 +44,7 @@ pub(crate) fn update_inspection_and_alerts_text(
             &HeldInteraction,
             &PlayerFieldState,
         ),
-        With<ShipboardPlayer>,
+        With<ObservedLocalPlayerMarker>,
     >,
     ship_query: Single<
         (&ShipAutomationState, &MissionState, &ShipAtmosphereState),

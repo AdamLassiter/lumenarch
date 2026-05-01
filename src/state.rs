@@ -1,13 +1,7 @@
-use std::sync::{Arc, Mutex};
-
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::DEFAULT_HOST_ADDR;
-use crate::{
-    protocol::ShipSnapshot,
-    ship::{ModuleKind, ModuleVariant, ShipDefinition, enemy::EnemyShipLibrary},
-};
+use crate::ship::{ModuleKind, ModuleVariant, ShipDefinition, enemy::EnemyShipLibrary};
 
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 pub(crate) enum ClientAppState {
@@ -17,115 +11,6 @@ pub(crate) enum ClientAppState {
     SectorMap,
     Editing,
     Encounter,
-}
-
-#[derive(Resource)]
-pub(crate) struct ConnectionConfig {
-    pub(crate) server_addr: String,
-}
-
-impl Default for ConnectionConfig {
-    fn default() -> Self {
-        Self {
-            server_addr: DEFAULT_HOST_ADDR.to_string(),
-        }
-    }
-}
-
-#[derive(Resource, Default)]
-pub(crate) struct ConnectionStatus {
-    pub(crate) phase: ConnectionPhase,
-    pub(crate) active_snapshot: Option<ShipSnapshot>,
-    pub(crate) local_player_id: Option<u32>,
-}
-
-#[derive(Default)]
-pub(crate) enum ConnectionPhase {
-    #[default]
-    Idle,
-    Connecting,
-    Connected,
-    Failed(String),
-}
-
-#[derive(Resource, Clone, Default)]
-pub(crate) struct ConnectionMailbox {
-    pub(crate) events: Arc<Mutex<Vec<ConnectionEvent>>>,
-}
-
-pub(crate) enum ConnectionEvent {
-    Connected(crate::protocol::SessionWelcome),
-    Snapshot(crate::protocol::SessionSnapshot),
-    CommittedInputs(crate::protocol::CommittedInputBatch),
-    HashStatus(crate::protocol::HashStatusMessage),
-    Drift(crate::protocol::DriftDetectedMessage),
-    Failed(String),
-}
-
-#[derive(Resource, Clone, Default)]
-pub(crate) struct NetworkCommandSender {
-    pub(crate) sender: Arc<Mutex<Option<std::sync::mpsc::Sender<crate::protocol::ClientMessage>>>>,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum MultiplayerPlayerRole {
-    #[default]
-    Local,
-    Remote,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub(crate) struct RemotePlayerState {
-    pub(crate) player_id: u32,
-    pub(crate) display_name: String,
-    pub(crate) role: MultiplayerPlayerRole,
-    pub(crate) connected: bool,
-    pub(crate) presence: crate::protocol::PlayerPresenceSnapshot,
-}
-
-#[derive(Resource, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct MultiplayerSessionState {
-    pub(crate) connected: bool,
-    pub(crate) session_tick: u64,
-    pub(crate) local_player_id: Option<u32>,
-    pub(crate) remote_players: Vec<RemotePlayerState>,
-    pub(crate) last_committed_inputs: Vec<crate::protocol::PlayerInputFrame>,
-    pub(crate) last_local_committed_input: Option<crate::protocol::PlayerInputFrame>,
-    pub(crate) authoritative_registers: crate::protocol::EncounterRegisterState,
-}
-
-#[derive(Resource, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct MultiplayerDiagnosticsState {
-    pub(crate) local_hash: u64,
-    pub(crate) host_hash: u64,
-    pub(crate) last_matching_tick: Option<u64>,
-    pub(crate) first_mismatching_tick: Option<u64>,
-    pub(crate) mismatch_count: u32,
-    pub(crate) last_category: Option<String>,
-    pub(crate) last_message: Option<String>,
-    pub(crate) waiting_for_resync: bool,
-    pub(crate) last_resync_tick: Option<u64>,
-}
-
-#[derive(Resource, Clone, Copy, Default, Serialize, Deserialize)]
-pub(crate) struct MultiplayerTickState {
-    pub(crate) current_tick: u64,
-}
-
-#[derive(Resource, Clone, Default)]
-pub(crate) struct MultiplayerAppliedInputState {
-    pub(crate) last_applied_tick: u64,
-}
-
-#[derive(Resource, Clone, Copy, Default)]
-pub(crate) struct MultiplayerMovementIntentState {
-    pub(crate) move_x_milli: i32,
-    pub(crate) move_y_milli: i32,
-}
-
-#[derive(Resource, Default)]
-pub(crate) struct MultiplayerSyncGuard {
-    pub(crate) suppress_outbound_once: bool,
 }
 
 #[derive(Resource, Default, Clone)]

@@ -28,7 +28,7 @@ use crate::gameplay::{
 pub(crate) fn apply_module_interactions(
     mut instant_events: EventReader<InteractWithModule>,
     mut complete_events: EventReader<CompleteHeldInteraction>,
-    player_query: Single<&mut ShipboardControlState, With<ShipboardPlayer>>,
+    mut player_query: Query<&mut ShipboardControlState, With<ShipboardPlayer>>,
     mission_query: Single<
         &mut MissionState,
         (
@@ -53,9 +53,11 @@ pub(crate) fn apply_module_interactions(
         Option<&DestroyedModule>,
     )>,
 ) {
-    let mut ship_control = player_query.into_inner();
     let mut mission_state = mission_query.into_inner();
     for event in instant_events.read() {
+        let Ok(mut ship_control) = player_query.get_mut(event.player) else {
+            continue;
+        };
         apply_instant_interaction(
             event,
             &mut ship_control,

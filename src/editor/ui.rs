@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use super::{
     super::{
+        netcode,
         TOOLBOX_COMPONENTS,
         TOOLBOX_WIDTH,
         state::{
@@ -11,7 +12,6 @@ use super::{
             ComputerProgramButton,
             ComputerProgramEntry,
             ComputerProgramPanel,
-            ConnectionStatus,
             DemoProgression,
             EditingCleanup,
             EditorMode,
@@ -40,7 +40,8 @@ use crate::ship::{
 };
 
 pub(crate) fn initialize_editor_ship(
-    status: Res<ConnectionStatus>,
+    status: Res<netcode::SessionStatus>,
+    rollback_state: Res<netcode::RollbackGameState>,
     editor_session: Res<EditorSessionState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
     mut editor_ship: ResMut<EditorShip>,
@@ -48,26 +49,36 @@ pub(crate) fn initialize_editor_ship(
     mut arch_editor_state: ResMut<ArchEditorState>,
 ) {
     match editor_session.mode {
-        EditorMode::Player => match load_default_ship() {
-            Ok(Some(saved_ship)) => {
-                editor_ship.ship = saved_ship;
-            }
-            Ok(None) => {
-                if let Some(snapshot) = status.active_snapshot.as_ref() {
-                    editor_ship.ship = snapshot.clone();
-                } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
-                    editor_ship.ship = ShipDefinition::empty("Untitled Knot");
+        EditorMode::Player => {
+            if matches!(status.phase, netcode::SessionPhase::Connected) {
+                editor_ship.ship = rollback_state.editor_ship.clone();
+            } else {
+                match load_default_ship() {
+                    Ok(Some(saved_ship)) => {
+                        editor_ship.ship = saved_ship;
+                    }
+                    Ok(None) => {
+                        if let Some(snapshot) = status.active_ship_snapshot.as_ref() {
+                            editor_ship.ship = snapshot.clone();
+                        } else if editor_ship.ship.name.is_empty()
+                            && editor_ship.ship.modules.is_empty()
+                        {
+                            editor_ship.ship = ShipDefinition::empty("Untitled Knot");
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!("editor: failed to load saved ship: {error}");
+                        if let Some(snapshot) = status.active_ship_snapshot.as_ref() {
+                            editor_ship.ship = snapshot.clone();
+                        } else if editor_ship.ship.name.is_empty()
+                            && editor_ship.ship.modules.is_empty()
+                        {
+                            editor_ship.ship = ShipDefinition::empty("Untitled Knot");
+                        }
+                    }
                 }
             }
-            Err(error) => {
-                eprintln!("editor: failed to load saved ship: {error}");
-                if let Some(snapshot) = status.active_snapshot.as_ref() {
-                    editor_ship.ship = snapshot.clone();
-                } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
-                    editor_ship.ship = ShipDefinition::empty("Untitled Knot");
-                }
-            }
-        },
+        }
         EditorMode::Enemy => {
             match load_default_enemy_library() {
                 Ok(Some(library)) => {

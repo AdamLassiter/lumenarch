@@ -41,6 +41,7 @@ use crate::{
             TravelOutcome,
         },
     },
+    netcode,
     ship::ModuleKind,
 };
 
@@ -261,6 +262,7 @@ pub(crate) fn return_after_mission_resolution(
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     mut progression: ResMut<DemoProgression>,
     mut sector_state: ResMut<SectorState>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
     inventory_query: Query<(
         &RuntimeShipModule,
         Option<&StorageModule>,
@@ -463,6 +465,10 @@ pub(crate) fn return_after_mission_resolution(
         sector_state.selected_node_id = Some(next_node.id);
     }
 
+    rollback_state.progression = progression.clone();
+    rollback_state.sector = sector_state.clone();
+    rollback_state.last_mission_report = last_mission_report.clone();
+    rollback_state.phase = netcode::RollbackPhase::Docked;
     mission_state.return_delay_remaining = None;
     next_state.set(ClientAppState::Docked);
 }

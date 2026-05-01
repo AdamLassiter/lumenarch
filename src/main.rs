@@ -1,6 +1,3 @@
-mod host;
-mod protocol;
-mod session;
 mod ship;
 
 mod balance;
@@ -9,21 +6,19 @@ mod docked;
 mod editor;
 pub(crate) mod gameplay;
 mod menu;
-mod net;
+mod netcode;
 mod sector_map;
 pub(crate) mod state;
 
 use std::time::Duration;
 
 use bevy::{app::AppExit, prelude::*};
+use bevy_ggrs::{GgrsApp, GgrsPlugin};
 
 use self::state::{
     ArchEditorState,
     CampaignLoadState,
     ClientAppState,
-    ConnectionConfig,
-    ConnectionMailbox,
-    ConnectionStatus,
     DebugOverlayState,
     DemoProgression,
     DockedState,
@@ -35,18 +30,13 @@ use self::state::{
     EnemyShipLibraryState,
     LastMissionReport,
     MainCamera,
-    MultiplayerAppliedInputState,
-    MultiplayerDiagnosticsState,
-    MultiplayerMovementIntentState,
-    MultiplayerSessionState,
-    MultiplayerSyncGuard,
-    MultiplayerTickState,
-    NetworkCommandSender,
     SectorMapPanState,
     SectorMapViewState,
     SectorState,
 };
-use crate::{host::TICK_MILLIS, ship::ModuleKind};
+use crate::{netcode::LumenGgrsConfig, ship::ModuleKind};
+
+pub(crate) const TICK_MILLIS: u64 = 50;
 
 pub(crate) const DEFAULT_HOST_ADDR: &str = "127.0.0.1:5000";
 pub(crate) const TILE_SIZE: f32 = 32.0;
@@ -69,10 +59,16 @@ pub fn run_client() {
         .insert_resource(Time::<Fixed>::from_duration(Duration::from_millis(TICK_MILLIS)))
         .insert_resource(ClearColor(Color::srgb(0.04, 0.05, 0.08)))
         .insert_resource(balance_config)
-        .insert_resource(ConnectionConfig::default())
-        .insert_resource(ConnectionStatus::default())
-        .insert_resource(ConnectionMailbox::default())
-        .insert_resource(NetworkCommandSender::default())
+        .insert_resource(netcode::SessionConfig::default())
+        .insert_resource(netcode::SessionStatus::default())
+        .insert_resource(netcode::SessionBootstrapConfig::default())
+        .insert_resource(netcode::RollbackGameState::default())
+        .insert_resource(netcode::LocalPlayerHandle::default())
+        .insert_resource(netcode::PlayerHandleMap::default())
+        .insert_resource(netcode::ObservedLocalPlayer::default())
+        .insert_resource(netcode::PendingLocalMetaCommand::default())
+        .insert_resource(netcode::DecodedPlayerCommands::default())
+        .insert_resource(netcode::ChecksumHistory::default())
         .insert_resource(EditorShip::default())
         .insert_resource(EditorSessionState::default())
         .insert_resource(EnemyShipLibraryState::default())
@@ -82,12 +78,6 @@ pub fn run_client() {
         .insert_resource(CampaignLoadState::default())
         .insert_resource(DebugOverlayState::default())
         .insert_resource(LastMissionReport::default())
-        .insert_resource(MultiplayerSessionState::default())
-        .insert_resource(MultiplayerDiagnosticsState::default())
-        .insert_resource(MultiplayerTickState::default())
-        .insert_resource(MultiplayerAppliedInputState::default())
-        .insert_resource(MultiplayerMovementIntentState::default())
-        .insert_resource(MultiplayerSyncGuard::default())
         .insert_resource(EditorToolState::default())
         .insert_resource(ArchEditorState::default())
         .insert_resource(EditorPanState::default())
@@ -106,11 +96,122 @@ pub fn run_client() {
                     ..default()
                 }),
         )
+        .add_plugins(GgrsPlugin::<LumenGgrsConfig>::default())
+        .set_rollback_schedule_fps((1000 / TICK_MILLIS) as usize)
+        .rollback_resource_with_clone::<netcode::RollbackGameState>()
+        .rollback_resource_with_clone::<netcode::PlayerHandleMap>()
+        .rollback_resource_with_clone::<netcode::DecodedPlayerCommands>()
+        .update_resource_with_map_entities::<netcode::PlayerHandleMap>()
+        .rollback_component_with_clone::<gameplay::components::PlayerHandleComponent>()
+        .rollback_component_with_clone::<gameplay::components::PlayerShipAssignment>()
+        .rollback_component_with_clone::<gameplay::components::PlayerMotionState>()
+        .rollback_component_with_clone::<gameplay::components::CarriedResource>()
+        .rollback_component_with_clone::<gameplay::components::CurrentStation>()
+        .rollback_component_with_clone::<gameplay::components::InternalPosition>()
+        .rollback_component_with_clone::<gameplay::components::ShipboardControlState>()
+        .rollback_component_with_clone::<gameplay::components::NearbyInteraction>()
+        .rollback_component_with_clone::<gameplay::components::HeldInteraction>()
+        .rollback_component_with_clone::<gameplay::components::PlayerFieldState>()
+        .rollback_component_with_clone::<gameplay::components::ShipInertiaField>()
+        .rollback_component_with_clone::<gameplay::components::ShipInteriorMap>()
+        .rollback_component_with_clone::<gameplay::components::ShipAtmosphereState>()
+        .rollback_component_with_clone::<gameplay::components::RuntimeShipModule>()
+        .rollback_component_with_clone::<gameplay::components::Integrity>()
+        .rollback_component_with_clone::<gameplay::components::RuntimeArchComputer>()
+        .rollback_component_with_clone::<gameplay::components::TurretCommandState>()
+        .rollback_component_with_clone::<gameplay::components::ReactorCommandState>()
+        .rollback_component_with_clone::<gameplay::components::StorageCommandState>()
+        .rollback_component_with_clone::<gameplay::components::AirlockCommandState>()
+        .rollback_component_with_clone::<gameplay::components::ManipulatorCommandState>()
+        .rollback_component_with_clone::<gameplay::components::ProcessorCommandState>()
+        .rollback_component_with_clone::<gameplay::components::ModuleRuntimeState>()
+        .rollback_component_with_clone::<gameplay::components::ModuleFieldEmitter>()
+        .rollback_component_with_clone::<gameplay::components::ShipMovementModel>()
+        .rollback_component_with_clone::<gameplay::components::ShipPowerModel>()
+        .rollback_component_with_clone::<gameplay::components::ShipPowerState>()
+        .rollback_component_with_clone::<gameplay::components::ShipControlState>()
+        .rollback_component_with_clone::<gameplay::components::ShipWeaponState>()
+        .rollback_component_with_clone::<gameplay::components::ShipAutomationState>()
+        .rollback_component_with_clone::<gameplay::components::ShipArchCommandState>()
+        .rollback_component_with_clone::<gameplay::components::MissionState>()
+        .rollback_component_with_clone::<gameplay::components::LinearVelocity>()
+        .rollback_component_with_clone::<gameplay::components::AngularVelocity>()
+        .rollback_component_with_clone::<gameplay::components::SimPosition>()
+        .rollback_component_with_clone::<gameplay::components::SimRotation>()
+        .rollback_component_with_clone::<gameplay::components::StorageModule>()
+        .rollback_component_with_clone::<gameplay::components::ManipulatorModule>()
+        .rollback_component_with_clone::<gameplay::components::ProcessorModule>()
+        .rollback_component_with_clone::<gameplay::components::LooseCargo>()
+        .rollback_component_with_clone::<gameplay::components::Projectile>()
+        .rollback_component_with_clone::<gameplay::components::HostileWeaponState>()
+        .rollback_component_with_clone::<gameplay::components::SalvagePickup>()
+        .update_component_with_map_entities::<gameplay::components::PlayerShipAssignment>()
+        .update_component_with_map_entities::<gameplay::components::PlayerMotionState>()
+        .update_component_with_map_entities::<gameplay::components::ShipboardControlState>()
+        .update_component_with_map_entities::<gameplay::components::NearbyInteraction>()
+        .update_component_with_map_entities::<gameplay::components::HeldInteraction>()
         .init_state::<ClientAppState>()
         .add_event::<gameplay::components::InteractWithModule>()
         .add_event::<gameplay::components::BeginHeldInteraction>()
         .add_event::<gameplay::components::CompleteHeldInteraction>()
         .add_systems(Startup, setup_camera)
+        .add_systems(bevy_ggrs::ReadInputs, netcode::read_local_inputs)
+        .add_systems(
+            bevy_ggrs::GgrsSchedule,
+            (
+                netcode::decode_player_inputs,
+                netcode::apply_host_meta_ops,
+                (
+                    gameplay::toggle_shipboard_control_mode,
+                    gameplay::exit_focused_station,
+                    gameplay::update_player_reference_frame,
+                    gameplay::update_ship_atmosphere,
+                    gameplay::sample_player_atmosphere,
+                    gameplay::move_shipboard_player,
+                    gameplay::update_current_station,
+                    gameplay::detect_nearby_interactions,
+                    gameplay::run_shipboard_interaction_input,
+                    gameplay::handle_player_cargo_interaction,
+                    gameplay::begin_held_interactions,
+                    gameplay::complete_held_interactions,
+                    gameplay::apply_module_interactions,
+                    gameplay::update_station_command_input,
+                )
+                    .chain()
+                    .run_if(netcode::rollback_phase_is_encounter),
+                (
+                    gameplay::sample_ship_fields,
+                    gameplay::update_module_runtime_state,
+                    gameplay::run_arch_automation,
+                    gameplay::run_logistics_transfers,
+                    gameplay::run_processors,
+                    gameplay::update_mission_telemetry,
+                    gameplay::tick_recent_action_feedback,
+                    gameplay::sync_hostile_ship_state,
+                )
+                    .chain()
+                    .run_if(netcode::rollback_phase_is_encounter),
+                (
+                    gameplay::sync_runtime_ship_state,
+                    gameplay::apply_player_ship_controls,
+                    gameplay::drive_hostile_ships,
+                    gameplay::fire_player_weapons,
+                    gameplay::fire_hostile_ship_weapons,
+                    gameplay::aim_hostile_turrets,
+                    gameplay::fire_hostile_targets,
+                    gameplay::advance_projectiles,
+                    gameplay::handle_projectile_hits,
+                    gameplay::update_mission_state,
+                    gameplay::collect_salvage,
+                    gameplay::return_after_mission_resolution,
+                )
+                    .chain()
+                    .run_if(netcode::rollback_phase_is_encounter),
+                netcode::advance_rollback_state,
+            ),
+        )
+        .add_systems(Update, netcode::sync_presentation_from_rollback)
+        .add_systems(PreUpdate, netcode::sync_local_player_handle)
         .add_systems(Update, docked::persist_campaign_state)
         .add_systems(OnEnter(ClientAppState::Menu), menu::spawn_menu_ui)
         .add_systems(
@@ -119,9 +220,9 @@ pub fn run_client() {
                 menu::edit_host_address.run_if(in_state(ClientAppState::Menu)),
                 menu::menu_button_system.run_if(in_state(ClientAppState::Menu)),
                 menu::menu_keyboard_shortcuts.run_if(in_state(ClientAppState::Menu)),
-                net::poll_connection_events,
                 menu::update_menu_status_text.run_if(in_state(ClientAppState::Menu)),
                 menu::update_host_address_text.run_if(in_state(ClientAppState::Menu)),
+                netcode::finalize_pending_session_bootstrap,
                 exit_on_escape,
             ),
         )
@@ -138,13 +239,9 @@ pub fn run_client() {
             ),
         )
         .add_systems(
-            FixedUpdate,
-            (
-                net::sync_app_state_to_host.run_if(in_state(ClientAppState::Docked)),
-                net::sync_campaign_to_host.run_if(in_state(ClientAppState::Docked)),
-            ),
+            OnExit(ClientAppState::Docked),
+            docked::cleanup_docked_ui,
         )
-        .add_systems(OnExit(ClientAppState::Docked), docked::cleanup_docked_ui)
         .add_systems(
             OnEnter(ClientAppState::SectorMap),
             sector_map::spawn_sector_map_ui,
@@ -158,13 +255,6 @@ pub fn run_client() {
                 sector_map::pan_and_zoom_sector_map.run_if(in_state(ClientAppState::SectorMap)),
                 sector_map::sync_sector_map_layout.run_if(in_state(ClientAppState::SectorMap)),
                 sector_map::update_sector_map_text.run_if(in_state(ClientAppState::SectorMap)),
-            ),
-        )
-        .add_systems(
-            FixedUpdate,
-            (
-                net::sync_app_state_to_host.run_if(in_state(ClientAppState::SectorMap)),
-                net::sync_campaign_to_host.run_if(in_state(ClientAppState::SectorMap)),
             ),
         )
         .add_systems(
@@ -204,14 +294,6 @@ pub fn run_client() {
             ),
         )
         .add_systems(
-            FixedUpdate,
-            (
-                net::sync_app_state_to_host.run_if(in_state(ClientAppState::Editing)),
-                net::sync_ship_to_host.run_if(in_state(ClientAppState::Editing)),
-                net::sync_campaign_to_host.run_if(in_state(ClientAppState::Editing)),
-            ),
-        )
-        .add_systems(
             OnExit(ClientAppState::Editing),
             editor::cleanup_editor_entities,
         )
@@ -225,55 +307,11 @@ pub fn run_client() {
                 gameplay::return_button_system.run_if(in_state(ClientAppState::Encounter)),
                 gameplay::return_keyboard_shortcut.run_if(in_state(ClientAppState::Encounter)),
                 gameplay::toggle_debug_overlay.run_if(in_state(ClientAppState::Encounter)),
-                (
-                    (
-                        gameplay::toggle_shipboard_control_mode,
-                        gameplay::exit_focused_station,
-                        gameplay::update_player_reference_frame,
-                        gameplay::sync_player_reference_frame_parenting,
-                        gameplay::update_ship_atmosphere,
-                        gameplay::sample_player_atmosphere,
-                        gameplay::move_shipboard_player,
-                        gameplay::update_current_station,
-                        gameplay::detect_nearby_interactions,
-                        gameplay::run_shipboard_interaction_input,
-                        gameplay::handle_player_cargo_interaction,
-                        gameplay::begin_held_interactions,
-                        gameplay::complete_held_interactions,
-                        gameplay::apply_module_interactions,
-                        gameplay::update_station_command_input,
-                    )
-                        .chain(),
-                    (
-                        gameplay::sample_ship_fields,
-                        gameplay::update_module_runtime_state,
-                        gameplay::run_arch_automation,
-                        gameplay::run_logistics_transfers,
-                        gameplay::run_processors,
-                        gameplay::update_mission_telemetry,
-                        gameplay::tick_recent_action_feedback,
-                        gameplay::sync_hostile_ship_state,
-                    )
-                        .chain(),
-                )
+                gameplay::sync_player_reference_frame_parenting
                     .run_if(in_state(ClientAppState::Encounter)),
                 (
-                    net::apply_authoritative_encounter_registers,
-                    gameplay::sync_runtime_ship_state,
-                    gameplay::apply_player_ship_controls,
-                    gameplay::drive_hostile_ships,
-                    gameplay::fire_player_weapons,
-                    gameplay::fire_hostile_ship_weapons,
-                    gameplay::aim_hostile_turrets,
-                    gameplay::fire_hostile_targets,
-                    gameplay::advance_projectiles,
-                    gameplay::handle_projectile_hits,
-                    gameplay::update_mission_state,
-                    gameplay::collect_salvage,
-                    gameplay::return_after_mission_resolution,
                     gameplay::update_destroyed_module_visuals,
                     gameplay::sync_shipboard_player_visual,
-                    gameplay::sync_remote_session_players,
                     gameplay::integrate_player_ship_motion,
                     gameplay::integrate_hostile_ship_motion,
                     gameplay::camera_follow_player_ship,
@@ -285,20 +323,6 @@ pub fn run_client() {
                 gameplay::update_inspection_and_alerts_text
                     .run_if(in_state(ClientAppState::Encounter)),
                 gameplay::station_panel_button_system.run_if(in_state(ClientAppState::Encounter)),
-            ),
-        )
-        .add_systems(
-            FixedUpdate,
-            (
-                net::apply_committed_multiplayer_inputs.run_if(in_state(ClientAppState::Encounter)),
-                net::advance_multiplayer_tick.run_if(in_state(ClientAppState::Encounter)),
-                net::send_local_multiplayer_presence.run_if(in_state(ClientAppState::Encounter)),
-                net::send_local_multiplayer_input.run_if(in_state(ClientAppState::Encounter)),
-                net::sync_encounter_registers_to_host.run_if(in_state(ClientAppState::Encounter)),
-                net::send_multiplayer_hash_report.run_if(in_state(ClientAppState::Encounter)),
-                net::request_resync_when_waiting.run_if(in_state(ClientAppState::Encounter)),
-                net::sync_app_state_to_host.run_if(in_state(ClientAppState::Encounter)),
-                net::sync_campaign_to_host.run_if(in_state(ClientAppState::Encounter)),
             ),
         )
         .add_systems(
@@ -319,14 +343,5 @@ fn exit_on_escape(keys: Res<ButtonInput<KeyCode>>, mut exit: EventWriter<AppExit
 }
 
 fn main() {
-    let wants_host = std::env::args().skip(1).any(|arg| arg == "--host");
-
-    if wants_host {
-        if let Err(error) = host::run_host() {
-            eprintln!("{error}");
-            std::process::exit(1);
-        }
-    } else {
-        run_client();
-    }
+    run_client();
 }

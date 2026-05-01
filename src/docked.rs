@@ -6,10 +6,9 @@ use super::{
     PRESSED_BUTTON,
     TOOLBOX_WIDTH,
     campaign::{CampaignSave, load_campaign, save_campaign},
+    netcode,
     state::{
         CampaignLoadState,
-        ClientAppState,
-        ConnectionStatus,
         DemoProgression,
         DockedRoot,
         DockedState,
@@ -28,7 +27,8 @@ use super::{
 use crate::ship::{ShipDefinition, enemy::load_default_enemy_library, storage::load_default_ship};
 
 pub(crate) fn initialize_campaign_state(
-    status: Res<ConnectionStatus>,
+    status: Res<netcode::SessionStatus>,
+    rollback_state: Res<netcode::RollbackGameState>,
     mut campaign_load_state: ResMut<CampaignLoadState>,
     mut progression: ResMut<DemoProgression>,
     mut sector_state: ResMut<SectorState>,
@@ -38,6 +38,13 @@ pub(crate) fn initialize_campaign_state(
     mut editor_ship: ResMut<EditorShip>,
 ) {
     if !campaign_load_state.hydrated {
+        if matches!(status.phase, netcode::SessionPhase::Connected) {
+            *progression = rollback_state.progression.clone();
+            *sector_state = rollback_state.sector.clone();
+            *last_mission_report = rollback_state.last_mission_report.clone();
+            editor_ship.ship = rollback_state.editor_ship.clone();
+            campaign_load_state.hydrated = true;
+        } else {
         match load_campaign() {
             Ok(Some(save)) => {
                 *progression = save.progression;
@@ -60,7 +67,7 @@ pub(crate) fn initialize_campaign_state(
 
         if let Ok(Some(saved_ship)) = load_default_ship() {
             editor_ship.ship = saved_ship;
-        } else if let Some(snapshot) = status.active_snapshot.as_ref() {
+        } else if let Some(snapshot) = status.active_ship_snapshot.as_ref() {
             editor_ship.ship = snapshot.clone();
         } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
             editor_ship.ship = ShipDefinition::empty("Untitled Knot");
@@ -72,6 +79,7 @@ pub(crate) fn initialize_campaign_state(
         }
 
         campaign_load_state.hydrated = true;
+        }
     }
 
     if let Some(current_node) = sector_state.current_node() {
@@ -234,31 +242,35 @@ pub(crate) fn docked_button_system(
         ),
         (Changed<Interaction>, With<Button>),
     >,
-    mut progression: ResMut<DemoProgression>,
-    mut last_mission_report: ResMut<LastMissionReport>,
+    status: Res<netcode::SessionStatus>,
+    mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
     mut editor_session: ResMut<EditorSessionState>,
-    mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     for (interaction, mut background, refit, open_map, repair) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
                 if refit.is_some() {
                     *background = BackgroundColor(PRESSED_BUTTON);
                     editor_session.mode = EditorMode::Player;
-                    next_state.set(ClientAppState::Editing);
+                    pending_meta.0 = Some(netcode::PendingMetaCommand {
+                        op: netcode::RollbackMetaOp::OpenEditor,
+                        ..Default::default()
+                    });
                 } else if open_map.is_some() {
                     *background = BackgroundColor(Color::srgb(0.12, 0.40, 0.24));
-                    next_state.set(ClientAppState::SectorMap);
+                    pending_meta.0 = Some(netcode::PendingMetaCommand {
+                        op: netcode::RollbackMetaOp::OpenSectorMap,
+                        ..Default::default()
+                    });
                 } else if repair.is_some() {
                     *background = BackgroundColor(Color::srgb(0.62, 0.44, 0.16));
-                    let repair_cost = progression.hull_wear.saturating_mul(2);
-                    if repair_cost > 0 && progression.scrap >= repair_cost {
-                        progression.scrap -= repair_cost;
-                        progression.hull_wear = 0;
-                        last_mission_report.detail = Some(format!(
-                            "Station service restored your ship for {repair_cost} scrap."
-                        ));
-                    }
+                    pending_meta.0 = Some(netcode::PendingMetaCommand {
+                        op: netcode::RollbackMetaOp::RepairShip,
+                        ..Default::default()
+                    });
                 }
             }
             Interaction::Hovered => {

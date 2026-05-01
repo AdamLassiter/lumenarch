@@ -22,6 +22,7 @@ use crate::{
             PlayerMotionState,
             PlayerReferenceFrame,
             PlayerShip,
+            ObservedLocalPlayerMarker,
             ProcessorCommandState,
             ProcessorModule,
             Projectile,
@@ -38,7 +39,6 @@ use crate::{
             ShipRoot,
             ShipWeaponState,
             ShipboardControlState,
-            ShipboardPlayer,
             SimPosition,
             StorageCommandState,
             StorageModule,
@@ -57,9 +57,8 @@ use crate::{
         },
         systems::shared::module_display_name,
     },
+    netcode,
     state::{
-        ConnectionPhase,
-        ConnectionStatus,
         DebugOverlayState,
         DemoProgression,
         GameplayBarFill,
@@ -73,8 +72,6 @@ use crate::{
         GameplayStationPanelButton,
         GameplayStationPanelButtonLabel,
         GameplayTopBannerText,
-        MultiplayerDiagnosticsState,
-        MultiplayerSessionState,
         StationPanelButtonAction,
     },
 };
@@ -107,12 +104,12 @@ pub(crate) fn update_gameplay_status_text(
             &CarriedResource,
             &ShipboardControlState,
         ),
-        With<ShipboardPlayer>,
+        With<ObservedLocalPlayerMarker>,
     >,
     status_world: GameplayStatusWorldQueries,
     progression: Res<DemoProgression>,
-    multiplayer_session: Res<MultiplayerSessionState>,
-    multiplayer_diagnostics: Res<MultiplayerDiagnosticsState>,
+    rollback_state: Res<netcode::RollbackGameState>,
+    checksum_history: Res<netcode::ChecksumHistory>,
     mut hud_ui: GameplayHudUiQueries,
 ) {
     let (
@@ -167,8 +164,8 @@ pub(crate) fn update_gameplay_status_text(
         mission_state,
         progression.scrap,
         &arch_summary,
-        &multiplayer_session,
-        &multiplayer_diagnostics,
+        rollback_state.frame,
+        checksum_history.last_value,
     );
     let controls_text = controls_help_text(control_mode.mode);
     let (panel_title, panel_body, active_station_kind, active_station_flags) =
@@ -385,7 +382,6 @@ pub(crate) struct GameplayHudUiQueries<'w, 's> {
 }
 
 pub(crate) fn station_panel_button_system(
-    status: Res<ConnectionStatus>,
     mut interaction_query: Query<
         (
             &Interaction,
@@ -394,7 +390,7 @@ pub(crate) fn station_panel_button_system(
         ),
         (Changed<Interaction>, With<Button>),
     >,
-    player_query: Single<&mut ShipboardControlState, With<ShipboardPlayer>>,
+    player_query: Single<&mut ShipboardControlState, With<ObservedLocalPlayerMarker>>,
     ship_control_query: Single<&mut ShipControlState, (With<PlayerShip>, With<ShipRoot>)>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     candidate_query: Query<&RuntimeShipModule>,
@@ -410,10 +406,7 @@ pub(crate) fn station_panel_button_system(
         Option<&mut RuntimeArchComputer>,
     )>,
 ) {
-    if matches!(status.phase, ConnectionPhase::Connected) {
-        return;
-    }
-    let mut control_state = player_query.into_inner();
+    let control_state = player_query.into_inner();
     let mut ship_controls = ship_control_query.into_inner();
     let mut mission_state = mission_query.into_inner();
 
@@ -610,11 +603,11 @@ fn build_compact_status(
     mission_state: &MissionState,
     scrap_total: u32,
     arch_summary: &ArchSummary,
-    multiplayer_session: &MultiplayerSessionState,
-    multiplayer_diagnostics: &MultiplayerDiagnosticsState,
+    rollback_frame: i32,
+    checksum: u128,
 ) -> String {
     format!(
-        "Mode: {}  |  Focus: {}\nFrame: {}\nContext: {}\nStation: {}\nPlayer: {}, {} @ {}\nShip: {}, {} @ {}\nTurn: {}\nModules: {} active  |  {} degraded  |  {} disabled\nIntegrity: {} / {}\nAtmosphere: {} avg / {} min  |  venting {}\nCargo: {}\nMission Ops: repairs {}  stabs {}  transfers {}  cycles {}\nARCH: {}  [{}]  writes {}  invalid {}\nSession: tick {}  peers {}  host {:016x}  local {:016x}\nScrap: {}",
+        "Mode: {}  |  Focus: {}\nFrame: {}\nContext: {}\nStation: {}\nPlayer: {}, {} @ {}\nShip: {}, {} @ {}\nTurn: {}\nModules: {} active  |  {} degraded  |  {} disabled\nIntegrity: {} / {}\nAtmosphere: {} avg / {} min  |  venting {}\nCargo: {}\nMission Ops: repairs {}  stabs {}  transfers {}  cycles {}\nARCH: {}  [{}]  writes {}  invalid {}\nRollback: frame {}  checksum {:016x}\nScrap: {}",
         control_mode.mode.as_str(),
         control_mode
             .focused_family
@@ -650,10 +643,8 @@ fn build_compact_status(
         arch_summary.exec_summary,
         arch_summary.recent_writes,
         arch_summary.invalid_count,
-        multiplayer_session.session_tick,
-        multiplayer_session.remote_players.len(),
-        multiplayer_diagnostics.host_hash,
-        multiplayer_diagnostics.local_hash,
+        rollback_frame,
+        checksum,
         scrap_total,
     )
 }

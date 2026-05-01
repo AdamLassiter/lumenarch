@@ -7,7 +7,7 @@ This document refines the simulation layer described in `TECH_DESIGN.md`.
 The simulation model must be valid for both:
 
 * single-player local-host sessions
-* deterministic multiplayer sessions
+* deterministic rollback multiplayer sessions
 
 ## Two Simulation Spaces
 

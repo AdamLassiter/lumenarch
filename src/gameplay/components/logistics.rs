@@ -54,7 +54,7 @@ impl ResourceInventory {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct StorageModule {
     pub(crate) capacity: u32,
     pub(crate) inventory: ResourceInventory,
@@ -73,7 +73,7 @@ impl StorageModule {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ManipulatorModule {
     pub(crate) transfer_progress: Fx,
     pub(crate) transfer_duration: Fx,
@@ -84,7 +84,7 @@ pub(crate) struct ManipulatorModule {
     pub(crate) blocked_reason: Option<String>,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ProcessorModule {
     pub(crate) progress: Fx,
     pub(crate) duration: Fx,
@@ -95,7 +95,7 @@ pub(crate) struct ProcessorModule {
     pub(crate) output_amount: u32,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct LooseCargo {
     pub(crate) kind: ResourceKind,
     pub(crate) amount: u32,

@@ -7,47 +7,35 @@ This document defines the preferred multiplayer model for **LUMEN//ARCH**.
 The primary goal is reliability:
 
 * deterministic simulation first
-* low bandwidth through intent replication
-* strong desync detection
-* bounded recovery paths
+* rollback-driven peer synchronization through `bevy_ggrs`
+* compact per-player intent replication
+* strong checksum-backed desync detection
 
 ## Networking Philosophy
 
-LUMEN//ARCH should not begin from a rollback-first design.
+LUMEN//ARCH now uses a rollback-oriented peer session built on `bevy_ggrs`.
 
-The game contains:
+Current runtime model:
 
-* vessel-local tile simulation
-* programmable systems
-* logistics reservations
-* autonomous drones
-* persistent projectiles and hazards
-* many interacting long-lived state machines
-
-That makes full-world rollback expensive and fragile.
-
-Preferred model:
-
-* authoritative host or dedicated server
-* deterministic clients running the same simulation
-* inputs committed to future ticks
-* periodic verification hashes
-* targeted resync when peers diverge
+* listen-host UX for creating and coordinating a session
+* GGRS P2P session for synchronized gameplay authority
+* deterministic peers advancing the same rollback simulation
+* compact input frames as the only synchronized gameplay command stream
+* periodic checksum validation for debugging and desync diagnosis
 
 ## Session Roles
 
 Supported runtime roles:
 
-* `LocalHost`: single-player or listen-server authority
-* `DedicatedServer`: headless authority
-* `RemoteClient`: player client mirroring deterministic simulation
+* `Host`: creates the session, defines the peer list, and loads the initial deterministic snapshot
+* `Client`: joins the host-provided peer session and runs the same rollback simulation
 
-Authority rules:
+Current constraints:
 
-* the host defines accepted player membership
-* the host assigns player ids and vessel ownership
-* the host defines the canonical simulation tick
-* the host distributes initial seeds and authoritative snapshots
+* all players must be present before the session starts
+* no late join
+* no host migration
+* no separate authoritative snapshot/resync protocol outside GGRS rollback behavior
 
 ## Tick Model
 
@@ -62,17 +50,17 @@ Each tick has:
 
 Suggested tick flow:
 
-1. gather inputs for future tick `T + D`
-2. finalize the committed input set for that tick
-3. run deterministic simulation for that tick
-4. emit per-tick hash or periodic checkpoint hash
-5. archive minimal snapshot history
+1. collect local hardware input in `ReadInputs`
+2. submit compact `PlayerGgrsInput` frames through GGRS
+3. advance deterministic simulation in `GgrsSchedule`
+4. save rollback snapshots and checksums
+5. expose presentation-only state after rollback advancement
 
-`D` is the configured input delay.
+`D` remains the configured local input delay.
 
 ## Input Replication
 
-Clients should send intents, not simulation results.
+Peers should send intents, not simulation results.
 
 Examples of replicated intent:
 
@@ -90,7 +78,7 @@ Examples of state that should not normally be sent every tick:
 * logistics inventory contents
 * projectile positions
 
-Those should emerge from deterministic simulation.
+Those should emerge from deterministic rollback simulation.
 
 ## Input Delay
 

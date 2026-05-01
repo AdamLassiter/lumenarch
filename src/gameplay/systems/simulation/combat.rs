@@ -24,13 +24,11 @@ use crate::{
                 RuntimeShipModule,
                 ShieldCommandState,
                 ShipArchCommandState,
-                ShipControlMode,
                 ShipMovementModel,
                 ShipPowerModel,
                 ShipPowerState,
                 ShipRoot,
                 ShipWeaponState,
-                ShipboardControlState,
                 SimPosition,
                 SimRotation,
                 StorageModule,
@@ -64,10 +62,6 @@ use crate::{
 pub(crate) fn fire_player_weapons(
     mut commands: Commands,
     balance: Res<BalanceConfig>,
-    control_mode_query: Single<
-        &ShipboardControlState,
-        With<crate::gameplay::components::ShipboardPlayer>,
-    >,
     player_ship_query: Single<
         (
             &Children,
@@ -92,13 +86,15 @@ pub(crate) fn fire_player_weapons(
     >,
     mut storage_query: Query<(&Parent, &mut StorageModule)>,
 ) {
-    let control_mode = control_mode_query.into_inner();
-
     let (children, ship_position, ship_rotation, power_state, arch_commands, mut weapon_state) =
         player_ship_query.into_inner();
 
-    let fire_requested =
-        control_mode.mode == ShipControlMode::Turret || arch_commands.turret_auto_fire;
+    let fire_requested = arch_commands.turret_auto_fire
+        || weapon_query
+            .iter()
+            .any(|(_, _, _, _, turret_state, destroyed)| {
+                destroyed.is_none() && turret_state.fire_intent
+            });
     if !fire_requested
         || !power_state.weapons_powered
         || weapon_state.turret_count == 0
@@ -111,7 +107,7 @@ pub(crate) fn fire_player_weapons(
     let mut cooldown_after_shot = Fx::from_num(0);
     for child in children.iter() {
         let Ok((
-            weapon_entity,
+            _weapon_entity,
             weapon_module,
             runtime_state,
             weapon_stats,
@@ -124,8 +120,7 @@ pub(crate) fn fire_player_weapons(
         if destroyed.is_some() || runtime_state.is_disabled {
             continue;
         }
-        let is_manual_turret = control_mode.mode == ShipControlMode::Turret
-            && control_mode.focused_entity == Some(weapon_entity);
+        let is_manual_turret = turret_state.fire_intent;
         if !is_manual_turret && !arch_commands.turret_auto_fire {
             continue;
         }

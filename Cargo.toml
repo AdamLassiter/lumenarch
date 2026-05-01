@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 bevy = "0.15"
+bevy_ggrs = "0.17.0"
+ggrs = "0.11.0"
 cordic = "0.1.5"
 fixed = { version = "1.31", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }

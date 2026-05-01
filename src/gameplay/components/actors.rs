@@ -1,4 +1,5 @@
-use bevy::prelude::*;
+use bevy::{ecs::entity::{EntityMapper, MapEntities}, prelude::*};
+use ggrs::PlayerHandle;
 
 use super::{
     super::helpers::{FixedVec2, Fx},
@@ -15,7 +16,7 @@ pub(crate) struct ShipRoot;
 #[derive(Component)]
 pub(crate) struct HostileShip;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct HostileShipAi {
     pub(crate) preferred_range: Fx,
     pub(crate) aggression: Fx,
@@ -25,20 +26,23 @@ pub(crate) struct HostileShipAi {
 #[derive(Component)]
 pub(crate) struct ShipboardPlayer;
 
-#[derive(Component)]
-pub(crate) struct ShipboardMarker;
-
-#[derive(Component)]
-pub(crate) struct RemoteSessionPlayer {
-    pub(crate) player_id: u32,
+#[derive(Component, Clone, Copy)]
+pub(crate) struct PlayerHandleComponent {
+    pub(crate) handle: PlayerHandle,
 }
 
 #[derive(Component)]
+pub(crate) struct ObservedLocalPlayerMarker;
+
+#[derive(Component)]
+pub(crate) struct ShipboardMarker;
+
+#[derive(Component, Clone)]
 pub(crate) struct ShipInertiaField {
     pub(crate) radius: Fx,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct PlayerShipAssignment {
     pub(crate) _ship_entity: Entity,
 }
@@ -49,7 +53,7 @@ pub(crate) enum PlayerReferenceFrame {
     Ship(Entity),
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct PlayerMotionState {
     pub(crate) frame: PlayerReferenceFrame,
     pub(crate) world_position: FixedVec2,
@@ -58,7 +62,7 @@ pub(crate) struct PlayerMotionState {
     pub(crate) local_velocity: FixedVec2,
 }
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Clone)]
 pub(crate) struct CarriedResource {
     pub(crate) kind: Option<ResourceKind>,
     pub(crate) amount: u32,
@@ -73,7 +77,7 @@ pub(crate) struct ShipInteriorNode {
     pub(crate) local_position: FixedVec2,
 }
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Clone)]
 pub(crate) struct ShipInteriorMap {
     pub(crate) walkable_nodes: Vec<ShipInteriorNode>,
 }
@@ -89,7 +93,7 @@ pub(crate) struct ShipAtmosphereTile {
     pub(crate) exterior_edges: u8,
 }
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Clone)]
 pub(crate) struct ShipAtmosphereState {
     pub(crate) tiles: Vec<ShipAtmosphereTile>,
     pub(crate) average_oxygen: Fx,
@@ -98,14 +102,14 @@ pub(crate) struct ShipAtmosphereState {
     pub(crate) decompression_reported: bool,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct InternalPosition {
     pub(crate) grid_x: i32,
     pub(crate) grid_y: i32,
     pub(crate) local_position: FixedVec2,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct CurrentStation {
     pub(crate) module_id: u64,
     pub(crate) kind: ModuleKind,
@@ -174,7 +178,7 @@ pub(crate) enum StationFocusMode {
     Focused,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ShipboardControlState {
     pub(crate) mode: ShipControlMode,
     pub(crate) focus_mode: StationFocusMode,
@@ -184,7 +188,7 @@ pub(crate) struct ShipboardControlState {
     pub(crate) focused_family: Option<StationFamily>,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct PlayerFieldState {
     pub(crate) local_heat: Fx,
     pub(crate) local_electrical: Fx,
@@ -193,4 +197,32 @@ pub(crate) struct PlayerFieldState {
     pub(crate) electrical_danger: bool,
     pub(crate) oxygen_warning: bool,
     pub(crate) oxygen_critical: bool,
+}
+
+impl MapEntities for PlayerShipAssignment {
+    fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
+        self._ship_entity = entity_mapper.map_entity(self._ship_entity);
+    }
+}
+
+impl MapEntities for PlayerReferenceFrame {
+    fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
+        if let Self::Ship(entity) = self {
+            *entity = entity_mapper.map_entity(*entity);
+        }
+    }
+}
+
+impl MapEntities for PlayerMotionState {
+    fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
+        self.frame.map_entities(entity_mapper);
+    }
+}
+
+impl MapEntities for ShipboardControlState {
+    fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
+        if let Some(entity) = self.focused_entity {
+            self.focused_entity = Some(entity_mapper.map_entity(entity));
+        }
+    }
 }

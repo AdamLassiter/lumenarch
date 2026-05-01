@@ -1,16 +1,9 @@
-use bevy::{prelude::*, window::PrimaryWindow};
+use bevy::prelude::*;
+use bevy_ggrs::PlayerInputs;
+use std::collections::BTreeSet;
 
 use super::super::{
-    super::state::{
-        AbortEncounterButton,
-        ClientAppState,
-        ConnectionPhase,
-        ConnectionStatus,
-        MainCamera,
-        MultiplayerMovementIntentState,
-        MultiplayerSessionState,
-        PlayingCleanup,
-    },
+    super::state::{AbortEncounterButton, ClientAppState, MainCamera, PlayingCleanup},
     components::{
         AirlockCommandState,
         AngularVelocity,
@@ -22,15 +15,15 @@ use super::super::{
         LooseCargo,
         ManipulatorCommandState,
         MissionState,
+        ObservedLocalPlayerMarker,
         PlayerFieldState,
+        PlayerHandleComponent,
         PlayerMotionState,
         PlayerReferenceFrame,
         PlayerShip,
         PlayerShipAssignment,
         ProcessorCommandState,
-        ReactorCommandState,
-        RemoteSessionPlayer,
-        ResourceKind,
+        ReactorCommandState, ResourceKind,
         RuntimeArchComputer,
         RuntimeShipModule,
         ShipArchCommandState,
@@ -68,7 +61,11 @@ use super::super::{
         wrap_radians,
     },
 };
-use crate::{balance::BalanceConfig, ship::ModuleKind};
+use crate::{
+    balance::BalanceConfig,
+    netcode::{self, LumenGgrsConfig},
+    ship::ModuleKind,
+};
 
 const INTERIOR_CAMERA_SCALE: f32 = 0.58;
 const EXTERIOR_CAMERA_SCALE: f32 = 1.0;
@@ -121,8 +118,8 @@ pub(crate) fn return_keyboard_shortcut(
 pub(crate) fn camera_follow_player_ship(
     time: Res<Time>,
     balance: Res<BalanceConfig>,
-    ship_query: Single<&ShipboardControlState, With<ShipboardPlayer>>,
-    player_query: Single<(&PlayerMotionState, &CurrentStation), With<ShipboardPlayer>>,
+    ship_query: Single<&ShipboardControlState, With<ObservedLocalPlayerMarker>>,
+    player_query: Single<(&PlayerMotionState, &CurrentStation), With<ObservedLocalPlayerMarker>>,
     ship_frame_query: Query<(Entity, &SimPosition, &SimRotation), With<ShipRoot>>,
     module_query: Query<(&RuntimeShipModule, &Parent)>,
     camera_query: Single<
@@ -205,66 +202,70 @@ pub(crate) fn camera_follow_player_ship(
 }
 
 pub(crate) fn toggle_shipboard_control_mode(
-    status: Res<ConnectionStatus>,
-    keys: Res<ButtonInput<KeyCode>>,
-    ship_query: Single<&mut ShipboardControlState, With<ShipboardPlayer>>,
+    decoded_commands: Res<netcode::DecodedPlayerCommands>,
     mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
-    station_query: Single<&CurrentStation, (With<ShipboardPlayer>, With<PlayerShipAssignment>)>,
+    mut player_query: Query<
+        (
+            &PlayerHandleComponent,
+            &mut ShipboardControlState,
+            &CurrentStation,
+        ),
+        With<PlayerShipAssignment>,
+    >,
     module_query: Query<(Entity, &RuntimeShipModule)>,
 ) {
-    if matches!(status.phase, ConnectionPhase::Connected) {
-        return;
-    }
-    if !keys.just_pressed(KeyCode::KeyE) {
-        return;
-    }
     let mission_state = mission_query.into_inner();
     if mission_state.failed || mission_state.completed {
         return;
     }
 
-    let mut control_state = ship_query.into_inner();
-    let current_station = station_query.into_inner();
-    if control_state.mode == ShipControlMode::Interior {
-        if current_station.kind != ModuleKind::Cockpit {
-            return;
+    let mut players: Vec<_> = player_query.iter_mut().collect();
+    players.sort_by_key(|(handle, _, _)| handle.handle);
+    for (handle, mut control_state, current_station) in players {
+        let command = netcode::command_for_handle(&decoded_commands, handle.handle);
+        if !command.raw.pressed(netcode::INPUT_TOGGLE_STATION) {
+            continue;
         }
-        if let Some((entity, runtime_module)) = module_query
-            .iter()
-            .find(|(_, runtime_module)| runtime_module.module_id == current_station.module_id)
-        {
-            focus_station(
-                &mut control_state,
-                entity,
-                runtime_module.module_id,
-                runtime_module.kind,
-                StationFamily::Cockpit,
-                ShipControlMode::Cockpit,
-            );
+        if control_state.mode == ShipControlMode::Interior {
+            if current_station.kind != ModuleKind::Cockpit {
+                continue;
+            }
+            if let Some((entity, runtime_module)) = module_query
+                .iter()
+                .find(|(_, runtime_module)| runtime_module.module_id == current_station.module_id)
+            {
+                focus_station(
+                    &mut control_state,
+                    entity,
+                    runtime_module.module_id,
+                    runtime_module.kind,
+                    StationFamily::Cockpit,
+                    ShipControlMode::Cockpit,
+                );
+            }
         }
     }
 }
 
 pub(crate) fn exit_focused_station(
-    status: Res<ConnectionStatus>,
-    keys: Res<ButtonInput<KeyCode>>,
-    ship_query: Single<&mut ShipboardControlState, With<ShipboardPlayer>>,
+    decoded_commands: Res<netcode::DecodedPlayerCommands>,
+    mut ship_query: Query<(&PlayerHandleComponent, &mut ShipboardControlState)>,
 ) {
-    if matches!(status.phase, ConnectionPhase::Connected) {
-        return;
-    }
-    if !keys.just_pressed(KeyCode::Escape) && !keys.just_pressed(KeyCode::KeyQ) {
-        return;
-    }
-
-    let mut control_state = ship_query.into_inner();
-    if control_state.focus_mode == StationFocusMode::Focused {
-        control_state.mode = ShipControlMode::Interior;
-        control_state.focus_mode = StationFocusMode::Internal;
-        control_state.focused_entity = None;
-        control_state.focused_module_id = None;
-        control_state.focused_kind = None;
-        control_state.focused_family = None;
+    let mut players: Vec<_> = ship_query.iter_mut().collect();
+    players.sort_by_key(|(handle, _)| handle.handle);
+    for (handle, mut control_state) in players {
+        let command = netcode::command_for_handle(&decoded_commands, handle.handle);
+        if !command.raw.pressed(netcode::INPUT_EXIT_STATION) {
+            continue;
+        }
+        if control_state.focus_mode == StationFocusMode::Focused {
+            control_state.mode = ShipControlMode::Interior;
+            control_state.focus_mode = StationFocusMode::Internal;
+            control_state.focused_entity = None;
+            control_state.focused_module_id = None;
+            control_state.focused_kind = None;
+            control_state.focused_family = None;
+        }
     }
 }
 
@@ -279,51 +280,56 @@ pub(crate) fn update_player_reference_frame(
         ),
         With<ShipRoot>,
     >,
-    player_query: Single<
-        (&mut PlayerMotionState, &mut InternalPosition),
-        (With<ShipboardPlayer>, With<PlayerShipAssignment>),
+    mut player_query: Query<
+        (&PlayerHandleComponent, &mut PlayerMotionState, &mut InternalPosition),
+        With<PlayerShipAssignment>,
     >,
 ) {
-    let (mut motion, mut internal_position) = player_query.into_inner();
-    let previous_frame = motion.frame;
-    let mut best_ship = None;
-    let mut best_distance_sq = None;
+    let mut players: Vec<_> = player_query.iter_mut().collect();
+    players.sort_by_key(|(handle, _, _)| handle.handle);
+    for (_, mut motion, mut internal_position) in players {
+        let previous_frame = motion.frame;
+        let mut best_ship = None;
+        let mut best_distance_sq = None;
 
-    for (ship_entity, ship_position, ship_rotation, ship_velocity, inertia_field) in &ship_query {
-        let offset = motion.world_position - ship_position.value;
-        let distance_sq = offset.length_sq();
-        let radius_sq = fixed_square(inertia_field.radius);
-        if distance_sq <= radius_sq && best_distance_sq.is_none_or(|current| distance_sq < current)
+        for (ship_entity, ship_position, ship_rotation, ship_velocity, inertia_field) in &ship_query
         {
-            best_distance_sq = Some(distance_sq);
-            let local_position = offset.rotate(-ship_rotation.radians);
-            let relative_velocity = motion.world_velocity - ship_velocity.value;
-            let local_velocity = relative_velocity.rotate(-ship_rotation.radians);
-            best_ship = Some((ship_entity, local_position, local_velocity));
+            let offset = motion.world_position - ship_position.value;
+            let distance_sq = offset.length_sq();
+            let radius_sq = fixed_square(inertia_field.radius);
+            if distance_sq <= radius_sq
+                && best_distance_sq.is_none_or(|current| distance_sq < current)
+            {
+                best_distance_sq = Some(distance_sq);
+                let local_position = offset.rotate(-ship_rotation.radians);
+                let relative_velocity = motion.world_velocity - ship_velocity.value;
+                let local_velocity = relative_velocity.rotate(-ship_rotation.radians);
+                best_ship = Some((ship_entity, local_position, local_velocity));
+            }
         }
-    }
 
-    match best_ship {
-        Some((ship_entity, local_position, local_velocity)) => {
-            motion.frame = PlayerReferenceFrame::Ship(ship_entity);
-            if !matches!(previous_frame, PlayerReferenceFrame::Ship(current) if current == ship_entity)
-            {
-                motion.local_position = local_position;
-                motion.local_velocity = local_velocity;
+        match best_ship {
+            Some((ship_entity, local_position, local_velocity)) => {
+                motion.frame = PlayerReferenceFrame::Ship(ship_entity);
+                if !matches!(previous_frame, PlayerReferenceFrame::Ship(current) if current == ship_entity)
+                {
+                    motion.local_position = local_position;
+                    motion.local_velocity = local_velocity;
+                }
+                internal_position.local_position = local_position;
+                internal_position.grid_x = (local_position.x / Fx::from_num(32)).to_num::<i32>();
+                internal_position.grid_y = (-local_position.y / Fx::from_num(32)).to_num::<i32>();
             }
-            internal_position.local_position = local_position;
-            internal_position.grid_x = (local_position.x / Fx::from_num(32)).to_num::<i32>();
-            internal_position.grid_y = (-local_position.y / Fx::from_num(32)).to_num::<i32>();
-        }
-        None => {
-            if let PlayerReferenceFrame::Ship(ship_entity) = previous_frame
-                && let Ok((_, _, ship_rotation, ship_velocity, _)) = ship_query.get(ship_entity)
-            {
-                motion.world_velocity =
-                    ship_velocity.value + motion.local_velocity.rotate(ship_rotation.radians);
+            None => {
+                if let PlayerReferenceFrame::Ship(ship_entity) = previous_frame
+                    && let Ok((_, _, ship_rotation, ship_velocity, _)) = ship_query.get(ship_entity)
+                {
+                    motion.world_velocity =
+                        ship_velocity.value + motion.local_velocity.rotate(ship_rotation.radians);
+                }
+                motion.frame = PlayerReferenceFrame::World;
+                motion.local_velocity = FixedVec2::zero();
             }
-            motion.frame = PlayerReferenceFrame::World;
-            motion.local_velocity = FixedVec2::zero();
         }
     }
 }
@@ -331,9 +337,7 @@ pub(crate) fn update_player_reference_frame(
 pub(crate) fn move_shipboard_player(
     time: Res<Time>,
     balance: Res<BalanceConfig>,
-    status: Res<ConnectionStatus>,
-    keys: Res<ButtonInput<KeyCode>>,
-    movement_intent: Res<MultiplayerMovementIntentState>,
+    decoded_commands: Res<netcode::DecodedPlayerCommands>,
     ship_query: Query<
         (
             Entity,
@@ -353,109 +357,97 @@ pub(crate) fn move_shipboard_player(
         ),
         With<RuntimeShipModule>,
     >,
-    mode_query: Single<&ShipboardControlState, With<ShipboardPlayer>>,
     mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
-    player_query: Single<
+    mut player_query: Query<
         (
+            &PlayerHandleComponent,
+            &ShipboardControlState,
             &mut PlayerMotionState,
             &mut InternalPosition,
             &PlayerFieldState,
         ),
-        (With<ShipboardPlayer>, With<PlayerShipAssignment>),
+        With<PlayerShipAssignment>,
     >,
 ) {
-    let control_state = mode_query.into_inner();
-    let (mut motion, mut position, player_fields) = player_query.into_inner();
-
-    if control_state.mode != ShipControlMode::Interior {
-        anchor_player_to_focused_station(
-            &mut motion,
-            &mut position,
-            control_state,
-            &ship_query,
-            &module_query,
-        );
-        return;
-    }
     let mission_state = mission_query.into_inner();
     if mission_state.failed || mission_state.completed {
         return;
     }
 
     let dt = fx_from_time_delta(&time);
-    let mut input = FixedVec2::zero();
-    if matches!(status.phase, ConnectionPhase::Connected) {
-        input.x = Fx::from_num(movement_intent.move_x_milli as f32 / 1000.0);
-        input.y = Fx::from_num(movement_intent.move_y_milli as f32 / 1000.0);
-    } else {
-        if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
-            input.y += Fx::from_num(1);
-        }
-        if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
-            input.y -= Fx::from_num(1);
-        }
-        if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
-            input.x -= Fx::from_num(1);
-        }
-        if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
-            input.x += Fx::from_num(1);
-        }
-    }
-    let input = input.normalized_or_zero();
-
-    match motion.frame {
-        PlayerReferenceFrame::Ship(ship_entity) => {
-            let Ok((_, ship_position, ship_rotation, ship_velocity, atmosphere_state)) =
-                ship_query.get(ship_entity)
-            else {
-                motion.frame = PlayerReferenceFrame::World;
-                return;
-            };
-            let movement_multiplier = if player_fields.oxygen_critical {
-                Fx::from_num(balance.atmosphere.critical_oxygen_speed_multiplier)
-            } else if player_fields.oxygen_warning {
-                Fx::from_num(balance.atmosphere.low_oxygen_speed_multiplier)
-            } else {
-                Fx::from_num(1)
-            };
-            motion.local_velocity +=
-                input * Fx::from_num(PLAYER_WALK_ACCELERATION) * movement_multiplier * dt;
-            motion.local_velocity =
-                damp_vec2(motion.local_velocity, Fx::from_num(PLAYER_WALK_DAMPING), dt)
-                    .clamp_length(Fx::from_num(PLAYER_WALK_MAX_SPEED) * movement_multiplier);
-            let local_velocity = motion.local_velocity;
-            let desired_local_position = motion.local_position + local_velocity * dt;
-            let collision_tiles =
-                ship_collision_tiles(ship_entity, atmosphere_state, &module_query);
-            motion.local_position = resolve_ship_local_motion(
-                motion.local_position,
-                desired_local_position,
-                &collision_tiles,
+    let mut players: Vec<_> = player_query.iter_mut().collect();
+    players.sort_by_key(|(handle, _, _, _, _)| handle.handle);
+    for (handle, control_state, mut motion, mut position, player_fields) in players {
+        if control_state.mode != ShipControlMode::Interior {
+            anchor_player_to_focused_station(
+                &mut motion,
+                &mut position,
+                control_state,
+                &ship_query,
+                &module_query,
             );
-            motion.world_position =
-                ship_position.value + motion.local_position.rotate(ship_rotation.radians);
-            motion.world_velocity =
-                ship_velocity.value + local_velocity.rotate(ship_rotation.radians);
-            position.local_position = motion.local_position;
-            position.grid_x = (motion.local_position.x / Fx::from_num(32)).to_num::<i32>();
-            position.grid_y = (-motion.local_position.y / Fx::from_num(32)).to_num::<i32>();
+            continue;
         }
-        PlayerReferenceFrame::World => {
-            motion.world_velocity += input * Fx::from_num(PLAYER_EVA_ACCELERATION) * dt;
-            motion.world_velocity =
-                damp_vec2(motion.world_velocity, Fx::from_num(PLAYER_EVA_DAMPING), dt)
-                    .clamp_length(Fx::from_num(PLAYER_EVA_MAX_SPEED));
-            let world_velocity = motion.world_velocity;
-            motion.world_position += world_velocity * dt;
-            clamp_position_to_arena(&mut motion.world_position);
+
+        let command = netcode::command_for_handle(&decoded_commands, handle.handle);
+        let input = FixedVec2::from_num(command.move_x as i32, command.move_y as i32)
+            .normalized_or_zero();
+
+        match motion.frame {
+            PlayerReferenceFrame::Ship(ship_entity) => {
+                let Ok((_, ship_position, ship_rotation, ship_velocity, atmosphere_state)) =
+                    ship_query.get(ship_entity)
+                else {
+                    motion.frame = PlayerReferenceFrame::World;
+                    continue;
+                };
+                let movement_multiplier = if player_fields.oxygen_critical {
+                    Fx::from_num(balance.atmosphere.critical_oxygen_speed_multiplier)
+                } else if player_fields.oxygen_warning {
+                    Fx::from_num(balance.atmosphere.low_oxygen_speed_multiplier)
+                } else {
+                    Fx::from_num(1)
+                };
+                motion.local_velocity +=
+                    input * Fx::from_num(PLAYER_WALK_ACCELERATION) * movement_multiplier * dt;
+                motion.local_velocity =
+                    damp_vec2(motion.local_velocity, Fx::from_num(PLAYER_WALK_DAMPING), dt)
+                        .clamp_length(Fx::from_num(PLAYER_WALK_MAX_SPEED) * movement_multiplier);
+                let local_velocity = motion.local_velocity;
+                let desired_local_position = motion.local_position + local_velocity * dt;
+                let collision_tiles =
+                    ship_collision_tiles(ship_entity, atmosphere_state, &module_query);
+                motion.local_position = resolve_ship_local_motion(
+                    motion.local_position,
+                    desired_local_position,
+                    &collision_tiles,
+                );
+                motion.world_position =
+                    ship_position.value + motion.local_position.rotate(ship_rotation.radians);
+                motion.world_velocity =
+                    ship_velocity.value + local_velocity.rotate(ship_rotation.radians);
+                position.local_position = motion.local_position;
+                position.grid_x = (motion.local_position.x / Fx::from_num(32)).to_num::<i32>();
+                position.grid_y = (-motion.local_position.y / Fx::from_num(32)).to_num::<i32>();
+            }
+            PlayerReferenceFrame::World => {
+                motion.world_velocity += input * Fx::from_num(PLAYER_EVA_ACCELERATION) * dt;
+                motion.world_velocity =
+                    damp_vec2(motion.world_velocity, Fx::from_num(PLAYER_EVA_DAMPING), dt)
+                        .clamp_length(Fx::from_num(PLAYER_EVA_MAX_SPEED));
+                let world_velocity = motion.world_velocity;
+                motion.world_position += world_velocity * dt;
+                clamp_position_to_arena(&mut motion.world_position);
+            }
         }
     }
 }
 
 pub(crate) fn sync_shipboard_player_visual(
-    ship_query: Single<&ShipboardControlState, With<ShipboardPlayer>>,
-    player_query: Single<
+    ship_query: Single<&ShipboardControlState, With<ObservedLocalPlayerMarker>>,
+    mut player_query: Query<
         (
+            Option<&ObservedLocalPlayerMarker>,
             &PlayerMotionState,
             &CarriedResource,
             &mut Transform,
@@ -466,110 +458,47 @@ pub(crate) fn sync_shipboard_player_visual(
     >,
 ) {
     let control_state = ship_query.into_inner();
-    let (position, carried, mut transform, mut sprite, mut visibility) = player_query.into_inner();
-    transform.translation = match position.frame {
-        PlayerReferenceFrame::Ship(_) => Vec3::new(
-            position.local_position.x.to_num::<f32>(),
-            position.local_position.y.to_num::<f32>(),
-            6.0,
-        ),
-        PlayerReferenceFrame::World => render_translation(position.world_position, 6.0),
-    };
-    sprite.color = match control_state.mode {
-        ShipControlMode::Interior if carried.kind.is_some() => Color::srgb(0.98, 0.88, 0.52),
-        ShipControlMode::Interior => Color::srgb(0.82, 0.96, 0.62),
-        ShipControlMode::Cockpit | ShipControlMode::Turret => Color::srgba(0.82, 0.96, 0.62, 0.20),
-        ShipControlMode::Reactor | ShipControlMode::Logistics | ShipControlMode::Computer => {
-            Color::srgb(0.92, 0.96, 0.68)
-        }
-    };
-    *visibility = if matches!(
-        control_state.mode,
-        ShipControlMode::Cockpit | ShipControlMode::Turret
-    ) {
-        Visibility::Hidden
-    } else {
-        Visibility::Visible
-    };
-}
-
-pub(crate) fn sync_remote_session_players(
-    mut commands: Commands,
-    multiplayer_session: Res<MultiplayerSessionState>,
-    ship_query: Query<(&SimPosition, &SimRotation), With<PlayerShip>>,
-    mut query: Query<(Entity, &RemoteSessionPlayer, &mut Transform)>,
-) {
-    let mut seen = std::collections::BTreeSet::new();
-    for remote in &multiplayer_session.remote_players {
-        if Some(remote.player_id) == multiplayer_session.local_player_id || !remote.connected {
-            continue;
-        }
-        seen.insert(remote.player_id);
-        let mut matched = false;
-        for (_entity, marker, mut transform) in &mut query {
-            if marker.player_id != remote.player_id {
-                continue;
-            }
-            transform.translation = remote_presence_translation(remote, &ship_query);
-            matched = true;
-            break;
-        }
-        if !matched {
-            commands.spawn((
-                Sprite::from_color(Color::srgb(0.40, 0.82, 0.96), Vec2::splat(10.0)),
-                Transform::from_translation(remote_presence_translation(remote, &ship_query)),
-                RemoteSessionPlayer {
-                    player_id: remote.player_id,
-                },
-                PlayingCleanup,
-            ));
-        }
-    }
-
-    for (entity, marker, _) in &query {
-        if !seen.contains(&marker.player_id) {
-            commands.entity(entity).despawn_recursive();
-        }
-    }
-}
-
-fn remote_presence_translation(
-    remote: &crate::state::RemotePlayerState,
-    ship_query: &Query<(&SimPosition, &SimRotation), With<PlayerShip>>,
-) -> Vec3 {
-    match remote.presence.frame {
-        crate::protocol::PresenceFrame::World => Vec3::new(
-            remote.presence.world_position[0],
-            remote.presence.world_position[1],
-            20.0,
-        ),
-        crate::protocol::PresenceFrame::Ship => {
-            if let Ok((ship_position, ship_rotation)) = ship_query.get_single() {
-                let local_position = FixedVec2::new(
-                    Fx::from_num(remote.presence.local_position[0]),
-                    Fx::from_num(remote.presence.local_position[1]),
-                );
-                let world_position =
-                    ship_position.value + local_position.rotate(ship_rotation.radians);
-                Vec3::new(
-                    world_position.x.to_num::<f32>(),
-                    world_position.y.to_num::<f32>(),
-                    20.0,
-                )
+    for (observed, position, carried, mut transform, mut sprite, mut visibility) in &mut player_query
+    {
+        transform.translation = match position.frame {
+            PlayerReferenceFrame::Ship(_) => Vec3::new(
+                position.local_position.x.to_num::<f32>(),
+                position.local_position.y.to_num::<f32>(),
+                6.0,
+            ),
+            PlayerReferenceFrame::World => render_translation(position.world_position, 6.0),
+        };
+        if observed.is_some() {
+            sprite.color = match control_state.mode {
+                ShipControlMode::Interior if carried.kind.is_some() => Color::srgb(0.98, 0.88, 0.52),
+                ShipControlMode::Interior => Color::srgb(0.82, 0.96, 0.62),
+                ShipControlMode::Cockpit | ShipControlMode::Turret => {
+                    Color::srgba(0.82, 0.96, 0.62, 0.20)
+                }
+                ShipControlMode::Reactor | ShipControlMode::Logistics | ShipControlMode::Computer => {
+                    Color::srgb(0.92, 0.96, 0.68)
+                }
+            };
+            *visibility = if matches!(
+                control_state.mode,
+                ShipControlMode::Cockpit | ShipControlMode::Turret
+            ) {
+                Visibility::Hidden
             } else {
-                Vec3::new(
-                    remote.presence.world_position[0],
-                    remote.presence.world_position[1],
-                    20.0,
-                )
-            }
+                Visibility::Visible
+            };
+        } else {
+            *visibility = Visibility::Visible;
         }
     }
 }
 
 pub(crate) fn sync_player_reference_frame_parenting(
     mut commands: Commands,
-    player_query: Single<(Entity, &PlayerMotionState, Option<&Parent>), With<ShipboardPlayer>>,
+    player_query: Single<
+        (Entity, &PlayerMotionState, Option<&Parent>),
+        With<ObservedLocalPlayerMarker>,
+    >,
 ) {
     let (player_entity, motion, parent) = player_query.into_inner();
     match motion.frame {
@@ -591,78 +520,84 @@ pub(crate) fn sync_player_reference_frame_parenting(
 pub(crate) fn update_current_station(
     ship_query: Query<(Entity, &SimPosition, &SimRotation), With<ShipRoot>>,
     module_query: Query<(&RuntimeShipModule, &Parent)>,
-    player_query: Single<
-        (&PlayerMotionState, &mut CurrentStation),
-        (With<ShipboardPlayer>, With<PlayerShipAssignment>),
+    mut player_query: Query<
+        (&PlayerHandleComponent, &PlayerMotionState, &mut CurrentStation),
+        With<PlayerShipAssignment>,
     >,
 ) {
-    let (motion, mut station) = player_query.into_inner();
-    let Some(active_ship) = (match motion.frame {
-        PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
-        PlayerReferenceFrame::World => None,
-    }) else {
-        station.module_id = 0;
-        station.kind = ModuleKind::Interior;
-        return;
-    };
-
-    let Ok((_, ship_position, ship_rotation)) = ship_query.get(active_ship) else {
-        station.module_id = 0;
-        station.kind = ModuleKind::Interior;
-        return;
-    };
-
-    let mut nearest = None;
-    let mut nearest_distance_sq = None;
-    let max_distance_sq = fixed_square(Fx::from_num(PLAYER_INTERACT_RADIUS));
-    for (runtime_module, parent) in &module_query {
-        if parent.get() != active_ship {
+    let mut players: Vec<_> = player_query.iter_mut().collect();
+    players.sort_by_key(|(handle, _, _)| handle.handle);
+    for (_, motion, mut station) in players {
+        let Some(active_ship) = (match motion.frame {
+            PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
+            PlayerReferenceFrame::World => None,
+        }) else {
+            station.module_id = 0;
+            station.kind = ModuleKind::Interior;
             continue;
-        }
-        let world_position =
-            ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians);
-        let distance_sq = motion.world_position.distance_sq(world_position);
-        if distance_sq > max_distance_sq {
-            continue;
-        }
-        if nearest_distance_sq.is_none_or(|current| distance_sq < current) {
-            nearest_distance_sq = Some(distance_sq);
-            nearest = Some((runtime_module.module_id, runtime_module.kind));
-        }
-    }
+        };
 
-    if let Some((module_id, kind)) = nearest {
-        station.module_id = module_id;
-        station.kind = kind;
-    } else {
-        station.module_id = 0;
-        station.kind = ModuleKind::Interior;
+        let Ok((_, ship_position, ship_rotation)) = ship_query.get(active_ship) else {
+            station.module_id = 0;
+            station.kind = ModuleKind::Interior;
+            continue;
+        };
+
+        let mut nearest = None;
+        let mut nearest_distance_sq = None;
+        let max_distance_sq = fixed_square(Fx::from_num(PLAYER_INTERACT_RADIUS));
+        for (runtime_module, parent) in &module_query {
+            if parent.get() != active_ship {
+                continue;
+            }
+            let world_position =
+                ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians);
+            let distance_sq = motion.world_position.distance_sq(world_position);
+            if distance_sq > max_distance_sq {
+                continue;
+            }
+            if nearest_distance_sq.is_none_or(|current| distance_sq < current) {
+                nearest_distance_sq = Some(distance_sq);
+                nearest = Some((runtime_module.module_id, runtime_module.kind));
+            }
+        }
+
+        if let Some((module_id, kind)) = nearest {
+            station.module_id = module_id;
+            station.kind = kind;
+        } else {
+            station.module_id = 0;
+            station.kind = ModuleKind::Interior;
+        }
     }
 }
 
 pub(crate) fn handle_player_cargo_interaction(
-    status: Res<ConnectionStatus>,
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
+    session_inputs: Option<Res<PlayerInputs<LumenGgrsConfig>>>,
+    local_handle: Option<Res<netcode::LocalPlayerHandle>>,
     player_ship_query: Single<(Entity, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,
     player_query: Single<
         (&PlayerMotionState, &CurrentStation, &mut CarriedResource),
-        (With<ShipboardPlayer>, With<PlayerShipAssignment>),
+        (With<ObservedLocalPlayerMarker>, With<PlayerShipAssignment>),
     >,
     mut loose_cargo_query: Query<(Entity, &SimPosition, &LooseCargo)>,
     mut storage_query: Query<(&RuntimeShipModule, &Parent, &mut StorageModule)>,
 ) {
-    if matches!(status.phase, ConnectionPhase::Connected) {
-        return;
-    }
-    if !keys.just_pressed(KeyCode::KeyF) && !keys.just_pressed(KeyCode::KeyG) {
+    let session_input = netcode::local_player_input(session_inputs, local_handle);
+    let pickup_pressed =
+        keys.just_pressed(KeyCode::KeyF) || session_input.pressed(netcode::INPUT_PICKUP);
+    let drop_pressed =
+        keys.just_pressed(KeyCode::KeyG) || session_input.pressed(netcode::INPUT_DROP);
+    if !pickup_pressed && !drop_pressed {
         return;
     }
 
     let (player_ship_entity, mut mission_state) = player_ship_query.into_inner();
     let (motion, current_station, mut carried) = player_query.into_inner();
 
-    if keys.just_pressed(KeyCode::KeyG) {
+    if drop_pressed {
         let Some(kind) = carried.kind else {
             return;
         };
@@ -773,13 +708,9 @@ pub(crate) fn handle_player_cargo_interaction(
 pub(crate) fn update_station_command_input(
     time: Res<Time>,
     balance: Res<BalanceConfig>,
-    status: Res<ConnectionStatus>,
-    keys: Res<ButtonInput<KeyCode>>,
-    mouse_buttons: Res<ButtonInput<MouseButton>>,
-    window_query: Single<&Window, With<PrimaryWindow>>,
-    camera_query: Single<(&Camera, &GlobalTransform), With<MainCamera>>,
+    decoded_commands: Res<netcode::DecodedPlayerCommands>,
     ship_query: Single<(&SimPosition, &SimRotation), (With<PlayerShip>, With<ShipRoot>)>,
-    player_control_query: Single<&mut ShipboardControlState, With<ShipboardPlayer>>,
+    player_control_query: Query<(&PlayerHandleComponent, &ShipboardControlState)>,
     ship_control_query: Single<&mut ShipControlState, (With<PlayerShip>, With<ShipRoot>)>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     mut module_query: Query<(
@@ -795,238 +726,184 @@ pub(crate) fn update_station_command_input(
     )>,
     candidate_query: Query<&RuntimeShipModule>,
 ) {
-    if matches!(status.phase, ConnectionPhase::Connected) {
-        return;
-    }
     let dt = fx_from_time_delta(&time);
-    let (ship_position, ship_rotation) = ship_query.into_inner();
-    let control_state = player_control_query.into_inner();
+    let (_, ship_rotation) = ship_query.into_inner();
     let mut ship_controls = ship_control_query.into_inner();
     let mut mission_runtime = mission_query.into_inner();
+    let mut control_states: Vec<_> = player_control_query.iter().collect();
+    control_states.sort_by_key(|(handle, _)| handle.handle);
+    let mut claimed_entities = BTreeSet::new();
 
     ship_controls.fire_pressed = false;
+    ship_controls.throttle_demand = Fx::from_num(0);
+    ship_controls.turn_input = Fx::from_num(0);
     if mission_runtime.failed || mission_runtime.completed {
-        ship_controls.throttle_demand = Fx::from_num(0);
-        ship_controls.turn_input = Fx::from_num(0);
         return;
     }
 
-    if control_state.mode != ShipControlMode::Cockpit {
-        ship_controls.throttle_demand = Fx::from_num(0);
-        ship_controls.turn_input = Fx::from_num(0);
-    }
-
-    match control_state.mode {
-        ShipControlMode::Interior => {}
-        ShipControlMode::Cockpit => {
-            if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
-                ship_controls.throttle_demand = (ship_controls.throttle_demand
-                    + dt * Fx::from_num(0.9))
-                .clamp(Fx::from_num(0), Fx::from_num(1));
-            }
-            if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
-                ship_controls.throttle_demand = (ship_controls.throttle_demand
-                    - dt * Fx::from_num(0.9))
-                .clamp(Fx::from_num(0), Fx::from_num(1));
-            }
-            ship_controls.turn_input = Fx::from_num(0);
-            if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
-                ship_controls.turn_input += Fx::from_num(1);
-            }
-            if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
-                ship_controls.turn_input -= Fx::from_num(1);
-            }
-
-            if mouse_buttons.pressed(MouseButton::Left)
-                && let Some((cursor_x, cursor_y)) = cursor_normalized(&window_query)
-            {
-                ship_controls.turn_input = Fx::from_num(-cursor_x);
+    for (handle, control_state) in control_states {
+        let command = netcode::command_for_handle(&decoded_commands, handle.handle);
+        match control_state.mode {
+            ShipControlMode::Interior => {}
+            ShipControlMode::Cockpit => {
                 ship_controls.throttle_demand =
-                    Fx::from_num(((1.0 - cursor_y) * 0.5).clamp(0.0, 1.0));
+                    (Fx::from_num(command.throttle_milli) / Fx::from_num(1000))
+                        .clamp(Fx::from_num(0), Fx::from_num(1));
+                ship_controls.turn_input =
+                    (Fx::from_num(command.turn_milli) / Fx::from_num(1000))
+                        .clamp(Fx::from_num(-1), Fx::from_num(1));
+                if command.raw.pressed(netcode::INPUT_FIRE) {
+                    ship_controls.turn_input =
+                        Fx::from_num(-command.aim_x_milli) / Fx::from_num(1000);
+                    ship_controls.throttle_demand =
+                        (((Fx::from_num(command.aim_y_milli) / Fx::from_num(1000))
+                            + Fx::from_num(1))
+                            / Fx::from_num(2))
+                        .clamp(Fx::from_num(0), Fx::from_num(1));
+                }
             }
-            ship_controls.turn_input = ship_controls
-                .turn_input
-                .clamp(Fx::from_num(-1), Fx::from_num(1));
-        }
-        ShipControlMode::Turret => {
-            let Some(focused_entity) = control_state.focused_entity else {
-                return;
-            };
-            let Ok((_, runtime_module, turret_state, _, _, _, _, _, _)) =
-                module_query.get_mut(focused_entity)
-            else {
-                return;
-            };
-            let Some(mut turret_state) = turret_state else {
-                return;
-            };
-            if let Some(cursor_world) = cursor_world_position(&window_query, &camera_query) {
-                let turret_world = ship_position.value
-                    + runtime_module.local_position.rotate(ship_rotation.radians);
-                let to_cursor = cursor_world - turret_world;
-                if !to_cursor.is_near_zero() {
-                    turret_state.desired_angle = wrap_radians(
-                        angle_from_vector(to_cursor) - Fx::FRAC_PI_2 - ship_rotation.radians,
+            ShipControlMode::Turret => {
+                let Some(focused_entity) = control_state.focused_entity else {
+                    continue;
+                };
+                if !claimed_entities.insert(focused_entity) {
+                    continue;
+                }
+                let Ok((_, _, turret_state, _, _, _, _, _, _)) = module_query.get_mut(focused_entity)
+                else {
+                    continue;
+                };
+                let Some(mut turret_state) = turret_state else {
+                    continue;
+                };
+                let aim =
+                    FixedVec2::from_num(command.aim_x_milli as i32, command.aim_y_milli as i32);
+                if !aim.is_near_zero() {
+                    turret_state.desired_angle =
+                        wrap_radians(angle_from_vector(aim) - Fx::FRAC_PI_2 - ship_rotation.radians);
+                }
+                turret_state.desired_angle +=
+                    dt * Fx::from_num(command.turn_milli) / Fx::from_num(1000) * Fx::from_num(1.8);
+                turret_state.desired_angle = wrap_radians(turret_state.desired_angle);
+                turret_state.fire_intent = command.raw.pressed(netcode::INPUT_FIRE);
+                ship_controls.fire_pressed |= turret_state.fire_intent;
+            }
+            ShipControlMode::Reactor => {
+                let Some(focused_entity) = control_state.focused_entity else {
+                    continue;
+                };
+                if !claimed_entities.insert(focused_entity) {
+                    continue;
+                }
+                let Ok((_, _, _, reactor_state, _, _, _, _, _)) = module_query.get_mut(focused_entity)
+                else {
+                    continue;
+                };
+                let Some(mut reactor_state) = reactor_state else {
+                    continue;
+                };
+                reactor_state.reaction_rate +=
+                    dt * Fx::from_num(balance.reactor.control_adjust_rate)
+                        * Fx::from_num(command.reactor_delta_milli)
+                        / Fx::from_num(1000);
+                reactor_state.turbine_load +=
+                    dt * Fx::from_num(balance.reactor.control_adjust_rate)
+                        * Fx::from_num(command.turbine_delta_milli)
+                        / Fx::from_num(1000);
+                reactor_state.reaction_rate = reactor_state.reaction_rate.clamp(Fx::from_num(0), Fx::from_num(1));
+                reactor_state.turbine_load = reactor_state.turbine_load.clamp(Fx::from_num(0), Fx::from_num(1));
+            }
+            ShipControlMode::Logistics => {
+                let Some(focused_entity) = control_state.focused_entity else {
+                    continue;
+                };
+                if !claimed_entities.insert(focused_entity) {
+                    continue;
+                }
+                let candidate_ids = nearby_logistics_target_ids(
+                    control_state.focused_module_id.unwrap_or_default(),
+                    &candidate_query,
+                );
+                let Ok((_, runtime_module, _, _, storage_cmd, manipulator_cmd, processor_cmd, airlock_state, _)) =
+                    module_query.get_mut(focused_entity)
+                else {
+                    continue;
+                };
+                if let Some(mut airlock_state) = airlock_state {
+                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE) {
+                        airlock_state.open = !airlock_state.open;
+                        mission_runtime.airlocks_cycled += 1;
+                    }
+                } else if let Some(mut storage_cmd) = storage_cmd
+                    && command.raw.pressed(netcode::INPUT_SPACE_EDGE)
+                {
+                    storage_cmd.allow_intake = !storage_cmd.allow_intake;
+                }
+                if let Some(mut manipulator_cmd) = manipulator_cmd {
+                    if command.raw.pressed(netcode::INPUT_AUX_EDGE) {
+                        manipulator_cmd.manual_mode = !manipulator_cmd.manual_mode;
+                    }
+                    if command.reactor_delta_milli != 0 {
+                        manipulator_cmd.resource_kind = match manipulator_cmd.resource_kind {
+                            crate::gameplay::components::ResourceKind::RawSalvage => crate::gameplay::components::ResourceKind::RepairCharge,
+                            crate::gameplay::components::ResourceKind::RepairCharge => crate::gameplay::components::ResourceKind::Fuel,
+                            crate::gameplay::components::ResourceKind::Fuel => crate::gameplay::components::ResourceKind::Ammunition,
+                            crate::gameplay::components::ResourceKind::Ammunition => crate::gameplay::components::ResourceKind::RawSalvage,
+                        };
+                    }
+                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE) {
+                        manipulator_cmd.transfer_enabled = !manipulator_cmd.transfer_enabled;
+                    }
+                    if !candidate_ids.is_empty()
+                        && (command.raw.pressed(netcode::INPUT_PREV_EDGE)
+                            || command.raw.pressed(netcode::INPUT_NEXT_EDGE))
+                    {
+                        let direction = if command.raw.pressed(netcode::INPUT_PREV_EDGE) { -1 } else { 1 };
+                        let current_index = manipulator_cmd
+                            .target_module_id
+                            .and_then(|module_id| candidate_ids.iter().position(|id| *id == module_id))
+                            .unwrap_or(0);
+                        let next_index = ((current_index as i32 + direction)
+                            .rem_euclid(candidate_ids.len() as i32)) as usize;
+                        manipulator_cmd.target_module_id = Some(candidate_ids[next_index]);
+                        manipulator_cmd.source_module_id = Some(runtime_module.module_id);
+                    }
+                }
+                if let Some(mut processor_cmd) = processor_cmd {
+                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE) {
+                        processor_cmd.enabled = !processor_cmd.enabled;
+                    }
+                    if command.reactor_delta_milli != 0 {
+                        processor_cmd.selected_recipe = match processor_cmd.selected_recipe {
+                            crate::gameplay::components::ProcessorRecipe::RepairCharge => crate::gameplay::components::ProcessorRecipe::Ammunition,
+                            crate::gameplay::components::ProcessorRecipe::Ammunition => crate::gameplay::components::ProcessorRecipe::Fuel,
+                            crate::gameplay::components::ProcessorRecipe::Fuel => crate::gameplay::components::ProcessorRecipe::RepairCharge,
+                        };
+                    }
+                }
+            }
+            ShipControlMode::Computer => {
+                let Some(focused_entity) = control_state.focused_entity else {
+                    continue;
+                };
+                if !claimed_entities.insert(focused_entity) {
+                    continue;
+                }
+                let Ok((_, _, _, _, _, _, _, _, arch_runtime)) = module_query.get_mut(focused_entity)
+                else {
+                    continue;
+                };
+                let Some(mut arch_runtime) = arch_runtime else {
+                    continue;
+                };
+                if command.raw.pressed(netcode::INPUT_SPACE_EDGE) {
+                    arch_runtime.enabled = !arch_runtime.enabled;
+                }
+                if command.raw.pressed(netcode::INPUT_CYCLE_TEMPLATE) {
+                    arch_runtime.program = crate::ship::arch::ArchProgram::from_template(
+                        arch_runtime.program.template.next(),
                     );
                 }
-            }
-            if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
-                turret_state.desired_angle += dt * Fx::from_num(1.8);
-            }
-            if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
-                turret_state.desired_angle -= dt * Fx::from_num(1.8);
-            }
-            turret_state.desired_angle = wrap_radians(turret_state.desired_angle);
-            ship_controls.fire_pressed =
-                keys.pressed(KeyCode::Space) || mouse_buttons.pressed(MouseButton::Left);
-            turret_state.fire_intent = ship_controls.fire_pressed;
-        }
-        ShipControlMode::Reactor => {
-            let Some(focused_entity) = control_state.focused_entity else {
-                return;
-            };
-            let Ok((_, _, _, reactor_state, _, _, _, _, _)) = module_query.get_mut(focused_entity)
-            else {
-                return;
-            };
-            let Some(mut reactor_state) = reactor_state else {
-                return;
-            };
-            if keys.pressed(KeyCode::KeyW) || keys.pressed(KeyCode::ArrowUp) {
-                reactor_state.reaction_rate +=
-                    dt * Fx::from_num(balance.reactor.control_adjust_rate);
-            }
-            if keys.pressed(KeyCode::KeyS) || keys.pressed(KeyCode::ArrowDown) {
-                reactor_state.reaction_rate -=
-                    dt * Fx::from_num(balance.reactor.control_adjust_rate);
-            }
-            if keys.pressed(KeyCode::KeyD) || keys.pressed(KeyCode::ArrowRight) {
-                reactor_state.turbine_load +=
-                    dt * Fx::from_num(balance.reactor.control_adjust_rate);
-            }
-            if keys.pressed(KeyCode::KeyA) || keys.pressed(KeyCode::ArrowLeft) {
-                reactor_state.turbine_load -=
-                    dt * Fx::from_num(balance.reactor.control_adjust_rate);
-            }
-            reactor_state.reaction_rate = reactor_state
-                .reaction_rate
-                .clamp(Fx::from_num(0), Fx::from_num(1));
-            reactor_state.turbine_load = reactor_state
-                .turbine_load
-                .clamp(Fx::from_num(0), Fx::from_num(1));
-        }
-        ShipControlMode::Logistics => {
-            let Some(focused_entity) = control_state.focused_entity else {
-                return;
-            };
-            let candidate_ids = nearby_logistics_target_ids(
-                control_state.focused_module_id.unwrap_or_default(),
-                &candidate_query,
-            );
-            let Ok((
-                _,
-                runtime_module,
-                _,
-                _,
-                storage_cmd,
-                manipulator_cmd,
-                processor_cmd,
-                airlock_state,
-                _,
-            )) = module_query.get_mut(focused_entity)
-            else {
-                return;
-            };
-            if let Some(mut airlock_state) = airlock_state {
-                if keys.just_pressed(KeyCode::Space) {
-                    airlock_state.open = !airlock_state.open;
-                    mission_runtime.airlocks_cycled += 1;
-                }
-            } else if let Some(mut storage_cmd) = storage_cmd
-                && keys.just_pressed(KeyCode::Space)
-            {
-                storage_cmd.allow_intake = !storage_cmd.allow_intake;
-            }
-            if let Some(mut manipulator_cmd) = manipulator_cmd {
-                if keys.just_pressed(KeyCode::KeyM) {
-                    manipulator_cmd.manual_mode = !manipulator_cmd.manual_mode;
-                }
-                if keys.just_pressed(KeyCode::KeyR) {
-                    manipulator_cmd.resource_kind = match manipulator_cmd.resource_kind {
-                        crate::gameplay::components::ResourceKind::RawSalvage => {
-                            crate::gameplay::components::ResourceKind::RepairCharge
-                        }
-                        crate::gameplay::components::ResourceKind::RepairCharge => {
-                            crate::gameplay::components::ResourceKind::Fuel
-                        }
-                        crate::gameplay::components::ResourceKind::Fuel => {
-                            crate::gameplay::components::ResourceKind::Ammunition
-                        }
-                        crate::gameplay::components::ResourceKind::Ammunition => {
-                            crate::gameplay::components::ResourceKind::RawSalvage
-                        }
-                    };
-                }
-                if keys.just_pressed(KeyCode::Space) {
-                    manipulator_cmd.transfer_enabled = !manipulator_cmd.transfer_enabled;
-                }
-                if !candidate_ids.is_empty()
-                    && (keys.just_pressed(KeyCode::BracketLeft)
-                        || keys.just_pressed(KeyCode::BracketRight))
-                {
-                    let direction = if keys.just_pressed(KeyCode::BracketLeft) {
-                        -1
-                    } else {
-                        1
-                    };
-                    let current_index = manipulator_cmd
-                        .target_module_id
-                        .and_then(|module_id| candidate_ids.iter().position(|id| *id == module_id))
-                        .unwrap_or(0);
-                    let next_index = ((current_index as i32 + direction)
-                        .rem_euclid(candidate_ids.len() as i32))
-                        as usize;
-                    manipulator_cmd.target_module_id = Some(candidate_ids[next_index]);
-                    manipulator_cmd.source_module_id = Some(runtime_module.module_id);
-                }
-            }
-            if let Some(mut processor_cmd) = processor_cmd {
-                if keys.just_pressed(KeyCode::Space) {
-                    processor_cmd.enabled = !processor_cmd.enabled;
-                }
-                if keys.just_pressed(KeyCode::KeyR) {
-                    processor_cmd.selected_recipe = match processor_cmd.selected_recipe {
-                        crate::gameplay::components::ProcessorRecipe::RepairCharge => {
-                            crate::gameplay::components::ProcessorRecipe::Ammunition
-                        }
-                        crate::gameplay::components::ProcessorRecipe::Ammunition => {
-                            crate::gameplay::components::ProcessorRecipe::Fuel
-                        }
-                        crate::gameplay::components::ProcessorRecipe::Fuel => {
-                            crate::gameplay::components::ProcessorRecipe::RepairCharge
-                        }
-                    };
-                }
-            }
-        }
-        ShipControlMode::Computer => {
-            let Some(focused_entity) = control_state.focused_entity else {
-                return;
-            };
-            let Ok((_, _, _, _, _, _, _, _, arch_runtime)) = module_query.get_mut(focused_entity)
-            else {
-                return;
-            };
-            let Some(mut arch_runtime) = arch_runtime else {
-                return;
-            };
-            if keys.just_pressed(KeyCode::Space) {
-                arch_runtime.enabled = !arch_runtime.enabled;
-            }
-            if keys.just_pressed(KeyCode::KeyT) {
-                arch_runtime.program = crate::ship::arch::ArchProgram::from_template(
-                    arch_runtime.program.template.next(),
-                );
             }
         }
     }
@@ -1034,7 +911,6 @@ pub(crate) fn update_station_command_input(
 
 pub(crate) fn apply_player_ship_controls(
     time: Res<Time>,
-    player_control_query: Single<&ShipboardControlState, With<ShipboardPlayer>>,
     player_ship_query: Single<
         (
             &SimRotation,
@@ -1063,22 +939,13 @@ pub(crate) fn apply_player_ship_controls(
         mut weapon_state,
         mission_state,
     ) = player_ship_query.into_inner();
-    let control_mode = player_control_query.into_inner();
     let dt = fx_from_time_delta(&time);
-    let throttle_demand = if control_mode.mode == ShipControlMode::Cockpit {
-        control_state
-            .throttle_demand
-            .clamp(Fx::from_num(0), Fx::from_num(1))
-    } else {
-        Fx::from_num(0)
-    };
-    let mut turn_input = if control_mode.mode == ShipControlMode::Cockpit {
-        control_state
-            .turn_input
-            .clamp(Fx::from_num(-1), Fx::from_num(1))
-    } else {
-        Fx::from_num(0)
-    };
+    let throttle_demand = control_state
+        .throttle_demand
+        .clamp(Fx::from_num(0), Fx::from_num(1));
+    let mut turn_input = control_state
+        .turn_input
+        .clamp(Fx::from_num(-1), Fx::from_num(1));
 
     if mission_state.failed || mission_state.completed {
         turn_input = Fx::from_num(0);
@@ -1088,7 +955,6 @@ pub(crate) fn apply_player_ship_controls(
     control_state.thrust_active =
         throttle_demand > Fx::from_num(0.05) && !mission_state.failed && !mission_state.completed;
     control_state.turn_input = turn_input;
-    control_state.fire_pressed = false;
     weapon_state.cooldown_remaining = (weapon_state.cooldown_remaining - dt).max(Fx::from_num(0));
 
     update_ship_power_state(

@@ -6,7 +6,7 @@ use super::{
 };
 use crate::ship::{ModuleKind, ModuleVariant, arch::ArchProgram};
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct RuntimeShipModule {
     pub(crate) module_id: u64,
     pub(crate) kind: ModuleKind,
@@ -20,7 +20,7 @@ pub(crate) struct RuntimeShipModule {
 #[derive(Component)]
 pub(crate) struct HostileShipModule;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct Integrity {
     pub(crate) current: i32,
     pub(crate) max: i32,
@@ -38,12 +38,12 @@ pub(crate) struct PowerConsumer {
     pub(crate) draw: i32,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct EngineModule {
     pub(crate) thrust_multiplier: Fx,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct WeaponModule {
     pub(crate) damage: i32,
     pub(crate) requires_ammo: bool,
@@ -65,7 +65,7 @@ pub(crate) struct ArchExecutionResult {
     pub(crate) program_name: String,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct RuntimeArchComputer {
     pub(crate) enabled: bool,
     pub(crate) instruction_budget: u32,
@@ -76,14 +76,14 @@ pub(crate) struct RuntimeArchComputer {
 #[derive(Component)]
 pub(crate) struct TurretTopSprite;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct TurretCommandState {
     pub(crate) desired_angle: Fx,
     pub(crate) actual_angle: Fx,
     pub(crate) fire_intent: bool,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ReactorCommandState {
     pub(crate) variant: ModuleVariant,
     pub(crate) reaction_rate: Fx,
@@ -110,17 +110,17 @@ impl ProcessorRecipe {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct StorageCommandState {
     pub(crate) allow_intake: bool,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct AirlockCommandState {
     pub(crate) open: bool,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ManipulatorCommandState {
     pub(crate) manual_mode: bool,
     pub(crate) transfer_enabled: bool,
@@ -129,7 +129,7 @@ pub(crate) struct ManipulatorCommandState {
     pub(crate) resource_kind: ResourceKind,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ProcessorCommandState {
     pub(crate) selected_recipe: ProcessorRecipe,
     pub(crate) enabled: bool,
@@ -195,7 +195,7 @@ pub(crate) enum ModuleCondition {
     Destroyed,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ModuleRuntimeState {
     pub(crate) current_heat: Fx,
     pub(crate) electrical_instability: Fx,
@@ -207,7 +207,7 @@ pub(crate) struct ModuleRuntimeState {
     pub(crate) last_interaction_age: Fx,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct ModuleFieldEmitter {
     pub(crate) heat_output: Fx,
     pub(crate) cooling_output: Fx,

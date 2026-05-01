@@ -3,10 +3,9 @@ use bevy::{input::mouse::MouseWheel, prelude::*, window::PrimaryWindow};
 use super::{
     HOVERED_BUTTON,
     PRESSED_BUTTON,
+    netcode,
     state::{
         BackToStationButton,
-        ClientAppState,
-        DemoProgression,
         LaunchEncounterButton,
         SectorMapCanvas,
         SectorMapDetailText,
@@ -249,8 +248,13 @@ pub(crate) fn sector_node_button_system(
         (&Interaction, &SectorNodeButton, &mut BackgroundColor),
         (Changed<Interaction>, With<Button>),
     >,
-    mut sector_state: ResMut<SectorState>,
+    status: Res<netcode::SessionStatus>,
+    sector_state: Res<SectorState>,
+    mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     for (interaction, button, mut background) in &mut interaction_query {
         let Some(node) = sector_state.node(button.node_id).cloned() else {
             continue;
@@ -260,7 +264,11 @@ pub(crate) fn sector_node_button_system(
         match *interaction {
             Interaction::Pressed => {
                 if reachable && !matches!(node.kind, SectorNodeKind::HubStation) {
-                    sector_state.selected_node_id = Some(button.node_id);
+                    pending_meta.0 = Some(netcode::PendingMetaCommand {
+                        op: netcode::RollbackMetaOp::SelectSectorNode,
+                        arg0: button.node_id as i16,
+                        ..Default::default()
+                    });
                 }
                 *background = BackgroundColor(PRESSED_BUTTON);
             }
@@ -291,10 +299,13 @@ pub(crate) fn sector_navigation_button_system(
         ),
         (Changed<Interaction>, With<Button>),
     >,
-    mut sector_state: ResMut<SectorState>,
-    mut progression: ResMut<DemoProgression>,
-    mut next_state: ResMut<NextState<ClientAppState>>,
+    sector_state: Res<SectorState>,
+    status: Res<netcode::SessionStatus>,
+    mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     for (interaction, mut background, launch, back) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
@@ -307,13 +318,18 @@ pub(crate) fn sector_navigation_button_system(
                             .map(|node| !matches!(node.kind, SectorNodeKind::HubStation))
                             .unwrap_or(false)
                     {
-                        sector_state.active_encounter_node_id = Some(node_id);
-                        progression.jump_count += 1;
-                        next_state.set(ClientAppState::Encounter);
+                        pending_meta.0 = Some(netcode::PendingMetaCommand {
+                            op: netcode::RollbackMetaOp::LaunchEncounter,
+                            arg0: node_id as i16,
+                            ..Default::default()
+                        });
                     }
                 } else if back.is_some() {
                     *background = BackgroundColor(Color::srgb(0.42, 0.30, 0.20));
-                    next_state.set(ClientAppState::Docked);
+                    pending_meta.0 = Some(netcode::PendingMetaCommand {
+                        op: netcode::RollbackMetaOp::ReturnToDock,
+                        ..Default::default()
+                    });
                 }
             }
             Interaction::Hovered => {

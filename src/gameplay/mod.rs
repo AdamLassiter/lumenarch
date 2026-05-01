@@ -37,7 +37,6 @@ pub(crate) use systems::{
     station_panel_button_system,
     sync_hostile_ship_state,
     sync_player_reference_frame_parenting,
-    sync_remote_session_players,
     sync_runtime_ship_state,
     sync_shipboard_player_visual,
     tick_recent_action_feedback,

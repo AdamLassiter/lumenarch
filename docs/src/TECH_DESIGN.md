@@ -95,22 +95,22 @@ Suggested system sets inside `FixedUpdate`:
 
 In networked play:
 
-* `FixedUpdate` is the gameplay truth path used by the host and mirrored by clients
-* `Update` is the presentation path used to render interpolated or predicted state
-* local input capture may happen before simulation, but intent should be stamped for a future tick before entering the deterministic pipeline
+* `GgrsSchedule` is the gameplay truth path used by every synchronized peer
+* `Update` is the presentation path used to render UI, camera, and non-authoritative visuals
+* local input capture happens before rollback simulation and is encoded into deterministic `PlayerGgrsInput` frames
 
 ## Multiplayer Model
 
-The preferred architecture is **authoritative host/server plus deterministic input replication**.
+The current architecture is **listen-host session bootstrap plus `bevy_ggrs` rollback synchronization**.
 
 High-level rules:
 
-* the host is authoritative for accepted inputs, world generation seeds, and resync checkpoints
-* clients send **player intent**, not high-frequency state transforms
-* all peers step the same deterministic simulation once a tick's input set is committed
-* clients present locally predicted visuals where helpful, but committed simulation advances only on agreed tick boundaries
+* the host defines the peer list and initial deterministic snapshot before the session starts
+* peers send **player intent**, not high-frequency state transforms
+* all peers step the same deterministic simulation inside rollback
+* clients present locally predicted visuals where helpful, but synchronized gameplay state lives in rollback-owned resources and entities
 
-This keeps bandwidth low and makes desync detection tractable.
+This keeps bandwidth low while giving the game a single synchronized execution path.
 
 ### Why Not Pure Rollback-First
 

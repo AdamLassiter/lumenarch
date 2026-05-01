@@ -11,6 +11,7 @@ use super::ship::{spawn_hostile_ship, spawn_runtime_ship};
 use crate::{
     balance::BalanceConfig,
     gameplay::helpers::{FixedVec2, Fx},
+    netcode,
     state::{DemoProgression, EditorShip, EnemyShipLibraryState, SectorState},
 };
 
@@ -21,8 +22,16 @@ pub(crate) fn spawn_runtime_scene(
     progression: Res<DemoProgression>,
     enemy_library_state: Res<EnemyShipLibraryState>,
     sector_state: Res<SectorState>,
+    session_status: Res<netcode::SessionStatus>,
+    local_handle: Res<netcode::LocalPlayerHandle>,
+    mut player_handle_map: ResMut<netcode::PlayerHandleMap>,
+    mut observed_local_player: ResMut<netcode::ObservedLocalPlayer>,
     balance: Res<BalanceConfig>,
 ) {
+    player_handle_map.entities.clear();
+    observed_local_player.entity = None;
+    observed_local_player.handle = local_handle.0;
+
     spawn_runtime_hud(&mut commands, &asset_server, &editor_ship.ship);
     let active_node = sector_state
         .active_node()
@@ -46,6 +55,10 @@ pub(crate) fn spawn_runtime_scene(
         &mut commands,
         &asset_server,
         &editor_ship.ship,
+        &(0..session_status.total_players.max(1)).collect::<Vec<_>>(),
+        local_handle.0,
+        &mut player_handle_map,
+        &mut observed_local_player,
         &balance,
         active_node.id,
         &active_node.label,
@@ -91,8 +104,12 @@ pub(crate) fn spawn_runtime_scene(
 
 pub(crate) fn cleanup_runtime_entities(
     mut commands: Commands,
+    mut player_handle_map: ResMut<netcode::PlayerHandleMap>,
+    mut observed_local_player: ResMut<netcode::ObservedLocalPlayer>,
     query: Query<Entity, With<super::super::super::state::PlayingCleanup>>,
 ) {
+    player_handle_map.entities.clear();
+    observed_local_player.entity = None;
     for entity in &query {
         commands.entity(entity).despawn_recursive();
     }

@@ -7,20 +7,15 @@ use super::{
     HOVERED_BUTTON,
     NORMAL_BUTTON,
     PRESSED_BUTTON,
-    net,
+    netcode,
     state::{
         ClientAppState,
-        ConnectionConfig,
-        ConnectionMailbox,
-        ConnectionPhase,
-        ConnectionStatus,
         DebugEnemyEditorButton,
         EditorMode,
         EditorSessionState,
         HostAddressText,
         JoinButton,
         MenuRoot,
-        NetworkCommandSender,
         StatusText,
     },
 };
@@ -28,8 +23,8 @@ use super::{
 pub(crate) fn spawn_menu_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    config: Res<ConnectionConfig>,
-    status: Res<ConnectionStatus>,
+    config: Res<netcode::SessionConfig>,
+    status: Res<netcode::SessionStatus>,
 ) {
     let title_font = asset_server.load("fonts/FiraSans-Bold.ttf");
     let mono_font = asset_server.load("fonts/FiraMono-Medium.ttf");
@@ -72,7 +67,7 @@ pub(crate) fn spawn_menu_ui(
 
                     panel.spawn((
                         Text::new(
-                            "Type to edit the host address, Backspace to delete, Enter to join.",
+                            "Type a session descriptor, Backspace to delete, Enter to start.\nExamples: host@127.0.0.1:5000 or client1@127.0.0.1:5001>127.0.0.1:5000",
                         ),
                         TextFont {
                             font: title_font.clone(),
@@ -94,7 +89,7 @@ pub(crate) fn spawn_menu_ui(
                         ))
                         .with_children(|field| {
                             field.spawn((
-                                Text::new(host_address_line(&config.server_addr)),
+                                Text::new(host_address_line(&config.session_descriptor)),
                                 TextFont {
                                     font: mono_font.clone(),
                                     font_size: 18.0,
@@ -154,7 +149,7 @@ pub(crate) fn spawn_menu_ui(
                         ));
 
                     panel.spawn((
-                        Text::new(menu_status_line(&status.phase, &config.server_addr)),
+                        Text::new(menu_status_line(&status.phase, &config.session_descriptor)),
                         TextFont {
                             font: mono_font,
                             font_size: 16.0,
@@ -169,10 +164,10 @@ pub(crate) fn spawn_menu_ui(
 
 pub(crate) fn edit_host_address(
     mut keyboard_events: EventReader<KeyboardInput>,
-    mut config: ResMut<ConnectionConfig>,
-    status: Res<ConnectionStatus>,
+    mut config: ResMut<netcode::SessionConfig>,
+    status: Res<netcode::SessionStatus>,
 ) {
-    if matches!(status.phase, ConnectionPhase::Connecting) {
+    if matches!(status.phase, netcode::SessionPhase::Connecting) {
         return;
     }
 
@@ -183,22 +178,22 @@ pub(crate) fn edit_host_address(
 
         match &event.logical_key {
             Key::Backspace => {
-                config.server_addr.pop();
+                config.session_descriptor.pop();
             }
             Key::Character(chars) if chars.chars().all(is_host_address_character) => {
-                config.server_addr.push_str(chars);
+                config.session_descriptor.push_str(chars);
             }
             _ => {}
         }
     }
 
-    if config.server_addr.is_empty() {
-        config.server_addr = super::DEFAULT_HOST_ADDR.to_string();
+    if config.session_descriptor.is_empty() {
+        config.session_descriptor = format!("host@{}", super::DEFAULT_HOST_ADDR);
     }
 }
 
 pub(crate) fn update_host_address_text(
-    config: Res<ConnectionConfig>,
+    config: Res<netcode::SessionConfig>,
     mut query: Query<&mut Text, With<HostAddressText>>,
 ) {
     if !config.is_changed() {
@@ -206,11 +201,12 @@ pub(crate) fn update_host_address_text(
     }
 
     for mut text in &mut query {
-        **text = host_address_line(&config.server_addr);
+        **text = host_address_line(&config.session_descriptor);
     }
 }
 
 pub(crate) fn menu_button_system(
+    mut commands: Commands,
     mut interaction_query: Query<
         (
             &Interaction,
@@ -220,10 +216,9 @@ pub(crate) fn menu_button_system(
         ),
         (Changed<Interaction>, With<Button>),
     >,
-    config: Res<ConnectionConfig>,
-    mut status: ResMut<ConnectionStatus>,
-    mailbox: Res<ConnectionMailbox>,
-    command_sender: Res<NetworkCommandSender>,
+    config: Res<netcode::SessionConfig>,
+    mut status: ResMut<netcode::SessionStatus>,
+    mut bootstrap: ResMut<netcode::SessionBootstrapConfig>,
     mut editor_session: ResMut<EditorSessionState>,
     mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
@@ -233,12 +228,8 @@ pub(crate) fn menu_button_system(
                 if join.is_some() {
                     *background = BackgroundColor(PRESSED_BUTTON);
                     editor_session.mode = EditorMode::Player;
-                    net::begin_connection_attempt(
-                        &config.server_addr,
-                        &mut status,
-                        &mailbox,
-                        &command_sender,
-                    );
+                    netcode::begin_session_attempt(&config, &mut status, &mut bootstrap);
+                    commands.insert_resource(netcode::LocalPlayerHandle::default());
                 } else if debug_enemy.is_some() {
                     *background = BackgroundColor(Color::srgb(0.36, 0.24, 0.16));
                     editor_session.mode = EditorMode::Enemy;
@@ -261,19 +252,18 @@ pub(crate) fn menu_button_system(
 
 pub(crate) fn menu_keyboard_shortcuts(
     keys: Res<ButtonInput<KeyCode>>,
-    config: Res<ConnectionConfig>,
-    mut status: ResMut<ConnectionStatus>,
-    mailbox: Res<ConnectionMailbox>,
-    command_sender: Res<NetworkCommandSender>,
+    config: Res<netcode::SessionConfig>,
+    mut status: ResMut<netcode::SessionStatus>,
+    mut bootstrap: ResMut<netcode::SessionBootstrapConfig>,
 ) {
     if keys.just_pressed(KeyCode::Enter) {
-        net::begin_connection_attempt(&config.server_addr, &mut status, &mailbox, &command_sender);
+        netcode::begin_session_attempt(&config, &mut status, &mut bootstrap);
     }
 }
 
 pub(crate) fn update_menu_status_text(
-    status: Res<ConnectionStatus>,
-    config: Res<ConnectionConfig>,
+    status: Res<netcode::SessionStatus>,
+    config: Res<netcode::SessionConfig>,
     mut query: Query<&mut Text, With<StatusText>>,
 ) {
     if !status.is_changed() && !config.is_changed() {
@@ -281,7 +271,7 @@ pub(crate) fn update_menu_status_text(
     }
 
     for mut text in &mut query {
-        **text = menu_status_line(&status.phase, &config.server_addr);
+        **text = menu_status_line(&status.phase, &config.session_descriptor);
     }
 }
 
@@ -292,20 +282,23 @@ pub(crate) fn cleanup_menu_ui(mut commands: Commands, query: Query<Entity, With<
 }
 
 fn is_host_address_character(character: char) -> bool {
-    character.is_ascii_alphanumeric() || matches!(character, '.' | ':' | '-' | '[' | ']')
+    character.is_ascii_alphanumeric()
+        || matches!(character, '.' | ':' | '-' | '[' | ']' | '@' | '>' | ',')
 }
 
 fn host_address_line(server_addr: &str) -> String {
-    format!("Host Address: {server_addr}")
+    format!("Session: {server_addr}")
 }
 
-fn menu_status_line(phase: &ConnectionPhase, server_addr: &str) -> String {
+fn menu_status_line(phase: &netcode::SessionPhase, server_addr: &str) -> String {
     match phase {
-        ConnectionPhase::Idle => format!("Ready to connect to {server_addr}."),
-        ConnectionPhase::Connecting => format!("Connecting to {server_addr}..."),
-        ConnectionPhase::Connected => {
-            "Connected to multiplayer host. Synchronizing authoritative session...".to_string()
+        netcode::SessionPhase::Idle => format!("Ready to start a rollback session at {server_addr}."),
+        netcode::SessionPhase::Connecting => {
+            format!("Bootstrapping deterministic rollback session for {server_addr}...")
         }
-        ConnectionPhase::Failed(message) => format!("Connection failed: {message}"),
+        netcode::SessionPhase::Connected => {
+            "Rollback session running. Loading deterministic game state...".to_string()
+        }
+        netcode::SessionPhase::Failed(message) => format!("Session bootstrap failed: {message}"),
     }
 }

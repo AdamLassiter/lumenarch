@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use ggrs::PlayerHandle;
 
 use super::{
     interior::{build_atmosphere_tiles, build_interior_nodes},
@@ -17,10 +18,12 @@ use crate::{
                 HostileShip,
                 HostileShipAi,
                 InternalPosition,
+                ObservedLocalPlayerMarker,
                 LinearVelocity,
                 MissionState,
                 NearbyInteraction,
                 PlayerFieldState,
+                PlayerHandleComponent,
                 PlayerMotionState,
                 PlayerReferenceFrame,
                 PlayerShip,
@@ -54,6 +57,7 @@ use crate::{
         },
         state::PlayingCleanup,
     },
+    netcode,
     ship::{ModuleKind, ModuleSpec, ShipDefinition},
 };
 
@@ -132,6 +136,10 @@ pub(crate) fn spawn_runtime_ship(
     commands: &mut Commands,
     asset_server: &AssetServer,
     ship: &ShipDefinition,
+    player_handles: &[PlayerHandle],
+    local_handle: Option<PlayerHandle>,
+    player_handle_map: &mut netcode::PlayerHandleMap,
+    observed_local_player: &mut netcode::ObservedLocalPlayer,
     balance: &BalanceConfig,
     node_id: u32,
     node_name: &str,
@@ -322,60 +330,88 @@ pub(crate) fn spawn_runtime_ship(
         })
         .collect();
 
-    let shipboard_marker = commands
-        .spawn((
-            Sprite::from_color(Color::srgb(0.82, 0.96, 0.62), Vec2::splat(12.0)),
-            Transform::from_xyz(
-                start_station.local_position.x.to_num::<f32>(),
-                start_station.local_position.y.to_num::<f32>(),
-                6.0,
-            ),
-            ShipboardPlayer,
-            ShipboardMarker,
-            PlayerShipAssignment {
-                _ship_entity: root_entity,
-            },
-            InternalPosition {
-                grid_x: start_station.grid_x,
-                grid_y: start_station.grid_y,
-                local_position: start_station.local_position,
-            },
-            PlayerMotionState {
-                frame: PlayerReferenceFrame::Ship(root_entity),
-                world_position: FixedVec2::from_vec2(
-                    RUNTIME_SHIP_ORIGIN.truncate() + start_station.local_position.to_vec2(),
+    let mut spawn_nodes = interior_nodes.clone();
+    spawn_nodes.sort_by_key(|node| {
+        (node.local_position - start_station.local_position)
+            .length_sq()
+            .to_num::<i128>()
+    });
+    let palette = [
+        Color::srgb(0.82, 0.96, 0.62),
+        Color::srgb(0.62, 0.90, 0.96),
+        Color::srgb(0.96, 0.86, 0.62),
+        Color::srgb(0.94, 0.70, 0.82),
+    ];
+    let shipboard_markers: Vec<_> = player_handles
+        .iter()
+        .enumerate()
+        .map(|(index, handle)| {
+            let spawn_node = spawn_nodes.get(index).unwrap_or(&start_station);
+            let mut entity_commands = commands.spawn((
+                Sprite::from_color(palette[index % palette.len()], Vec2::splat(12.0)),
+                Transform::from_xyz(
+                    spawn_node.local_position.x.to_num::<f32>(),
+                    spawn_node.local_position.y.to_num::<f32>(),
+                    6.0,
                 ),
-                world_velocity: FixedVec2::zero(),
-                local_position: start_station.local_position,
-                local_velocity: FixedVec2::zero(),
-            },
-            CarriedResource::default(),
-            CurrentStation {
-                module_id: start_station.module_id,
-                kind: start_station.kind,
-            },
-            ShipboardControlState {
-                mode: ShipControlMode::Interior,
-                focus_mode: StationFocusMode::Internal,
-                focused_entity: None,
-                focused_module_id: None,
-                focused_kind: None,
-                focused_family: None,
-            },
-            NearbyInteraction::default(),
-            HeldInteraction::default(),
-            PlayerFieldState {
-                local_heat: Fx::from_num(0),
-                local_electrical: Fx::from_num(0),
-                local_oxygen: Fx::from_num(balance.atmosphere.initial_tile_oxygen),
-                heat_danger: false,
-                electrical_danger: false,
-                oxygen_warning: false,
-                oxygen_critical: false,
-            },
-            PlayingCleanup,
-        ))
-        .id();
+                ShipboardPlayer,
+                ShipboardMarker,
+                PlayerHandleComponent { handle: *handle },
+                PlayerShipAssignment {
+                    _ship_entity: root_entity,
+                },
+                InternalPosition {
+                    grid_x: spawn_node.grid_x,
+                    grid_y: spawn_node.grid_y,
+                    local_position: spawn_node.local_position,
+                },
+                PlayerMotionState {
+                    frame: PlayerReferenceFrame::Ship(root_entity),
+                    world_position: FixedVec2::from_vec2(
+                        RUNTIME_SHIP_ORIGIN.truncate() + spawn_node.local_position.to_vec2(),
+                    ),
+                    world_velocity: FixedVec2::zero(),
+                    local_position: spawn_node.local_position,
+                    local_velocity: FixedVec2::zero(),
+                },
+                CarriedResource::default(),
+                CurrentStation {
+                    module_id: spawn_node.module_id,
+                    kind: spawn_node.kind,
+                },
+                ShipboardControlState {
+                    mode: ShipControlMode::Interior,
+                    focus_mode: StationFocusMode::Internal,
+                    focused_entity: None,
+                    focused_module_id: None,
+                    focused_kind: None,
+                    focused_family: None,
+                },
+                NearbyInteraction::default(),
+                HeldInteraction::default(),
+                PlayerFieldState {
+                    local_heat: Fx::from_num(0),
+                    local_electrical: Fx::from_num(0),
+                    local_oxygen: Fx::from_num(balance.atmosphere.initial_tile_oxygen),
+                    heat_danger: false,
+                    electrical_danger: false,
+                    oxygen_warning: false,
+                    oxygen_critical: false,
+                },
+                PlayingCleanup,
+            ));
+            if Some(*handle) == local_handle {
+                entity_commands.insert(ObservedLocalPlayerMarker);
+            }
+            let entity = entity_commands.id();
+            player_handle_map.entities.insert(*handle, entity);
+            if Some(*handle) == local_handle {
+                observed_local_player.handle = Some(*handle);
+                observed_local_player.entity = Some(entity);
+            }
+            entity
+        })
+        .collect();
 
     commands.entity(root_entity).insert((
         ShipInteriorMap {
@@ -390,9 +426,7 @@ pub(crate) fn spawn_runtime_ship(
         },
     ));
     commands.entity(root_entity).add_children(&child_entities);
-    commands.entity(root_entity).add_child(shipboard_marker);
-
-    let _ = shipboard_marker;
+    commands.entity(root_entity).add_children(&shipboard_markers);
 }
 
 pub(crate) fn spawn_hostile_ship(

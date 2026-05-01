@@ -10,6 +10,7 @@ use crate::{
             DestroyedModule,
             HostileShip,
             MissionState,
+            PlayerHandleComponent,
             PlayerFieldState,
             PlayerMotionState,
             PlayerReferenceFrame,
@@ -163,53 +164,58 @@ pub(crate) fn sample_player_atmosphere(
     balance: Res<BalanceConfig>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     ship_query: Query<&ShipAtmosphereState, With<ShipRoot>>,
-    player_query: Single<(&PlayerMotionState, &mut PlayerFieldState), With<ShipboardPlayer>>,
+    mut player_query: Query<
+        (&PlayerHandleComponent, &PlayerMotionState, &mut PlayerFieldState),
+        With<ShipboardPlayer>,
+    >,
 ) {
     let mut mission_state = mission_query.into_inner();
-    let (player_motion, mut player_fields) = player_query.into_inner();
+    let mut players: Vec<_> = player_query.iter_mut().collect();
+    players.sort_by_key(|(handle, _, _)| handle.handle);
+    for (_, player_motion, mut player_fields) in players {
+        let Some(ship_entity) = (match player_motion.frame {
+            PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
+            PlayerReferenceFrame::World => None,
+        }) else {
+            player_fields.local_oxygen = Fx::from_num(0);
+            player_fields.oxygen_warning = false;
+            player_fields.oxygen_critical = false;
+            continue;
+        };
 
-    let Some(ship_entity) = (match player_motion.frame {
-        PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
-        PlayerReferenceFrame::World => None,
-    }) else {
-        player_fields.local_oxygen = Fx::from_num(0);
-        player_fields.oxygen_warning = false;
-        player_fields.oxygen_critical = false;
-        return;
-    };
+        let Ok(atmosphere_state) = ship_query.get(ship_entity) else {
+            player_fields.local_oxygen = Fx::from_num(0);
+            player_fields.oxygen_warning = false;
+            player_fields.oxygen_critical = false;
+            continue;
+        };
 
-    let Ok(atmosphere_state) = ship_query.get(ship_entity) else {
-        player_fields.local_oxygen = Fx::from_num(0);
-        player_fields.oxygen_warning = false;
-        player_fields.oxygen_critical = false;
-        return;
-    };
+        let Some(local_oxygen) = atmosphere_state
+            .tiles
+            .iter()
+            .filter(|tile| point_inside_tile(player_motion.local_position, tile.local_position))
+            .min_by_key(|tile| {
+                (tile.local_position - player_motion.local_position)
+                    .length_sq()
+                    .to_num::<i128>()
+            })
+            .map(|tile| tile.oxygen)
+        else {
+            player_fields.local_oxygen = Fx::from_num(0);
+            player_fields.oxygen_warning = false;
+            player_fields.oxygen_critical = false;
+            mission_state.lowest_player_oxygen =
+                mission_state.lowest_player_oxygen.min(Fx::from_num(0));
+            continue;
+        };
 
-    let Some(local_oxygen) = atmosphere_state
-        .tiles
-        .iter()
-        .filter(|tile| point_inside_tile(player_motion.local_position, tile.local_position))
-        .min_by_key(|tile| {
-            (tile.local_position - player_motion.local_position)
-                .length_sq()
-                .to_num::<i128>()
-        })
-        .map(|tile| tile.oxygen)
-    else {
-        player_fields.local_oxygen = Fx::from_num(0);
-        player_fields.oxygen_warning = false;
-        player_fields.oxygen_critical = false;
-        mission_state.lowest_player_oxygen =
-            mission_state.lowest_player_oxygen.min(Fx::from_num(0));
-        return;
-    };
-
-    player_fields.local_oxygen = local_oxygen;
-    player_fields.oxygen_warning =
-        local_oxygen <= Fx::from_num(balance.atmosphere.player_warning_threshold);
-    player_fields.oxygen_critical =
-        local_oxygen <= Fx::from_num(balance.atmosphere.player_critical_threshold);
-    mission_state.lowest_player_oxygen = mission_state.lowest_player_oxygen.min(local_oxygen);
+        player_fields.local_oxygen = local_oxygen;
+        player_fields.oxygen_warning =
+            local_oxygen <= Fx::from_num(balance.atmosphere.player_warning_threshold);
+        player_fields.oxygen_critical =
+            local_oxygen <= Fx::from_num(balance.atmosphere.player_critical_threshold);
+        mission_state.lowest_player_oxygen = mission_state.lowest_player_oxygen.min(local_oxygen);
+    }
 }
 
 fn point_inside_tile(

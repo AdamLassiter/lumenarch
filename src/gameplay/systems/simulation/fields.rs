@@ -11,6 +11,7 @@ use crate::{
                 ModuleFieldEmitter,
                 ModuleRuntimeState,
                 PlayerFieldState,
+                PlayerHandleComponent,
                 PlayerMotionState,
                 PlayerReferenceFrame,
                 PlayerShip,
@@ -48,7 +49,10 @@ pub(crate) fn sample_ship_fields(
         Option<&DestroyedModule>,
     )>,
     mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
-    player_query: Single<(&PlayerMotionState, &mut PlayerFieldState), With<ShipboardPlayer>>,
+    mut player_query: Query<
+        (&PlayerHandleComponent, &PlayerMotionState, &mut PlayerFieldState),
+        With<ShipboardPlayer>,
+    >,
 ) {
     let mission_state = mission_query.into_inner();
     let module_samples: Vec<_> = module_query
@@ -115,51 +119,55 @@ pub(crate) fn sample_ship_fields(
             (electrical + mission_state.ambient_electrical_pressure).max(Fx::from_num(0));
     }
 
-    let (player_motion, mut player_fields) = player_query.into_inner();
-    let Some(active_ship) = (match player_motion.frame {
-        PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
-        PlayerReferenceFrame::World => None,
-    }) else {
-        player_fields.local_heat = Fx::from_num(0);
-        player_fields.local_electrical = Fx::from_num(0);
-        player_fields.heat_danger = false;
-        player_fields.electrical_danger = false;
-        return;
-    };
-    let player_pos = player_motion.local_position;
+    let mut players: Vec<_> = player_query.iter_mut().collect();
+    players.sort_by_key(|(handle, _, _)| handle.handle);
+    for (_, player_motion, mut player_fields) in players {
+        let Some(active_ship) = (match player_motion.frame {
+            PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
+            PlayerReferenceFrame::World => None,
+        }) else {
+            player_fields.local_heat = Fx::from_num(0);
+            player_fields.local_electrical = Fx::from_num(0);
+            player_fields.heat_danger = false;
+            player_fields.electrical_danger = false;
+            continue;
+        };
+        let player_pos = player_motion.local_position;
 
-    let mut heat = Fx::from_num(0);
-    let mut electrical = Fx::from_num(0);
-    for (
-        _,
-        source_parent,
-        source_pos,
-        source_heat,
-        source_cooling,
-        source_electrical,
-        source_grounding,
-        source_destroyed,
-    ) in &module_samples
-    {
-        if *source_destroyed || *source_parent != active_ship {
-            continue;
+        let mut heat = Fx::from_num(0);
+        let mut electrical = Fx::from_num(0);
+        for (
+            _,
+            source_parent,
+            source_pos,
+            source_heat,
+            source_cooling,
+            source_electrical,
+            source_grounding,
+            source_destroyed,
+        ) in &module_samples
+        {
+            if *source_destroyed || *source_parent != active_ship {
+                continue;
+            }
+            let attenuation =
+                field_attenuation(local_field_distance(player_pos, *source_pos), &balance);
+            if attenuation <= Fx::from_num(0) {
+                continue;
+            }
+            heat += (*source_heat - *source_cooling) * attenuation;
+            electrical += (*source_electrical - *source_grounding) * attenuation;
         }
-        let attenuation =
-            field_attenuation(local_field_distance(player_pos, *source_pos), &balance);
-        if attenuation <= Fx::from_num(0) {
-            continue;
-        }
-        heat += (*source_heat - *source_cooling) * attenuation;
-        electrical += (*source_electrical - *source_grounding) * attenuation;
+
+        player_fields.local_heat =
+            (heat + mission_state.ambient_heat_pressure).max(Fx::from_num(0));
+        player_fields.local_electrical =
+            (electrical + mission_state.ambient_electrical_pressure).max(Fx::from_num(0));
+        player_fields.heat_danger =
+            player_fields.local_heat >= Fx::from_num(balance.fields.player_heat_warning_threshold);
+        player_fields.electrical_danger = player_fields.local_electrical
+            >= Fx::from_num(balance.fields.player_electrical_warning_threshold);
     }
-
-    player_fields.local_heat = (heat + mission_state.ambient_heat_pressure).max(Fx::from_num(0));
-    player_fields.local_electrical =
-        (electrical + mission_state.ambient_electrical_pressure).max(Fx::from_num(0));
-    player_fields.heat_danger =
-        player_fields.local_heat >= Fx::from_num(balance.fields.player_heat_warning_threshold);
-    player_fields.electrical_danger = player_fields.local_electrical
-        >= Fx::from_num(balance.fields.player_electrical_warning_threshold);
 }
 
 pub(crate) fn update_module_runtime_state(
