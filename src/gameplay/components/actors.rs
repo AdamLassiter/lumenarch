@@ -1,4 +1,7 @@
-use bevy::{ecs::entity::{EntityMapper, MapEntities}, prelude::*};
+use bevy::{
+    ecs::entity::{EntityMapper, MapEntities},
+    prelude::*,
+};
 use ggrs::PlayerHandle;
 
 use super::{

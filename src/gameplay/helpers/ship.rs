@@ -2,11 +2,9 @@ use bevy::prelude::*;
 
 use super::{FixedVec2, Fx, fx_ratio};
 use crate::{
-    {
-        TILE_SIZE,
-        balance::BalanceConfig,
-        gameplay::components::{ShipMovementModel, ShipPowerModel, ShipPowerState},
-    },
+    TILE_SIZE,
+    balance::BalanceConfig,
+    gameplay::components::{ShipMovementModel, ShipPowerModel, ShipPowerState},
     ship::{ModuleKind, ModuleSpec, ShipDefinition, ShipModule},
 };
 

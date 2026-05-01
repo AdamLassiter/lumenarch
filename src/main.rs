@@ -36,7 +36,7 @@ use self::state::{
 };
 use crate::{netcode::LumenGgrsConfig, ship::ModuleKind};
 
-pub(crate) const TICK_MILLIS: u64 = 50;
+pub(crate) const TICK_MILLIS: u64 = 30;
 
 pub(crate) const DEFAULT_HOST_ADDR: &str = "127.0.0.1:5000";
 pub(crate) const TILE_SIZE: f32 = 32.0;
@@ -56,7 +56,9 @@ pub fn run_client() {
     });
 
     App::new()
-        .insert_resource(Time::<Fixed>::from_duration(Duration::from_millis(TICK_MILLIS)))
+        .insert_resource(Time::<Fixed>::from_duration(Duration::from_millis(
+            TICK_MILLIS,
+        )))
         .insert_resource(ClearColor(Color::srgb(0.04, 0.05, 0.08)))
         .insert_resource(balance_config)
         .insert_resource(netcode::SessionConfig::default())
@@ -155,12 +157,14 @@ pub fn run_client() {
         .add_event::<gameplay::components::BeginHeldInteraction>()
         .add_event::<gameplay::components::CompleteHeldInteraction>()
         .add_systems(Startup, setup_camera)
+        // Inputs
         .add_systems(bevy_ggrs::ReadInputs, netcode::read_local_inputs)
+        // Rollback systems
         .add_systems(
             bevy_ggrs::GgrsSchedule,
             (
-                netcode::decode_player_inputs,
-                netcode::apply_host_meta_ops,
+                netcode::decode_player_inputs.ambiguous_with_all(),
+                netcode::apply_host_meta_ops.ambiguous_with_all(),
                 (
                     gameplay::toggle_shipboard_control_mode,
                     gameplay::exit_focused_station,
@@ -178,7 +182,8 @@ pub fn run_client() {
                     gameplay::update_station_command_input,
                 )
                     .chain()
-                    .run_if(netcode::rollback_phase_is_encounter),
+                    .run_if(netcode::rollback_phase_is_encounter)
+                    .ambiguous_with_all(),
                 (
                     gameplay::sample_ship_fields,
                     gameplay::update_module_runtime_state,
@@ -190,7 +195,8 @@ pub fn run_client() {
                     gameplay::sync_hostile_ship_state,
                 )
                     .chain()
-                    .run_if(netcode::rollback_phase_is_encounter),
+                    .run_if(netcode::rollback_phase_is_encounter)
+                    .ambiguous_with_all(),
                 (
                     gameplay::sync_runtime_ship_state,
                     gameplay::apply_player_ship_controls,
@@ -206,13 +212,15 @@ pub fn run_client() {
                     gameplay::return_after_mission_resolution,
                 )
                     .chain()
-                    .run_if(netcode::rollback_phase_is_encounter),
-                netcode::advance_rollback_state,
+                    .run_if(netcode::rollback_phase_is_encounter)
+                    .ambiguous_with_all(),
+                netcode::advance_rollback_state.ambiguous_with_all(),
             ),
         )
-        .add_systems(Update, netcode::sync_presentation_from_rollback)
         .add_systems(PreUpdate, netcode::sync_local_player_handle)
+        .add_systems(Update, netcode::sync_presentation_from_rollback)
         .add_systems(Update, docked::persist_campaign_state)
+        // Menu systems
         .add_systems(OnEnter(ClientAppState::Menu), menu::spawn_menu_ui)
         .add_systems(
             FixedUpdate,
@@ -227,6 +235,7 @@ pub fn run_client() {
             ),
         )
         .add_systems(OnExit(ClientAppState::Menu), menu::cleanup_menu_ui)
+        // Docked systems
         .add_systems(
             OnEnter(ClientAppState::Docked),
             (docked::initialize_campaign_state, docked::spawn_docked_ui),
@@ -238,10 +247,8 @@ pub fn run_client() {
                 docked::update_docked_status_text.run_if(in_state(ClientAppState::Docked)),
             ),
         )
-        .add_systems(
-            OnExit(ClientAppState::Docked),
-            docked::cleanup_docked_ui,
-        )
+        .add_systems(OnExit(ClientAppState::Docked), docked::cleanup_docked_ui)
+        // Sector map systems
         .add_systems(
             OnEnter(ClientAppState::SectorMap),
             sector_map::spawn_sector_map_ui,
@@ -261,6 +268,7 @@ pub fn run_client() {
             OnExit(ClientAppState::SectorMap),
             sector_map::cleanup_sector_map_ui,
         )
+        // Editor systems
         .add_systems(
             OnEnter(ClientAppState::Editing),
             (
@@ -297,6 +305,7 @@ pub fn run_client() {
             OnExit(ClientAppState::Editing),
             editor::cleanup_editor_entities,
         )
+        // Gameplay systems
         .add_systems(
             OnEnter(ClientAppState::Encounter),
             gameplay::spawn_runtime_scene,

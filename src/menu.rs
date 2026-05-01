@@ -56,7 +56,7 @@ pub(crate) fn spawn_menu_ui(
                 ))
                 .with_children(|panel| {
                     panel.spawn((
-                        Text::new("LUMEN//ARCH\nShip Editor Utility"),
+                        Text::new("LUMEN//ARCH"),
                         TextFont {
                             font: title_font.clone(),
                             font_size: 34.0,
@@ -66,8 +66,9 @@ pub(crate) fn spawn_menu_ui(
                     ));
 
                     panel.spawn((
+
                         Text::new(
-                            "Type a session descriptor, Backspace to delete, Enter to start.\nExamples: host@127.0.0.1:5000 or client1@127.0.0.1:5001>127.0.0.1:5000",
+                            format!("Type a session descriptor, Backspace to delete, Enter to start.\nExamples: host@{} or client1@127.0.0.1:5001>{}", super::DEFAULT_HOST_ADDR, super::DEFAULT_HOST_ADDR),
                         ),
                         TextFont {
                             font: title_font.clone(),
@@ -186,10 +187,6 @@ pub(crate) fn edit_host_address(
             _ => {}
         }
     }
-
-    if config.session_descriptor.is_empty() {
-        config.session_descriptor = format!("host@{}", super::DEFAULT_HOST_ADDR);
-    }
 }
 
 pub(crate) fn update_host_address_text(
@@ -292,7 +289,9 @@ fn host_address_line(server_addr: &str) -> String {
 
 fn menu_status_line(phase: &netcode::SessionPhase, server_addr: &str) -> String {
     match phase {
-        netcode::SessionPhase::Idle => format!("Ready to start a rollback session at {server_addr}."),
+        netcode::SessionPhase::Idle => {
+            format!("Ready to start a rollback session at {server_addr}.")
+        }
         netcode::SessionPhase::Connecting => {
             format!("Bootstrapping deterministic rollback session for {server_addr}...")
         }

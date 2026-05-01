@@ -45,40 +45,40 @@ pub(crate) fn initialize_campaign_state(
             editor_ship.ship = rollback_state.editor_ship.clone();
             campaign_load_state.hydrated = true;
         } else {
-        match load_campaign() {
-            Ok(Some(save)) => {
-                *progression = save.progression;
-                *sector_state = save.sector;
-                sector_state.ensure_latest_layout();
-                *last_mission_report = save.last_mission_report;
+            match load_campaign() {
+                Ok(Some(save)) => {
+                    *progression = save.progression;
+                    *sector_state = save.sector;
+                    sector_state.ensure_latest_layout();
+                    *last_mission_report = save.last_mission_report;
+                }
+                Ok(None) => {
+                    *progression = DemoProgression::default();
+                    *sector_state = SectorState::default();
+                    *last_mission_report = LastMissionReport::default();
+                }
+                Err(error) => {
+                    eprintln!("campaign: failed to load save state: {error}");
+                    *progression = DemoProgression::default();
+                    *sector_state = SectorState::default();
+                    *last_mission_report = LastMissionReport::default();
+                }
             }
-            Ok(None) => {
-                *progression = DemoProgression::default();
-                *sector_state = SectorState::default();
-                *last_mission_report = LastMissionReport::default();
+
+            if let Ok(Some(saved_ship)) = load_default_ship() {
+                editor_ship.ship = saved_ship;
+            } else if let Some(snapshot) = status.active_ship_snapshot.as_ref() {
+                editor_ship.ship = snapshot.clone();
+            } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
+                editor_ship.ship = ShipDefinition::empty("Untitled Knot");
             }
-            Err(error) => {
-                eprintln!("campaign: failed to load save state: {error}");
-                *progression = DemoProgression::default();
-                *sector_state = SectorState::default();
-                *last_mission_report = LastMissionReport::default();
+
+            if let Ok(Some(library)) = load_default_enemy_library() {
+                enemy_library_state.library = library;
+                enemy_library_state.library.ensure_seeded();
             }
-        }
 
-        if let Ok(Some(saved_ship)) = load_default_ship() {
-            editor_ship.ship = saved_ship;
-        } else if let Some(snapshot) = status.active_ship_snapshot.as_ref() {
-            editor_ship.ship = snapshot.clone();
-        } else if editor_ship.ship.name.is_empty() && editor_ship.ship.modules.is_empty() {
-            editor_ship.ship = ShipDefinition::empty("Untitled Knot");
-        }
-
-        if let Ok(Some(library)) = load_default_enemy_library() {
-            enemy_library_state.library = library;
-            enemy_library_state.library.ensure_seeded();
-        }
-
-        campaign_load_state.hydrated = true;
+            campaign_load_state.hydrated = true;
         }
     }
 

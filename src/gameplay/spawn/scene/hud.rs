@@ -1,28 +1,26 @@
 use bevy::prelude::*;
 
 use crate::{
-    {
-        gameplay::helpers::gameplay_status_line,
-        state::{
-            AbortEncounterButton,
-            GameplayAlertsText,
-            GameplayBarFill,
-            GameplayBarKind,
-            GameplayBarLabel,
-            GameplayCompactStatusText,
-            GameplayControlsText,
-            GameplayInspectionText,
-            GameplayPanelBodyText,
-            GameplayPanelTitleText,
-            GameplayStationPanel,
-            GameplayStationPanelButton,
-            GameplayStationPanelButtonLabel,
-            GameplayTopBannerText,
-            PlayingCleanup,
-            StationPanelButtonAction,
-        },
-    },
+    gameplay::helpers::gameplay_status_line,
     ship::ShipDefinition,
+    state::{
+        AbortEncounterButton,
+        GameplayAlertsText,
+        GameplayBarFill,
+        GameplayBarKind,
+        GameplayBarLabel,
+        GameplayCompactStatusText,
+        GameplayControlsText,
+        GameplayInspectionText,
+        GameplayPanelBodyText,
+        GameplayPanelTitleText,
+        GameplayStationPanel,
+        GameplayStationPanelButton,
+        GameplayStationPanelButtonLabel,
+        GameplayTopBannerText,
+        PlayingCleanup,
+        StationPanelButtonAction,
+    },
 };
 
 pub(super) fn spawn_runtime_hud(

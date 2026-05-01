@@ -1,4 +1,7 @@
-use bevy::{ecs::entity::{EntityMapper, MapEntities}, prelude::*};
+use bevy::{
+    ecs::entity::{EntityMapper, MapEntities},
+    prelude::*,
+};
 
 use super::super::helpers::Fx;
 

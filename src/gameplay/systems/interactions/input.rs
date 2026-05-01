@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_ggrs::PlayerInputs;
 
 use crate::{
     gameplay::{
@@ -14,7 +15,6 @@ use crate::{
     },
     netcode::{self, LumenGgrsConfig},
 };
-use bevy_ggrs::PlayerInputs;
 
 pub(crate) fn run_shipboard_interaction_input(
     session_inputs: Option<Res<PlayerInputs<LumenGgrsConfig>>>,

@@ -1,48 +1,46 @@
 use bevy::prelude::*;
 
 use crate::{
-    {
-        balance::BalanceConfig,
-        gameplay::{
-            components::{
-                DestroyedModule,
-                HostileTarget,
-                Integrity,
-                MissionState,
-                ModuleRuntimeState,
-                PlayerShip,
-                ProcessorModule,
-                ReactorCommandState,
-                RuntimeArchComputer,
-                RuntimeShipModule,
-                SalvageWreck,
-                ShipAutomationState,
-                ShipMovementModel,
-                ShipPowerModel,
-                ShipRoot,
-                ShipWeaponState,
-                StorageModule,
-                WeaponModule,
-            },
-            helpers::{
-                Fx,
-                fx_from_time_delta,
-                module_effectiveness,
-                ship_movement_model_with_effective,
-                ship_power_model_with_effective,
-            },
+    balance::BalanceConfig,
+    gameplay::{
+        components::{
+            DestroyedModule,
+            HostileTarget,
+            Integrity,
+            MissionState,
+            ModuleRuntimeState,
+            PlayerShip,
+            ProcessorModule,
+            ReactorCommandState,
+            RuntimeArchComputer,
+            RuntimeShipModule,
+            SalvageWreck,
+            ShipAutomationState,
+            ShipMovementModel,
+            ShipPowerModel,
+            ShipRoot,
+            ShipWeaponState,
+            StorageModule,
+            WeaponModule,
         },
-        state::{
-            ClientAppState,
-            DemoProgression,
-            LastMissionReport,
-            SectorNodeStatus,
-            SectorState,
-            TravelOutcome,
+        helpers::{
+            Fx,
+            fx_from_time_delta,
+            module_effectiveness,
+            ship_movement_model_with_effective,
+            ship_power_model_with_effective,
         },
     },
     netcode,
     ship::ModuleKind,
+    state::{
+        ClientAppState,
+        DemoProgression,
+        LastMissionReport,
+        SectorNodeStatus,
+        SectorState,
+        TravelOutcome,
+    },
 };
 
 pub(crate) fn update_mission_telemetry(

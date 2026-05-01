@@ -1,22 +1,24 @@
 use bevy::prelude::*;
 use bevy_ggrs::PlayerInputs;
 
-use crate::gameplay::{
-    components::{
-        BeginHeldInteraction,
-        CompleteHeldInteraction,
-        HeldInteraction,
-        MissionState,
-        NearbyInteraction,
-        PlayerHandleComponent,
-        PlayerFieldState,
-        PlayerShip,
-        ShipRoot,
-        ShipboardPlayer,
+use crate::{
+    gameplay::{
+        components::{
+            BeginHeldInteraction,
+            CompleteHeldInteraction,
+            HeldInteraction,
+            MissionState,
+            NearbyInteraction,
+            PlayerFieldState,
+            PlayerHandleComponent,
+            PlayerShip,
+            ShipRoot,
+            ShipboardPlayer,
+        },
+        helpers::{Fx, fx_from_time_delta},
     },
-    helpers::{Fx, fx_from_time_delta},
+    netcode::{self, LumenGgrsConfig},
 };
-use crate::netcode::{self, LumenGgrsConfig};
 
 pub(crate) fn begin_held_interactions(
     mut events: EventReader<BeginHeldInteraction>,

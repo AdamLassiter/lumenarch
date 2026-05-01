@@ -1,30 +1,28 @@
 use bevy::prelude::*;
 
 use crate::{
-    {
-        TILE_SIZE,
-        balance::BalanceConfig,
-        gameplay::{
-            components::{
-                DestroyedModule,
-                Integrity,
-                ManipulatorModule,
-                ModuleCondition,
-                ModuleFieldEmitter,
-                ModuleRuntimeState,
-                PlayerShip,
-                RuntimeShipModule,
-                ShipRoot,
-                SimPosition,
-                SimRotation,
-                TurretCommandState,
-                TurretTopSprite,
-            },
-            helpers::{Fx, module_condition},
+    TILE_SIZE,
+    balance::BalanceConfig,
+    gameplay::{
+        components::{
+            DestroyedModule,
+            Integrity,
+            ManipulatorModule,
+            ModuleCondition,
+            ModuleFieldEmitter,
+            ModuleRuntimeState,
+            PlayerShip,
+            RuntimeShipModule,
+            ShipRoot,
+            SimPosition,
+            SimRotation,
+            TurretCommandState,
+            TurretTopSprite,
         },
-        state::DebugOverlayState,
+        helpers::{Fx, module_condition},
     },
     ship::ModuleKind,
+    state::DebugOverlayState,
 };
 
 pub(crate) fn toggle_debug_overlay(

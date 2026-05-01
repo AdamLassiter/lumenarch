@@ -1,8 +1,15 @@
 use std::{collections::BTreeMap, net::SocketAddr};
 
-use bevy::{ecs::entity::{EntityMapper, MapEntities}, prelude::*};
+use bevy::{
+    ecs::entity::{EntityMapper, MapEntities},
+    prelude::*,
+};
 use bevy_ggrs::{
-    LocalInputs, LocalPlayers, PlayerInputs, RollbackFrameCount, Session,
+    LocalInputs,
+    LocalPlayers,
+    PlayerInputs,
+    RollbackFrameCount,
+    Session,
     prelude::{PlayerType, SessionBuilder},
 };
 use ggrs::{PlayerHandle, UdpNonBlockingSocket};
@@ -11,8 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     DEFAULT_HOST_ADDR,
     campaign::{CampaignSave, load_campaign},
-    ship::ShipDefinition,
-    ship::storage::load_default_ship,
+    ship::{ShipDefinition, storage::load_default_ship},
     state::{ClientAppState, DemoProgression, LastMissionReport, SectorState},
 };
 
@@ -685,8 +691,7 @@ mod tests {
     #[test]
     fn parses_host_session_descriptor() {
         let descriptor =
-            parse_session_descriptor("host@127.0.0.1:5000>127.0.0.1:5001,127.0.0.1:5002")
-                .unwrap();
+            parse_session_descriptor("host@127.0.0.1:5000>127.0.0.1:5001,127.0.0.1:5002").unwrap();
         assert_eq!(descriptor.role, SessionRole::Host);
         assert_eq!(descriptor.local_handle, 0);
         assert_eq!(descriptor.peer_addrs.len(), 2);
@@ -694,8 +699,7 @@ mod tests {
 
     #[test]
     fn parses_client_session_descriptor() {
-        let descriptor =
-            parse_session_descriptor("client1@127.0.0.1:5001>127.0.0.1:5000").unwrap();
+        let descriptor = parse_session_descriptor("client1@127.0.0.1:5001>127.0.0.1:5000").unwrap();
         assert_eq!(descriptor.role, SessionRole::Client);
         assert_eq!(descriptor.local_handle, 1);
         assert_eq!(descriptor.peer_addrs.len(), 1);
@@ -739,9 +743,10 @@ fn parse_session_descriptor(value: &str) -> Result<ParsedSessionDescriptor, Stri
             .split(',')
             .filter(|entry| !entry.trim().is_empty())
             .map(|entry| {
-                entry.trim().parse().map_err(|error| {
-                    format!("invalid peer address '{}': {error}", entry.trim())
-                })
+                entry
+                    .trim()
+                    .parse()
+                    .map_err(|error| format!("invalid peer address '{}': {error}", entry.trim()))
             })
             .collect::<Result<Vec<_>, _>>()?
     };

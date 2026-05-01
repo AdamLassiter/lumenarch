@@ -2,9 +2,9 @@ use bevy::prelude::*;
 
 use super::{
     super::{
-        netcode,
         TOOLBOX_COMPONENTS,
         TOOLBOX_WIDTH,
+        netcode,
         state::{
             ArchEditorButton,
             ArchEditorButtonAction,

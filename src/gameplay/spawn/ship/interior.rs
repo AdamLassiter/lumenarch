@@ -1,12 +1,10 @@
 use std::collections::HashSet;
 
 use crate::{
-    {
-        balance::BalanceConfig,
-        gameplay::{
-            components::{ShipAtmosphereTile, ShipInteriorNode},
-            helpers::{Fx, module_local_position},
-        },
+    balance::BalanceConfig,
+    gameplay::{
+        components::{ShipAtmosphereTile, ShipInteriorNode},
+        helpers::{Fx, module_local_position},
     },
     ship::ShipDefinition,
 };

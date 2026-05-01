@@ -1,6 +1,7 @@
+use std::collections::BTreeSet;
+
 use bevy::prelude::*;
 use bevy_ggrs::PlayerInputs;
-use std::collections::BTreeSet;
 
 use super::super::{
     super::state::{AbortEncounterButton, ClientAppState, MainCamera, PlayingCleanup},
@@ -23,7 +24,8 @@ use super::super::{
         PlayerShip,
         PlayerShipAssignment,
         ProcessorCommandState,
-        ReactorCommandState, ResourceKind,
+        ReactorCommandState,
+        ResourceKind,
         RuntimeArchComputer,
         RuntimeShipModule,
         ShipArchCommandState,
@@ -281,7 +283,11 @@ pub(crate) fn update_player_reference_frame(
         With<ShipRoot>,
     >,
     mut player_query: Query<
-        (&PlayerHandleComponent, &mut PlayerMotionState, &mut InternalPosition),
+        (
+            &PlayerHandleComponent,
+            &mut PlayerMotionState,
+            &mut InternalPosition,
+        ),
         With<PlayerShipAssignment>,
     >,
 ) {
@@ -390,8 +396,8 @@ pub(crate) fn move_shipboard_player(
         }
 
         let command = netcode::command_for_handle(&decoded_commands, handle.handle);
-        let input = FixedVec2::from_num(command.move_x as i32, command.move_y as i32)
-            .normalized_or_zero();
+        let input =
+            FixedVec2::from_num(command.move_x as i32, command.move_y as i32).normalized_or_zero();
 
         match motion.frame {
             PlayerReferenceFrame::Ship(ship_entity) => {
@@ -458,7 +464,8 @@ pub(crate) fn sync_shipboard_player_visual(
     >,
 ) {
     let control_state = ship_query.into_inner();
-    for (observed, position, carried, mut transform, mut sprite, mut visibility) in &mut player_query
+    for (observed, position, carried, mut transform, mut sprite, mut visibility) in
+        &mut player_query
     {
         transform.translation = match position.frame {
             PlayerReferenceFrame::Ship(_) => Vec3::new(
@@ -470,14 +477,16 @@ pub(crate) fn sync_shipboard_player_visual(
         };
         if observed.is_some() {
             sprite.color = match control_state.mode {
-                ShipControlMode::Interior if carried.kind.is_some() => Color::srgb(0.98, 0.88, 0.52),
+                ShipControlMode::Interior if carried.kind.is_some() => {
+                    Color::srgb(0.98, 0.88, 0.52)
+                }
                 ShipControlMode::Interior => Color::srgb(0.82, 0.96, 0.62),
                 ShipControlMode::Cockpit | ShipControlMode::Turret => {
                     Color::srgba(0.82, 0.96, 0.62, 0.20)
                 }
-                ShipControlMode::Reactor | ShipControlMode::Logistics | ShipControlMode::Computer => {
-                    Color::srgb(0.92, 0.96, 0.68)
-                }
+                ShipControlMode::Reactor
+                | ShipControlMode::Logistics
+                | ShipControlMode::Computer => Color::srgb(0.92, 0.96, 0.68),
             };
             *visibility = if matches!(
                 control_state.mode,
@@ -521,7 +530,11 @@ pub(crate) fn update_current_station(
     ship_query: Query<(Entity, &SimPosition, &SimRotation), With<ShipRoot>>,
     module_query: Query<(&RuntimeShipModule, &Parent)>,
     mut player_query: Query<
-        (&PlayerHandleComponent, &PlayerMotionState, &mut CurrentStation),
+        (
+            &PlayerHandleComponent,
+            &PlayerMotionState,
+            &mut CurrentStation,
+        ),
         With<PlayerShipAssignment>,
     >,
 ) {
@@ -746,20 +759,19 @@ pub(crate) fn update_station_command_input(
         match control_state.mode {
             ShipControlMode::Interior => {}
             ShipControlMode::Cockpit => {
-                ship_controls.throttle_demand =
-                    (Fx::from_num(command.throttle_milli) / Fx::from_num(1000))
-                        .clamp(Fx::from_num(0), Fx::from_num(1));
-                ship_controls.turn_input =
-                    (Fx::from_num(command.turn_milli) / Fx::from_num(1000))
-                        .clamp(Fx::from_num(-1), Fx::from_num(1));
+                ship_controls.throttle_demand = (Fx::from_num(command.throttle_milli)
+                    / Fx::from_num(1000))
+                .clamp(Fx::from_num(0), Fx::from_num(1));
+                ship_controls.turn_input = (Fx::from_num(command.turn_milli) / Fx::from_num(1000))
+                    .clamp(Fx::from_num(-1), Fx::from_num(1));
                 if command.raw.pressed(netcode::INPUT_FIRE) {
                     ship_controls.turn_input =
                         Fx::from_num(-command.aim_x_milli) / Fx::from_num(1000);
-                    ship_controls.throttle_demand =
-                        (((Fx::from_num(command.aim_y_milli) / Fx::from_num(1000))
-                            + Fx::from_num(1))
-                            / Fx::from_num(2))
-                        .clamp(Fx::from_num(0), Fx::from_num(1));
+                    ship_controls.throttle_demand = (((Fx::from_num(command.aim_y_milli)
+                        / Fx::from_num(1000))
+                        + Fx::from_num(1))
+                        / Fx::from_num(2))
+                    .clamp(Fx::from_num(0), Fx::from_num(1));
                 }
             }
             ShipControlMode::Turret => {
@@ -769,7 +781,8 @@ pub(crate) fn update_station_command_input(
                 if !claimed_entities.insert(focused_entity) {
                     continue;
                 }
-                let Ok((_, _, turret_state, _, _, _, _, _, _)) = module_query.get_mut(focused_entity)
+                let Ok((_, _, turret_state, _, _, _, _, _, _)) =
+                    module_query.get_mut(focused_entity)
                 else {
                     continue;
                 };
@@ -779,8 +792,9 @@ pub(crate) fn update_station_command_input(
                 let aim =
                     FixedVec2::from_num(command.aim_x_milli as i32, command.aim_y_milli as i32);
                 if !aim.is_near_zero() {
-                    turret_state.desired_angle =
-                        wrap_radians(angle_from_vector(aim) - Fx::FRAC_PI_2 - ship_rotation.radians);
+                    turret_state.desired_angle = wrap_radians(
+                        angle_from_vector(aim) - Fx::FRAC_PI_2 - ship_rotation.radians,
+                    );
                 }
                 turret_state.desired_angle +=
                     dt * Fx::from_num(command.turn_milli) / Fx::from_num(1000) * Fx::from_num(1.8);
@@ -795,23 +809,28 @@ pub(crate) fn update_station_command_input(
                 if !claimed_entities.insert(focused_entity) {
                     continue;
                 }
-                let Ok((_, _, _, reactor_state, _, _, _, _, _)) = module_query.get_mut(focused_entity)
+                let Ok((_, _, _, reactor_state, _, _, _, _, _)) =
+                    module_query.get_mut(focused_entity)
                 else {
                     continue;
                 };
                 let Some(mut reactor_state) = reactor_state else {
                     continue;
                 };
-                reactor_state.reaction_rate +=
-                    dt * Fx::from_num(balance.reactor.control_adjust_rate)
-                        * Fx::from_num(command.reactor_delta_milli)
-                        / Fx::from_num(1000);
-                reactor_state.turbine_load +=
-                    dt * Fx::from_num(balance.reactor.control_adjust_rate)
-                        * Fx::from_num(command.turbine_delta_milli)
-                        / Fx::from_num(1000);
-                reactor_state.reaction_rate = reactor_state.reaction_rate.clamp(Fx::from_num(0), Fx::from_num(1));
-                reactor_state.turbine_load = reactor_state.turbine_load.clamp(Fx::from_num(0), Fx::from_num(1));
+                reactor_state.reaction_rate += dt
+                    * Fx::from_num(balance.reactor.control_adjust_rate)
+                    * Fx::from_num(command.reactor_delta_milli)
+                    / Fx::from_num(1000);
+                reactor_state.turbine_load += dt
+                    * Fx::from_num(balance.reactor.control_adjust_rate)
+                    * Fx::from_num(command.turbine_delta_milli)
+                    / Fx::from_num(1000);
+                reactor_state.reaction_rate = reactor_state
+                    .reaction_rate
+                    .clamp(Fx::from_num(0), Fx::from_num(1));
+                reactor_state.turbine_load = reactor_state
+                    .turbine_load
+                    .clamp(Fx::from_num(0), Fx::from_num(1));
             }
             ShipControlMode::Logistics => {
                 let Some(focused_entity) = control_state.focused_entity else {
@@ -824,8 +843,17 @@ pub(crate) fn update_station_command_input(
                     control_state.focused_module_id.unwrap_or_default(),
                     &candidate_query,
                 );
-                let Ok((_, runtime_module, _, _, storage_cmd, manipulator_cmd, processor_cmd, airlock_state, _)) =
-                    module_query.get_mut(focused_entity)
+                let Ok((
+                    _,
+                    runtime_module,
+                    _,
+                    _,
+                    storage_cmd,
+                    manipulator_cmd,
+                    processor_cmd,
+                    airlock_state,
+                    _,
+                )) = module_query.get_mut(focused_entity)
                 else {
                     continue;
                 };
@@ -845,10 +873,18 @@ pub(crate) fn update_station_command_input(
                     }
                     if command.reactor_delta_milli != 0 {
                         manipulator_cmd.resource_kind = match manipulator_cmd.resource_kind {
-                            crate::gameplay::components::ResourceKind::RawSalvage => crate::gameplay::components::ResourceKind::RepairCharge,
-                            crate::gameplay::components::ResourceKind::RepairCharge => crate::gameplay::components::ResourceKind::Fuel,
-                            crate::gameplay::components::ResourceKind::Fuel => crate::gameplay::components::ResourceKind::Ammunition,
-                            crate::gameplay::components::ResourceKind::Ammunition => crate::gameplay::components::ResourceKind::RawSalvage,
+                            crate::gameplay::components::ResourceKind::RawSalvage => {
+                                crate::gameplay::components::ResourceKind::RepairCharge
+                            }
+                            crate::gameplay::components::ResourceKind::RepairCharge => {
+                                crate::gameplay::components::ResourceKind::Fuel
+                            }
+                            crate::gameplay::components::ResourceKind::Fuel => {
+                                crate::gameplay::components::ResourceKind::Ammunition
+                            }
+                            crate::gameplay::components::ResourceKind::Ammunition => {
+                                crate::gameplay::components::ResourceKind::RawSalvage
+                            }
                         };
                     }
                     if command.raw.pressed(netcode::INPUT_SPACE_EDGE) {
@@ -858,13 +894,20 @@ pub(crate) fn update_station_command_input(
                         && (command.raw.pressed(netcode::INPUT_PREV_EDGE)
                             || command.raw.pressed(netcode::INPUT_NEXT_EDGE))
                     {
-                        let direction = if command.raw.pressed(netcode::INPUT_PREV_EDGE) { -1 } else { 1 };
+                        let direction = if command.raw.pressed(netcode::INPUT_PREV_EDGE) {
+                            -1
+                        } else {
+                            1
+                        };
                         let current_index = manipulator_cmd
                             .target_module_id
-                            .and_then(|module_id| candidate_ids.iter().position(|id| *id == module_id))
+                            .and_then(|module_id| {
+                                candidate_ids.iter().position(|id| *id == module_id)
+                            })
                             .unwrap_or(0);
                         let next_index = ((current_index as i32 + direction)
-                            .rem_euclid(candidate_ids.len() as i32)) as usize;
+                            .rem_euclid(candidate_ids.len() as i32))
+                            as usize;
                         manipulator_cmd.target_module_id = Some(candidate_ids[next_index]);
                         manipulator_cmd.source_module_id = Some(runtime_module.module_id);
                     }
@@ -875,9 +918,15 @@ pub(crate) fn update_station_command_input(
                     }
                     if command.reactor_delta_milli != 0 {
                         processor_cmd.selected_recipe = match processor_cmd.selected_recipe {
-                            crate::gameplay::components::ProcessorRecipe::RepairCharge => crate::gameplay::components::ProcessorRecipe::Ammunition,
-                            crate::gameplay::components::ProcessorRecipe::Ammunition => crate::gameplay::components::ProcessorRecipe::Fuel,
-                            crate::gameplay::components::ProcessorRecipe::Fuel => crate::gameplay::components::ProcessorRecipe::RepairCharge,
+                            crate::gameplay::components::ProcessorRecipe::RepairCharge => {
+                                crate::gameplay::components::ProcessorRecipe::Ammunition
+                            }
+                            crate::gameplay::components::ProcessorRecipe::Ammunition => {
+                                crate::gameplay::components::ProcessorRecipe::Fuel
+                            }
+                            crate::gameplay::components::ProcessorRecipe::Fuel => {
+                                crate::gameplay::components::ProcessorRecipe::RepairCharge
+                            }
                         };
                     }
                 }
@@ -889,7 +938,8 @@ pub(crate) fn update_station_command_input(
                 if !claimed_entities.insert(focused_entity) {
                     continue;
                 }
-                let Ok((_, _, _, _, _, _, _, _, arch_runtime)) = module_query.get_mut(focused_entity)
+                let Ok((_, _, _, _, _, _, _, _, arch_runtime)) =
+                    module_query.get_mut(focused_entity)
                 else {
                     continue;
                 };
@@ -1060,9 +1110,7 @@ fn cursor_world_position(
     let cursor = window.cursor_position()?;
     let (camera, camera_transform) = camera_query;
     let world = camera.viewport_to_world_2d(camera_transform, cursor).ok()?;
-    Some(crate::gameplay::helpers::FixedVec2::from_vec2(
-        world,
-    ))
+    Some(crate::gameplay::helpers::FixedVec2::from_vec2(world))
 }
 
 fn nearby_logistics_target_ids(

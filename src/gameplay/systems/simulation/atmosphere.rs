@@ -10,8 +10,8 @@ use crate::{
             DestroyedModule,
             HostileShip,
             MissionState,
-            PlayerHandleComponent,
             PlayerFieldState,
+            PlayerHandleComponent,
             PlayerMotionState,
             PlayerReferenceFrame,
             PlayerShip,
@@ -165,7 +165,11 @@ pub(crate) fn sample_player_atmosphere(
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     ship_query: Query<&ShipAtmosphereState, With<ShipRoot>>,
     mut player_query: Query<
-        (&PlayerHandleComponent, &PlayerMotionState, &mut PlayerFieldState),
+        (
+            &PlayerHandleComponent,
+            &PlayerMotionState,
+            &mut PlayerFieldState,
+        ),
         With<ShipboardPlayer>,
     >,
 ) {

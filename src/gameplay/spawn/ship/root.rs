@@ -6,59 +6,57 @@ use super::{
     modules::spawn_runtime_module,
 };
 use crate::{
-    {
-        balance::BalanceConfig,
-        gameplay::{
-            RUNTIME_SHIP_ORIGIN,
-            components::{
-                AngularVelocity,
-                CarriedResource,
-                CurrentStation,
-                HeldInteraction,
-                HostileShip,
-                HostileShipAi,
-                InternalPosition,
-                ObservedLocalPlayerMarker,
-                LinearVelocity,
-                MissionState,
-                NearbyInteraction,
-                PlayerFieldState,
-                PlayerHandleComponent,
-                PlayerMotionState,
-                PlayerReferenceFrame,
-                PlayerShip,
-                PlayerShipAssignment,
-                ShipArchCommandState,
-                ShipAtmosphereState,
-                ShipAutomationMode,
-                ShipAutomationState,
-                ShipControlMode,
-                ShipControlState,
-                ShipInertiaField,
-                ShipInteriorMap,
-                ShipInteriorNode,
-                ShipPowerState,
-                ShipRoot,
-                ShipWeaponState,
-                ShipboardControlState,
-                ShipboardMarker,
-                ShipboardPlayer,
-                SimPosition,
-                SimRotation,
-                StationFocusMode,
-            },
-            helpers::{
-                FixedVec2,
-                Fx,
-                module_local_position,
-                ship_movement_model_with_effective,
-                ship_power_model_with_effective,
-            },
+    balance::BalanceConfig,
+    gameplay::{
+        RUNTIME_SHIP_ORIGIN,
+        components::{
+            AngularVelocity,
+            CarriedResource,
+            CurrentStation,
+            HeldInteraction,
+            HostileShip,
+            HostileShipAi,
+            InternalPosition,
+            LinearVelocity,
+            MissionState,
+            NearbyInteraction,
+            ObservedLocalPlayerMarker,
+            PlayerFieldState,
+            PlayerHandleComponent,
+            PlayerMotionState,
+            PlayerReferenceFrame,
+            PlayerShip,
+            PlayerShipAssignment,
+            ShipArchCommandState,
+            ShipAtmosphereState,
+            ShipAutomationMode,
+            ShipAutomationState,
+            ShipControlMode,
+            ShipControlState,
+            ShipInertiaField,
+            ShipInteriorMap,
+            ShipInteriorNode,
+            ShipPowerState,
+            ShipRoot,
+            ShipWeaponState,
+            ShipboardControlState,
+            ShipboardMarker,
+            ShipboardPlayer,
+            SimPosition,
+            SimRotation,
+            StationFocusMode,
         },
-        state::PlayingCleanup,
+        helpers::{
+            FixedVec2,
+            Fx,
+            module_local_position,
+            ship_movement_model_with_effective,
+            ship_power_model_with_effective,
+        },
     },
     netcode,
     ship::{ModuleKind, ModuleSpec, ShipDefinition},
+    state::PlayingCleanup,
 };
 
 #[derive(Default)]
@@ -426,7 +424,9 @@ pub(crate) fn spawn_runtime_ship(
         },
     ));
     commands.entity(root_entity).add_children(&child_entities);
-    commands.entity(root_entity).add_children(&shipboard_markers);
+    commands
+        .entity(root_entity)
+        .add_children(&shipboard_markers);
 }
 
 pub(crate) fn spawn_hostile_ship(
