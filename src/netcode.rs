@@ -18,7 +18,7 @@ use crate::{
     DEFAULT_HOST_ADDR,
     campaign::{CampaignSave, load_campaign},
     ship::{ShipDefinition, storage::load_default_ship},
-    state::{ClientAppState, DemoProgression, LastMissionReport, SectorState},
+    state::{DemoProgression, FrontendMode, LastMissionReport, SectorState},
 };
 
 pub(crate) type LumenGgrsConfig = bevy_ggrs::GgrsConfig<PlayerGgrsInput, SocketAddr, u128>;
@@ -93,23 +93,10 @@ impl PlayerGgrsInput {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum RollbackPhase {
     #[default]
-    Menu,
     Docked,
     SectorMap,
     Editing,
     Encounter,
-}
-
-impl From<ClientAppState> for RollbackPhase {
-    fn from(value: ClientAppState) -> Self {
-        match value {
-            ClientAppState::Menu => Self::Menu,
-            ClientAppState::Docked => Self::Docked,
-            ClientAppState::SectorMap => Self::SectorMap,
-            ClientAppState::Editing => Self::Editing,
-            ClientAppState::Encounter => Self::Encounter,
-        }
-    }
 }
 
 #[derive(Resource, Clone, Debug, Serialize, Deserialize)]
@@ -127,7 +114,7 @@ pub(crate) struct RollbackGameState {
 impl Default for RollbackGameState {
     fn default() -> Self {
         Self {
-            phase: RollbackPhase::Menu,
+            phase: RollbackPhase::Docked,
             frame: 0,
             seed: 0x10_4E6,
             scene_generation: 0,
@@ -228,6 +215,12 @@ pub(crate) struct ChecksumHistory {
     pub(crate) last_value: u128,
 }
 
+#[derive(Resource, Default, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ActivePresentationPhase {
+    pub(crate) phase: Option<RollbackPhase>,
+    pub(crate) scene_generation: Option<u32>,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct PendingMetaCommand {
     pub(crate) op: RollbackMetaOp,
@@ -292,7 +285,9 @@ pub(crate) fn finalize_pending_session_bootstrap(
     mut bootstrap: ResMut<SessionBootstrapConfig>,
     mut status: ResMut<SessionStatus>,
     mut rollback_state: ResMut<RollbackGameState>,
-    mut next_state: ResMut<NextState<ClientAppState>>,
+    mut next_mode: ResMut<NextState<FrontendMode>>,
+    mut pending_meta: ResMut<PendingLocalMetaCommand>,
+    mut decoded_commands: ResMut<DecodedPlayerCommands>,
 ) {
     if !bootstrap.pending_start {
         return;
@@ -312,11 +307,13 @@ pub(crate) fn finalize_pending_session_bootstrap(
             status.local_player_handles = vec![bootstrap.local_handle];
             status.active_ship_snapshot = Some(bootstrap.initial_state.editor_ship.clone());
             *rollback_state = bootstrap.initial_state.clone();
+            pending_meta.0 = None;
+            decoded_commands.by_handle.clear();
             bootstrap.pending_start = false;
-            next_state.set(ClientAppState::Docked);
+            next_mode.set(FrontendMode::Session);
             log::info!("Successfully started P2P session as {:?} with local handle {:?} and peer addresses {:?}",
                 bootstrap.role, bootstrap.local_handle, bootstrap.peer_addrs);
-            log::info!("Switching to Docked state");
+            log::info!("Switching to session frontend");
         }
         Err(error) => {
             status.phase = SessionPhase::Failed(error);
@@ -341,7 +338,6 @@ pub(crate) fn sync_presentation_from_rollback(
     mut progression: ResMut<DemoProgression>,
     mut sector: ResMut<SectorState>,
     mut last_mission_report: ResMut<LastMissionReport>,
-    mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
     if !rollback_state.is_changed() {
         return;
@@ -350,13 +346,129 @@ pub(crate) fn sync_presentation_from_rollback(
     *progression = rollback_state.progression.clone();
     *sector = rollback_state.sector.clone();
     *last_mission_report = rollback_state.last_mission_report.clone();
-    next_state.set(match rollback_state.phase {
-        RollbackPhase::Menu => ClientAppState::Menu,
-        RollbackPhase::Docked => ClientAppState::Docked,
-        RollbackPhase::SectorMap => ClientAppState::SectorMap,
-        RollbackPhase::Editing => ClientAppState::Editing,
-        RollbackPhase::Encounter => ClientAppState::Encounter,
-    });
+}
+
+pub(crate) fn sync_active_presentation_phase(
+    frontend_mode: Res<State<FrontendMode>>,
+    rollback_state: Res<RollbackGameState>,
+    mut active_phase: ResMut<ActivePresentationPhase>,
+) {
+    let desired = if *frontend_mode.get() == FrontendMode::Session {
+        ActivePresentationPhase {
+            phase: Some(rollback_state.phase),
+            scene_generation: (rollback_state.phase == RollbackPhase::Encounter)
+                .then_some(rollback_state.scene_generation),
+        }
+    } else {
+        ActivePresentationPhase::default()
+    };
+    if *active_phase != desired {
+        *active_phase = desired;
+    }
+}
+
+pub(crate) fn sync_player_editor_mode(
+    frontend_mode: Res<State<FrontendMode>>,
+    rollback_state: Res<RollbackGameState>,
+    mut editor_session: ResMut<crate::state::EditorSessionState>,
+) {
+    if *frontend_mode.get() == FrontendMode::Session
+        && rollback_state.phase == RollbackPhase::Editing
+        && editor_session.mode != crate::state::EditorMode::Player
+    {
+        editor_session.mode = crate::state::EditorMode::Player;
+    }
+}
+
+pub(crate) fn frontend_mode_is_session(frontend_mode: Res<State<FrontendMode>>) -> bool {
+    *frontend_mode.get() == FrontendMode::Session
+}
+
+pub(crate) fn frontend_mode_is_menu(frontend_mode: Res<State<FrontendMode>>) -> bool {
+    *frontend_mode.get() == FrontendMode::Menu
+}
+
+pub(crate) fn frontend_mode_is_debug_enemy_editor(
+    frontend_mode: Res<State<FrontendMode>>,
+) -> bool {
+    *frontend_mode.get() == FrontendMode::DebugEnemyEditor
+}
+
+pub(crate) fn frontend_mode_is_not_menu(frontend_mode: Res<State<FrontendMode>>) -> bool {
+    *frontend_mode.get() != FrontendMode::Menu
+}
+
+pub(crate) fn frontend_mode_is_not_debug_enemy_editor(
+    frontend_mode: Res<State<FrontendMode>>,
+) -> bool {
+    *frontend_mode.get() != FrontendMode::DebugEnemyEditor
+}
+
+pub(crate) fn session_presents_docked(
+    frontend_mode: Res<State<FrontendMode>>,
+    rollback_state: Res<RollbackGameState>,
+) -> bool {
+    *frontend_mode.get() == FrontendMode::Session && rollback_state.phase == RollbackPhase::Docked
+}
+
+pub(crate) fn session_not_presents_docked(
+    frontend_mode: Res<State<FrontendMode>>,
+    rollback_state: Res<RollbackGameState>,
+) -> bool {
+    !session_presents_docked(frontend_mode, rollback_state)
+}
+
+pub(crate) fn session_presents_sector_map(
+    frontend_mode: Res<State<FrontendMode>>,
+    rollback_state: Res<RollbackGameState>,
+) -> bool {
+    *frontend_mode.get() == FrontendMode::Session
+        && rollback_state.phase == RollbackPhase::SectorMap
+}
+
+pub(crate) fn session_not_presents_sector_map(
+    frontend_mode: Res<State<FrontendMode>>,
+    rollback_state: Res<RollbackGameState>,
+) -> bool {
+    !session_presents_sector_map(frontend_mode, rollback_state)
+}
+
+pub(crate) fn session_presents_player_editor(
+    frontend_mode: Res<State<FrontendMode>>,
+    rollback_state: Res<RollbackGameState>,
+) -> bool {
+    *frontend_mode.get() == FrontendMode::Session && rollback_state.phase == RollbackPhase::Editing
+}
+
+pub(crate) fn session_not_presents_player_editor(
+    frontend_mode: Res<State<FrontendMode>>,
+    rollback_state: Res<RollbackGameState>,
+) -> bool {
+    !session_presents_player_editor(frontend_mode, rollback_state)
+}
+
+pub(crate) fn editor_ui_should_not_be_present(
+    frontend_mode: Res<State<FrontendMode>>,
+    rollback_state: Res<RollbackGameState>,
+) -> bool {
+    *frontend_mode.get() != FrontendMode::DebugEnemyEditor
+        && !(*frontend_mode.get() == FrontendMode::Session
+            && rollback_state.phase == RollbackPhase::Editing)
+}
+
+pub(crate) fn session_presents_encounter(
+    frontend_mode: Res<State<FrontendMode>>,
+    rollback_state: Res<RollbackGameState>,
+) -> bool {
+    *frontend_mode.get() == FrontendMode::Session
+        && rollback_state.phase == RollbackPhase::Encounter
+}
+
+pub(crate) fn session_not_presents_encounter(
+    frontend_mode: Res<State<FrontendMode>>,
+    rollback_state: Res<RollbackGameState>,
+) -> bool {
+    !session_presents_encounter(frontend_mode, rollback_state)
 }
 
 pub(crate) fn read_local_inputs(
@@ -438,13 +550,9 @@ pub(crate) fn rollback_phase_is_encounter(rollback_state: Res<RollbackGameState>
 }
 
 pub(crate) fn apply_host_meta_ops(
-    status: Res<SessionStatus>,
     decoded: Res<DecodedPlayerCommands>,
     mut rollback_state: ResMut<RollbackGameState>,
 ) {
-    if !is_host_authority(&status) {
-        return;
-    }
     let Some(command) = decoded.by_handle.get(&0) else {
         return;
     };

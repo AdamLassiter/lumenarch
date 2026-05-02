@@ -114,3 +114,15 @@ pub(crate) fn cleanup_runtime_entities(
         commands.entity(entity).despawn();
     }
 }
+
+pub(crate) fn runtime_scene_missing(
+    query: Query<Entity, With<super::super::super::state::PlayingCleanup>>,
+) -> bool {
+    query.is_empty()
+}
+
+pub(crate) fn runtime_scene_present(
+    query: Query<Entity, With<super::super::super::state::PlayingCleanup>>,
+) -> bool {
+    !query.is_empty()
+}

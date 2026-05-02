@@ -14,12 +14,10 @@ use std::time::Duration;
 
 use bevy::{app::AppExit, prelude::*};
 use bevy_ggrs::{GgrsPlugin, RollbackApp, RollbackFrameRate};
-use bevy_roll_safe::RollApp;
 
 use self::state::{
     ArchEditorState,
     CampaignLoadState,
-    ClientAppState,
     DebugOverlayState,
     DemoProgression,
     DockedState,
@@ -29,6 +27,7 @@ use self::state::{
     EditorToolState,
     EditorViewState,
     EnemyShipLibraryState,
+    FrontendMode,
     LastMissionReport,
     MainCamera,
     SectorMapPanState,
@@ -75,6 +74,7 @@ pub fn run_client() {
         .insert_resource(netcode::PendingLocalMetaCommand::default())
         .insert_resource(netcode::DecodedPlayerCommands::default())
         .insert_resource(netcode::ChecksumHistory::default())
+        .insert_resource(netcode::ActivePresentationPhase::default())
         .insert_resource(EditorShip::default())
         .insert_resource(EditorSessionState::default())
         .insert_resource(EnemyShipLibraryState::default())
@@ -103,6 +103,7 @@ pub fn run_client() {
                 }),
         )
         .add_plugins(GgrsPlugin::<LumenGgrsConfig>::default())
+        // .add_plugins(RollbackSchedulePlugin::new_ggrs())
         .rollback_resource_with_clone::<netcode::RollbackGameState>()
         .rollback_resource_with_clone::<netcode::PlayerHandleMap>()
         .rollback_resource_with_clone::<netcode::DecodedPlayerCommands>()
@@ -155,7 +156,7 @@ pub fn run_client() {
         .update_component_with_map_entities::<gameplay::components::ShipboardControlState>()
         .update_component_with_map_entities::<gameplay::components::NearbyInteraction>()
         .update_component_with_map_entities::<gameplay::components::HeldInteraction>()
-        .init_state::<ClientAppState>()
+        .init_state::<FrontendMode>()
         .add_message::<gameplay::components::InteractWithModule>()
         .add_message::<gameplay::components::BeginHeldInteraction>()
         .add_message::<gameplay::components::CompleteHeldInteraction>()
@@ -166,8 +167,8 @@ pub fn run_client() {
         .add_systems(
             bevy_ggrs::GgrsSchedule,
             (
-                netcode::decode_player_inputs.ambiguous_with_all(),
                 netcode::apply_host_meta_ops.ambiguous_with_all(),
+                netcode::decode_player_inputs.ambiguous_with_all(),
                 (
                     gameplay::toggle_shipboard_control_mode,
                     gameplay::exit_focused_station,
@@ -221,106 +222,152 @@ pub fn run_client() {
             ),
         )
         .add_systems(PreUpdate, netcode::sync_local_player_handle)
-        .add_systems(Update, netcode::sync_presentation_from_rollback)
+        .add_systems(
+            Update,
+            (
+                netcode::sync_presentation_from_rollback,
+                netcode::sync_active_presentation_phase,
+                netcode::sync_player_editor_mode,
+                menu::spawn_menu_ui
+                    .run_if(netcode::frontend_mode_is_menu)
+                    .run_if(menu::menu_ui_missing),
+                menu::cleanup_menu_ui
+                    .run_if(netcode::frontend_mode_is_not_menu)
+                    .run_if(menu::menu_ui_present),
+                docked::initialize_campaign_state.run_if(netcode::session_presents_docked),
+                docked::spawn_docked_ui
+                    .run_if(netcode::session_presents_docked)
+                    .run_if(docked::docked_ui_missing),
+                docked::cleanup_docked_ui
+                    .run_if(netcode::session_not_presents_docked)
+                    .run_if(docked::docked_ui_present),
+                sector_map::spawn_sector_map_ui
+                    .run_if(netcode::session_presents_sector_map)
+                    .run_if(sector_map::sector_map_ui_missing),
+                sector_map::cleanup_sector_map_ui
+                    .run_if(netcode::session_not_presents_sector_map)
+                    .run_if(sector_map::sector_map_ui_present),
+                (
+                    editor::initialize_editor_ship,
+                    editor::spawn_editor_ui,
+                    editor::spawn_preview_tile,
+                )
+                    .chain()
+                    .run_if(netcode::session_presents_player_editor)
+                    .run_if(editor::editor_ui_missing),
+                editor::cleanup_editor_entities
+                    .run_if(netcode::editor_ui_should_not_be_present)
+                    .run_if(editor::editor_ui_present),
+                gameplay::spawn_runtime_scene
+                    .run_if(netcode::session_presents_encounter)
+                    .run_if(gameplay::runtime_scene_missing),
+                gameplay::cleanup_runtime_entities
+                    .run_if(netcode::session_not_presents_encounter)
+                    .run_if(gameplay::runtime_scene_present),
+                (
+                    editor::initialize_editor_ship,
+                    editor::spawn_editor_ui,
+                    editor::spawn_preview_tile,
+                )
+                    .chain()
+                    .run_if(netcode::frontend_mode_is_debug_enemy_editor)
+                    .run_if(editor::editor_ui_missing),
+            ),
+        )
         .add_systems(Update, docked::persist_campaign_state)
-        // Menu systems
-        .add_systems(OnEnter(ClientAppState::Menu), menu::spawn_menu_ui)
         .add_systems(
             FixedUpdate,
             (
-                menu::edit_host_address.run_if(in_state(ClientAppState::Menu)),
-                menu::menu_button_system.run_if(in_state(ClientAppState::Menu)),
-                menu::menu_keyboard_shortcuts.run_if(in_state(ClientAppState::Menu)),
-                menu::update_menu_status_text.run_if(in_state(ClientAppState::Menu)),
-                menu::update_host_address_text.run_if(in_state(ClientAppState::Menu)),
+                menu::edit_host_address.run_if(in_state(FrontendMode::Menu)),
+                menu::menu_button_system.run_if(in_state(FrontendMode::Menu)),
+                menu::menu_keyboard_shortcuts.run_if(in_state(FrontendMode::Menu)),
+                menu::update_menu_status_text.run_if(in_state(FrontendMode::Menu)),
+                menu::update_host_address_text.run_if(in_state(FrontendMode::Menu)),
                 netcode::finalize_pending_session_bootstrap,
                 exit_on_escape,
             ),
         )
-        .add_systems(OnExit(ClientAppState::Menu), menu::cleanup_menu_ui)
-        // Docked systems
-        .add_systems(
-            OnEnter(ClientAppState::Docked),
-            (docked::initialize_campaign_state, docked::spawn_docked_ui),
-        )
         .add_systems(
             FixedUpdate,
             (
-                docked::docked_button_system.run_if(in_state(ClientAppState::Docked)),
-                docked::update_docked_status_text.run_if(in_state(ClientAppState::Docked)),
+                docked::docked_button_system.run_if(netcode::session_presents_docked),
+                docked::update_docked_status_text.run_if(netcode::session_presents_docked),
             ),
         )
-        .add_systems(OnExit(ClientAppState::Docked), docked::cleanup_docked_ui)
-        // Sector map systems
-        .add_systems(
-            OnEnter(ClientAppState::SectorMap),
-            sector_map::spawn_sector_map_ui,
-        )
         .add_systems(
             FixedUpdate,
             (
-                sector_map::sector_node_button_system.run_if(in_state(ClientAppState::SectorMap)),
+                sector_map::sector_node_button_system.run_if(netcode::session_presents_sector_map),
                 sector_map::sector_navigation_button_system
-                    .run_if(in_state(ClientAppState::SectorMap)),
-                sector_map::pan_and_zoom_sector_map.run_if(in_state(ClientAppState::SectorMap)),
-                sector_map::sync_sector_map_layout.run_if(in_state(ClientAppState::SectorMap)),
-                sector_map::update_sector_map_text.run_if(in_state(ClientAppState::SectorMap)),
-            ),
-        )
-        .add_systems(
-            OnExit(ClientAppState::SectorMap),
-            sector_map::cleanup_sector_map_ui,
-        )
-        // Editor systems
-        .add_systems(
-            OnEnter(ClientAppState::Editing),
-            (
-                editor::initialize_editor_ship,
-                editor::spawn_editor_ui,
-                editor::spawn_preview_tile,
+                    .run_if(netcode::session_presents_sector_map),
+                sector_map::pan_and_zoom_sector_map.run_if(netcode::session_presents_sector_map),
+                sector_map::sync_sector_map_layout.run_if(netcode::session_presents_sector_map),
+                sector_map::update_sector_map_text.run_if(netcode::session_presents_sector_map),
             ),
         )
         .add_systems(
             FixedUpdate,
             (
-                editor::draw_grid_overlay.run_if(in_state(ClientAppState::Editing)),
-                editor::toolbox_button_system.run_if(in_state(ClientAppState::Editing)),
-                editor::computer_program_button_system.run_if(in_state(ClientAppState::Editing)),
-                editor::arch_editor_button_system.run_if(in_state(ClientAppState::Editing)),
-                editor::enemy_library_button_system.run_if(in_state(ClientAppState::Editing)),
-                editor::enemy_library_keyboard_shortcuts.run_if(in_state(ClientAppState::Editing)),
-                editor::leave_editor_button_system.run_if(in_state(ClientAppState::Editing)),
-                editor::leave_editor_keyboard_shortcut.run_if(in_state(ClientAppState::Editing)),
-                editor::rotate_selected_tool.run_if(in_state(ClientAppState::Editing)),
-                editor::place_or_remove_tile.run_if(in_state(ClientAppState::Editing)),
-                editor::pan_and_zoom_editor_view.run_if(in_state(ClientAppState::Editing)),
-                editor::save_editor_ship_shortcut.run_if(in_state(ClientAppState::Editing)),
-                editor::load_editor_ship_shortcut.run_if(in_state(ClientAppState::Editing)),
-                editor::persist_editor_ship.run_if(in_state(ClientAppState::Editing)),
-                editor::sync_preview_tile.run_if(in_state(ClientAppState::Editing)),
-                editor::sync_ship_tile_entities.run_if(in_state(ClientAppState::Editing)),
-                editor::sync_computer_program_entries.run_if(in_state(ClientAppState::Editing)),
-                editor::sync_toolbox_visuals.run_if(in_state(ClientAppState::Editing)),
-                editor::update_editor_status_text.run_if(in_state(ClientAppState::Editing)),
+                editor::draw_grid_overlay.run_if(netcode::session_presents_player_editor),
+                editor::toolbox_button_system.run_if(netcode::session_presents_player_editor),
+                editor::computer_program_button_system
+                    .run_if(netcode::session_presents_player_editor),
+                editor::arch_editor_button_system
+                    .run_if(netcode::session_presents_player_editor),
+                editor::leave_editor_button_system
+                    .run_if(netcode::session_presents_player_editor),
+                editor::leave_editor_keyboard_shortcut
+                    .run_if(netcode::session_presents_player_editor),
+                editor::rotate_selected_tool.run_if(netcode::session_presents_player_editor),
+                editor::place_or_remove_tile.run_if(netcode::session_presents_player_editor),
+                editor::pan_and_zoom_editor_view.run_if(netcode::session_presents_player_editor),
+                editor::save_editor_ship_shortcut.run_if(netcode::session_presents_player_editor),
+                editor::load_editor_ship_shortcut.run_if(netcode::session_presents_player_editor),
+                editor::persist_editor_ship.run_if(netcode::session_presents_player_editor),
+                editor::sync_preview_tile.run_if(netcode::session_presents_player_editor),
+                editor::sync_ship_tile_entities.run_if(netcode::session_presents_player_editor),
+                editor::sync_computer_program_entries
+                    .run_if(netcode::session_presents_player_editor),
+                editor::sync_toolbox_visuals.run_if(netcode::session_presents_player_editor),
+                editor::update_editor_status_text.run_if(netcode::session_presents_player_editor),
             ),
-        )
-        .add_systems(
-            OnExit(ClientAppState::Editing),
-            editor::cleanup_editor_entities,
-        )
-        // Gameplay systems
-        .add_systems(
-            OnEnter(ClientAppState::Encounter),
-            gameplay::spawn_runtime_scene,
         )
         .add_systems(
             FixedUpdate,
             (
-                gameplay::return_button_system.run_if(in_state(ClientAppState::Encounter)),
-                gameplay::return_keyboard_shortcut.run_if(in_state(ClientAppState::Encounter)),
-                gameplay::toggle_debug_overlay.run_if(in_state(ClientAppState::Encounter)),
+                editor::draw_grid_overlay.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::toolbox_button_system.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::enemy_library_button_system
+                    .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::enemy_library_keyboard_shortcuts
+                    .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::leave_editor_button_system
+                    .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::leave_editor_keyboard_shortcut
+                    .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::rotate_selected_tool.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::place_or_remove_tile.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::pan_and_zoom_editor_view.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::save_editor_ship_shortcut.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::load_editor_ship_shortcut
+                    .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::persist_editor_ship.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::sync_preview_tile.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::sync_ship_tile_entities.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::sync_computer_program_entries
+                    .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::sync_toolbox_visuals.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::update_editor_status_text.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+            ),
+        )
+        .add_systems(
+            FixedUpdate,
+            (
+                gameplay::return_button_system.run_if(netcode::session_presents_encounter),
+                gameplay::return_keyboard_shortcut.run_if(netcode::session_presents_encounter),
+                gameplay::toggle_debug_overlay.run_if(netcode::session_presents_encounter),
                 gameplay::sync_player_reference_frame_parenting
-                    .run_if(in_state(ClientAppState::Encounter)),
+                    .run_if(netcode::session_presents_encounter),
                 (
                     gameplay::update_destroyed_module_visuals,
                     gameplay::sync_shipboard_player_visual,
@@ -330,16 +377,12 @@ pub fn run_client() {
                     gameplay::draw_debug_overlay,
                 )
                     .chain()
-                    .run_if(in_state(ClientAppState::Encounter)),
-                gameplay::update_gameplay_status_text.run_if(in_state(ClientAppState::Encounter)),
+                    .run_if(netcode::session_presents_encounter),
+                gameplay::update_gameplay_status_text.run_if(netcode::session_presents_encounter),
                 gameplay::update_inspection_and_alerts_text
-                    .run_if(in_state(ClientAppState::Encounter)),
-                gameplay::station_panel_button_system.run_if(in_state(ClientAppState::Encounter)),
+                    .run_if(netcode::session_presents_encounter),
+                gameplay::station_panel_button_system.run_if(netcode::session_presents_encounter),
             ),
-        )
-        .add_systems(
-            OnExit(ClientAppState::Encounter),
-            gameplay::cleanup_runtime_entities,
         )
         .run();
 }

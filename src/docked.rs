@@ -231,6 +231,14 @@ pub(crate) fn cleanup_docked_ui(mut commands: Commands, query: Query<Entity, Wit
     }
 }
 
+pub(crate) fn docked_ui_missing(query: Query<Entity, With<DockedRoot>>) -> bool {
+    query.is_empty()
+}
+
+pub(crate) fn docked_ui_present(query: Query<Entity, With<DockedRoot>>) -> bool {
+    !query.is_empty()
+}
+
 pub(crate) fn docked_button_system(
     mut interaction_query: Query<
         (

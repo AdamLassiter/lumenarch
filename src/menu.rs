@@ -8,7 +8,7 @@ use super::{
     PRESSED_BUTTON,
     netcode,
     state::{
-        ClientAppState,
+        FrontendMode,
         DebugEnemyEditorButton,
         EditorMode,
         EditorSessionState,
@@ -231,7 +231,7 @@ pub(crate) fn menu_button_system(
     mut status: ResMut<netcode::SessionStatus>,
     mut bootstrap: ResMut<netcode::SessionBootstrapConfig>,
     mut editor_session: ResMut<EditorSessionState>,
-    mut next_state: ResMut<NextState<ClientAppState>>,
+    mut next_mode: ResMut<NextState<FrontendMode>>,
 ) {
     for (interaction, mut background, join, debug_enemy) in &mut interaction_query {
         match *interaction {
@@ -244,7 +244,7 @@ pub(crate) fn menu_button_system(
                 } else if debug_enemy.is_some() {
                     *background = BackgroundColor(Color::srgb(0.36, 0.24, 0.16));
                     editor_session.mode = EditorMode::Enemy;
-                    next_state.set(ClientAppState::Editing);
+                    next_mode.set(FrontendMode::DebugEnemyEditor);
                     log::info!("Debug Enemy Editor button pressed");
                     log::info!("Switching to Editing mode");
                 }
@@ -292,6 +292,14 @@ pub(crate) fn cleanup_menu_ui(mut commands: Commands, query: Query<Entity, With<
     for entity in &query {
         commands.entity(entity).despawn();
     }
+}
+
+pub(crate) fn menu_ui_missing(query: Query<Entity, With<MenuRoot>>) -> bool {
+    query.is_empty()
+}
+
+pub(crate) fn menu_ui_present(query: Query<Entity, With<MenuRoot>>) -> bool {
+    !query.is_empty()
 }
 
 fn is_host_address_character(character: char) -> bool {

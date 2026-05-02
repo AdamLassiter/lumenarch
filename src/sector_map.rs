@@ -242,6 +242,14 @@ pub(crate) fn cleanup_sector_map_ui(
     }
 }
 
+pub(crate) fn sector_map_ui_missing(query: Query<Entity, With<SectorMapRoot>>) -> bool {
+    query.is_empty()
+}
+
+pub(crate) fn sector_map_ui_present(query: Query<Entity, With<SectorMapRoot>>) -> bool {
+    !query.is_empty()
+}
+
 pub(crate) fn sector_node_button_system(
     mut interaction_query: Query<
         (&Interaction, &SectorNodeButton, &mut BackgroundColor),

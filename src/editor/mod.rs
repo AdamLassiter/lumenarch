@@ -27,6 +27,8 @@ pub(crate) use render::{
 };
 pub(crate) use ui::{
     cleanup_editor_entities,
+    editor_ui_missing,
+    editor_ui_present,
     initialize_editor_ship,
     spawn_editor_ui,
     sync_computer_program_entries,

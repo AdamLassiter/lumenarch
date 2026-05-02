@@ -15,10 +15,10 @@ use super::{
             ArchEditorButton,
             ArchEditorButtonAction,
             ArchEditorState,
-            ClientAppState,
             ComputerProgramButton,
             DemoProgression,
             EditorMode,
+            FrontendMode,
             EditorPanState,
             EditorSessionState,
             EditorShip,
@@ -84,23 +84,28 @@ pub(crate) fn leave_editor_button_system(
     editor_session: Res<EditorSessionState>,
     status: Res<netcode::SessionStatus>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
-    mut next_state: ResMut<NextState<ClientAppState>>,
+    mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
+    mut next_mode: ResMut<NextState<FrontendMode>>,
 ) {
-    if !netcode::is_host_authority(&status) {
+    if editor_session.mode == EditorMode::Player && !netcode::is_host_authority(&status) {
         return;
     }
     for (interaction, mut background) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
                 *background = BackgroundColor(Color::srgb(0.42, 0.30, 0.20));
-                rollback_state.phase = match editor_session.mode {
-                    EditorMode::Player => netcode::RollbackPhase::Docked,
-                    EditorMode::Enemy => netcode::RollbackPhase::Menu,
-                };
-                next_state.set(match editor_session.mode {
-                    EditorMode::Player => ClientAppState::Docked,
-                    EditorMode::Enemy => ClientAppState::Menu,
-                });
+                match editor_session.mode {
+                    EditorMode::Player => {
+                        pending_meta.0 = Some(netcode::PendingMetaCommand {
+                            op: netcode::RollbackMetaOp::LeaveEditor,
+                            ..Default::default()
+                        });
+                    }
+                    EditorMode::Enemy => {
+                        rollback_state.phase = netcode::RollbackPhase::Docked;
+                        next_mode.set(FrontendMode::Menu);
+                    }
+                }
             }
             Interaction::Hovered => {
                 *background = BackgroundColor(Color::srgb(0.56, 0.40, 0.26));
@@ -117,20 +122,25 @@ pub(crate) fn leave_editor_keyboard_shortcut(
     editor_session: Res<EditorSessionState>,
     status: Res<netcode::SessionStatus>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
-    mut next_state: ResMut<NextState<ClientAppState>>,
+    mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
+    mut next_mode: ResMut<NextState<FrontendMode>>,
 ) {
-    if !netcode::is_host_authority(&status) {
+    if editor_session.mode == EditorMode::Player && !netcode::is_host_authority(&status) {
         return;
     }
     if keys.just_pressed(KeyCode::Tab) {
-        rollback_state.phase = match editor_session.mode {
-            EditorMode::Player => netcode::RollbackPhase::Docked,
-            EditorMode::Enemy => netcode::RollbackPhase::Menu,
-        };
-        next_state.set(match editor_session.mode {
-            EditorMode::Player => ClientAppState::Docked,
-            EditorMode::Enemy => ClientAppState::Menu,
-        });
+        match editor_session.mode {
+            EditorMode::Player => {
+                pending_meta.0 = Some(netcode::PendingMetaCommand {
+                    op: netcode::RollbackMetaOp::LeaveEditor,
+                    ..Default::default()
+                });
+            }
+            EditorMode::Enemy => {
+                rollback_state.phase = netcode::RollbackPhase::Docked;
+                next_mode.set(FrontendMode::Menu);
+            }
+        }
     }
 }
 

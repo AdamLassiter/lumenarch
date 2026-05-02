@@ -4,13 +4,11 @@ use serde::{Deserialize, Serialize};
 use crate::ship::{ModuleKind, ModuleVariant, ShipDefinition, enemy::EnemyShipLibrary};
 
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
-pub(crate) enum ClientAppState {
+pub(crate) enum FrontendMode {
     #[default]
     Menu,
-    Docked,
-    SectorMap,
-    Editing,
-    Encounter,
+    Session,
+    DebugEnemyEditor,
 }
 
 #[derive(Resource, Default, Clone)]

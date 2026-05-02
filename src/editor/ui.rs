@@ -117,6 +117,14 @@ pub(crate) fn initialize_editor_ship(
     arch_editor_state.selected_line = 0;
 }
 
+pub(crate) fn editor_ui_missing(query: Query<Entity, With<EditorRoot>>) -> bool {
+    query.is_empty()
+}
+
+pub(crate) fn editor_ui_present(query: Query<Entity, With<EditorRoot>>) -> bool {
+    !query.is_empty()
+}
+
 pub(crate) fn spawn_editor_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,

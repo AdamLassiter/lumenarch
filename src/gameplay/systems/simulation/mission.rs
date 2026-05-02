@@ -34,11 +34,8 @@ use crate::{
     netcode,
     ship::ModuleKind,
     state::{
-        ClientAppState,
-        DemoProgression,
         LastMissionReport,
         SectorNodeStatus,
-        SectorState,
         TravelOutcome,
     },
 };
@@ -258,8 +255,6 @@ pub(crate) fn sync_runtime_ship_state(
 pub(crate) fn return_after_mission_resolution(
     time: Res<Time>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
-    mut progression: ResMut<DemoProgression>,
-    mut sector_state: ResMut<SectorState>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
     inventory_query: Query<(
         &RuntimeShipModule,
@@ -267,8 +262,6 @@ pub(crate) fn return_after_mission_resolution(
         Option<&ProcessorModule>,
     )>,
     computer_query: Query<&RuntimeArchComputer>,
-    mut last_mission_report: ResMut<LastMissionReport>,
-    mut next_state: ResMut<NextState<ClientAppState>>,
 ) {
     let mut mission_state = mission_query.into_inner();
     let Some(delay) = mission_state.return_delay_remaining.as_mut() else {
@@ -294,6 +287,7 @@ pub(crate) fn return_after_mission_resolution(
     }
     let logistics_payout = (raw_salvage_returned + repair_charge_returned * 3)
         * mission_state.reward_multiplier.max(1);
+    let mut progression = rollback_state.progression.clone();
     progression.scrap += logistics_payout;
     mission_state.salvage_scrap_awarded = logistics_payout;
 
@@ -347,6 +341,7 @@ pub(crate) fn return_after_mission_resolution(
         ("Mission Complete".to_string(), detail)
     };
 
+    let mut last_mission_report = LastMissionReport::default();
     last_mission_report.headline = Some(headline);
     last_mission_report.detail = Some(detail);
     last_mission_report.scrap_awarded = mission_state.salvage_scrap_awarded;
@@ -445,6 +440,7 @@ pub(crate) fn return_after_mission_resolution(
         )
     });
 
+    let mut sector_state = rollback_state.sector.clone();
     if let Some(node) = sector_state.node_mut(mission_state.node_id) {
         node.status = if travel_outcome.failed {
             SectorNodeStatus::Failed
@@ -468,7 +464,6 @@ pub(crate) fn return_after_mission_resolution(
     rollback_state.last_mission_report = last_mission_report.clone();
     rollback_state.phase = netcode::RollbackPhase::Docked;
     mission_state.return_delay_remaining = None;
-    next_state.set(ClientAppState::Docked);
     log::info!("Mission resolved with outcome: {}", last_mission_report.travel_outcome.clone().unwrap_or_default());
     log::info!("Returning to Docked state");
 }

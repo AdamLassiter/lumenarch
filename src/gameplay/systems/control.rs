@@ -4,7 +4,7 @@ use bevy::{ecs::relationship::Relationship, log, prelude::*};
 use bevy_ggrs::PlayerInputs;
 
 use super::super::{
-    super::state::{AbortEncounterButton, ClientAppState, MainCamera, PlayingCleanup},
+    super::state::{AbortEncounterButton, MainCamera, PlayingCleanup},
     components::{
         AirlockCommandState,
         AngularVelocity,
@@ -90,13 +90,20 @@ pub(crate) fn return_button_system(
             With<AbortEncounterButton>,
         ),
     >,
-    mut next_state: ResMut<NextState<ClientAppState>>,
+    status: Res<netcode::SessionStatus>,
+    mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     for (interaction, mut background) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
                 *background = BackgroundColor(Color::srgb(0.44, 0.20, 0.14));
-                next_state.set(ClientAppState::Docked);
+                pending_meta.0 = Some(netcode::PendingMetaCommand {
+                    op: netcode::RollbackMetaOp::ReturnToDock,
+                    ..Default::default()
+                });
                 log::info!("Abort Encounter button pressed");
                 log::info!("Returning to Docked state");
             }
@@ -112,10 +119,17 @@ pub(crate) fn return_button_system(
 
 pub(crate) fn return_keyboard_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
-    mut next_state: ResMut<NextState<ClientAppState>>,
+    status: Res<netcode::SessionStatus>,
+    mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
 ) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
     if keys.just_pressed(KeyCode::Tab) {
-        next_state.set(ClientAppState::Docked);
+        pending_meta.0 = Some(netcode::PendingMetaCommand {
+            op: netcode::RollbackMetaOp::ReturnToDock,
+            ..Default::default()
+        });
         log::info!("Tab key pressed");
         log::info!("Returning to Docked state");
     }
