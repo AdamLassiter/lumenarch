@@ -1,6 +1,5 @@
 use bevy::{
-    input::keyboard::{Key, KeyboardInput},
-    prelude::*,
+    input::keyboard::{Key, KeyboardInput}, log, prelude::*
 };
 
 use super::{
@@ -246,6 +245,8 @@ pub(crate) fn menu_button_system(
                     *background = BackgroundColor(Color::srgb(0.36, 0.24, 0.16));
                     editor_session.mode = EditorMode::Enemy;
                     next_state.set(ClientAppState::Editing);
+                    log::info!("Debug Enemy Editor button pressed");
+                    log::info!("Switching to Editing mode");
                 }
             }
             Interaction::Hovered => {

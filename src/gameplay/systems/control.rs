@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, ops::DerefMut};
 
-use bevy::{ecs::relationship::Relationship, prelude::*};
+use bevy::{ecs::relationship::Relationship, log, prelude::*};
 use bevy_ggrs::PlayerInputs;
 
 use super::super::{
@@ -97,6 +97,8 @@ pub(crate) fn return_button_system(
             Interaction::Pressed => {
                 *background = BackgroundColor(Color::srgb(0.44, 0.20, 0.14));
                 next_state.set(ClientAppState::Docked);
+                log::info!("Abort Encounter button pressed");
+                log::info!("Returning to Docked state");
             }
             Interaction::Hovered => {
                 *background = BackgroundColor(Color::srgb(0.64, 0.34, 0.22));
@@ -114,6 +116,8 @@ pub(crate) fn return_keyboard_shortcut(
 ) {
     if keys.just_pressed(KeyCode::Tab) {
         next_state.set(ClientAppState::Docked);
+        log::info!("Tab key pressed");
+        log::info!("Returning to Docked state");
     }
 }
 

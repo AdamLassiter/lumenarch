@@ -155,7 +155,7 @@ pub fn run_client() {
         .update_component_with_map_entities::<gameplay::components::ShipboardControlState>()
         .update_component_with_map_entities::<gameplay::components::NearbyInteraction>()
         .update_component_with_map_entities::<gameplay::components::HeldInteraction>()
-        .init_roll_state::<ClientAppState>()
+        .init_state::<ClientAppState>()
         .add_message::<gameplay::components::InteractWithModule>()
         .add_message::<gameplay::components::BeginHeldInteraction>()
         .add_message::<gameplay::components::CompleteHeldInteraction>()

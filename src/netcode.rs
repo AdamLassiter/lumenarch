@@ -1,9 +1,7 @@
 use std::{collections::BTreeMap, net::SocketAddr};
 
 use bevy::{
-    ecs::entity::{EntityMapper, MapEntities},
-    platform::collections::HashMap,
-    prelude::*,
+    ecs::entity::{EntityMapper, MapEntities}, log, platform::collections::HashMap, prelude::*
 };
 use bevy_ggrs::{
     LocalInputs,
@@ -316,6 +314,9 @@ pub(crate) fn finalize_pending_session_bootstrap(
             *rollback_state = bootstrap.initial_state.clone();
             bootstrap.pending_start = false;
             next_state.set(ClientAppState::Docked);
+            log::info!("Successfully started P2P session as {:?} with local handle {:?} and peer addresses {:?}",
+                bootstrap.role, bootstrap.local_handle, bootstrap.peer_addrs);
+            log::info!("Switching to Docked state");
         }
         Err(error) => {
             status.phase = SessionPhase::Failed(error);

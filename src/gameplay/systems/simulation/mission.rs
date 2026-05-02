@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{log, prelude::*};
 
 use crate::{
     balance::BalanceConfig,
@@ -469,6 +469,8 @@ pub(crate) fn return_after_mission_resolution(
     rollback_state.phase = netcode::RollbackPhase::Docked;
     mission_state.return_delay_remaining = None;
     next_state.set(ClientAppState::Docked);
+    log::info!("Mission resolved with outcome: {}", last_mission_report.travel_outcome.clone().unwrap_or_default());
+    log::info!("Returning to Docked state");
 }
 
 fn automation_program_name(computer_query: &Query<&RuntimeArchComputer>) -> Option<String> {
