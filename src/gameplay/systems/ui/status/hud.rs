@@ -1,4 +1,23 @@
 use super::*;
+use super::super::alerts;
+
+pub(crate) fn toggle_gameplay_info_panel(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut hud_mode: ResMut<GameplayInfoPanelMode>,
+) {
+    if keys.just_pressed(KeyCode::F1) {
+        *hud_mode = GameplayInfoPanelMode::Overview;
+    }
+    if keys.just_pressed(KeyCode::F2) {
+        *hud_mode = GameplayInfoPanelMode::FocusedModule;
+    }
+    if keys.just_pressed(KeyCode::F3) {
+        *hud_mode = GameplayInfoPanelMode::Alerts;
+    }
+    if keys.just_pressed(KeyCode::F4) {
+        *hud_mode = GameplayInfoPanelMode::StationConsole;
+    }
+}
 
 #[derive(SystemParam)]
 pub(crate) struct GameplayStatusWorldQueries<'w, 's> {
@@ -45,13 +64,31 @@ pub(crate) struct GameplayHudUiQueries<'w, 's> {
         'w,
         's,
         (
-            Query<'w, 's, &'static mut Text, With<GameplayTopBannerText>>,
-            Query<'w, 's, &'static mut Text, With<GameplayCompactStatusText>>,
-            Query<'w, 's, &'static mut Text, With<GameplayControlsText>>,
-            Query<'w, 's, &'static mut Text, With<GameplayPanelTitleText>>,
-            Query<'w, 's, &'static mut Text, With<GameplayPanelBodyText>>,
+            Query<
+                'w,
+                's,
+                (
+                    &'static mut Text,
+                    Option<&'static GameplayTopBannerText>,
+                    Option<&'static GameplayCompactStatusText>,
+                    Option<&'static GameplayControlsText>,
+                    Option<&'static GameplayPanelTitleText>,
+                    Option<&'static GameplayPanelBodyText>,
+                    Option<&'static GameplayStationTitleText>,
+                ),
+            >,
             Query<'w, 's, (&'static GameplayBarLabel, &'static mut Text)>,
             Query<'w, 's, (&'static GameplayStationPanelButtonLabel, &'static mut Text)>,
+            Query<
+                'w,
+                's,
+                (
+                    &'static ChildOf,
+                    &'static mut Text,
+                    Option<&'static GameplayStationReadoutLabel>,
+                    Option<&'static GameplayStationReadoutValue>,
+                ),
+            >,
         ),
     >,
     node_queries: ParamSet<
@@ -71,13 +108,52 @@ pub(crate) struct GameplayHudUiQueries<'w, 's> {
                 With<Button>,
             >,
             Query<'w, 's, &'static mut Node, With<GameplayStationPanel>>,
+            Query<
+                'w,
+                's,
+                (
+                    Entity,
+                    &'static GameplayStationReadoutSlot,
+                    &'static mut Node,
+                    &'static Children,
+                ),
+            >,
+            Query<
+                'w,
+                's,
+                (
+                    &'static ChildOf,
+                    &'static mut Node,
+                ),
+                With<GameplayStationReadoutBarTrack>,
+            >,
+            Query<
+                'w,
+                's,
+                (
+                    &'static ChildOf,
+                    &'static mut Node,
+                    &'static mut BackgroundColor,
+                ),
+                With<GameplayStationReadoutBarFill>,
+            >,
+            Query<
+                'w,
+                's,
+                (
+                    &'static ChildOf,
+                    &'static mut Node,
+                    &'static mut BackgroundColor,
+                ),
+                With<GameplayStationReadoutLight>,
+            >,
         ),
     >,
 }
 
 pub(crate) fn update_gameplay_status_text(
     balance: Res<BalanceConfig>,
-    debug_overlay: Res<DebugOverlayState>,
+    hud_mode: Res<GameplayInfoPanelMode>,
     ship_query: Single<
         (
             &SimPosition,
@@ -98,6 +174,8 @@ pub(crate) fn update_gameplay_status_text(
     player_query: Single<
         (
             &CurrentStation,
+            &NearbyInteraction,
+            &HeldInteraction,
             &PlayerFieldState,
             &PlayerMotionState,
             &CarriedResource,
@@ -116,7 +194,7 @@ pub(crate) fn update_gameplay_status_text(
         children,
         linear_velocity,
         angular_velocity,
-        _automation_state,
+        automation_state,
         _movement_model,
         power_state,
         power_model,
@@ -125,7 +203,7 @@ pub(crate) fn update_gameplay_status_text(
         atmosphere_state,
         _ship_controls,
     ) = ship_query.into_inner();
-    let (current_station, player_fields, player_motion, carried_resource, control_mode) =
+    let (current_station, nearby_interaction, held_interaction, player_fields, player_motion, carried_resource, control_mode) =
         player_query.into_inner();
 
     let frame_label = summary::reference_frame_label(player_motion, &status_world.ship_identity_query);
@@ -166,8 +244,11 @@ pub(crate) fn update_gameplay_status_text(
         rollback_state.frame,
         checksum_history.last_value,
     );
-    let controls_text = summary::controls_help_text(control_mode.mode);
-    let (panel_title, panel_body, active_station_kind, active_station_flags) =
+    let controls_text = format!(
+        "{}\nF1 ship  |  F2 focus  |  F3 alerts  |  F4 station",
+        summary::controls_help_text(control_mode.mode)
+    );
+    let (panel_title, panel_body, _, _) =
         station_panel::station_panel_content(
             control_mode,
             mission_state,
@@ -178,23 +259,69 @@ pub(crate) fn update_gameplay_status_text(
             focused_station_context,
             &arch_summary,
         );
-    let show_station_panel =
-        control_mode.mode != ShipControlMode::Interior || debug_overlay.enabled;
+    let station_display = station_panel::station_panel_display(
+        control_mode,
+        mission_state,
+        weapon_state,
+        player_fields,
+        &status_world.module_query,
+        focused_station_context,
+        &arch_summary,
+    );
+    let current_module = status_world
+        .module_query
+        .iter()
+        .find(|(_, runtime_module, _, _, _, _, _, _, _, _, _, _, _, _, _)| {
+            runtime_module.module_id == current_station.module_id
+        });
+    let mut issues = alerts::collect_alert_issues(&status_world.module_query, &balance);
+    issues.sort_by_key(|issue| std::cmp::Reverse(issue.0));
+    issues.truncate(3);
+    let shared_title = match *hud_mode {
+        GameplayInfoPanelMode::Overview => "Ship Overview".to_string(),
+        GameplayInfoPanelMode::FocusedModule => "Focused Module".to_string(),
+        GameplayInfoPanelMode::Alerts => "Alerts".to_string(),
+        GameplayInfoPanelMode::StationConsole => panel_title.clone(),
+    };
+    let shared_body = match *hud_mode {
+        GameplayInfoPanelMode::Overview => format!("{top_banner}\n\n{compact}"),
+        GameplayInfoPanelMode::FocusedModule => alerts::inspection_text(
+            current_module,
+            nearby_interaction,
+            held_interaction,
+            automation_state,
+            &balance,
+        ),
+        GameplayInfoPanelMode::Alerts => alerts::alerts_text(
+            player_fields,
+            nearby_interaction,
+            mission_state,
+            atmosphere_state,
+            &issues,
+        ),
+        GameplayInfoPanelMode::StationConsole => panel_body.clone(),
+    };
+    let show_station_panel = !matches!(
+        control_mode.mode,
+        ShipControlMode::Interior | ShipControlMode::Cockpit | ShipControlMode::Turret
+    );
 
-    for mut text in &mut hud_ui.text_queries.p0() {
-        **text = top_banner.clone();
-    }
-    for mut text in &mut hud_ui.text_queries.p1() {
-        **text = compact.clone();
-    }
-    for mut text in &mut hud_ui.text_queries.p2() {
-        **text = controls_text.clone();
-    }
-    for mut text in &mut hud_ui.text_queries.p3() {
-        **text = panel_title.clone();
-    }
-    for mut text in &mut hud_ui.text_queries.p4() {
-        **text = panel_body.clone();
+    for (mut text, top_banner_marker, compact_marker, controls_marker, panel_title_marker, panel_body_marker, station_title_marker) in
+        &mut hud_ui.text_queries.p0()
+    {
+        if top_banner_marker.is_some() {
+            **text = top_banner.clone();
+        } else if compact_marker.is_some() {
+            **text = compact.clone();
+        } else if controls_marker.is_some() {
+            **text = controls_text.clone();
+        } else if panel_title_marker.is_some() {
+            **text = shared_title.clone();
+        } else if panel_body_marker.is_some() {
+            **text = shared_body.clone();
+        } else if station_title_marker.is_some() {
+            **text = station_display.title.clone();
+        }
     }
 
     let hull_pct = summary::percent(current_integrity as f32, max_integrity.max(1) as f32);
@@ -236,7 +363,7 @@ pub(crate) fn update_gameplay_status_text(
         node.width = Val::Percent(pct);
     }
 
-    for (label, mut text) in &mut hud_ui.text_queries.p5() {
+    for (label, mut text) in &mut hud_ui.text_queries.p1() {
         **text = match label.kind {
             GameplayBarKind::Hull => format!("Hull {} / {}", current_integrity, max_integrity),
             GameplayBarKind::Power => format!(
@@ -283,8 +410,8 @@ pub(crate) fn update_gameplay_status_text(
         let visible = station_panel::station_action_visible(
             button.action,
             control_mode.mode,
-            active_station_kind,
-            active_station_flags,
+            station_display.active_station_kind,
+            station_display.flags,
         );
         node.display = if visible {
             Display::Flex
@@ -297,12 +424,78 @@ pub(crate) fn update_gameplay_status_text(
             Color::srgba(0.24, 0.38, 0.58, 0.18)
         });
         for child in children.iter() {
-            if let Ok((label, mut text)) = hud_ui.text_queries.p6().get_mut(child) {
+            if let Ok((label, mut text)) = hud_ui.text_queries.p2().get_mut(child) {
                 **text = station_panel::station_button_label(
                     label.action,
                     control_mode.mode,
-                    active_station_flags,
+                    station_display.flags,
                 );
+            }
+        }
+    }
+
+    let mut readout_rows = Vec::new();
+    for (row_entity, slot, mut row_node, children) in &mut hud_ui.node_queries.p3() {
+        let readout = station_display.readouts.get(slot.index as usize).cloned();
+        row_node.display = if show_station_panel && readout.is_some() {
+            Display::Flex
+        } else {
+            Display::None
+        };
+        if let Some(readout) = readout {
+            readout_rows.push((row_entity, children.to_vec(), readout));
+        }
+    }
+
+    for (row_entity, children, readout) in readout_rows {
+        for child in children {
+            if let Ok((parent, mut text, is_label, is_value)) =
+                hud_ui.text_queries.p3().get_mut(child)
+                && parent.get() == row_entity
+            {
+                if is_label.is_some() {
+                    **text = readout.label.clone();
+                } else if is_value.is_some() {
+                    **text = readout.value.clone();
+                }
+            }
+            if let Ok((parent, mut node)) = hud_ui.node_queries.p4().get_mut(child)
+                && parent.get() == row_entity
+            {
+                node.display = if matches!(
+                    readout.visual,
+                    station_panel::StationReadoutVisual::Bar { .. }
+                ) {
+                    Display::Flex
+                } else {
+                    Display::None
+                };
+            }
+            if let Ok((parent, mut node, mut color)) = hud_ui.node_queries.p5().get_mut(child)
+                && parent.get() == row_entity
+            {
+                if let station_panel::StationReadoutVisual::Bar {
+                    percent,
+                    color: fill_color,
+                } = readout.visual
+                {
+                    node.width = Val::Percent(percent);
+                    *color = BackgroundColor(fill_color);
+                }
+                node.display = Display::Flex;
+            }
+            if let Ok((parent, mut node, mut color)) = hud_ui.node_queries.p6().get_mut(child)
+                && parent.get() == row_entity
+            {
+                if let station_panel::StationReadoutVisual::Light {
+                    color: light_color,
+                } = readout.visual
+                {
+                    node.display = Display::Flex;
+                    *color = BackgroundColor(light_color);
+                } else {
+                    node.display = Display::None;
+                }
             }
         }
     }

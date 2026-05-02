@@ -47,7 +47,6 @@ pub(crate) use simulation::{
     sync_hostile_ship_state,
     sync_runtime_ship_state,
     tick_recent_action_feedback,
-    toggle_debug_overlay,
     update_destroyed_module_visuals,
     update_mission_state,
     update_mission_telemetry,
@@ -56,6 +55,7 @@ pub(crate) use simulation::{
 };
 pub(crate) use ui::{
     station_panel_button_system,
+    toggle_gameplay_info_panel,
     update_gameplay_status_text,
     update_inspection_and_alerts_text,
 };

@@ -27,8 +27,4 @@ pub(crate) use mission::{
     update_mission_state,
     update_mission_telemetry,
 };
-pub(crate) use visuals::{
-    draw_debug_overlay,
-    toggle_debug_overlay,
-    update_destroyed_module_visuals,
-};
+pub(crate) use visuals::{draw_debug_overlay, update_destroyed_module_visuals};

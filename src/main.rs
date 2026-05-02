@@ -25,6 +25,7 @@ use self::state::{
     EditorSessionState,
     EditorShip,
     EditorToolState,
+    EditorUiState,
     EditorViewState,
     EnemyShipLibraryState,
     FrontendMode,
@@ -44,6 +45,11 @@ pub(crate) const DEFAULT_CLIENT_ADDR: &str = "127.0.0.1:5001";
 pub(crate) const TILE_SIZE: f32 = 32.0;
 pub(crate) const HALF_TILE_SIZE: f32 = TILE_SIZE * 0.5;
 pub(crate) const TOOLBOX_WIDTH: f32 = 280.0;
+pub(crate) const UI_PANEL_RADIUS: f32 = 12.0;
+pub(crate) const UI_BUTTON_RADIUS: f32 = 10.0;
+pub(crate) const UI_TITLE_FONT_SIZE: f32 = 20.0;
+pub(crate) const UI_BODY_FONT_SIZE: f32 = 14.0;
+pub(crate) const UI_HELP_FONT_SIZE: f32 = 14.0;
 pub(crate) const NORMAL_BUTTON: Color = Color::srgb(0.24, 0.47, 0.78);
 pub(crate) const HOVERED_BUTTON: Color = Color::srgb(0.30, 0.55, 0.88);
 pub(crate) const PRESSED_BUTTON: Color = Color::srgb(0.18, 0.36, 0.62);
@@ -77,6 +83,7 @@ pub fn run_client() {
         .insert_resource(netcode::DecodedPlayerCommands::default())
         .insert_resource(netcode::ChecksumHistory::default())
         .insert_resource(netcode::ActivePresentationPhase::default())
+        .insert_resource(state::GameplayInfoPanelMode::default())
         .insert_resource(EditorShip::default())
         .insert_resource(EditorSessionState::default())
         .insert_resource(EnemyShipLibraryState::default())
@@ -87,6 +94,7 @@ pub fn run_client() {
         .insert_resource(DebugOverlayState::default())
         .insert_resource(LastMissionReport::default())
         .insert_resource(EditorToolState::default())
+        .insert_resource(EditorUiState::default())
         .insert_resource(ArchEditorState::default())
         .insert_resource(EditorPanState::default())
         .insert_resource(EditorViewState::default())
@@ -317,6 +325,8 @@ pub fn run_client() {
             (
                 editor::draw_grid_overlay.run_if(netcode::session_presents_player_editor),
                 editor::toolbox_button_system.run_if(netcode::session_presents_player_editor),
+                editor::mission_report_button_system
+                    .run_if(netcode::session_presents_player_editor),
                 editor::computer_program_button_system
                     .run_if(netcode::session_presents_player_editor),
                 editor::arch_editor_button_system
@@ -336,6 +346,7 @@ pub fn run_client() {
                 editor::sync_computer_program_entries
                     .run_if(netcode::session_presents_player_editor),
                 editor::sync_toolbox_visuals.run_if(netcode::session_presents_player_editor),
+                editor::sync_toolbox_scroll.run_if(netcode::session_presents_player_editor),
                 editor::update_editor_status_text.run_if(netcode::session_presents_player_editor),
             ),
         )
@@ -344,6 +355,7 @@ pub fn run_client() {
             (
                 editor::draw_grid_overlay.run_if(in_state(FrontendMode::DebugEnemyEditor)),
                 editor::toolbox_button_system.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::mission_report_button_system.run_if(in_state(FrontendMode::DebugEnemyEditor)),
                 editor::enemy_library_button_system
                     .run_if(in_state(FrontendMode::DebugEnemyEditor)),
                 editor::enemy_library_keyboard_shortcuts
@@ -364,6 +376,7 @@ pub fn run_client() {
                 editor::sync_computer_program_entries
                     .run_if(in_state(FrontendMode::DebugEnemyEditor)),
                 editor::sync_toolbox_visuals.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+                editor::sync_toolbox_scroll.run_if(in_state(FrontendMode::DebugEnemyEditor)),
                 editor::update_editor_status_text.run_if(in_state(FrontendMode::DebugEnemyEditor)),
             ),
         )
@@ -372,7 +385,7 @@ pub fn run_client() {
             (
                 gameplay::return_button_system.run_if(netcode::session_presents_encounter),
                 gameplay::return_keyboard_shortcut.run_if(netcode::session_presents_encounter),
-                gameplay::toggle_debug_overlay.run_if(netcode::session_presents_encounter),
+                gameplay::toggle_gameplay_info_panel.run_if(netcode::session_presents_encounter),
                 gameplay::sync_player_reference_frame_parenting
                     .run_if(netcode::session_presents_encounter),
                 (
@@ -386,8 +399,6 @@ pub fn run_client() {
                     .chain()
                     .run_if(netcode::session_presents_encounter),
                 gameplay::update_gameplay_status_text.run_if(netcode::session_presents_encounter),
-                gameplay::update_inspection_and_alerts_text
-                    .run_if(netcode::session_presents_encounter),
                 gameplay::station_panel_button_system.run_if(netcode::session_presents_encounter),
             ),
         )

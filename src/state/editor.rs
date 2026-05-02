@@ -54,6 +54,21 @@ pub(crate) struct EditorPanState {
     pub(crate) last_cursor: Option<Vec2>,
 }
 
+#[derive(Resource, Clone, Copy)]
+pub(crate) struct EditorUiState {
+    pub(crate) mission_report_expanded: bool,
+    pub(crate) toolbox_scroll: f32,
+}
+
+impl Default for EditorUiState {
+    fn default() -> Self {
+        Self {
+            mission_report_expanded: false,
+            toolbox_scroll: 0.0,
+        }
+    }
+}
+
 #[derive(Resource)]
 pub(crate) struct EditorToolState {
     pub(crate) selected_kind: ModuleKind,
@@ -94,6 +109,21 @@ pub(crate) struct EnemyNewButton;
 
 #[derive(Component)]
 pub(crate) struct EditorStatusText;
+
+#[derive(Component)]
+pub(crate) struct EditorMissionReportButton;
+
+#[derive(Component)]
+pub(crate) struct EditorMissionReportButtonText;
+
+#[derive(Component)]
+pub(crate) struct EditorMissionReportText;
+
+#[derive(Component)]
+pub(crate) struct EditorToolboxScrollViewport;
+
+#[derive(Component)]
+pub(crate) struct EditorToolboxScrollContent;
 
 #[derive(Component)]
 pub(crate) struct ToolboxButton {

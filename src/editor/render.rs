@@ -14,6 +14,8 @@ use super::{
             EditingCleanup,
             EditorShip,
             EditorToolState,
+            EditorToolboxScrollContent,
+            EditorUiState,
             MainCamera,
             PreviewTile,
             ShipTileSprite,
@@ -136,6 +138,19 @@ pub(crate) fn sync_toolbox_visuals(
                 super::UNAFFORDABLE_BUTTON
             });
         }
+    }
+}
+
+pub(crate) fn sync_toolbox_scroll(
+    editor_ui_state: Res<EditorUiState>,
+    mut query: Query<&mut Node, With<EditorToolboxScrollContent>>,
+) {
+    if !editor_ui_state.is_changed() {
+        return;
+    }
+
+    for mut node in &mut query {
+        node.top = Val::Px(-editor_ui_state.toolbox_scroll);
     }
 }
 

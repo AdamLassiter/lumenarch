@@ -1,6 +1,38 @@
 use bevy::log;
 
 use super::*;
+use crate::gameplay::helpers::wrap_radians;
+
+#[derive(Clone)]
+pub(super) struct StationPanelReadout {
+    pub(super) label: String,
+    pub(super) value: String,
+    pub(super) visual: StationReadoutVisual,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum StationReadoutVisual {
+    Bar { percent: f32, color: Color },
+    Light { color: Color },
+}
+
+pub(super) struct StationPanelDisplay {
+    pub(super) title: String,
+    pub(super) active_station_kind: Option<crate::ship::ModuleKind>,
+    pub(super) flags: summary::StationFlags,
+    pub(super) readouts: Vec<StationPanelReadout>,
+}
+
+impl StationPanelDisplay {
+    fn empty(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            active_station_kind: None,
+            flags: summary::StationFlags::default(),
+            readouts: Vec::new(),
+        }
+    }
+}
 
 pub(crate) fn station_panel_button_system(
     mut interaction_query: Query<
@@ -34,6 +66,303 @@ pub(crate) fn station_panel_button_system(
             }
             Interaction::None => {}
         }
+    }
+}
+
+pub(super) fn station_panel_display(
+    control_mode: &ShipboardControlState,
+    mission_state: &MissionState,
+    weapon_state: &ShipWeaponState,
+    _player_fields: &PlayerFieldState,
+    module_query: &Query<
+        (
+            Entity,
+            &RuntimeShipModule,
+            &Integrity,
+            &ModuleRuntimeState,
+            Option<&RuntimeArchComputer>,
+            Option<&StorageModule>,
+            Option<&StorageCommandState>,
+            Option<&ManipulatorModule>,
+            Option<&ManipulatorCommandState>,
+            Option<&ProcessorModule>,
+            Option<&ProcessorCommandState>,
+            Option<&ReactorCommandState>,
+            Option<&TurretCommandState>,
+            Option<&AirlockCommandState>,
+            Option<&DestroyedModule>,
+        ),
+        With<RuntimeShipModule>,
+    >,
+    focused_station_context: &str,
+    arch_summary: &summary::ArchSummary,
+) -> StationPanelDisplay {
+    let Some(focused_entity) = control_mode.focused_entity else {
+        return StationPanelDisplay::empty("Station Console");
+    };
+
+    let Ok((
+        _,
+        runtime_module,
+        integrity,
+        runtime_state,
+        computer,
+        storage,
+        storage_command,
+        manipulator,
+        manipulator_command,
+        processor,
+        processor_command,
+        reactor,
+        turret,
+        airlock_state,
+        destroyed,
+    )) = module_query.get(focused_entity)
+    else {
+        return StationPanelDisplay::empty("Station Console");
+    };
+
+    let flags = summary::StationFlags {
+        storage: storage.is_some(),
+        manipulator: manipulator.is_some(),
+        processor: processor.is_some(),
+        airlock: airlock_state.is_some(),
+        computer: computer.is_some(),
+        reactor: reactor.is_some(),
+        turret: turret.is_some(),
+    };
+
+    let title = format!("{} Console", module_display_name(runtime_module.kind));
+
+    if destroyed.is_some() {
+        return StationPanelDisplay {
+            title,
+            active_station_kind: Some(runtime_module.kind),
+            flags,
+            readouts: vec![
+                readout_bar(
+                    "Integrity",
+                    format!("{} / {}", integrity.current, integrity.max),
+                    percent_from_ratio(integrity.current as f32, integrity.max.max(1) as f32),
+                    Color::srgb(0.80, 0.34, 0.34),
+                ),
+                readout_bar(
+                    "Heat",
+                    format_fx1(runtime_state.current_heat),
+                    percent_from_fx(runtime_state.current_heat, Fx::from_num(16)),
+                    Color::srgb(0.96, 0.50, 0.24),
+                ),
+                readout_bar(
+                    "Electrical",
+                    format_fx1(runtime_state.electrical_instability),
+                    percent_from_fx(runtime_state.electrical_instability, Fx::from_num(12)),
+                    Color::srgb(0.74, 0.56, 0.98),
+                ),
+                readout_light("Status", "Destroyed", Color::srgb(0.90, 0.28, 0.28)),
+            ],
+        };
+    }
+
+    let readouts = if let Some(reactor) = reactor {
+        vec![
+            readout_bar(
+                "Reaction",
+                format!("{}%", format_fx0(reactor.reaction_rate * Fx::from_num(100))),
+                percent_from_fx(reactor.reaction_rate, Fx::from_num(1)),
+                Color::srgb(0.94, 0.42, 0.24),
+            ),
+            readout_bar(
+                "Turbine",
+                format!("{}%", format_fx0(reactor.turbine_load * Fx::from_num(100))),
+                percent_from_fx(reactor.turbine_load, Fx::from_num(1)),
+                Color::srgb(0.34, 0.74, 0.94),
+            ),
+            readout_bar(
+                "Confinement",
+                format!("{}%", format_fx0(reactor.confinement * Fx::from_num(100))),
+                percent_from_fx(reactor.confinement, Fx::from_num(1)),
+                Color::srgb(0.70, 0.48, 0.94),
+            ),
+            readout_bar(
+                "Output",
+                format_fx1(reactor.power_output),
+                percent_from_fx(reactor.power_output, Fx::from_num(20)),
+                Color::srgb(0.86, 0.74, 0.30),
+            ),
+            readout_bar(
+                "Fuel",
+                format_fx0(reactor.fuel_remaining),
+                percent_from_fx(reactor.fuel_remaining, Fx::from_num(100)),
+                Color::srgb(0.42, 0.86, 0.62),
+            ),
+            readout_light(
+                "Core Status",
+                if runtime_state.needs_attention {
+                    "Attention"
+                } else {
+                    "Stable"
+                },
+                if runtime_state.needs_attention {
+                    Color::srgb(0.90, 0.48, 0.18)
+                } else {
+                    Color::srgb(0.34, 0.78, 0.46)
+                },
+            ),
+        ]
+    } else if let Some(turret) = turret {
+        vec![
+            readout_bar(
+                "Aim Error",
+                format_fx1(angle_distance(turret.desired_angle, turret.actual_angle)),
+                percent_from_fx(angle_distance(turret.desired_angle, turret.actual_angle), Fx::PI),
+                Color::srgb(0.36, 0.72, 0.96),
+            ),
+            readout_bar(
+                "Desired Arc",
+                format_fx1(turret.desired_angle),
+                percent_from_wrapped_angle(turret.desired_angle),
+                Color::srgb(0.64, 0.60, 0.96),
+            ),
+            readout_bar(
+                "Cooldown",
+                format_fx2(weapon_state.cooldown_remaining),
+                percent_from_fx(weapon_state.cooldown_remaining, Fx::from_num(3)),
+                Color::srgb(0.96, 0.56, 0.24),
+            ),
+            readout_bar(
+                "Heat",
+                format_fx1(runtime_state.current_heat),
+                percent_from_fx(runtime_state.current_heat, Fx::from_num(16)),
+                Color::srgb(0.96, 0.50, 0.24),
+            ),
+            readout_light(
+                "Fire Gate",
+                if turret.fire_intent { "Open" } else { "Hold" },
+                if turret.fire_intent {
+                    Color::srgb(0.34, 0.78, 0.46)
+                } else {
+                    Color::srgb(0.84, 0.28, 0.28)
+                },
+            ),
+            readout_light(
+                "Threat State",
+                mission_status_line(mission_state),
+                if mission_state.failed {
+                    Color::srgb(0.84, 0.28, 0.28)
+                } else {
+                    Color::srgb(0.34, 0.78, 0.46)
+                },
+            ),
+        ]
+    } else if storage.is_some() || manipulator.is_some() || processor.is_some() || airlock_state.is_some() {
+        logistics_readouts(
+            storage,
+            storage_command,
+            manipulator,
+            manipulator_command,
+            processor,
+            processor_command,
+            airlock_state,
+            focused_station_context,
+        )
+    } else if let Some(computer) = computer {
+        let budget_pct = if computer.last_result.budget == 0 {
+            0.0
+        } else {
+            percent_from_ratio(
+                computer.last_result.executed as f32,
+                computer.last_result.budget as f32,
+            )
+        };
+        vec![
+            readout_light(
+                "Online",
+                if computer.enabled { "Enabled" } else { "Disabled" },
+                if computer.enabled {
+                    Color::srgb(0.34, 0.78, 0.46)
+                } else {
+                    Color::srgb(0.84, 0.28, 0.28)
+                },
+            ),
+            readout_bar(
+                "Exec Budget",
+                format!(
+                    "{}/{}",
+                    computer.last_result.executed, computer.last_result.budget
+                ),
+                budget_pct,
+                Color::srgb(0.36, 0.72, 0.96),
+            ),
+            readout_light(
+                "Writes",
+                arch_summary.recent_writes.as_str(),
+                Color::srgb(0.90, 0.64, 0.20),
+            ),
+            readout_light(
+                "Halt State",
+                computer
+                    .last_result
+                    .halted_reason
+                    .as_deref()
+                    .unwrap_or("Running"),
+                if computer.last_result.halted_reason.is_some() {
+                    Color::srgb(0.90, 0.48, 0.18)
+                } else {
+                    Color::srgb(0.34, 0.78, 0.46)
+                },
+            ),
+            readout_light(
+                "Program",
+                computer.program.name.as_str(),
+                Color::srgb(0.52, 0.76, 0.96),
+            ),
+        ]
+    } else {
+        vec![
+            readout_bar(
+                "Integrity",
+                format!("{} / {}", integrity.current, integrity.max),
+                percent_from_ratio(integrity.current as f32, integrity.max.max(1) as f32),
+                Color::srgb(0.80, 0.34, 0.34),
+            ),
+            readout_bar(
+                "Heat",
+                format_fx1(runtime_state.current_heat),
+                percent_from_fx(runtime_state.current_heat, Fx::from_num(16)),
+                Color::srgb(0.96, 0.50, 0.24),
+            ),
+            readout_bar(
+                "Electrical",
+                format_fx1(runtime_state.electrical_instability),
+                percent_from_fx(runtime_state.electrical_instability, Fx::from_num(12)),
+                Color::srgb(0.74, 0.56, 0.98),
+            ),
+            readout_light(
+                "Context",
+                focused_station_context,
+                Color::srgb(0.52, 0.76, 0.96),
+            ),
+            readout_light(
+                "Attention",
+                if runtime_state.needs_attention {
+                    "Required"
+                } else {
+                    "Nominal"
+                },
+                if runtime_state.needs_attention {
+                    Color::srgb(0.90, 0.48, 0.18)
+                } else {
+                    Color::srgb(0.34, 0.78, 0.46)
+                },
+            ),
+        ]
+    };
+
+    StationPanelDisplay {
+        title,
+        active_station_kind: Some(runtime_module.kind),
+        flags,
+        readouts,
     }
 }
 
@@ -164,6 +493,200 @@ fn pending_station_command(
         }
         _ => None,
     }
+}
+
+fn logistics_readouts(
+    storage: Option<&StorageModule>,
+    storage_command: Option<&StorageCommandState>,
+    manipulator: Option<&ManipulatorModule>,
+    manipulator_command: Option<&ManipulatorCommandState>,
+    processor: Option<&ProcessorModule>,
+    processor_command: Option<&ProcessorCommandState>,
+    airlock_state: Option<&AirlockCommandState>,
+    focused_station_context: &str,
+) -> Vec<StationPanelReadout> {
+    let mut readouts = Vec::new();
+
+    if let Some(storage) = storage {
+        readouts.push(readout_bar(
+            "Cargo Fill",
+            format!("{}/{}", storage.inventory.total_units(), storage.capacity),
+            percent_from_ratio(storage.inventory.total_units() as f32, storage.capacity.max(1) as f32),
+            Color::srgb(0.86, 0.74, 0.30),
+        ));
+        readouts.push(readout_light(
+            "Intake",
+            if storage_command.is_some_and(|command| command.allow_intake) {
+                "Open"
+            } else {
+                "Closed"
+            },
+            if storage_command.is_some_and(|command| command.allow_intake) {
+                Color::srgb(0.34, 0.78, 0.46)
+            } else {
+                Color::srgb(0.84, 0.28, 0.28)
+            },
+        ));
+    }
+    if let Some(airlock_state) = airlock_state {
+        readouts.push(readout_light(
+            "Airlock",
+            if airlock_state.open { "Open" } else { "Sealed" },
+            if airlock_state.open {
+                Color::srgb(0.90, 0.48, 0.18)
+            } else {
+                Color::srgb(0.34, 0.78, 0.46)
+            },
+        ));
+    }
+    if let Some(manipulator) = manipulator {
+        let progress_pct = if manipulator.transfer_duration > Fx::from_num(0) {
+            percent_from_fx(manipulator.transfer_progress, manipulator.transfer_duration)
+        } else {
+            0.0
+        };
+        readouts.push(readout_bar(
+            "Transfer",
+            if manipulator.active && manipulator.transfer_duration > Fx::from_num(0) {
+                format!(
+                    "{}%",
+                    format_fx0(
+                        manipulator.transfer_progress / manipulator.transfer_duration
+                            * Fx::from_num(100)
+                    )
+                )
+            } else {
+                "Idle".to_string()
+            },
+            progress_pct,
+            Color::srgb(0.36, 0.72, 0.96),
+        ));
+        readouts.push(readout_light(
+            "Manipulator",
+            if manipulator_command.is_some_and(|command| command.transfer_enabled) {
+                "Enabled"
+            } else {
+                "Disabled"
+            },
+            if manipulator_command.is_some_and(|command| command.transfer_enabled) {
+                Color::srgb(0.34, 0.78, 0.46)
+            } else {
+                Color::srgb(0.84, 0.28, 0.28)
+            },
+        ));
+        readouts.push(readout_light(
+            "Resource",
+            manipulator_command
+                .map(|command| resource_kind_label(command.resource_kind))
+                .unwrap_or("Unassigned"),
+            Color::srgb(0.90, 0.64, 0.20),
+        ));
+    }
+    if let Some(processor) = processor {
+        let progress_pct = if processor.duration > Fx::from_num(0) {
+            percent_from_fx(processor.progress, processor.duration)
+        } else {
+            0.0
+        };
+        readouts.push(readout_bar(
+            "Fabrication",
+            if processor.duration > Fx::from_num(0) {
+                format!(
+                    "{}%",
+                    format_fx0(
+                        processor.progress / processor.duration * Fx::from_num(100)
+                    )
+                )
+            } else {
+                "Idle".to_string()
+            },
+            progress_pct,
+            Color::srgb(0.70, 0.48, 0.94),
+        ));
+        readouts.push(readout_light(
+            "Processor",
+            if processor_command.is_none_or(|command| command.enabled) {
+                processor
+                    .blocked_reason
+                    .as_deref()
+                    .unwrap_or("Running")
+            } else {
+                "Disabled"
+            },
+            if processor_command.is_none_or(|command| command.enabled) {
+                Color::srgb(0.34, 0.78, 0.46)
+            } else {
+                Color::srgb(0.84, 0.28, 0.28)
+            },
+        ));
+    }
+
+    if readouts.is_empty() {
+        readouts.push(readout_light(
+            "Context",
+            focused_station_context,
+            Color::srgb(0.52, 0.76, 0.96),
+        ));
+    }
+
+    readouts.truncate(6);
+    readouts
+}
+
+fn readout_bar(
+    label: impl Into<String>,
+    value: impl Into<String>,
+    percent: f32,
+    color: Color,
+) -> StationPanelReadout {
+    StationPanelReadout {
+        label: label.into(),
+        value: value.into(),
+        visual: StationReadoutVisual::Bar {
+            percent: percent.clamp(0.0, 100.0),
+            color,
+        },
+    }
+}
+
+fn readout_light(
+    label: impl Into<String>,
+    value: impl Into<String>,
+    color: Color,
+) -> StationPanelReadout {
+    StationPanelReadout {
+        label: label.into(),
+        value: value.into(),
+        visual: StationReadoutVisual::Light { color },
+    }
+}
+
+fn percent_from_ratio(current: f32, max: f32) -> f32 {
+    if max <= 0.0 {
+        0.0
+    } else {
+        (current / max * 100.0).clamp(0.0, 100.0)
+    }
+}
+
+fn percent_from_fx(current: Fx, max: Fx) -> f32 {
+    if max <= Fx::from_num(0) {
+        0.0
+    } else {
+        (current / max * Fx::from_num(100))
+            .clamp(Fx::from_num(0), Fx::from_num(100))
+            .to_num::<f32>()
+    }
+}
+
+fn percent_from_wrapped_angle(angle: Fx) -> f32 {
+    (((wrap_radians(angle) + Fx::PI) / (Fx::PI * Fx::from_num(2))) * Fx::from_num(100))
+        .clamp(Fx::from_num(0), Fx::from_num(100))
+        .to_num::<f32>()
+}
+
+fn angle_distance(a: Fx, b: Fx) -> Fx {
+    wrap_radians(a - b).abs()
 }
 
 pub(super) fn station_panel_content(

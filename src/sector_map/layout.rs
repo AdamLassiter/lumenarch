@@ -1,8 +1,11 @@
 use bevy::prelude::*;
 
-use crate::state::{
-    SectorMapDetailText, SectorMapStatusText, SectorMapViewState, SectorNodeButton,
-    SectorNodeKind, SectorNodeStatus, SectorState,
+use crate::{
+    UI_BUTTON_RADIUS,
+    state::{
+        SectorMapDetailText, SectorMapStatusText, SectorMapViewState, SectorNodeButton,
+        SectorNodeKind, SectorNodeStatus, SectorState,
+    },
 };
 
 pub(super) const MAP_CENTER_X: f32 = 360.0;
@@ -55,7 +58,7 @@ pub(super) fn sector_status_text(sector_state: &SectorState) -> String {
         .unwrap_or("None");
 
     format!(
-        "Current Node: {current}\nSelected Node: {selected}\nSeed: {}\nReachable Nodes: {}\nControls: scroll zoom, middle drag pan",
+        "Current Node: {current}\nSelected Node: {selected}\nSeed: {}\nReachable Nodes: {}",
         sector_state.seed,
         sector_state.available_neighbors().len(),
     )
@@ -121,7 +124,7 @@ pub(super) fn projected_node(position: [f32; 2], zoom: f32, offset: Vec2) -> Nod
         justify_content: JustifyContent::Center,
         align_items: AlignItems::Center,
         padding: UiRect::horizontal(Val::Px(8.0)),
-        border_radius: BorderRadius::all(Val::Px(10.0)),
+        border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
         ..default()
     }
 }

@@ -208,46 +208,44 @@ fn run_host_lobby(
     log::info!("Host lobby listening on {}", bind_addr);
 
     'outer: loop {
-        loop {
-            match control_rx.try_recv() {
-                Ok(LobbyControlCommand::Shutdown) => {
-                    log::info!("Shutting down host lobby runtime");
-                    break 'outer;
-                }
-                Ok(LobbyControlCommand::StartSession {
-                    initial_state,
+        match control_rx.try_recv() {
+            Ok(LobbyControlCommand::Shutdown) => {
+                log::info!("Shutting down host lobby runtime");
+                break 'outer;
+            }
+            Ok(LobbyControlCommand::StartSession {
+                initial_state,
+                input_delay,
+                check_distance,
+            }) => {
+                log::info!(
+                    "Host lobby starting rollback session with {} player(s)",
+                    snapshot.players.len()
+                );
+                let host_start = LobbySessionStart {
+                    local_handle: 0,
+                    peer_addrs: snapshot
+                        .players
+                        .iter()
+                        .filter(|player| !player.is_host)
+                        .map(|player| player.bind_addr)
+                        .collect(),
                     input_delay,
                     check_distance,
-                }) => {
-                    log::info!(
-                        "Host lobby starting rollback session with {} player(s)",
-                        snapshot.players.len()
-                    );
-                    let host_start = LobbySessionStart {
-                        local_handle: 0,
-                        peer_addrs: snapshot
-                            .players
-                            .iter()
-                            .filter(|player| !player.is_host)
-                            .map(|player| player.bind_addr)
-                            .collect(),
-                        input_delay,
-                        check_distance,
-                        initial_state: initial_state.clone(),
-                    };
-                    let _ = event_tx.send(LobbyRuntimeEvent::StartSession(host_start));
-                    broadcast_start_session(
-                        &mut clients,
-                        &snapshot.players,
-                        input_delay,
-                        check_distance,
-                        &initial_state,
-                    );
-                    break 'outer;
-                }
-                Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => break 'outer,
+                    initial_state: initial_state.clone(),
+                };
+                let _ = event_tx.send(LobbyRuntimeEvent::StartSession(host_start));
+                broadcast_start_session(
+                    &mut clients,
+                    &snapshot.players,
+                    input_delay,
+                    check_distance,
+                    &initial_state,
+                );
+                break 'outer;
             }
+            Err(TryRecvError::Empty) => {},
+            Err(TryRecvError::Disconnected) => break 'outer,
         }
 
         loop {

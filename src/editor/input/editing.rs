@@ -7,17 +7,18 @@ use bevy::{
 };
 
 use super::super::{
-    helpers::{cursor_grid_position, is_cursor_over_editor_ui, module_kind_cost},
+    helpers::{cursor_grid_position, is_cursor_over_editor_ui, is_cursor_over_toolbox, module_kind_cost},
 };
 use crate::{
     netcode,
     HOVERED_BUTTON,
     PRESSED_BUTTON,
+    TOOLBOX_COMPONENTS,
     ship::{enemy::{load_default_enemy_library, save_default_enemy_library}, storage::{load_default_ship, save_default_ship}, ModuleVariant, ShipModule},
     state::{
-        DemoProgression, EditorMode, EditorPanState, EditorSessionState, EditorShip,
-        EditorToolState, EditorViewState, EnemyShipLibraryState, FrontendMode, LeaveEditorButton,
-        MainCamera, ToolboxButton,
+        DemoProgression, EditorMissionReportButton, EditorMode, EditorPanState,
+        EditorSessionState, EditorShip, EditorToolState, EditorUiState, EditorViewState,
+        EnemyShipLibraryState, FrontendMode, LeaveEditorButton, MainCamera, ToolboxButton,
     },
 };
 
@@ -117,6 +118,29 @@ pub(crate) fn leave_editor_keyboard_shortcut(
             EditorMode::Enemy => {
                 rollback_state.phase = netcode::RollbackPhase::Docked;
                 next_mode.set(FrontendMode::Menu);
+            }
+        }
+    }
+}
+
+pub(crate) fn mission_report_button_system(
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor),
+        (Changed<Interaction>, With<Button>, With<EditorMissionReportButton>),
+    >,
+    mut editor_ui_state: ResMut<EditorUiState>,
+) {
+    for (interaction, mut background) in &mut interaction_query {
+        match *interaction {
+            Interaction::Pressed => {
+                editor_ui_state.mission_report_expanded = !editor_ui_state.mission_report_expanded;
+                *background = BackgroundColor(PRESSED_BUTTON);
+            }
+            Interaction::Hovered => {
+                *background = BackgroundColor(HOVERED_BUTTON);
+            }
+            Interaction::None => {
+                *background = BackgroundColor(crate::NORMAL_BUTTON);
             }
         }
     }
@@ -253,6 +277,7 @@ pub(crate) fn pan_and_zoom_editor_view(
     mut mouse_wheel: MessageReader<MouseWheel>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     window: Single<&Window, With<PrimaryWindow>>,
+    mut editor_ui_state: ResMut<EditorUiState>,
     mut pan_state: ResMut<EditorPanState>,
     mut view_state: ResMut<EditorViewState>,
     camera_query: Single<(&mut Transform, &mut Projection), (With<Camera2d>, With<MainCamera>)>,
@@ -264,8 +289,16 @@ pub(crate) fn pan_and_zoom_editor_view(
     };
 
     for event in mouse_wheel.read() {
-        let zoom_step = (1.0 - event.y * 0.08).clamp(0.75, 1.25);
-        view_state.zoom = (view_state.zoom * zoom_step).clamp(0.35, 2.75);
+        if is_cursor_over_toolbox(window) {
+            let estimated_content_height = TOOLBOX_COMPONENTS.len() as f32 * 48.0 + 180.0;
+            let viewport_height = 430.0;
+            let max_scroll = (estimated_content_height - viewport_height).max(0.0);
+            editor_ui_state.toolbox_scroll =
+                (editor_ui_state.toolbox_scroll - event.y * 28.0).clamp(0.0, max_scroll);
+        } else {
+            let zoom_step = (1.0 - event.y * 0.08).clamp(0.75, 1.25);
+            view_state.zoom = (view_state.zoom * zoom_step).clamp(0.35, 2.75);
+        }
     }
 
     let cursor_position = window.cursor_position();

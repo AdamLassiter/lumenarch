@@ -5,6 +5,11 @@ use super::{
     NORMAL_BUTTON,
     PRESSED_BUTTON,
     TOOLBOX_WIDTH,
+    UI_BODY_FONT_SIZE,
+    UI_BUTTON_RADIUS,
+    UI_HELP_FONT_SIZE,
+    UI_PANEL_RADIUS,
+    UI_TITLE_FONT_SIZE,
     campaign::{CampaignSave, load_campaign, save_campaign},
     netcode,
     state::{
@@ -144,6 +149,7 @@ pub(crate) fn spawn_docked_ui(
                     padding: UiRect::all(Val::Px(22.0)),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(14.0),
+                    border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.94)),
@@ -153,7 +159,7 @@ pub(crate) fn spawn_docked_ui(
                     Text::new(format!("Docked At\n{}", docked_state.station_title)),
                     TextFont {
                         font: title_font.clone(),
-                        font_size: 30.0,
+                        font_size: UI_TITLE_FONT_SIZE,
                         ..default()
                     },
                     TextColor(Color::WHITE),
@@ -167,7 +173,7 @@ pub(crate) fn spawn_docked_ui(
                     )),
                     TextFont {
                         font: mono_font.clone(),
-                        font_size: 15.0,
+                        font_size: UI_BODY_FONT_SIZE,
                         ..default()
                     },
                     TextColor(Color::srgb(0.90, 0.93, 0.98)),
@@ -204,7 +210,7 @@ pub(crate) fn spawn_docked_ui(
                     top: Val::Px(48.0),
                     width: Val::Px(520.0),
                     padding: UiRect::all(Val::Px(16.0)),
-                    border_radius: BorderRadius::all(Val::Px(12.0)),
+                    border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.09, 0.12, 0.18, 0.90)),
@@ -216,7 +222,33 @@ pub(crate) fn spawn_docked_ui(
                     ),
                     TextFont {
                         font: mono_font,
-                        font_size: 16.0,
+                        font_size: UI_BODY_FONT_SIZE,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.82, 0.86, 0.92)),
+                ));
+            });
+
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(16.0),
+                    bottom: Val::Px(16.0),
+                    width: Val::Px(360.0),
+                    padding: UiRect::all(Val::Px(12.0)),
+                    border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.90)),
+            ))
+            .with_children(|panel| {
+                panel.spawn((
+                    Text::new(
+                        "Dock Controls\nEnter or click to choose a station action\nRefit: open ship editor\nSector Map: choose next route\nRepair: spend scrap to clear hull wear",
+                    ),
+                    TextFont {
+                        font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                        font_size: UI_HELP_FONT_SIZE,
                         ..default()
                     },
                     TextColor(Color::srgb(0.82, 0.86, 0.92)),
@@ -340,7 +372,7 @@ fn spawn_action_button<T: Bundle + 'static>(
                 height: Val::Px(48.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                border_radius: BorderRadius::all(Val::Px(10.0)),
+                border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
                 ..default()
             },
             BackgroundColor(color),
@@ -350,7 +382,7 @@ fn spawn_action_button<T: Bundle + 'static>(
             Text::new(label),
             TextFont {
                 font: font.clone(),
-                font_size: 18.0,
+                font_size: UI_TITLE_FONT_SIZE - 2.0,
                 ..default()
             },
             TextColor(Color::WHITE),

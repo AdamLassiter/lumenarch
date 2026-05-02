@@ -106,7 +106,7 @@ pub(crate) fn camera_follow_player_ship(
                 .unwrap_or(0.0);
             (focus_pos, desired_rotation, INTERIOR_CAMERA_SCALE)
         }
-        ShipControlMode::Cockpit | ShipControlMode::Turret => {
+        ShipControlMode::Cockpit => {
             if let Some(ship_entity) = match player_motion.frame {
                 PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
                 PlayerReferenceFrame::World => None,
@@ -128,6 +128,30 @@ pub(crate) fn camera_follow_player_ship(
             } else {
                 (player_world, 0.0, EXTERIOR_CAMERA_SCALE)
             }
+        }
+        ShipControlMode::Turret => {
+            let focus_pos = control_state
+                .focused_entity
+                .and_then(|entity| module_query.get(entity).ok())
+                .and_then(|(runtime_module, parent)| {
+                    ship_frame_query
+                        .get(parent.get())
+                        .ok()
+                        .map(|(_, ship_pos, ship_rot)| {
+                            ship_pos.value + runtime_module.local_position.rotate(ship_rot.radians)
+                        })
+                })
+                .or_else(|| {
+                    match player_motion.frame {
+                        PlayerReferenceFrame::Ship(ship_entity) => ship_frame_query
+                            .get(ship_entity)
+                            .ok()
+                            .map(|(_, ship_position, _)| ship_position.value),
+                        PlayerReferenceFrame::World => None,
+                    }
+                })
+                .unwrap_or(player_world);
+            (focus_pos, 0.0, EXTERIOR_CAMERA_SCALE)
         }
     };
 

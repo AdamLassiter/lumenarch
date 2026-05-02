@@ -1,5 +1,14 @@
 use bevy::prelude::*;
 
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum GameplayInfoPanelMode {
+    #[default]
+    Overview,
+    FocusedModule,
+    Alerts,
+    StationConsole,
+}
+
 #[derive(Component)]
 pub(crate) struct AbortEncounterButton;
 
@@ -52,7 +61,39 @@ pub(crate) struct GameplayCompactStatusText;
 pub(crate) struct GameplayTopBannerText;
 
 #[derive(Component)]
+pub(crate) struct GameplayInfoPanelRoot;
+
+#[derive(Component)]
+pub(crate) struct GameplayOverviewBarsPanel;
+
+#[derive(Component)]
+pub(crate) struct GameplayControlsPanel;
+
+#[derive(Component)]
 pub(crate) struct GameplayStationPanel;
+
+#[derive(Component)]
+pub(crate) struct GameplayStationTitleText;
+
+#[derive(Component, Clone, Copy)]
+pub(crate) struct GameplayStationReadoutSlot {
+    pub(crate) index: u8,
+}
+
+#[derive(Component)]
+pub(crate) struct GameplayStationReadoutLabel;
+
+#[derive(Component)]
+pub(crate) struct GameplayStationReadoutValue;
+
+#[derive(Component)]
+pub(crate) struct GameplayStationReadoutBarTrack;
+
+#[derive(Component)]
+pub(crate) struct GameplayStationReadoutBarFill;
+
+#[derive(Component)]
+pub(crate) struct GameplayStationReadoutLight;
 
 #[derive(Component)]
 pub(crate) struct GameplayStationPanelButton {

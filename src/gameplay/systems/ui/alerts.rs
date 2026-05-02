@@ -8,19 +8,26 @@ use crate::{
             DestroyedModule,
             HeldInteraction,
             Integrity,
+            ManipulatorModule,
+            ManipulatorCommandState,
             MissionState,
             ModuleRuntimeState,
             NearbyInteraction,
             ObservedLocalPlayerMarker,
             PlayerFieldState,
             PlayerShip,
+            ProcessorCommandState,
             ProcessorModule,
+            ReactorCommandState,
             RuntimeArchComputer,
             RuntimeShipModule,
             ShipAtmosphereState,
             ShipAutomationState,
             ShipRoot,
+            StorageCommandState,
             StorageModule,
+            TurretCommandState,
+            AirlockCommandState,
         },
         helpers::{
             Fx,
@@ -50,15 +57,26 @@ pub(crate) fn update_inspection_and_alerts_text(
         (&ShipAutomationState, &MissionState, &ShipAtmosphereState),
         (With<PlayerShip>, With<ShipRoot>),
     >,
-    module_query: Query<(
-        &RuntimeShipModule,
-        &Integrity,
-        &ModuleRuntimeState,
-        Option<&RuntimeArchComputer>,
-        Option<&StorageModule>,
-        Option<&ProcessorModule>,
-        Option<&DestroyedModule>,
-    )>,
+    module_query: Query<
+        (
+            Entity,
+            &RuntimeShipModule,
+            &Integrity,
+            &ModuleRuntimeState,
+            Option<&RuntimeArchComputer>,
+            Option<&StorageModule>,
+            Option<&StorageCommandState>,
+            Option<&ManipulatorModule>,
+            Option<&ManipulatorCommandState>,
+            Option<&ProcessorModule>,
+            Option<&ProcessorCommandState>,
+            Option<&ReactorCommandState>,
+            Option<&TurretCommandState>,
+            Option<&AirlockCommandState>,
+            Option<&DestroyedModule>,
+        ),
+        With<RuntimeShipModule>,
+    >,
     mut inspection_query: Query<
         &mut Text,
         (With<GameplayInspectionText>, Without<GameplayAlertsText>),
@@ -69,7 +87,9 @@ pub(crate) fn update_inspection_and_alerts_text(
     let (automation_state, mission_state, atmosphere_state) = ship_query.into_inner();
     let current_module = module_query
         .iter()
-        .find(|(runtime_module, _, _, _, _, _, _)| runtime_module.module_id == station.module_id);
+        .find(|(_, runtime_module, _, _, _, _, _, _, _, _, _, _, _, _, _)| {
+            runtime_module.module_id == station.module_id
+        });
 
     for mut text in &mut inspection_query {
         **text = inspection_text(current_module, nearby, held, automation_state, &balance);
@@ -90,14 +110,22 @@ pub(crate) fn update_inspection_and_alerts_text(
     }
 }
 
-fn inspection_text(
+pub(crate) fn inspection_text(
     current_module: Option<(
+        Entity,
         &RuntimeShipModule,
         &Integrity,
         &ModuleRuntimeState,
         Option<&RuntimeArchComputer>,
         Option<&StorageModule>,
+        Option<&StorageCommandState>,
+        Option<&ManipulatorModule>,
+        Option<&ManipulatorCommandState>,
         Option<&ProcessorModule>,
+        Option<&ProcessorCommandState>,
+        Option<&ReactorCommandState>,
+        Option<&TurretCommandState>,
+        Option<&AirlockCommandState>,
         Option<&DestroyedModule>,
     )>,
     nearby: &NearbyInteraction,
@@ -105,7 +133,23 @@ fn inspection_text(
     automation_state: &ShipAutomationState,
     balance: &BalanceConfig,
 ) -> String {
-    let Some((runtime_module, integrity, runtime_state, computer, storage, processor, destroyed)) =
+    let Some((
+        _entity,
+        runtime_module,
+        integrity,
+        runtime_state,
+        computer,
+        storage,
+        _storage_command,
+        _manipulator,
+        _manipulator_command,
+        processor,
+        _processor_command,
+        _reactor,
+        _turret,
+        _airlock,
+        destroyed,
+    )) =
         current_module
     else {
         return "Module: unavailable".to_string();
@@ -193,28 +237,44 @@ fn inspection_text(
     )
 }
 
-fn collect_alert_issues(
+pub(crate) fn collect_alert_issues(
     module_query: &Query<(
+        Entity,
         &RuntimeShipModule,
         &Integrity,
         &ModuleRuntimeState,
         Option<&RuntimeArchComputer>,
         Option<&StorageModule>,
+        Option<&StorageCommandState>,
+        Option<&ManipulatorModule>,
+        Option<&ManipulatorCommandState>,
         Option<&ProcessorModule>,
+        Option<&ProcessorCommandState>,
+        Option<&ReactorCommandState>,
+        Option<&TurretCommandState>,
+        Option<&AirlockCommandState>,
         Option<&DestroyedModule>,
-    )>,
+    ), With<RuntimeShipModule>>,
     balance: &BalanceConfig,
 ) -> Vec<(i32, String)> {
     module_query
         .iter()
         .filter_map(
             |(
+                _entity,
                 runtime_module,
                 integrity,
                 runtime_state,
                 _computer,
                 storage,
+                _storage_command,
+                _manipulator,
+                _manipulator_command,
                 processor,
+                _processor_command,
+                _reactor,
+                _turret,
+                _airlock,
                 destroyed,
             )| {
                 let condition =
@@ -248,7 +308,7 @@ fn collect_alert_issues(
         .collect()
 }
 
-fn alerts_text(
+pub(crate) fn alerts_text(
     player_fields: &PlayerFieldState,
     nearby: &NearbyInteraction,
     mission_state: &MissionState,

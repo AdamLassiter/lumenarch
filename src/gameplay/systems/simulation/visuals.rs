@@ -5,11 +5,13 @@ use crate::{
     balance::BalanceConfig,
     gameplay::{
         components::{
+            CurrentStation,
             DestroyedModule,
             Integrity,
             ManipulatorModule,
             ModuleCondition,
             ModuleFieldEmitter,
+            ObservedLocalPlayerMarker,
             ModuleRuntimeState,
             PlayerShip,
             RuntimeShipModule,
@@ -22,21 +24,13 @@ use crate::{
         helpers::{Fx, module_condition},
     },
     ship::ModuleKind,
-    state::DebugOverlayState,
+    state::GameplayInfoPanelMode,
 };
 
-pub(crate) fn toggle_debug_overlay(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut debug_overlay: ResMut<DebugOverlayState>,
-) {
-    if keys.just_pressed(KeyCode::F3) {
-        debug_overlay.enabled = !debug_overlay.enabled;
-    }
-}
-
 pub(crate) fn draw_debug_overlay(
-    debug_overlay: Res<DebugOverlayState>,
+    hud_mode: Res<GameplayInfoPanelMode>,
     player_ship_query: Single<(&SimPosition, &SimRotation), (With<PlayerShip>, With<ShipRoot>)>,
+    player_query: Single<&CurrentStation, With<ObservedLocalPlayerMarker>>,
     module_query: Query<(
         Entity,
         &RuntimeShipModule,
@@ -49,16 +43,22 @@ pub(crate) fn draw_debug_overlay(
     mut gizmos: Gizmos,
 ) {
     let (ship_position, ship_rotation) = player_ship_query.into_inner();
+    let current_station = player_query.into_inner();
     update_turret_top_visuals(ship_rotation.radians, &module_query, &mut turret_top_query);
 
-    if !debug_overlay.enabled {
+    if *hud_mode != GameplayInfoPanelMode::FocusedModule {
         return;
     }
+
+    let focused_module_id = current_station.module_id;
 
     let field_radius = TILE_SIZE * 3.5;
     let manipulator_radius = TILE_SIZE * 2.5;
 
     for (_, runtime_module, emitter, manipulator, _, destroyed) in &module_query {
+        if runtime_module.module_id != focused_module_id {
+            continue;
+        }
         if destroyed.is_some() {
             continue;
         }
@@ -105,6 +105,11 @@ pub(crate) fn draw_debug_overlay(
         let Some(manipulator) = manipulator else {
             continue;
         };
+        if manipulator.source_module_id != Some(focused_module_id)
+            && manipulator.target_module_id != Some(focused_module_id)
+        {
+            continue;
+        }
         if destroyed.is_some() || !manipulator.active {
             continue;
         }

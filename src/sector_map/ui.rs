@@ -1,6 +1,11 @@
 use bevy::prelude::*;
 
 use crate::{
+    UI_BODY_FONT_SIZE,
+    UI_BUTTON_RADIUS,
+    UI_HELP_FONT_SIZE,
+    UI_PANEL_RADIUS,
+    UI_TITLE_FONT_SIZE,
     state::{
         BackToStationButton, LaunchEncounterButton, SectorMapCanvas, SectorMapDetailText,
         SectorMapRoot, SectorMapStatusText, SectorNodeButton, SectorState,
@@ -31,105 +36,12 @@ pub(crate) fn spawn_sector_map_ui(
             root.spawn((
                 Node {
                     position_type: PositionType::Absolute,
-                    left: Val::Px(24.0),
-                    top: Val::Px(24.0),
-                    width: Val::Px(340.0),
-                    padding: UiRect::all(Val::Px(16.0)),
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(12.0),
-                    border_radius: BorderRadius::all(Val::Px(12.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.94)),
-            ))
-            .with_children(|panel| {
-                panel.spawn((
-                    Text::new("Sector Map"),
-                    TextFont {
-                        font: title_font.clone(),
-                        font_size: 30.0,
-                        ..default()
-                    },
-                    TextColor(Color::WHITE),
-                ));
-                panel.spawn((
-                    Text::new(sector_status_text(&sector_state)),
-                    TextFont {
-                        font: mono_font.clone(),
-                        font_size: 15.0,
-                        ..default()
-                    },
-                    TextColor(Color::srgb(0.92, 0.94, 0.98)),
-                    SectorMapStatusText,
-                ));
-                panel.spawn((
-                    Text::new(sector_detail_text(&sector_state)),
-                    TextFont {
-                        font: mono_font.clone(),
-                        font_size: 14.0,
-                        ..default()
-                    },
-                    TextColor(Color::srgb(0.82, 0.86, 0.92)),
-                    SectorMapDetailText,
-                ));
-
-                panel
-                    .spawn((
-                        Button,
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Px(44.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            border_radius: BorderRadius::all(Val::Px(10.0)),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.18, 0.50, 0.30)),
-                        LaunchEncounterButton,
-                    ))
-                    .with_child((
-                        Text::new("Launch Selected Route"),
-                        TextFont {
-                            font: title_font.clone(),
-                            font_size: 18.0,
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                    ));
-
-                panel
-                    .spawn((
-                        Button,
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Px(40.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            border_radius: BorderRadius::all(Val::Px(10.0)),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.32, 0.24, 0.18)),
-                        BackToStationButton,
-                    ))
-                    .with_child((
-                        Text::new("Back To Station"),
-                        TextFont {
-                            font: title_font,
-                            font_size: 18.0,
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                    ));
-            });
-
-            root.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
                     left: Val::Px(400.0),
                     right: Val::Px(24.0),
                     top: Val::Px(24.0),
                     bottom: Val::Px(24.0),
-                    border_radius: BorderRadius::all(Val::Px(14.0)),
+                    overflow: Overflow::clip(),
+                    border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.05, 0.07, 0.10, 0.88)),
@@ -162,12 +74,132 @@ pub(crate) fn spawn_sector_map_ui(
                         )),
                         TextFont {
                             font: mono_font.clone(),
-                            font_size: 14.0,
+                            font_size: UI_BODY_FONT_SIZE,
                             ..default()
                         },
                         TextColor(Color::WHITE),
                     ));
                 }
+            });
+
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(24.0),
+                    top: Val::Px(24.0),
+                    width: Val::Px(340.0),
+                    padding: UiRect::all(Val::Px(16.0)),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(12.0),
+                    border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.94)),
+            ))
+            .with_children(|panel| {
+                panel.spawn((
+                    Text::new("Sector Map"),
+                    TextFont {
+                        font: title_font.clone(),
+                        font_size: UI_TITLE_FONT_SIZE,
+                        ..default()
+                    },
+                    TextColor(Color::WHITE),
+                ));
+                panel.spawn((
+                    Text::new(sector_status_text(&sector_state)),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: UI_BODY_FONT_SIZE,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.92, 0.94, 0.98)),
+                    SectorMapStatusText,
+                ));
+                panel.spawn((
+                    Text::new(sector_detail_text(&sector_state)),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: UI_BODY_FONT_SIZE,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.82, 0.86, 0.92)),
+                    SectorMapDetailText,
+                ));
+
+                panel
+                    .spawn((
+                        Button,
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Px(44.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.18, 0.50, 0.30)),
+                        LaunchEncounterButton,
+                    ))
+                    .with_child((
+                        Text::new("Launch Selected Route"),
+                            TextFont {
+                                font: title_font.clone(),
+                                font_size: UI_TITLE_FONT_SIZE - 2.0,
+                                ..default()
+                            },
+                        TextColor(Color::WHITE),
+                    ));
+
+                panel
+                    .spawn((
+                        Button,
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Px(40.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.32, 0.24, 0.18)),
+                        BackToStationButton,
+                    ))
+                    .with_child((
+                        Text::new("Back To Station"),
+                            TextFont {
+                                font: title_font,
+                                font_size: UI_TITLE_FONT_SIZE - 2.0,
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                    ));
+            });
+
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(24.0),
+                    bottom: Val::Px(24.0),
+                    width: Val::Px(340.0),
+                    padding: UiRect::all(Val::Px(12.0)),
+                    border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.94)),
+            ))
+            .with_children(|panel| {
+                panel.spawn((
+                    Text::new(
+                        "Sector Controls\nLeft click: select reachable route\nScroll: zoom map\nMiddle drag: pan map\nEnter host mission from left action panel\nTab: return to station",
+                    ),
+                    TextFont {
+                        font: mono_font,
+                        font_size: UI_HELP_FONT_SIZE,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.82, 0.86, 0.92)),
+                ));
             });
         });
 }

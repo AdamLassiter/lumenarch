@@ -17,7 +17,6 @@ pub(super) fn editor_status_line(
     selected_rotation: u8,
     module_count: usize,
     scrap_total: u32,
-    last_mission_report: &LastMissionReport,
 ) -> String {
     let selected_cost = module_kind_cost(*selected_kind, selected_variant);
     let affordability = if scrap_total >= selected_cost {
@@ -25,9 +24,21 @@ pub(super) fn editor_status_line(
     } else {
         "need more scrap"
     };
-    let mission_summary = match (&last_mission_report.headline, &last_mission_report.detail) {
+
+    format!(
+        "{}\nEntry: {entry_label}\nShip: {ship_name}\nSelected Tool: {selected_kind} / {}\nRotation: {selected_rotation}\nPlaced Modules: {module_count}\nScrap: {scrap_total}\nPlacement Cost: {selected_cost} ({affordability})",
+        match mode {
+            EditorMode::Player => "Player Refit",
+            EditorMode::Enemy => "Enemy Ship Debug Editor",
+        },
+        selected_variant.display_name(),
+    )
+}
+
+pub(super) fn editor_mission_report_text(last_mission_report: &LastMissionReport) -> String {
+    match (&last_mission_report.headline, &last_mission_report.detail) {
         (Some(headline), Some(detail)) => format!(
-            "\nLast Mission: {headline}\n{detail}\nScrap Awarded: {}\nTotal Scrap: {}\nHottest Module: {}\nFirst Disabled: {}\nRepairs / Stabilizations: {} / {}\nAutomation Used: {}\nARCH Program: {}\nARCH Invalid / Recent Writes: {} / {}\nRecovered Raw: {}\nProcessed / Used Charges: {} / {}\nTransfers / Processor Cycles: {} / {}\nLogistics Bottleneck: {}{}",
+            "Last Mission: {headline}\n{detail}\nScrap Awarded: {}\nTotal Scrap: {}\nHottest Module: {}\nFirst Disabled: {}\nRepairs / Stabilizations: {} / {}\nAutomation Used: {}\nARCH Program: {}\nARCH Invalid / Recent Writes: {} / {}\nRecovered Raw: {}\nProcessed / Used Charges: {} / {}\nTransfers / Processor Cycles: {} / {}\nLogistics Bottleneck: {}{}",
             last_mission_report.scrap_awarded,
             last_mission_report.total_scrap,
             last_mission_report
@@ -74,20 +85,11 @@ pub(super) fn editor_status_line(
             }
         ),
         (Some(headline), None) => format!(
-            "\nLast Mission: {headline}\nScrap Awarded: {}\nTotal Scrap: {}",
+            "Last Mission: {headline}\nScrap Awarded: {}\nTotal Scrap: {}",
             last_mission_report.scrap_awarded, last_mission_report.total_scrap,
         ),
-        _ => String::new(),
-    };
-
-    format!(
-        "{}\nEntry: {entry_label}\nShip: {ship_name}\nSelected Tool: {selected_kind} / {}\nRotation: {selected_rotation}\nPlaced Modules: {module_count}\nScrap: {scrap_total}\nPlacement Cost: {selected_cost} ({affordability}){mission_summary}",
-        match mode {
-            EditorMode::Player => "Player Refit",
-            EditorMode::Enemy => "Enemy Ship Debug Editor",
-        },
-        selected_variant.display_name(),
-    )
+        _ => "No completed sorties yet.".to_string(),
+    }
 }
 
 pub(super) fn module_kind_cost(kind: ModuleKind, variant: ModuleVariant) -> u32 {
@@ -132,8 +134,8 @@ pub(super) fn is_cursor_over_editor_ui(window: &Window) -> bool {
     let over_arch_panel = cursor.x >= TOOLBOX_WIDTH + 16.0
         && cursor.x <= TOOLBOX_WIDTH + 16.0 + 640.0
         && cursor.y >= height - 360.0;
-    let over_status_panel = cursor.x >= width - 360.0 && cursor.y <= 220.0;
-    let over_controls_panel = cursor.x >= width - 340.0 && cursor.y >= height - 200.0;
+    let over_status_panel = cursor.x >= width - 380.0 && cursor.y <= 420.0;
+    let over_controls_panel = cursor.x <= 380.0 && cursor.y >= height - 180.0;
 
     over_arch_panel || over_status_panel || over_controls_panel
 }

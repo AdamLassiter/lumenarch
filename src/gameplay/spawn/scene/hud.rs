@@ -4,23 +4,33 @@ use crate::{
     gameplay::helpers::gameplay_status_line,
     ship::ShipDefinition,
     state::{
-        AbortEncounterButton,
-        GameplayAlertsText,
         GameplayBarFill,
         GameplayBarKind,
         GameplayBarLabel,
-        GameplayCompactStatusText,
         GameplayControlsText,
-        GameplayInspectionText,
+        GameplayControlsPanel,
+        GameplayInfoPanelRoot,
+        GameplayOverviewBarsPanel,
         GameplayPanelBodyText,
         GameplayPanelTitleText,
+        GameplayStationReadoutBarFill,
+        GameplayStationReadoutBarTrack,
+        GameplayStationReadoutLabel,
+        GameplayStationReadoutLight,
+        GameplayStationReadoutSlot,
+        GameplayStationReadoutValue,
         GameplayStationPanel,
         GameplayStationPanelButton,
         GameplayStationPanelButtonLabel,
-        GameplayTopBannerText,
+        GameplayStationTitleText,
         PlayingCleanup,
         StationPanelButtonAction,
     },
+    UI_BODY_FONT_SIZE,
+    UI_BUTTON_RADIUS,
+    UI_HELP_FONT_SIZE,
+    UI_PANEL_RADIUS,
+    UI_TITLE_FONT_SIZE,
 };
 
 pub(super) fn spawn_runtime_hud(
@@ -42,10 +52,8 @@ pub(super) fn spawn_runtime_hud(
             PlayingCleanup,
         ))
         .with_children(|root| {
-            spawn_top_banner(root, title_font.clone(), mono_font.clone(), ship);
+            spawn_info_panel(root, title_font.clone(), mono_font.clone(), ship);
             spawn_compact_status_panel(root, title_font.clone(), mono_font.clone());
-            spawn_inspection_panel(root, title_font.clone(), mono_font.clone());
-            spawn_alerts_panel(root, title_font.clone(), mono_font.clone());
             spawn_station_panel(root, title_font.clone(), mono_font.clone());
             spawn_controls_panel(root, title_font, mono_font);
         });
@@ -55,7 +63,7 @@ fn panel_shell(node: Node) -> impl Bundle {
     (node, BackgroundColor(Color::srgba(0.05, 0.08, 0.13, 0.93)))
 }
 
-fn spawn_top_banner(
+fn spawn_info_panel(
     root: &mut ChildSpawnerCommands,
     title_font: Handle<Font>,
     mono_font: Handle<Font>,
@@ -63,34 +71,37 @@ fn spawn_top_banner(
 ) {
     root.spawn(panel_shell(Node {
         position_type: PositionType::Absolute,
-        left: Val::Px(18.0),
         right: Val::Px(18.0),
-        top: Val::Px(14.0),
-        padding: UiRect::axes(Val::Px(16.0), Val::Px(10.0)),
+        top: Val::Px(18.0),
+        width: Val::Px(360.0),
+        min_height: Val::Px(220.0),
+        padding: UiRect::axes(Val::Px(16.0), Val::Px(12.0)),
         flex_direction: FlexDirection::Column,
         row_gap: Val::Px(6.0),
-        border_radius: BorderRadius::all(Val::Px(14.0)),
+        border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
         ..default()
     }))
+    .insert(GameplayInfoPanelRoot)
     .with_children(|panel| {
         panel.spawn((
-            Text::new("Sector Operations"),
+            Text::new("Ship Overview"),
             TextFont {
                 font: title_font,
-                font_size: 22.0,
+                font_size: UI_TITLE_FONT_SIZE,
                 ..default()
             },
             TextColor(Color::WHITE),
+            GameplayPanelTitleText,
         ));
         panel.spawn((
             Text::new(gameplay_status_line(ship)),
             TextFont {
                 font: mono_font,
-                font_size: 14.0,
+                font_size: UI_BODY_FONT_SIZE,
                 ..default()
             },
             TextColor(Color::srgb(0.86, 0.91, 0.98)),
-            GameplayTopBannerText,
+            GameplayPanelBodyText,
         ));
     });
 }
@@ -103,33 +114,24 @@ fn spawn_compact_status_panel(
     root.spawn(panel_shell(Node {
         position_type: PositionType::Absolute,
         left: Val::Px(18.0),
-        top: Val::Px(104.0),
-        width: Val::Px(330.0),
+        top: Val::Px(18.0),
+        width: Val::Px(360.0),
         padding: UiRect::all(Val::Px(14.0)),
         flex_direction: FlexDirection::Column,
         row_gap: Val::Px(10.0),
-        border_radius: BorderRadius::all(Val::Px(14.0)),
+        border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
         ..default()
     }))
+    .insert(GameplayOverviewBarsPanel)
     .with_children(|panel| {
         panel.spawn((
             Text::new("Ship Overview"),
             TextFont {
                 font: title_font,
-                font_size: 20.0,
+                font_size: UI_TITLE_FONT_SIZE,
                 ..default()
             },
             TextColor(Color::WHITE),
-        ));
-        panel.spawn((
-            Text::new("Status pending"),
-            TextFont {
-                font: mono_font.clone(),
-                font_size: 13.0,
-                ..default()
-            },
-            TextColor(Color::srgb(0.88, 0.92, 0.97)),
-            GameplayCompactStatusText,
         ));
         spawn_bar(
             panel,
@@ -195,7 +197,7 @@ fn spawn_bar(
                 Text::new(format!("{label}: --")),
                 TextFont {
                     font: mono_font.clone(),
-                    font_size: 12.0,
+                    font_size: UI_BODY_FONT_SIZE - 1.0,
                     ..default()
                 },
                 TextColor(Color::srgb(0.82, 0.88, 0.95)),
@@ -223,84 +225,6 @@ fn spawn_bar(
                 ));
             });
         });
-}
-
-fn spawn_inspection_panel(
-    root: &mut ChildSpawnerCommands,
-    title_font: Handle<Font>,
-    mono_font: Handle<Font>,
-) {
-    root.spawn(panel_shell(Node {
-        position_type: PositionType::Absolute,
-        right: Val::Px(18.0),
-        top: Val::Px(104.0),
-        width: Val::Px(340.0),
-        padding: UiRect::all(Val::Px(14.0)),
-        flex_direction: FlexDirection::Column,
-        row_gap: Val::Px(8.0),
-        border_radius: BorderRadius::all(Val::Px(14.0)),
-        ..default()
-    }))
-    .with_children(|panel| {
-        panel.spawn((
-            Text::new("Focused Module"),
-            TextFont {
-                font: title_font,
-                font_size: 20.0,
-                ..default()
-            },
-            TextColor(Color::WHITE),
-        ));
-        panel.spawn((
-            Text::new("No station selected"),
-            TextFont {
-                font: mono_font,
-                font_size: 13.0,
-                ..default()
-            },
-            TextColor(Color::srgb(0.86, 0.90, 0.96)),
-            GameplayInspectionText,
-        ));
-    });
-}
-
-fn spawn_alerts_panel(
-    root: &mut ChildSpawnerCommands,
-    title_font: Handle<Font>,
-    mono_font: Handle<Font>,
-) {
-    root.spawn(panel_shell(Node {
-        position_type: PositionType::Absolute,
-        right: Val::Px(18.0),
-        top: Val::Px(374.0),
-        width: Val::Px(340.0),
-        padding: UiRect::all(Val::Px(14.0)),
-        flex_direction: FlexDirection::Column,
-        row_gap: Val::Px(8.0),
-        border_radius: BorderRadius::all(Val::Px(14.0)),
-        ..default()
-    }))
-    .with_children(|panel| {
-        panel.spawn((
-            Text::new("Alerts"),
-            TextFont {
-                font: title_font,
-                font_size: 20.0,
-                ..default()
-            },
-            TextColor(Color::WHITE),
-        ));
-        panel.spawn((
-            Text::new("No alerts"),
-            TextFont {
-                font: mono_font,
-                font_size: 13.0,
-                ..default()
-            },
-            TextColor(Color::srgb(0.86, 0.90, 0.96)),
-            GameplayAlertsText,
-        ));
-    });
 }
 
 fn spawn_station_panel(
@@ -335,14 +259,14 @@ fn spawn_station_panel(
     root.spawn((
         Node {
             position_type: PositionType::Absolute,
-            left: Val::Percent(24.0),
-            right: Val::Percent(24.0),
-            bottom: Val::Px(22.0),
-            min_height: Val::Px(230.0),
+            left: Val::Percent(20.0),
+            right: Val::Percent(20.0),
+            top: Val::Px(160.0),
+            min_height: Val::Px(260.0),
             padding: UiRect::all(Val::Px(18.0)),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(10.0),
-            border_radius: BorderRadius::all(Val::Px(16.0)),
+            border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
             ..default()
         },
         BackgroundColor(Color::srgba(0.04, 0.06, 0.11, 0.96)),
@@ -353,22 +277,105 @@ fn spawn_station_panel(
             Text::new("Station Console"),
             TextFont {
                 font: title_font,
-                font_size: 26.0,
+                font_size: UI_TITLE_FONT_SIZE,
                 ..default()
             },
             TextColor(Color::WHITE),
-            GameplayPanelTitleText,
+            GameplayStationTitleText,
         ));
-        panel.spawn((
-            Text::new("Walk to a station and press E to open a focused console."),
-            TextFont {
-                font: mono_font.clone(),
-                font_size: 14.0,
+        panel
+            .spawn(Node {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(8.0),
                 ..default()
-            },
-            TextColor(Color::srgb(0.88, 0.92, 0.98)),
-            GameplayPanelBodyText,
-        ));
+            })
+            .with_children(|readouts| {
+                for index in 0..6 {
+                    readouts
+                        .spawn((
+                            Node {
+                                width: Val::Percent(100.0),
+                                flex_direction: FlexDirection::Column,
+                                row_gap: Val::Px(4.0),
+                                ..default()
+                            },
+                            GameplayStationReadoutSlot { index },
+                        ))
+                        .with_children(|row| {
+                            row.spawn(Node {
+                                width: Val::Percent(100.0),
+                                justify_content: JustifyContent::SpaceBetween,
+                                align_items: AlignItems::Center,
+                                column_gap: Val::Px(10.0),
+                                ..default()
+                            })
+                            .with_children(|header| {
+                                header.spawn((
+                                    Text::new("--"),
+                                    TextFont {
+                                        font: mono_font.clone(),
+                                        font_size: UI_BODY_FONT_SIZE,
+                                        ..default()
+                                    },
+                                    TextColor(Color::srgb(0.88, 0.92, 0.98)),
+                                    GameplayStationReadoutLabel,
+                                ));
+                                header.spawn(Node {
+                                    align_items: AlignItems::Center,
+                                    column_gap: Val::Px(8.0),
+                                    ..default()
+                                })
+                                .with_children(|status| {
+                                    status.spawn((
+                                        Node {
+                                            width: Val::Px(12.0),
+                                            height: Val::Px(12.0),
+                                            border_radius: BorderRadius::all(Val::Px(999.0)),
+                                            display: Display::None,
+                                            ..default()
+                                        },
+                                        BackgroundColor(Color::srgb(0.22, 0.26, 0.30)),
+                                        GameplayStationReadoutLight,
+                                    ));
+                                    status.spawn((
+                                        Text::new("--"),
+                                        TextFont {
+                                            font: mono_font.clone(),
+                                            font_size: UI_BODY_FONT_SIZE - 1.0,
+                                            ..default()
+                                        },
+                                        TextColor(Color::srgb(0.76, 0.84, 0.92)),
+                                        GameplayStationReadoutValue,
+                                    ));
+                                });
+                            });
+                            row.spawn((
+                                Node {
+                                    width: Val::Percent(100.0),
+                                    height: Val::Px(10.0),
+                                    border_radius: BorderRadius::all(Val::Px(999.0)),
+                                    display: Display::None,
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgba(0.20, 0.24, 0.30, 0.95)),
+                                GameplayStationReadoutBarTrack,
+                            ))
+                            .with_children(|track| {
+                                track.spawn((
+                                    Node {
+                                        width: Val::Percent(0.0),
+                                        height: Val::Percent(100.0),
+                                        border_radius: BorderRadius::all(Val::Px(999.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::srgb(0.40, 0.72, 0.94)),
+                                    GameplayStationReadoutBarFill,
+                                ));
+                            });
+                        });
+                }
+            });
         panel
             .spawn(Node {
                 width: Val::Percent(100.0),
@@ -388,7 +395,7 @@ fn spawn_station_panel(
                                 justify_content: JustifyContent::Center,
                                 align_items: AlignItems::Center,
                                 padding: UiRect::horizontal(Val::Px(8.0)),
-                                border_radius: BorderRadius::all(Val::Px(10.0)),
+                                border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
                                 ..default()
                             },
                             BackgroundColor(Color::srgb(0.24, 0.38, 0.58)),
@@ -399,7 +406,7 @@ fn spawn_station_panel(
                                 Text::new(station_button_default_label(action)),
                                 TextFont {
                                     font: mono_font.clone(),
-                                    font_size: 13.0,
+                                    font_size: UI_BODY_FONT_SIZE - 1.0,
                                     ..default()
                                 },
                                 TextColor(Color::WHITE),
@@ -420,19 +427,20 @@ fn spawn_controls_panel(
         position_type: PositionType::Absolute,
         left: Val::Px(18.0),
         bottom: Val::Px(22.0),
-        width: Val::Px(330.0),
+        width: Val::Px(360.0),
         padding: UiRect::all(Val::Px(14.0)),
         flex_direction: FlexDirection::Column,
         row_gap: Val::Px(8.0),
-        border_radius: BorderRadius::all(Val::Px(14.0)),
+        border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
         ..default()
     }))
+    .insert(GameplayControlsPanel)
     .with_children(|panel| {
         panel.spawn((
             Text::new("Controls"),
             TextFont {
                 font: title_font,
-                font_size: 20.0,
+                font_size: UI_TITLE_FONT_SIZE,
                 ..default()
             },
             TextColor(Color::WHITE),
@@ -441,35 +449,12 @@ fn spawn_controls_panel(
             Text::new("Controls pending"),
             TextFont {
                 font: mono_font.clone(),
-                font_size: 13.0,
+                font_size: UI_HELP_FONT_SIZE,
                 ..default()
             },
             TextColor(Color::srgb(0.82, 0.86, 0.92)),
             GameplayControlsText,
         ));
-        panel
-            .spawn((
-                Button,
-                Node {
-                    width: Val::Px(170.0),
-                    height: Val::Px(40.0),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    border_radius: BorderRadius::all(Val::Px(10.0)),
-                    ..default()
-                },
-                BackgroundColor(Color::srgb(0.52, 0.27, 0.18)),
-                AbortEncounterButton,
-            ))
-            .with_child((
-                Text::new("Abort To Station"),
-                TextFont {
-                    font: mono_font.clone(),
-                    font_size: 15.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-            ));
     });
 }
 

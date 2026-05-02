@@ -11,6 +11,7 @@ pub(crate) use input::{
     leave_editor_button_system,
     leave_editor_keyboard_shortcut,
     load_editor_ship_shortcut,
+    mission_report_button_system,
     pan_and_zoom_editor_view,
     persist_editor_ship,
     place_or_remove_tile,
@@ -23,6 +24,7 @@ pub(crate) use render::{
     spawn_preview_tile,
     sync_preview_tile,
     sync_ship_tile_entities,
+    sync_toolbox_scroll,
     sync_toolbox_visuals,
 };
 pub(crate) use ui::{

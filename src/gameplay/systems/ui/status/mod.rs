@@ -12,6 +12,7 @@ use crate::{
             CarriedResource,
             CurrentStation,
             DestroyedModule,
+            HeldInteraction,
             HostileShip,
             HostileTarget,
             Integrity,
@@ -21,6 +22,7 @@ use crate::{
             MissionState,
             ModuleCondition,
             ModuleRuntimeState,
+            NearbyInteraction,
             ObservedLocalPlayerMarker,
             PlayerFieldState,
             PlayerMotionState,
@@ -62,18 +64,25 @@ use crate::{
     },
     netcode,
     state::{
-        DebugOverlayState,
         DemoProgression,
         GameplayBarFill,
         GameplayBarKind,
         GameplayBarLabel,
         GameplayCompactStatusText,
         GameplayControlsText,
+        GameplayInfoPanelMode,
         GameplayPanelBodyText,
         GameplayPanelTitleText,
+        GameplayStationReadoutBarFill,
+        GameplayStationReadoutBarTrack,
+        GameplayStationReadoutLabel,
+        GameplayStationReadoutLight,
+        GameplayStationReadoutSlot,
+        GameplayStationReadoutValue,
         GameplayStationPanel,
         GameplayStationPanelButton,
         GameplayStationPanelButtonLabel,
+        GameplayStationTitleText,
         GameplayTopBannerText,
         StationPanelButtonAction,
     },
@@ -83,5 +92,5 @@ mod hud;
 mod station_panel;
 mod summary;
 
-pub(crate) use hud::update_gameplay_status_text;
+pub(crate) use hud::{toggle_gameplay_info_panel, update_gameplay_status_text};
 pub(crate) use station_panel::station_panel_button_system;
