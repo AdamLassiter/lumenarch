@@ -1,0 +1,197 @@
+{
+  "seed": 66790,
+  "current_node_id": 0,
+  "selected_node_id": 1,
+  "nodes": [
+    {
+      "id": 0,
+      "label": "Needle Rest",
+      "kind": "HubStation",
+      "risk_tier": 0,
+      "reward_hint": "Safe dock, refit, relaunch",
+      "neighbors": [
+        1,
+        2,
+        3,
+        6
+      ],
+      "status": "Fresh",
+      "position": [
+        0.0,
+        0.0
+      ],
+      "encounter": {
+        "enemy_ship_ids": [],
+        "hostile_count": 0,
+        "salvage_value": 0,
+        "ambient_heat_pressure": 0,
+        "ambient_electrical_pressure": 0,
+        "reward_multiplier": 1,
+        "arena_variant": "station"
+      }
+    },
+    {
+      "id": 1,
+      "label": "Latchline Debris",
+      "kind": "SalvageField",
+      "risk_tier": 1,
+      "reward_hint": "Low threat, strong salvage",
+      "neighbors": [
+        0,
+        4
+      ],
+      "status": "Fresh",
+      "position": [
+        -260.0,
+        150.0
+      ],
+      "encounter": {
+        "enemy_ship_ids": [
+          "raider_skiff"
+        ],
+        "hostile_count": 1,
+        "salvage_value": 10,
+        "ambient_heat_pressure": 0,
+        "ambient_electrical_pressure": 0,
+        "reward_multiplier": 2,
+        "arena_variant": "salvage"
+      }
+    },
+    {
+      "id": 6,
+      "label": "Calibration Ring",
+      "kind": "TestRange",
+      "risk_tier": 0,
+      "reward_hint": "No hostiles, no salvage, pure ship testing",
+      "neighbors": [
+        0
+      ],
+      "status": "Fresh",
+      "position": [
+        320.0,
+        220.0
+      ],
+      "encounter": {
+        "enemy_ship_ids": [],
+        "hostile_count": 0,
+        "salvage_value": 1,
+        "ambient_heat_pressure": 0,
+        "ambient_electrical_pressure": 0,
+        "reward_multiplier": 1,
+        "arena_variant": "test"
+      }
+    },
+    {
+      "id": 2,
+      "label": "Gravehook Nest",
+      "kind": "HostileHold",
+      "risk_tier": 3,
+      "reward_hint": "Heavy guns, middling haul",
+      "neighbors": [
+        0,
+        4,
+        5
+      ],
+      "status": "Fresh",
+      "position": [
+        0.0,
+        200.0
+      ],
+      "encounter": {
+        "enemy_ship_ids": [
+          "scrap_brigand"
+        ],
+        "hostile_count": 3,
+        "salvage_value": 8,
+        "ambient_heat_pressure": 1,
+        "ambient_electrical_pressure": 0,
+        "reward_multiplier": 3,
+        "arena_variant": "hostile"
+      }
+    },
+    {
+      "id": 3,
+      "label": "Blueglass Hush",
+      "kind": "UnstableDerelict",
+      "risk_tier": 2,
+      "reward_hint": "System stress, moderate reward",
+      "neighbors": [
+        0,
+        5
+      ],
+      "status": "Fresh",
+      "position": [
+        250.0,
+        120.0
+      ],
+      "encounter": {
+        "enemy_ship_ids": [
+          "raider_skiff",
+          "raider_skiff"
+        ],
+        "hostile_count": 2,
+        "salvage_value": 9,
+        "ambient_heat_pressure": 1,
+        "ambient_electrical_pressure": 2,
+        "reward_multiplier": 3,
+        "arena_variant": "unstable"
+      }
+    },
+    {
+      "id": 4,
+      "label": "Forked Cache",
+      "kind": "SalvageField",
+      "risk_tier": 2,
+      "reward_hint": "Branch route, better payout",
+      "neighbors": [
+        1,
+        2
+      ],
+      "status": "Fresh",
+      "position": [
+        -320.0,
+        -70.0
+      ],
+      "encounter": {
+        "enemy_ship_ids": [
+          "raider_skiff",
+          "scrap_brigand"
+        ],
+        "hostile_count": 2,
+        "salvage_value": 12,
+        "ambient_heat_pressure": 1,
+        "ambient_electrical_pressure": 1,
+        "reward_multiplier": 4,
+        "arena_variant": "cache"
+      }
+    },
+    {
+      "id": 5,
+      "label": "Static Wake",
+      "kind": "UnstableDerelict",
+      "risk_tier": 4,
+      "reward_hint": "Brutal branch, rich recovery",
+      "neighbors": [
+        2,
+        3
+      ],
+      "status": "Fresh",
+      "position": [
+        300.0,
+        -90.0
+      ],
+      "encounter": {
+        "enemy_ship_ids": [
+          "scrap_brigand",
+          "raider_skiff"
+        ],
+        "hostile_count": 4,
+        "salvage_value": 14,
+        "ambient_heat_pressure": 2,
+        "ambient_electrical_pressure": 3,
+        "reward_multiplier": 5,
+        "arena_variant": "storm"
+      }
+    }
+  ]
+}

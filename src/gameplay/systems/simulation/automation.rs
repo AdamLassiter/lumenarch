@@ -26,6 +26,7 @@ use crate::{
     ship::{
         ModuleKind,
         arch::{ArchInstruction, ArchProgram, ArchProgramTemplate, ArchRegister, ArchValueRef},
+        lumen::{LumenAspect, LumenInstruction, LumenOp, LumenProgram, LumenTarget},
     },
 };
 
@@ -51,6 +52,19 @@ struct PendingArchCommands {
     logistics_preference: ArchLogisticsPreference,
     turret_assist: bool,
     turret_auto_fire: bool,
+    turret_fire_hold: bool,
+}
+
+#[derive(Clone, Copy, Default)]
+struct LumenSnapshot {
+    reactor_count: u32,
+    turret_count: u32,
+    cargo_count: u32,
+    processor_count: u32,
+    computer_count: u32,
+    hot_module_count: u32,
+    threat_present: bool,
+    low_power: bool,
 }
 
 pub(crate) fn run_arch_automation(
@@ -93,12 +107,19 @@ pub(crate) fn run_arch_automation(
     automation_state.output_scale = Fx::from_num(1);
     automation_state.invalid_executions = 0;
     automation_state.last_primary_program = None;
+    automation_state.last_secondary_program = None;
     automation_state.recent_writes.clear();
 
     let snapshot = build_snapshot(
         children,
         ship_power_state,
         ship_weapon_state,
+        !hostile_query.is_empty(),
+        &module_query,
+    );
+    let lumen_snapshot = build_lumen_snapshot(
+        children,
+        ship_power_state,
         !hostile_query.is_empty(),
         &module_query,
     );
@@ -180,6 +201,36 @@ pub(crate) fn run_arch_automation(
             runtime_state.current_heat =
                 (runtime_state.current_heat - Fx::from_num(0.4) * dt).max(Fx::from_num(0));
         }
+
+        if arch_runtime.lumen_program.enabled {
+            let (lumen_result, lumen_outputs) =
+                execute_lumen_program(&arch_runtime.lumen_program, lumen_snapshot);
+            automation_state.last_secondary_program = Some(arch_runtime.lumen_program.name.clone());
+            aggregate.reactor_bias += lumen_outputs.reactor_bias;
+            aggregate.logistics_enabled |= lumen_outputs.logistics_enabled;
+            if lumen_outputs.logistics_enabled {
+                aggregate.logistics_preference = lumen_outputs.logistics_preference;
+            }
+            aggregate.turret_assist |= lumen_outputs.turret_assist;
+            aggregate.turret_auto_fire |= lumen_outputs.turret_auto_fire;
+            aggregate.turret_fire_hold |= lumen_outputs.turret_fire_hold;
+            if automation_state.recent_writes.len() < 4 && !lumen_result.recent_effects.is_empty() {
+                automation_state
+                    .recent_writes
+                    .extend(lumen_result.recent_effects.iter().take(2).cloned());
+            }
+            if lumen_result.halted_reason.is_some() {
+                automation_state.invalid_executions += 1;
+            }
+            arch_runtime.last_lumen_result = lumen_result;
+        } else {
+            arch_runtime.last_lumen_result = crate::gameplay::components::LumenExecutionResult {
+                resolved_targets: 0,
+                recent_effects: Vec::new(),
+                halted_reason: Some("offline".to_string()),
+                program_name: arch_runtime.lumen_program.name.clone(),
+            };
+        }
     }
 
     if !had_active_computer {
@@ -192,11 +243,13 @@ pub(crate) fn run_arch_automation(
     command_state.logistics_preference = aggregate.logistics_preference;
     command_state.turret_assist_enabled = aggregate.turret_assist;
     command_state.turret_auto_fire = aggregate.turret_auto_fire;
+    command_state.turret_fire_hold = aggregate.turret_fire_hold;
 
     automation_state.active = aggregate.reactor_bias > Fx::from_num(0)
         || aggregate.logistics_enabled
         || aggregate.turret_assist
-        || aggregate.turret_auto_fire;
+        || aggregate.turret_auto_fire
+        || aggregate.turret_fire_hold;
     if aggregate.reactor_bias > Fx::from_num(0) {
         automation_state.output_scale = Fx::from_num(0.72);
     }
@@ -206,11 +259,16 @@ pub(crate) fn run_arch_automation(
         mission_state.automation_trigger_count = automation_state.trigger_count;
         mission_state.logistics_automation_used |= aggregate.logistics_enabled;
         mission_state.recent_action = Some(format!(
-            "ARCH active: {}",
+            "Automation active: {}{}",
             automation_state
                 .last_primary_program
                 .as_deref()
-                .unwrap_or("program")
+                .unwrap_or("program"),
+            automation_state
+                .last_secondary_program
+                .as_deref()
+                .map(|name| format!(" + {name}"))
+                .unwrap_or_default()
         ));
         mission_state.recent_action_timer = Fx::from_num(1.4);
     }
@@ -239,6 +297,66 @@ pub(crate) fn run_arch_automation(
             }
         }
     }
+}
+
+fn build_lumen_snapshot(
+    children: &Children,
+    ship_power_state: &super::super::super::components::ShipPowerState,
+    threat_present: bool,
+    module_query: &Query<(
+        Entity,
+        &RuntimeShipModule,
+        &mut ModuleRuntimeState,
+        Option<&ArchComputerModule>,
+        Option<&mut RuntimeArchComputer>,
+        Option<&StorageModule>,
+        Option<&ProcessorModule>,
+        Option<&DestroyedModule>,
+    )>,
+) -> LumenSnapshot {
+    let mut snapshot = LumenSnapshot {
+        low_power: ship_power_state.stored_energy <= Fx::from_num(2),
+        threat_present,
+        ..Default::default()
+    };
+
+    for child in children.iter() {
+        let Ok((_, runtime_module, runtime_state, computer, _, storage, processor, destroyed)) =
+            module_query.get(child)
+        else {
+            continue;
+        };
+        if destroyed.is_some() {
+            continue;
+        }
+        match runtime_module.kind {
+            ModuleKind::Reactor => snapshot.reactor_count += 1,
+            ModuleKind::Turret => snapshot.turret_count += 1,
+            ModuleKind::Cargo | ModuleKind::Airlock => {
+                if storage.is_some() {
+                    snapshot.cargo_count += 1;
+                }
+            }
+            ModuleKind::Processor => {
+                if processor.is_some() {
+                    snapshot.processor_count += 1;
+                }
+            }
+            ModuleKind::Computer => {
+                if computer.is_some() {
+                    snapshot.computer_count += 1;
+                }
+            }
+            _ => {}
+        }
+        if runtime_state.current_heat >= Fx::from_num(8)
+            || runtime_state.electrical_instability >= Fx::from_num(6)
+        {
+            snapshot.hot_module_count += 1;
+        }
+    }
+
+    snapshot
 }
 
 pub(crate) fn tick_recent_action_feedback(
@@ -862,6 +980,130 @@ fn write_register(
     }
 
     Ok(())
+}
+
+fn execute_lumen_program(
+    program: &LumenProgram,
+    snapshot: LumenSnapshot,
+) -> (crate::gameplay::components::LumenExecutionResult, PendingArchCommands) {
+    let mut commands = PendingArchCommands::default();
+    let mut resolved_targets = 0u32;
+    let mut effects = Vec::new();
+
+    for instruction in &program.instructions {
+        let target_count = resolve_lumen_target_count(instruction.target, snapshot);
+        if target_count == 0 {
+            effects.push(format!("{} {} -> no targets", instruction.op.as_str(), instruction.target.as_str()));
+            continue;
+        }
+        resolved_targets += target_count;
+        apply_lumen_instruction(instruction, snapshot, target_count, &mut commands, &mut effects);
+    }
+
+    (
+        crate::gameplay::components::LumenExecutionResult {
+            resolved_targets,
+            recent_effects: effects.into_iter().take(4).collect(),
+            halted_reason: None,
+            program_name: program.name.clone(),
+        },
+        commands,
+    )
+}
+
+fn resolve_lumen_target_count(target: LumenTarget, snapshot: LumenSnapshot) -> u32 {
+    match target {
+        LumenTarget::Reactors => snapshot.reactor_count,
+        LumenTarget::Turrets => snapshot.turret_count,
+        LumenTarget::Cargo => snapshot.cargo_count,
+        LumenTarget::Processors => snapshot.processor_count,
+        LumenTarget::Computers => snapshot.computer_count,
+        LumenTarget::HotModules => snapshot.hot_module_count,
+    }
+}
+
+fn apply_lumen_instruction(
+    instruction: &LumenInstruction,
+    snapshot: LumenSnapshot,
+    target_count: u32,
+    commands: &mut PendingArchCommands,
+    effects: &mut Vec<String>,
+) {
+    let weight = Fx::from_num(instruction.weight as i32).clamp(Fx::from_num(0), Fx::from_num(3));
+    match (instruction.op, instruction.aspect) {
+        (LumenOp::Buff, LumenAspect::HeatCooling)
+        | (LumenOp::Nerf, LumenAspect::Instability) => {
+            commands.reactor_bias = (commands.reactor_bias + weight).clamp(Fx::from_num(0), Fx::from_num(3));
+            effects.push(format!(
+                "{} {} {} -> cooling +{} ({} targets)",
+                instruction.op.as_str(),
+                instruction.target.as_str(),
+                instruction.aspect.as_str(),
+                instruction.weight,
+                target_count
+            ));
+        }
+        (LumenOp::Buff, LumenAspect::Throughput) => {
+            commands.logistics_enabled = true;
+            commands.logistics_preference = ArchLogisticsPreference::FeedProcessor;
+            effects.push(format!(
+                "BUFF {} throughput -> feed processor ({} targets)",
+                instruction.target.as_str(),
+                target_count
+            ));
+        }
+        (LumenOp::Nerf, LumenAspect::Throughput) => {
+            commands.logistics_enabled = true;
+            commands.logistics_preference = ArchLogisticsPreference::StoreCharges;
+            effects.push(format!(
+                "NERF {} throughput -> store charges ({} targets)",
+                instruction.target.as_str(),
+                target_count
+            ));
+        }
+        (LumenOp::Buff, LumenAspect::FireControl) => {
+            commands.turret_assist = true;
+            if snapshot.threat_present || instruction.weight >= 2 {
+                commands.turret_auto_fire = true;
+            }
+            effects.push(format!(
+                "BUFF {} fire_control -> assist {}auto ({} targets)",
+                instruction.target.as_str(),
+                if commands.turret_auto_fire { "+ " } else { "" },
+                target_count
+            ));
+        }
+        (LumenOp::Nerf, LumenAspect::FireControl)
+        | (LumenOp::Nerf, LumenAspect::PowerDraw) => {
+            commands.turret_fire_hold = true;
+            effects.push(format!(
+                "{} {} {} -> hold fire ({} targets)",
+                instruction.op.as_str(),
+                instruction.target.as_str(),
+                instruction.aspect.as_str(),
+                target_count
+            ));
+        }
+        (LumenOp::Buff, LumenAspect::PowerDraw) => {
+            if snapshot.low_power {
+                commands.reactor_bias = (commands.reactor_bias + Fx::from_num(1)).clamp(Fx::from_num(0), Fx::from_num(3));
+            }
+            effects.push(format!(
+                "BUFF {} power_draw -> reserve support ({} targets)",
+                instruction.target.as_str(),
+                target_count
+            ));
+        }
+        _ => {
+            effects.push(format!(
+                "{} {} {} -> observed ({} targets)",
+                instruction.op.as_str(),
+                instruction.target.as_str(),
+                instruction.aspect.as_str(),
+                target_count
+            ));
+        }
+    }
 }
 
 fn template_to_mode(template: ArchProgramTemplate) -> ShipAutomationMode {

@@ -188,6 +188,12 @@ pub(super) fn spawn_runtime_module(
                         )
                     }),
                     last_result: ArchExecutionResult::default(),
+                    lumen_program: module.lumen_program.clone().unwrap_or_else(|| {
+                        crate::ship::lumen::LumenProgram::from_template(
+                            crate::ship::lumen::LumenProgramTemplate::BalancedSupervision,
+                        )
+                    }),
+                    last_lumen_result: crate::gameplay::components::LumenExecutionResult::default(),
                 },
             ));
         }

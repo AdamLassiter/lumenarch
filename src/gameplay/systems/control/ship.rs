@@ -350,7 +350,9 @@ pub(crate) fn apply_player_ship_controls(
         dt,
         throttle_demand,
         turn_input,
-        if control_state.fire_pressed || arch_commands.turret_auto_fire {
+        if control_state.fire_pressed
+            || (arch_commands.turret_auto_fire && !arch_commands.turret_fire_hold)
+        {
             Fx::from_num(1)
         } else {
             Fx::from_num(0)

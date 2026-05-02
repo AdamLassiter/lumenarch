@@ -3,12 +3,14 @@ use bevy::prelude::*;
 use crate::{
     ship::{
         arch::{ArchProgram, ArchProgramTemplate},
+        lumen::{LumenProgram, LumenProgramTemplate},
         storage::save_default_ship,
         ModuleKind,
     },
     state::{
         ArchEditorButton, ArchEditorButtonAction, ArchEditorState, ComputerProgramButton,
         ComputerProgramEntry, ComputerProgramPanel, EditorShip, ProgramButtonAction,
+        ProgrammingLanguageMode,
     },
 };
 
@@ -34,7 +36,10 @@ pub(crate) fn sync_computer_program_entries(
 
     commands.entity(panel).with_children(|panel| {
         panel.spawn((
-            Text::new("ARCH Workshop"),
+            Text::new(match arch_editor_state.selected_language {
+                ProgrammingLanguageMode::Arch => "ARCH Workshop",
+                ProgrammingLanguageMode::Lumen => "LUMEN Workshop",
+            }),
             TextFont {
                 font: title_font,
                 font_size: 20.0,
@@ -66,7 +71,7 @@ pub(crate) fn sync_computer_program_entries(
         }
 
         panel.spawn((
-            Text::new("Select a computer, then edit its instruction list with buttons. This is a first-pass workshop: opcode cycling, register cycling, immediate/jump tweaks, line add/remove, plus template and constant controls."),
+            Text::new("Select a computer, then edit either the direct ARCH program or the optimization-layer LUMEN program. ARCH writes explicit command registers; LUMEN applies bounded BUFF / NERF directives to target groups."),
             TextFont {
                 font: mono_font.clone(),
                 font_size: 13.0,
@@ -114,6 +119,10 @@ pub(crate) fn sync_computer_program_entries(
             .arch_program
             .clone()
             .unwrap_or_else(|| ArchProgram::from_template(ArchProgramTemplate::BalancedOps));
+        let lumen_program = selected_module
+            .lumen_program
+            .clone()
+            .unwrap_or_else(|| LumenProgram::from_template(LumenProgramTemplate::BalancedSupervision));
 
         panel
             .spawn((
@@ -129,15 +138,63 @@ pub(crate) fn sync_computer_program_entries(
                 ComputerProgramEntry,
             ))
             .with_children(|entry| {
+                entry
+                    .spawn((
+                        Node {
+                            width: Val::Percent(100.0),
+                            flex_wrap: FlexWrap::Wrap,
+                            column_gap: Val::Px(8.0),
+                            row_gap: Val::Px(8.0),
+                            ..default()
+                        },
+                        ComputerProgramEntry,
+                    ))
+                    .with_children(|buttons| {
+                        spawn_program_button(
+                            buttons,
+                            &mono_font,
+                            if arch_editor_state.selected_language == ProgrammingLanguageMode::Arch {
+                                "ARCH Active"
+                            } else {
+                                "Open ARCH"
+                            },
+                            selected_module.id,
+                            ProgramButtonAction::SwitchLanguage(ProgrammingLanguageMode::Arch),
+                        );
+                        spawn_program_button(
+                            buttons,
+                            &mono_font,
+                            if arch_editor_state.selected_language == ProgrammingLanguageMode::Lumen {
+                                "LUMEN Active"
+                            } else {
+                                "Open LUMEN"
+                            },
+                            selected_module.id,
+                            ProgramButtonAction::SwitchLanguage(ProgrammingLanguageMode::Lumen),
+                        );
+                    });
                 entry.spawn((
                     Text::new(format!(
-                        "Computer #{}\nProgram: {}\nTemplate: {}\nConst A / B: {} / {}\nValidation: {}",
-                        selected_module.id,
-                        program.name,
-                        program.template.as_str(),
-                        program.constants[0],
-                        program.constants[1],
-                        program_validation_summary(&program),
+                        "{}",
+                        match arch_editor_state.selected_language {
+                            ProgrammingLanguageMode::Arch => format!(
+                                "Computer #{}\nProgram: {}\nTemplate: {}\nConst A / B: {} / {}\nValidation: {}",
+                                selected_module.id,
+                                program.name,
+                                program.template.as_str(),
+                                program.constants[0],
+                                program.constants[1],
+                                program_validation_summary(&program),
+                            ),
+                            ProgrammingLanguageMode::Lumen => format!(
+                                "Computer #{}\nProgram: {}\nTemplate: {}\nState: {}\nValidation: {}",
+                                selected_module.id,
+                                lumen_program.name,
+                                lumen_program.template.as_str(),
+                                if lumen_program.enabled { "online" } else { "disabled" },
+                                lumen_validation_summary(&lumen_program),
+                            ),
+                        }
                     )),
                     TextFont {
                         font: mono_font.clone(),
@@ -155,37 +212,83 @@ pub(crate) fn sync_computer_program_entries(
                         ..default()
                     })
                     .with_children(|buttons| {
-                        spawn_program_button(
-                            buttons,
-                            &mono_font,
-                            "Cycle Template",
-                            selected_module.id,
-                            ProgramButtonAction::CycleTemplate,
-                        );
-                        for (label, index, delta) in [
-                            ("Const A +1", 0, 1),
-                            ("Const A -1", 0, -1),
-                            ("Const B +1", 1, 1),
-                            ("Const B -1", 1, -1),
-                        ] {
-                            spawn_program_button(
-                                buttons,
-                                &mono_font,
-                                label,
-                                selected_module.id,
-                                ProgramButtonAction::AdjustConstant { index, delta },
-                            );
+                        match arch_editor_state.selected_language {
+                            ProgrammingLanguageMode::Arch => {
+                                spawn_program_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Cycle Template",
+                                    selected_module.id,
+                                    ProgramButtonAction::CycleArchTemplate,
+                                );
+                                for (label, index, delta) in [
+                                    ("Const A +1", 0, 1),
+                                    ("Const A -1", 0, -1),
+                                    ("Const B +1", 1, 1),
+                                    ("Const B -1", 1, -1),
+                                ] {
+                                    spawn_program_button(
+                                        buttons,
+                                        &mono_font,
+                                        label,
+                                        selected_module.id,
+                                        ProgramButtonAction::AdjustArchConstant { index, delta },
+                                    );
+                                }
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Add Line",
+                                    ArchEditorButtonAction::AddLine(selected_module.id),
+                                );
+                            }
+                            ProgrammingLanguageMode::Lumen => {
+                                spawn_program_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Cycle Template",
+                                    selected_module.id,
+                                    ProgramButtonAction::CycleLumenTemplate,
+                                );
+                                spawn_program_button(
+                                    buttons,
+                                    &mono_font,
+                                    if lumen_program.enabled {
+                                        "Disable Program"
+                                    } else {
+                                        "Enable Program"
+                                    },
+                                    selected_module.id,
+                                    ProgramButtonAction::ToggleLumenEnabled,
+                                );
+                                spawn_arch_editor_button(
+                                    buttons,
+                                    &mono_font,
+                                    "Add Directive",
+                                    ArchEditorButtonAction::AddLumenLine(selected_module.id),
+                                );
+                            }
                         }
-                        spawn_arch_editor_button(
-                            buttons,
-                            &mono_font,
-                            "Add Line",
-                            ArchEditorButtonAction::AddLine(selected_module.id),
-                        );
                     });
 
-                for (line_index, instruction) in program.instructions.iter().enumerate() {
+                let line_count = match arch_editor_state.selected_language {
+                    ProgrammingLanguageMode::Arch => program.instructions.len(),
+                    ProgrammingLanguageMode::Lumen => lumen_program.instructions.len(),
+                };
+                for line_index in 0..line_count {
                     let selected = arch_editor_state.selected_line == line_index;
+                    let title = match arch_editor_state.selected_language {
+                        ProgrammingLanguageMode::Arch => format!(
+                            "L{:02}  {}",
+                            line_index,
+                            instruction_summary(&program.instructions[line_index])
+                        ),
+                        ProgrammingLanguageMode::Lumen => format!(
+                            "L{:02}  {}",
+                            line_index,
+                            lumen_instruction_summary(&lumen_program.instructions[line_index])
+                        ),
+                    };
                     entry
                         .spawn((
                             Node {
@@ -204,11 +307,7 @@ pub(crate) fn sync_computer_program_entries(
                         ))
                         .with_children(|line| {
                             line.spawn((
-                                Text::new(format!(
-                                    "L{:02}  {}",
-                                    line_index,
-                                    instruction_summary(instruction)
-                                )),
+                                Text::new(title),
                                 TextFont {
                                     font: mono_font.clone(),
                                     font_size: 13.0,
@@ -224,119 +323,195 @@ pub(crate) fn sync_computer_program_entries(
                                 ..default()
                             })
                             .with_children(|buttons| {
-                                let actions = [
-                                    (
-                                        if selected { "Selected" } else { "Select" },
-                                        ArchEditorButtonAction::SelectLine {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                        },
-                                    ),
-                                    (
-                                        "Opcode",
-                                        ArchEditorButtonAction::CycleOpcode {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                        },
-                                    ),
-                                    (
-                                        "Dst",
-                                        ArchEditorButtonAction::CycleDst {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                        },
-                                    ),
-                                    (
-                                        "Src A",
-                                        ArchEditorButtonAction::CycleSrcA {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                        },
-                                    ),
-                                    (
-                                        "Src B",
-                                        ArchEditorButtonAction::CycleSrcB {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                        },
-                                    ),
-                                    (
-                                        "Imm A +",
-                                        ArchEditorButtonAction::AdjustImmediateA {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                            delta: 1,
-                                        },
-                                    ),
-                                    (
-                                        "Imm A -",
-                                        ArchEditorButtonAction::AdjustImmediateA {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                            delta: -1,
-                                        },
-                                    ),
-                                    (
-                                        "Imm B +",
-                                        ArchEditorButtonAction::AdjustImmediateB {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                            delta: 1,
-                                        },
-                                    ),
-                                    (
-                                        "Imm B -",
-                                        ArchEditorButtonAction::AdjustImmediateB {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                            delta: -1,
-                                        },
-                                    ),
-                                    (
-                                        "Jump +",
-                                        ArchEditorButtonAction::AdjustJump {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                            delta: 1,
-                                        },
-                                    ),
-                                    (
-                                        "Jump -",
-                                        ArchEditorButtonAction::AdjustJump {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                            delta: -1,
-                                        },
-                                    ),
-                                    (
-                                        "Insert",
-                                        ArchEditorButtonAction::InsertLineAfter {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                        },
-                                    ),
-                                    (
-                                        "Up",
-                                        ArchEditorButtonAction::MoveLineUp {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                        },
-                                    ),
-                                    (
-                                        "Down",
-                                        ArchEditorButtonAction::MoveLineDown {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                        },
-                                    ),
-                                    (
-                                        "Remove",
-                                        ArchEditorButtonAction::RemoveLine {
-                                            module_id: selected_module.id,
-                                            line: line_index,
-                                        },
-                                    ),
-                                ];
+                                let actions = match arch_editor_state.selected_language {
+                                    ProgrammingLanguageMode::Arch => vec![
+                                        (
+                                            if selected { "Selected" } else { "Select" },
+                                            ArchEditorButtonAction::SelectLine {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Opcode",
+                                            ArchEditorButtonAction::CycleOpcode {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Dst",
+                                            ArchEditorButtonAction::CycleDst {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Src A",
+                                            ArchEditorButtonAction::CycleSrcA {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Src B",
+                                            ArchEditorButtonAction::CycleSrcB {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Imm A +",
+                                            ArchEditorButtonAction::AdjustImmediateA {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                                delta: 1,
+                                            },
+                                        ),
+                                        (
+                                            "Imm A -",
+                                            ArchEditorButtonAction::AdjustImmediateA {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                                delta: -1,
+                                            },
+                                        ),
+                                        (
+                                            "Imm B +",
+                                            ArchEditorButtonAction::AdjustImmediateB {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                                delta: 1,
+                                            },
+                                        ),
+                                        (
+                                            "Imm B -",
+                                            ArchEditorButtonAction::AdjustImmediateB {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                                delta: -1,
+                                            },
+                                        ),
+                                        (
+                                            "Jump +",
+                                            ArchEditorButtonAction::AdjustJump {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                                delta: 1,
+                                            },
+                                        ),
+                                        (
+                                            "Jump -",
+                                            ArchEditorButtonAction::AdjustJump {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                                delta: -1,
+                                            },
+                                        ),
+                                        (
+                                            "Insert",
+                                            ArchEditorButtonAction::InsertLineAfter {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Up",
+                                            ArchEditorButtonAction::MoveLineUp {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Down",
+                                            ArchEditorButtonAction::MoveLineDown {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Remove",
+                                            ArchEditorButtonAction::RemoveLine {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                    ],
+                                    ProgrammingLanguageMode::Lumen => vec![
+                                        (
+                                            if selected { "Selected" } else { "Select" },
+                                            ArchEditorButtonAction::SelectLumenLine {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "BUFF/NERF",
+                                            ArchEditorButtonAction::CycleLumenOp {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Target",
+                                            ArchEditorButtonAction::CycleLumenTarget {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Aspect",
+                                            ArchEditorButtonAction::CycleLumenAspect {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Weight +",
+                                            ArchEditorButtonAction::AdjustLumenWeight {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                                delta: 1,
+                                            },
+                                        ),
+                                        (
+                                            "Weight -",
+                                            ArchEditorButtonAction::AdjustLumenWeight {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                                delta: -1,
+                                            },
+                                        ),
+                                        (
+                                            "Insert",
+                                            ArchEditorButtonAction::InsertLumenLineAfter {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Up",
+                                            ArchEditorButtonAction::MoveLumenLineUp {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Down",
+                                            ArchEditorButtonAction::MoveLumenLineDown {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                        (
+                                            "Remove",
+                                            ArchEditorButtonAction::RemoveLumenLine {
+                                                module_id: selected_module.id,
+                                                line: line_index,
+                                            },
+                                        ),
+                                    ],
+                                };
                                 for (label, action) in actions {
                                     spawn_arch_editor_button(buttons, &mono_font, label, action);
                                 }
@@ -345,6 +520,20 @@ pub(crate) fn sync_computer_program_entries(
                 }
             });
     });
+}
+
+fn lumen_instruction_summary(instruction: &crate::ship::lumen::LumenInstruction) -> String {
+    instruction.syntax()
+}
+
+fn lumen_validation_summary(program: &LumenProgram) -> String {
+    if program.instructions.is_empty() {
+        "no directives".to_string()
+    } else if !program.enabled {
+        "disabled".to_string()
+    } else {
+        format!("{} directives ready", program.instructions.len())
+    }
 }
 
 fn spawn_program_button(

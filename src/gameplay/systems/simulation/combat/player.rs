@@ -30,7 +30,7 @@ pub(crate) fn fire_player_weapons(
     let (children, ship_position, ship_rotation, power_state, arch_commands, mut weapon_state) =
         player_ship_query.into_inner();
 
-    let fire_requested = arch_commands.turret_auto_fire
+    let fire_requested = (arch_commands.turret_auto_fire && !arch_commands.turret_fire_hold)
         || weapon_query
             .iter()
             .any(|(_, _, _, _, turret_state, destroyed)| {
@@ -56,7 +56,9 @@ pub(crate) fn fire_player_weapons(
             continue;
         }
         let is_manual_turret = turret_state.fire_intent;
-        if !is_manual_turret && !arch_commands.turret_auto_fire {
+        if !is_manual_turret
+            && !(arch_commands.turret_auto_fire && !arch_commands.turret_fire_hold)
+        {
             continue;
         }
         if is_manual_turret && !turret_state.fire_intent {

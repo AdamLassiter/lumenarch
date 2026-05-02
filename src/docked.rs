@@ -1,9 +1,11 @@
 use bevy::{log, prelude::*};
+use std::hash::{Hash, Hasher};
 
 use super::{
     HOVERED_BUTTON,
     NORMAL_BUTTON,
     PRESSED_BUTTON,
+    TILE_SIZE,
     TOOLBOX_WIDTH,
     UI_BODY_FONT_SIZE,
     UI_BUTTON_RADIUS,
@@ -12,6 +14,7 @@ use super::{
     UI_TITLE_FONT_SIZE,
     campaign::{CampaignSave, load_campaign, save_campaign},
     netcode,
+    ship::{ModuleKind, ModuleVariant},
     state::{
         CampaignLoadState,
         DemoProgression,
@@ -30,6 +33,15 @@ use super::{
     },
 };
 use crate::ship::{ShipDefinition, enemy::load_default_enemy_library, storage::load_default_ship};
+
+#[derive(Component)]
+pub(crate) struct DockedPreviewRoot;
+
+#[derive(Component)]
+struct DockedPreviewTile;
+
+#[derive(Component)]
+pub(crate) struct DockedPreviewSignature(u128);
 
 pub(crate) fn initialize_campaign_state(
     status: Res<netcode::SessionStatus>,
@@ -124,9 +136,17 @@ pub(crate) fn spawn_docked_ui(
     progression: Res<DemoProgression>,
     last_mission_report: Res<LastMissionReport>,
     editor_ship: Res<EditorShip>,
+    status: Res<netcode::SessionStatus>,
 ) {
     let title_font = asset_server.load("fonts/FiraSans-Bold.ttf");
     let mono_font = asset_server.load("fonts/FiraMono-Medium.ttf");
+    let preview_ship = docked_preview_ship(&editor_ship, &status);
+    spawn_docked_ship_preview(
+        &mut commands,
+        &asset_server,
+        preview_ship.clone(),
+        docked_preview_signature(&preview_ship),
+    );
 
     commands
         .spawn((
@@ -156,7 +176,7 @@ pub(crate) fn spawn_docked_ui(
             ))
             .with_children(|panel| {
                 panel.spawn((
-                    Text::new(format!("Docked At\n{}", docked_state.station_title)),
+                    Text::new(format!("Docked at\n{}", docked_state.station_title)),
                     TextFont {
                         font: title_font.clone(),
                         font_size: UI_TITLE_FONT_SIZE,
@@ -257,9 +277,47 @@ pub(crate) fn spawn_docked_ui(
         });
 }
 
-pub(crate) fn cleanup_docked_ui(mut commands: Commands, query: Query<Entity, With<DockedRoot>>) {
+pub(crate) fn cleanup_docked_ui(
+    mut commands: Commands,
+    query: Query<Entity, With<DockedRoot>>,
+    preview_query: Query<Entity, With<DockedPreviewRoot>>,
+) {
     for entity in &query {
         commands.entity(entity).despawn();
+    }
+    for entity in &preview_query {
+        commands.entity(entity).despawn();
+    }
+}
+
+pub(crate) fn sync_docked_ship_preview(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    editor_ship: Res<EditorShip>,
+    existing_query: Query<(Entity, &DockedPreviewSignature), With<DockedPreviewRoot>>,
+) {
+    let ship = editor_ship.ship.clone();
+    let ship_signature = docked_preview_signature(&ship);
+
+    if let Some((_, existing_signature)) = existing_query.iter().next()
+        && existing_signature.0 == ship_signature
+    {
+        return;
+    }
+
+    for (entity, _) in &existing_query {
+        commands.entity(entity).despawn();
+    }
+
+    spawn_docked_ship_preview(&mut commands, &asset_server, ship, ship_signature);
+}
+
+pub(crate) fn rotate_docked_ship_preview(
+    time: Res<Time>,
+    mut query: Query<&mut Transform, With<DockedPreviewRoot>>,
+) {
+    for mut transform in &mut query {
+        transform.rotate_z(0.12 * time.delta_secs());
     }
 }
 
@@ -411,4 +469,93 @@ fn docked_status_text(
         editor_ship.ship.modules.len(),
         mission
     )
+}
+
+fn spawn_docked_ship_preview(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    ship: ShipDefinition,
+    ship_signature: u128,
+) {
+    if ship.modules.is_empty() {
+        return;
+    }
+
+    let mut min_x = i32::MAX;
+    let mut max_x = i32::MIN;
+    let mut min_y = i32::MAX;
+    let mut max_y = i32::MIN;
+    for module in &ship.modules {
+        min_x = min_x.min(module.grid_x);
+        max_x = max_x.max(module.grid_x);
+        min_y = min_y.min(module.grid_y);
+        max_y = max_y.max(module.grid_y);
+    }
+
+    let center_x = (min_x + max_x) as f32 * 0.5;
+    let center_y = (min_y + max_y) as f32 * 0.5;
+
+    commands
+        .spawn((
+            Transform::from_xyz(360.0, 10.0, 0.0),
+            GlobalTransform::default(),
+            Visibility::Visible,
+            InheritedVisibility::VISIBLE,
+            ViewVisibility::default(),
+            DockedPreviewRoot,
+            DockedPreviewSignature(ship_signature),
+        ))
+        .with_children(|root| {
+            for module in &ship.modules {
+                root.spawn((
+                    Sprite::from_image(
+                        asset_server.load(docked_sprite_path_for_kind(&module.kind, module.variant)),
+                    ),
+                    Transform {
+                        translation: Vec3::new(
+                            (module.grid_x as f32 - center_x) * TILE_SIZE,
+                            -(module.grid_y as f32 - center_y) * TILE_SIZE,
+                            0.1,
+                        ),
+                        rotation: Quat::from_rotation_z(
+                            -(module.rotation_quadrants as f32) * std::f32::consts::FRAC_PI_2,
+                        ),
+                        scale: Vec3::splat(1.0),
+                    },
+                    DockedPreviewTile,
+                ));
+            }
+        });
+}
+
+fn docked_sprite_path_for_kind(kind: &ModuleKind, variant: ModuleVariant) -> String {
+    let _ = variant;
+    match kind {
+        ModuleKind::Turret => "tiles/hardpoint.png".to_string(),
+        ModuleKind::Shield => "tiles/battery.png".to_string(),
+        _ => format!("tiles/{}.png", kind.as_str()),
+    }
+}
+
+fn docked_preview_ship(
+    editor_ship: &EditorShip,
+    status: &netcode::SessionStatus,
+) -> ShipDefinition {
+    if !editor_ship.ship.modules.is_empty() {
+        return editor_ship.ship.clone();
+    }
+    if let Some(snapshot) = status.active_ship_snapshot.as_ref() {
+        return snapshot.clone();
+    }
+    match load_default_ship() {
+        Ok(Some(ship)) => ship,
+        Ok(None) | Err(_) => ShipDefinition::empty("Untitled Knot"),
+    }
+}
+
+fn docked_preview_signature(ship: &ShipDefinition) -> u128 {
+    let encoded = serde_json::to_vec(ship).unwrap_or_default();
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    encoded.hash(&mut hasher);
+    hasher.finish() as u128
 }

@@ -43,10 +43,10 @@ Define the finished shape of the direct and optimization language layers.
 
 ### Tasks
 
-- [ ] Audit the current ARCH interpreter/editor/runtime state.
-- [ ] Identify gaps between implementation and `ARCHLANG` docs.
-- [ ] Define the first canonical LUMEN syntax and execution model.
-- [ ] Decide how ARCH and LUMEN programs coexist on ship systems.
+- [x] Audit the current ARCH interpreter/editor/runtime state.
+- [x] Identify gaps between implementation and `ARCHLANG` docs.
+- [x] Define the first canonical LUMEN syntax and execution model.
+- [x] Decide how ARCH and LUMEN programs coexist on ship systems.
 
 Definition of done:
 
@@ -62,10 +62,10 @@ Bring ARCH behavior in line with the intended instruction set.
 
 ### Tasks
 
-- [ ] Audit every documented ARCH opcode against implementation.
-- [ ] Add any missing execution semantics.
+- [x] Audit every documented ARCH opcode against implementation.
+- [x] Add any missing execution semantics.
 - [ ] Normalize parsing, operand rules, and validation behavior.
-- [ ] Ensure domain/error behavior is deterministic and readable.
+- [x] Ensure domain/error behavior is deterministic and readable.
 
 Definition of done:
 
@@ -81,10 +81,10 @@ Make the programmable control surface explicit and coherent.
 
 ### Tasks
 
-- [ ] Audit readable and writable registers exposed by current component systems.
+- [x] Audit readable and writable registers exposed by current component systems.
 - [ ] Normalize naming and grouping where needed.
-- [ ] Ensure runtime components expose the state needed by richer programs.
-- [ ] Keep manual and automated control surfaces aligned.
+- [x] Ensure runtime components expose the state needed by richer programs.
+- [x] Keep manual and automated control surfaces aligned.
 
 Definition of done:
 
@@ -100,16 +100,16 @@ Replace the current basic editing flow with a real in-game engineering tool.
 
 ### Tasks
 
-- [ ] Add a fuller line-based ARCH editor UI.
+- [x] Add a fuller line-based ARCH editor UI.
 - [ ] Support:
-  - inserting/removing lines
-  - reordering lines
-  - editing opcodes
-  - editing operands
-  - editing constants
-  - naming and saving programs
-- [ ] Add parse / validation / execution feedback.
-- [ ] Keep the interface usable without requiring external docs open.
+  - [x] inserting/removing lines
+  - [x] reordering lines
+  - [x] editing opcodes
+  - [x] editing operands
+  - [x] editing constants
+  - [ ] naming and saving programs
+- [x] Add parse / validation / execution feedback.
+- [x] Keep the interface usable without requiring external docs open.
 
 Definition of done:
 
@@ -125,10 +125,10 @@ Make authored automation inspectable during play.
 
 ### Tasks
 
-- [ ] Show current program and active computer status clearly.
-- [ ] Show recent writes and halt/error reasons.
-- [ ] Surface invalid instruction/domain failures cleanly.
-- [ ] Improve mission/reporting integration for authored automation outcomes.
+- [x] Show current program and active computer status clearly.
+- [x] Show recent writes and halt/error reasons.
+- [x] Surface invalid instruction/domain failures cleanly.
+- [x] Improve mission/reporting integration for authored automation outcomes.
 
 Definition of done:
 
@@ -144,12 +144,12 @@ Introduce LUMEN as its own saved language layer.
 
 ### Tasks
 
-- [ ] Define program/instruction representation for LUMEN.
-- [ ] Define target specification structures.
-- [ ] Define optimization operation structures such as:
-  - `BUFF`
-  - `NERF`
-- [ ] Add save/load support for LUMEN-authored content.
+- [x] Define program/instruction representation for LUMEN.
+- [x] Define target specification structures.
+- [x] Define optimization operation structures such as:
+  - [x] `BUFF`
+  - [x] `NERF`
+- [x] Add save/load support for LUMEN-authored content.
 
 Definition of done:
 
@@ -167,12 +167,12 @@ Make LUMEN speak a real language with real targets.
 
 - [ ] Implement first-pass parser/validator for LUMEN syntax.
 - [ ] Define target forms such as:
-  - explicit addressed module
-  - module-family filter
-  - nearby/range-based groups
-  - register-group targeting
-- [ ] Resolve those targets deterministically at runtime.
-- [ ] Surface target resolution in the editor/UI for debugging.
+  - [ ] explicit addressed module
+  - [x] module-family filter
+  - [ ] nearby/range-based groups
+  - [ ] register-group targeting
+- [x] Resolve those targets deterministically at runtime.
+- [x] Surface target resolution in the editor/UI for debugging.
 
 Definition of done:
 
@@ -188,10 +188,10 @@ Apply optimization/bias behavior without collapsing back into direct control.
 
 ### Tasks
 
-- [ ] Define how `BUFF`/`NERF` affect target properties.
-- [ ] Keep effects bounded, deterministic, and inspectable.
-- [ ] Ensure LUMEN modifies tendencies/weights rather than directly issuing ARCH-style commands.
-- [ ] Integrate with existing component/system simulation.
+- [x] Define how `BUFF`/`NERF` affect target properties.
+- [x] Keep effects bounded, deterministic, and inspectable.
+- [x] Ensure LUMEN modifies tendencies/weights rather than directly issuing ARCH-style commands.
+- [x] Integrate with existing component/system simulation.
 
 Definition of done:
 
@@ -207,10 +207,10 @@ Make LUMEN authorable in-game with comparable quality to ARCH.
 
 ### Tasks
 
-- [ ] Add a dedicated LUMEN editing view/panel.
-- [ ] Support target selection and optimization-instruction editing.
-- [ ] Show affected target preview or summary where possible.
-- [ ] Keep the UI visually distinct from ARCH to reinforce conceptual separation.
+- [x] Add a dedicated LUMEN editing view/panel.
+- [x] Support target selection and optimization-instruction editing.
+- [x] Show affected target preview or summary where possible.
+- [x] Keep the UI visually distinct from ARCH to reinforce conceptual separation.
 
 Definition of done:
 
@@ -226,9 +226,9 @@ Make both layers coexist coherently on the same ship.
 
 ### Tasks
 
-- [ ] Define evaluation order between ARCH and LUMEN.
-- [ ] Prevent undefined conflicts between direct writes and optimization effects.
-- [ ] Add clear runtime status reporting when both are active.
+- [x] Define evaluation order between ARCH and LUMEN.
+- [x] Prevent undefined conflicts between direct writes and optimization effects.
+- [x] Add clear runtime status reporting when both are active.
 - [ ] Ensure mission outcomes can reflect both types of logic separately.
 
 Definition of done:
@@ -247,7 +247,7 @@ Put the completed language stack under meaningful pressure.
 
 - [ ] Add one or more scenarios where richer ARCH is clearly useful.
 - [ ] Add one or more scenarios where LUMEN is clearly useful but not interchangeable with ARCH.
-- [ ] Ensure the current component roster exposes enough interesting targets.
+- [x] Ensure the current component roster exposes enough interesting targets.
 - [ ] Check that the player can perceive the difference in behavior.
 
 Definition of done:
@@ -267,19 +267,24 @@ Leave the programming layer coherent both in code and in design docs.
 - [ ] Tune instruction budgets, effect magnitudes, and usability.
 - [ ] Update docs for final implemented syntax and behavior.
 - [ ] Document current limits honestly.
-- [ ] Ensure save/load, reports, and UI all align with the final model.
+- [x] Ensure save/load, reports, and UI all align with the final model.
 
 Definition of done:
 
 * the project’s automation stack matches its documentation and intended identity
 
-## Immediate Next Task
+## Current Status
 
-Start with **Phase 1**:
+The current implementation now includes:
 
-* audit current ARCH implementation vs docs
-* define the first canonical LUMEN syntax and targeting model
-* decide where the line between direct control and optimization will be enforced in code
+* a saved LUMEN program model on computer modules
+* a dedicated in-editor LUMEN workshop alongside the existing ARCH workshop
+* deterministic post-ARCH LUMEN runtime evaluation
+* runtime reporting that surfaces both ARCH writes and LUMEN effects
 
-That architectural boundary is the most important decision in the slice.
+The biggest remaining gaps are:
 
+* a proper text parser/validator for LUMEN syntax rather than button-driven authoring only
+* broader target resolution beyond the first family/group-based pass
+* fuller docs alignment with the now-implemented runtime/editor model
+* scenario/content tuning that proves where LUMEN is useful but not interchangeable with ARCH

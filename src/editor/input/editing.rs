@@ -82,7 +82,7 @@ pub(crate) fn leave_editor_button_system(
                     }
                     EditorMode::Enemy => {
                         rollback_state.phase = netcode::RollbackPhase::Docked;
-                        next_mode.set(FrontendMode::Menu);
+                        next_mode.set(FrontendMode::Lobby);
                     }
                 }
             }
@@ -117,7 +117,7 @@ pub(crate) fn leave_editor_keyboard_shortcut(
             }
             EditorMode::Enemy => {
                 rollback_state.phase = netcode::RollbackPhase::Docked;
-                next_mode.set(FrontendMode::Menu);
+                next_mode.set(FrontendMode::Lobby);
             }
         }
     }

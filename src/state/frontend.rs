@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(States, Debug, Clone, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
 pub(crate) enum FrontendMode {
     #[default]
-    Menu,
+    Lobby,
     Session,
     DebugEnemyEditor,
 }
@@ -33,7 +33,7 @@ pub(crate) struct CampaignLoadState {
 }
 
 #[derive(Component)]
-pub(crate) struct MenuRoot;
+pub(crate) struct LobbyRoot;
 
 #[derive(Component)]
 pub(crate) struct DockedRoot;

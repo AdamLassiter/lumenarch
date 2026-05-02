@@ -90,6 +90,14 @@ impl Default for EditorToolState {
 pub(crate) struct ArchEditorState {
     pub(crate) selected_module_id: Option<u64>,
     pub(crate) selected_line: usize,
+    pub(crate) selected_language: ProgrammingLanguageMode,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum ProgrammingLanguageMode {
+    #[default]
+    Arch,
+    Lumen,
 }
 
 #[derive(Component)]
@@ -132,8 +140,11 @@ pub(crate) struct ToolboxButton {
 
 #[derive(Clone, Copy)]
 pub(crate) enum ProgramButtonAction {
-    CycleTemplate,
-    AdjustConstant { index: usize, delta: i32 },
+    SwitchLanguage(ProgrammingLanguageMode),
+    CycleArchTemplate,
+    AdjustArchConstant { index: usize, delta: i32 },
+    CycleLumenTemplate,
+    ToggleLumenEnabled,
 }
 
 #[derive(Clone, Copy)]
@@ -153,6 +164,17 @@ pub(crate) enum ArchEditorButtonAction {
     AdjustImmediateB { module_id: u64, line: usize, delta: i32 },
     AdjustJump { module_id: u64, line: usize, delta: i32 },
     RenameModuleProgram(u64),
+    SelectLumenLine { module_id: u64, line: usize },
+    AddLumenLine(u64),
+    InsertLumenLineAfter { module_id: u64, line: usize },
+    RemoveLumenLine { module_id: u64, line: usize },
+    MoveLumenLineUp { module_id: u64, line: usize },
+    MoveLumenLineDown { module_id: u64, line: usize },
+    CycleLumenOp { module_id: u64, line: usize },
+    CycleLumenTarget { module_id: u64, line: usize },
+    CycleLumenAspect { module_id: u64, line: usize },
+    AdjustLumenWeight { module_id: u64, line: usize, delta: i32 },
+    RenameLumenProgram(u64),
 }
 
 #[derive(Component)]

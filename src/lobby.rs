@@ -1,5 +1,7 @@
 use bevy::{
-    input::keyboard::{Key, KeyboardInput}, log, prelude::*
+    input::keyboard::{Key, KeyboardInput},
+    log,
+    prelude::*,
 };
 
 use super::{
@@ -8,19 +10,19 @@ use super::{
     PRESSED_BUTTON,
     netcode,
     state::{
-        FrontendMode,
         DebugEnemyEditorButton,
         EditorMode,
         EditorSessionState,
+        FrontendMode,
         HostAddressText,
         JoinButton,
         JoinButtonText,
-        MenuRoot,
+        LobbyRoot,
         StatusText,
     },
 };
 
-pub(crate) fn spawn_menu_ui(
+pub(crate) fn spawn_lobby_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     config: Res<netcode::SessionConfig>,
@@ -39,7 +41,7 @@ pub(crate) fn spawn_menu_ui(
                 ..default()
             },
             BackgroundColor(Color::NONE),
-            MenuRoot,
+            LobbyRoot,
         ))
         .with_children(|parent| {
             parent
@@ -66,15 +68,12 @@ pub(crate) fn spawn_menu_ui(
                     ));
 
                     panel.spawn((
-
-                        Text::new(
-                            format!(
-                                    "Type a session descriptor, Backspace to delete, Enter to start.\nExamples: host@{} or client1@{}>{}",
-                                    super::DEFAULT_HOST_ADDR,
-                                    super::DEFAULT_CLIENT_ADDR,
-                                    super::DEFAULT_HOST_ADDR
-                                ),
-                        ),
+                        Text::new(format!(
+                            "Type a session descriptor, Backspace to delete, Enter to start.\nExamples: host@{} or client1@{}>{}",
+                            super::DEFAULT_HOST_ADDR,
+                            super::DEFAULT_CLIENT_ADDR,
+                            super::DEFAULT_HOST_ADDR
+                        )),
                         TextFont {
                             font: title_font.clone(),
                             font_size: 18.0,
@@ -156,7 +155,7 @@ pub(crate) fn spawn_menu_ui(
                         ));
 
                     panel.spawn((
-                        Text::new(menu_status_line(&status, &config.session_descriptor)),
+                        Text::new(lobby_status_line(&status, &config.session_descriptor)),
                         TextFont {
                             font: mono_font,
                             font_size: 16.0,
@@ -223,7 +222,7 @@ pub(crate) fn update_host_address_text(
     }
 }
 
-pub(crate) fn menu_button_system(
+pub(crate) fn lobby_button_system(
     mut commands: Commands,
     mut interaction_query: Query<
         (
@@ -257,7 +256,7 @@ pub(crate) fn menu_button_system(
                     } else {
                         editor_session.mode = EditorMode::Player;
                         log::info!(
-                            "Menu join requested with session descriptor '{}'",
+                            "Lobby join requested with session descriptor '{}'",
                             config.session_descriptor
                         );
                         netcode::begin_session_attempt(
@@ -290,7 +289,7 @@ pub(crate) fn menu_button_system(
     }
 }
 
-pub(crate) fn menu_keyboard_shortcuts(
+pub(crate) fn lobby_keyboard_shortcuts(
     keys: Res<ButtonInput<KeyCode>>,
     config: Res<netcode::SessionConfig>,
     mut status: ResMut<netcode::SessionStatus>,
@@ -304,7 +303,7 @@ pub(crate) fn menu_keyboard_shortcuts(
             netcode::request_lobby_session_start(&mut status, &bootstrap, lobby_runtime.as_ref());
         } else {
             log::info!(
-                "Menu keyboard shortcut requested session start for descriptor '{}'",
+                "Lobby keyboard shortcut requested session start for descriptor '{}'",
                 config.session_descriptor
             );
             netcode::begin_session_attempt(
@@ -317,7 +316,7 @@ pub(crate) fn menu_keyboard_shortcuts(
     }
 }
 
-pub(crate) fn update_menu_status_text(
+pub(crate) fn update_lobby_status_text(
     status: Res<netcode::SessionStatus>,
     config: Res<netcode::SessionConfig>,
     mut status_query: Query<&mut Text, With<StatusText>>,
@@ -328,7 +327,7 @@ pub(crate) fn update_menu_status_text(
     }
 
     for mut text in &mut status_query {
-        **text = menu_status_line(&status, &config.session_descriptor);
+        **text = lobby_status_line(&status, &config.session_descriptor);
     }
 
     for mut text in &mut join_button_query {
@@ -336,17 +335,17 @@ pub(crate) fn update_menu_status_text(
     }
 }
 
-pub(crate) fn cleanup_menu_ui(mut commands: Commands, query: Query<Entity, With<MenuRoot>>) {
-    for entity in &query {
+pub(crate) fn cleanup_lobby_ui(mut commands: Commands, ui_query: Query<Entity, With<LobbyRoot>>) {
+    for entity in &ui_query {
         commands.entity(entity).despawn();
     }
 }
 
-pub(crate) fn menu_ui_missing(query: Query<Entity, With<MenuRoot>>) -> bool {
+pub(crate) fn lobby_ui_missing(query: Query<Entity, With<LobbyRoot>>) -> bool {
     query.is_empty()
 }
 
-pub(crate) fn menu_ui_present(query: Query<Entity, With<MenuRoot>>) -> bool {
+pub(crate) fn lobby_ui_present(query: Query<Entity, With<LobbyRoot>>) -> bool {
     !query.is_empty()
 }
 
@@ -368,7 +367,7 @@ fn join_button_label(server_addr: &str, status: &netcode::SessionStatus) -> &'st
     }
 }
 
-fn menu_status_line(status: &netcode::SessionStatus, server_addr: &str) -> String {
+fn lobby_status_line(status: &netcode::SessionStatus, server_addr: &str) -> String {
     let lobby_count = status
         .lobby_snapshot
         .as_ref()

@@ -71,6 +71,7 @@ pub(crate) struct ShipAutomationState {
     pub(crate) trigger_count: u32,
     pub(crate) invalid_executions: u32,
     pub(crate) last_primary_program: Option<String>,
+    pub(crate) last_secondary_program: Option<String>,
     pub(crate) recent_writes: Vec<String>,
 }
 
@@ -88,6 +89,7 @@ pub(crate) struct ShipArchCommandState {
     pub(crate) logistics_preference: ArchLogisticsPreference,
     pub(crate) turret_assist_enabled: bool,
     pub(crate) turret_auto_fire: bool,
+    pub(crate) turret_fire_hold: bool,
 }
 
 impl Default for ShipArchCommandState {
@@ -98,6 +100,7 @@ impl Default for ShipArchCommandState {
             logistics_preference: ArchLogisticsPreference::FeedProcessor,
             turret_assist_enabled: false,
             turret_auto_fire: false,
+            turret_fire_hold: false,
         }
     }
 }

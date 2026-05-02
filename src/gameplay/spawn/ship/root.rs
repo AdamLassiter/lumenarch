@@ -253,6 +253,7 @@ pub(crate) fn spawn_runtime_ship(
                 trigger_count: 0,
                 invalid_executions: 0,
                 last_primary_program: None,
+                last_secondary_program: None,
                 recent_writes: Vec::new(),
             },
             ShipArchCommandState::default(),

@@ -197,17 +197,31 @@ pub(super) fn summarize_arch(
         if let Some(computer) = computer {
             return ArchSummary {
                 program_name: if computer.last_result.program_name.is_empty() {
-                    computer.program.name.clone()
+                    format!(
+                        "{} / {}",
+                        computer.program.name,
+                        computer.lumen_program.name
+                    )
                 } else {
-                    computer.last_result.program_name.clone()
+                    format!(
+                        "{} / {}",
+                        computer.last_result.program_name,
+                        computer.last_lumen_result.program_name
+                    )
                 },
                 exec_summary: format!(
-                    "{}/{}",
-                    computer.last_result.executed, computer.last_result.budget
+                    "{}/{} | {}",
+                    computer.last_result.executed,
+                    computer.last_result.budget,
+                    computer.last_lumen_result.resolved_targets
                 ),
                 invalid_count: u32::from(computer.last_result.halted_reason.is_some()),
                 recent_writes: if computer.last_result.recent_writes.is_empty() {
-                    "none".to_string()
+                    if computer.last_lumen_result.recent_effects.is_empty() {
+                        "none".to_string()
+                    } else {
+                        computer.last_lumen_result.recent_effects.join(", ")
+                    }
                 } else {
                     computer.last_result.recent_writes.join(", ")
                 },

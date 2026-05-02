@@ -3,8 +3,8 @@ use bevy::prelude::*;
 use crate::{
     UI_BUTTON_RADIUS,
     state::{
-        SectorMapDetailText, SectorMapStatusText, SectorMapViewState, SectorNodeButton,
-        SectorNodeKind, SectorNodeStatus, SectorState,
+        SectorMapDetailText, SectorMapLinkDash, SectorMapStatusText, SectorMapViewState,
+        SectorMapNodeBorder, SectorNodeButton, SectorNodeKind, SectorNodeStatus, SectorState,
     },
 };
 
@@ -16,17 +16,60 @@ pub(super) const MAP_NODE_HEIGHT: f32 = 52.0;
 pub(crate) fn sync_sector_map_layout(
     sector_state: Res<SectorState>,
     view_state: Res<SectorMapViewState>,
-    mut node_query: Query<(&SectorNodeButton, &mut Node)>,
+    mut node_query: Query<
+        (&SectorNodeButton, &mut Node, &mut BackgroundColor, &mut BorderColor),
+        (With<SectorMapNodeBorder>, Without<SectorMapLinkDash>),
+    >,
+    mut dash_query: Query<
+        (&SectorMapLinkDash, &mut Node, &mut Transform, &mut BackgroundColor),
+        Without<SectorMapNodeBorder>,
+    >,
 ) {
     if !sector_state.is_changed() && !view_state.is_changed() {
         return;
     }
 
-    for (button, mut node_style) in &mut node_query {
+    for (button, mut node_style, mut background, mut border) in &mut node_query {
         let Some(node) = sector_state.node(button.node_id) else {
             continue;
         };
+        let reachable = sector_state.is_reachable(node.id);
+        let is_current = sector_state.current_node_id == node.id;
+        let is_selected = sector_state.selected_node_id == Some(node.id);
         *node_style = projected_node(node.position, view_state.zoom, view_state.offset);
+        *background = BackgroundColor(node_button_color(
+            node.kind,
+            node.status,
+            reachable,
+            is_current,
+            is_selected,
+        ));
+        *border = BorderColor::all(node_border_color(is_current, reachable));
+    }
+
+    let current_position = sector_state
+        .current_node()
+        .map(|node| node.position)
+        .unwrap_or([0.0, 0.0]);
+    for (dash, mut node, mut transform, mut background) in &mut dash_query {
+        let reachable = sector_state.is_reachable(dash.target_node_id);
+        if let Some(target_node) = sector_state.node(dash.target_node_id) {
+            let (next_node, next_transform) = projected_link_dash(
+                current_position,
+                target_node.position,
+                view_state.zoom,
+                view_state.offset,
+                dash.dash_index,
+                dash.dash_count,
+            );
+            *node = next_node;
+            *transform = next_transform;
+            *background = BackgroundColor(if reachable {
+                Color::srgb(0.88, 0.70, 0.30)
+            } else {
+                Color::srgba(0.88, 0.70, 0.30, 0.0)
+            });
+        }
     }
 }
 
@@ -114,6 +157,16 @@ pub(super) fn node_button_color(
     }
 }
 
+pub(super) fn node_border_color(is_current: bool, reachable: bool) -> Color {
+    if is_current {
+        Color::srgb(0.98, 0.88, 0.42)
+    } else if reachable {
+        Color::srgb(0.44, 0.58, 0.74)
+    } else {
+        Color::srgba(0.10, 0.10, 0.10, 0.0)
+    }
+}
+
 pub(super) fn projected_node(position: [f32; 2], zoom: f32, offset: Vec2) -> Node {
     Node {
         position_type: PositionType::Absolute,
@@ -121,10 +174,46 @@ pub(super) fn projected_node(position: [f32; 2], zoom: f32, offset: Vec2) -> Nod
         top: Val::Px(position[1] * zoom + MAP_CENTER_Y + offset.y),
         width: Val::Px(MAP_NODE_WIDTH * zoom.clamp(0.8, 1.35)),
         height: Val::Px(MAP_NODE_HEIGHT * zoom.clamp(0.8, 1.35)),
+        border: UiRect::all(Val::Px(3.0)),
         justify_content: JustifyContent::Center,
         align_items: AlignItems::Center,
         padding: UiRect::horizontal(Val::Px(8.0)),
         border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
         ..default()
     }
+}
+
+pub(super) fn projected_link_dash(
+    start: [f32; 2],
+    end: [f32; 2],
+    zoom: f32,
+    offset: Vec2,
+    dash_index: u8,
+    dash_count: u8,
+) -> (Node, Transform) {
+    let dash_count = dash_count.max(1);
+    let start = Vec2::new(start[0], start[1]) * zoom + Vec2::new(MAP_CENTER_X, MAP_CENTER_Y) + offset;
+    let end = Vec2::new(end[0], end[1]) * zoom + Vec2::new(MAP_CENTER_X, MAP_CENTER_Y) + offset;
+    let delta = end - start;
+    let direction = if delta.length_squared() > 0.0 {
+        delta.normalize()
+    } else {
+        Vec2::X
+    };
+    let progress = (dash_index as f32 + 0.5) / dash_count as f32;
+    let dash_length = (delta.length() / dash_count as f32 * 0.55).max(6.0);
+    let center = start + delta * progress;
+    let angle = direction.y.atan2(direction.x);
+
+    (
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(center.x - dash_length * 0.5),
+            top: Val::Px(center.y - 1.5),
+            width: Val::Px(dash_length),
+            height: Val::Px(3.0),
+            ..default()
+        },
+        Transform::from_rotation(Quat::from_rotation_z(angle)),
+    )
 }

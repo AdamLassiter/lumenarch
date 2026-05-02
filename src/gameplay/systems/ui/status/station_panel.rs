@@ -299,6 +299,24 @@ pub(super) fn station_panel_display(
                 Color::srgb(0.90, 0.64, 0.20),
             ),
             readout_light(
+                "LUMEN",
+                if computer.lumen_program.enabled {
+                    computer
+                        .last_lumen_result
+                        .recent_effects
+                        .first()
+                        .map(|effect| effect.as_str())
+                        .unwrap_or("Ready")
+                } else {
+                    "Disabled"
+                },
+                if computer.lumen_program.enabled {
+                    Color::srgb(0.44, 0.88, 0.68)
+                } else {
+                    Color::srgb(0.84, 0.28, 0.28)
+                },
+            ),
+            readout_light(
                 "Halt State",
                 computer
                     .last_result

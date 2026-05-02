@@ -4,7 +4,7 @@ use super::{
     super::helpers::{FixedVec2, Fx},
     logistics::ResourceKind,
 };
-use crate::ship::{ModuleKind, ModuleVariant, arch::ArchProgram};
+use crate::ship::{ModuleKind, ModuleVariant, arch::ArchProgram, lumen::LumenProgram};
 
 #[derive(Component, Clone)]
 pub(crate) struct RuntimeShipModule {
@@ -65,12 +65,22 @@ pub(crate) struct ArchExecutionResult {
     pub(crate) program_name: String,
 }
 
+#[derive(Clone, Debug, Default)]
+pub(crate) struct LumenExecutionResult {
+    pub(crate) resolved_targets: u32,
+    pub(crate) recent_effects: Vec<String>,
+    pub(crate) halted_reason: Option<String>,
+    pub(crate) program_name: String,
+}
+
 #[derive(Component, Clone)]
 pub(crate) struct RuntimeArchComputer {
     pub(crate) enabled: bool,
     pub(crate) instruction_budget: u32,
     pub(crate) program: ArchProgram,
     pub(crate) last_result: ArchExecutionResult,
+    pub(crate) lumen_program: LumenProgram,
+    pub(crate) last_lumen_result: LumenExecutionResult,
 }
 
 #[derive(Component)]

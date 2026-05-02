@@ -170,7 +170,7 @@ pub(crate) fn inspection_text(
     };
     let logistics_line = if let Some(computer) = computer {
         format!(
-            "Computer: {}  exec {}/{}  {}",
+            "Computer: {}  exec {}/{}  {}  |  LUMEN: {} ({})",
             if computer.last_result.program_name.is_empty() {
                 computer.program.name.as_str()
             } else {
@@ -182,7 +182,18 @@ pub(crate) fn inspection_text(
                 .last_result
                 .halted_reason
                 .as_deref()
-                .unwrap_or("ok")
+                .unwrap_or("ok"),
+            computer.last_lumen_result.program_name.as_str(),
+            if computer.lumen_program.enabled {
+                computer
+                    .last_lumen_result
+                    .recent_effects
+                    .first()
+                    .map(|s| s.as_str())
+                    .unwrap_or("ready")
+            } else {
+                "disabled"
+            }
         )
     } else if let Some(storage) = storage {
         format!(

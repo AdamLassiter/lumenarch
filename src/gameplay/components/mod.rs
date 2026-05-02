@@ -54,6 +54,7 @@ pub(crate) use modules::{
     ArchComputerModule,
     ArchExecutionResult,
     DestroyedModule,
+    LumenExecutionResult,
     DetectorCommandState,
     DroneStationCommandState,
     DroneTask,

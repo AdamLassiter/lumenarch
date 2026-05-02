@@ -4,10 +4,14 @@ use crate::{
     netcode,
     HOVERED_BUTTON,
     PRESSED_BUTTON,
-    ship::arch::{ArchInstruction, ArchProgram, ArchProgramTemplate, ArchRegister, ArchValueRef},
+    ship::{
+        ModuleKind,
+        arch::{ArchInstruction, ArchProgram, ArchProgramTemplate, ArchRegister, ArchValueRef},
+        lumen::{LumenAspect, LumenInstruction, LumenOp, LumenProgram, LumenProgramTemplate, LumenTarget},
+    },
     state::{
-        ArchEditorButton, ArchEditorButtonAction, ArchEditorState, ComputerProgramButton,
-        EditorShip, ProgramButtonAction,
+        ArchEditorButton, ArchEditorButtonAction, ArchEditorState, ComputerProgramButton, EditorShip,
+        ProgramButtonAction, ProgrammingLanguageMode,
     },
 };
 
@@ -16,6 +20,7 @@ pub(crate) fn computer_program_button_system(
         (&Interaction, &ComputerProgramButton, &mut BackgroundColor),
         (Changed<Interaction>, With<Button>),
     >,
+    mut arch_editor_state: ResMut<ArchEditorState>,
     mut editor_ship: ResMut<EditorShip>,
     status: Res<netcode::SessionStatus>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
@@ -35,17 +40,37 @@ pub(crate) fn computer_program_button_system(
                 else {
                     continue;
                 };
-                let program = module.arch_program.get_or_insert_with(|| {
-                    ArchProgram::from_template(ArchProgramTemplate::BalancedOps)
-                });
                 match button.action {
-                    ProgramButtonAction::CycleTemplate => {
+                    ProgramButtonAction::SwitchLanguage(language) => {
+                        arch_editor_state.selected_language = language;
+                        arch_editor_state.selected_module_id = Some(button.module_id);
+                        arch_editor_state.selected_line = 0;
+                    }
+                    ProgramButtonAction::CycleArchTemplate => {
+                        let program = module.arch_program.get_or_insert_with(|| {
+                            ArchProgram::from_template(ArchProgramTemplate::BalancedOps)
+                        });
                         *program = ArchProgram::from_template(program.template.next());
                     }
-                    ProgramButtonAction::AdjustConstant { index, delta } => {
+                    ProgramButtonAction::AdjustArchConstant { index, delta } => {
+                        let program = module.arch_program.get_or_insert_with(|| {
+                            ArchProgram::from_template(ArchProgramTemplate::BalancedOps)
+                        });
                         if let Some(constant) = program.constants.get_mut(index) {
                             *constant = (*constant + delta).clamp(0, 20);
                         }
+                    }
+                    ProgramButtonAction::CycleLumenTemplate => {
+                        let lumen_program = module.lumen_program.get_or_insert_with(|| {
+                            LumenProgram::from_template(LumenProgramTemplate::BalancedSupervision)
+                        });
+                        *lumen_program = LumenProgram::from_template(lumen_program.template.next());
+                    }
+                    ProgramButtonAction::ToggleLumenEnabled => {
+                        let lumen_program = module.lumen_program.get_or_insert_with(|| {
+                            LumenProgram::from_template(LumenProgramTemplate::BalancedSupervision)
+                        });
+                        lumen_program.enabled = !lumen_program.enabled;
                     }
                 }
                 rollback_state.editor_ship = editor_ship.ship.clone();
@@ -97,6 +122,12 @@ fn apply_arch_editor_action(
             arch_editor_state.selected_line = 0;
         }
         ArchEditorButtonAction::SelectLine { module_id, line } => {
+            arch_editor_state.selected_language = ProgrammingLanguageMode::Arch;
+            arch_editor_state.selected_module_id = Some(module_id);
+            arch_editor_state.selected_line = line;
+        }
+        ArchEditorButtonAction::SelectLumenLine { module_id, line } => {
+            arch_editor_state.selected_language = ProgrammingLanguageMode::Lumen;
             arch_editor_state.selected_module_id = Some(module_id);
             arch_editor_state.selected_line = line;
         }
@@ -205,6 +236,84 @@ fn apply_arch_editor_action(
             };
             program.name = format!("ARCH-{}", module_id);
         }
+        ArchEditorButtonAction::AddLumenLine(module_id) => {
+            let Some(program) = module_lumen_program_mut(editor_ship, module_id) else {
+                return;
+            };
+            program.instructions.push(default_lumen_instruction());
+            arch_editor_state.selected_language = ProgrammingLanguageMode::Lumen;
+            arch_editor_state.selected_module_id = Some(module_id);
+            arch_editor_state.selected_line = program.instructions.len().saturating_sub(1);
+        }
+        ArchEditorButtonAction::InsertLumenLineAfter { module_id, line } => {
+            let Some(program) = module_lumen_program_mut(editor_ship, module_id) else {
+                return;
+            };
+            let insert_at = (line + 1).min(program.instructions.len());
+            program.instructions.insert(insert_at, default_lumen_instruction());
+            arch_editor_state.selected_language = ProgrammingLanguageMode::Lumen;
+            arch_editor_state.selected_module_id = Some(module_id);
+            arch_editor_state.selected_line = insert_at;
+        }
+        ArchEditorButtonAction::RemoveLumenLine { module_id, line } => {
+            let Some(program) = module_lumen_program_mut(editor_ship, module_id) else {
+                return;
+            };
+            if program.instructions.len() > 1 && line < program.instructions.len() {
+                program.instructions.remove(line);
+                arch_editor_state.selected_line = arch_editor_state
+                    .selected_line
+                    .min(program.instructions.len().saturating_sub(1));
+            }
+        }
+        ArchEditorButtonAction::MoveLumenLineUp { module_id, line } => {
+            let Some(program) = module_lumen_program_mut(editor_ship, module_id) else {
+                return;
+            };
+            if line > 0 && line < program.instructions.len() {
+                program.instructions.swap(line, line - 1);
+                arch_editor_state.selected_line = line - 1;
+            }
+        }
+        ArchEditorButtonAction::MoveLumenLineDown { module_id, line } => {
+            let Some(program) = module_lumen_program_mut(editor_ship, module_id) else {
+                return;
+            };
+            if line + 1 < program.instructions.len() {
+                program.instructions.swap(line, line + 1);
+                arch_editor_state.selected_line = line + 1;
+            }
+        }
+        ArchEditorButtonAction::CycleLumenOp { module_id, line } => {
+            mutate_lumen_instruction(editor_ship, module_id, line, |instruction| {
+                instruction.op = instruction.op.next();
+            });
+        }
+        ArchEditorButtonAction::CycleLumenTarget { module_id, line } => {
+            mutate_lumen_instruction(editor_ship, module_id, line, |instruction| {
+                instruction.target = instruction.target.next();
+            });
+        }
+        ArchEditorButtonAction::CycleLumenAspect { module_id, line } => {
+            mutate_lumen_instruction(editor_ship, module_id, line, |instruction| {
+                instruction.aspect = instruction.aspect.next();
+            });
+        }
+        ArchEditorButtonAction::AdjustLumenWeight {
+            module_id,
+            line,
+            delta,
+        } => {
+            mutate_lumen_instruction(editor_ship, module_id, line, |instruction| {
+                instruction.weight = ((instruction.weight as i32 + delta).clamp(0, 9)) as u8;
+            });
+        }
+        ArchEditorButtonAction::RenameLumenProgram(module_id) => {
+            let Some(program) = module_lumen_program_mut(editor_ship, module_id) else {
+                return;
+            };
+            program.name = format!("LUMEN-{}", module_id);
+        }
     }
 }
 
@@ -224,6 +333,22 @@ fn module_program_mut(editor_ship: &mut EditorShip, module_id: u64) -> Option<&m
         })
 }
 
+fn module_lumen_program_mut(editor_ship: &mut EditorShip, module_id: u64) -> Option<&mut LumenProgram> {
+    editor_ship
+        .ship
+        .modules
+        .iter_mut()
+        .find(|module| module.id == module_id)
+        .and_then(|module| {
+            if module.kind != ModuleKind::Computer {
+                return None;
+            }
+            Some(module.lumen_program.get_or_insert_with(|| {
+                LumenProgram::from_template(LumenProgramTemplate::BalancedSupervision)
+            }))
+        })
+}
+
 fn mutate_instruction(
     editor_ship: &mut EditorShip,
     module_id: u64,
@@ -237,6 +362,30 @@ fn mutate_instruction(
         return;
     };
     mutate(instruction);
+}
+
+fn mutate_lumen_instruction(
+    editor_ship: &mut EditorShip,
+    module_id: u64,
+    line: usize,
+    mutate: impl FnOnce(&mut LumenInstruction),
+) {
+    let Some(program) = module_lumen_program_mut(editor_ship, module_id) else {
+        return;
+    };
+    let Some(instruction) = program.instructions.get_mut(line) else {
+        return;
+    };
+    mutate(instruction);
+}
+
+fn default_lumen_instruction() -> LumenInstruction {
+    LumenInstruction {
+        op: LumenOp::Buff,
+        target: LumenTarget::Reactors,
+        aspect: LumenAspect::HeatCooling,
+        weight: 1,
+    }
 }
 
 #[derive(Clone, Copy)]

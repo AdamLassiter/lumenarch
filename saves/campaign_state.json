@@ -2,13 +2,13 @@
   "progression": {
     "scrap": 31,
     "hull_wear": 0,
-    "jump_count": 104
+    "jump_count": 111
   },
   "sector": {
     "seed": 66790,
     "current_node_id": 0,
     "selected_node_id": 6,
-    "active_encounter_node_id": 6,
+    "active_encounter_node_id": null,
     "nodes": [
       {
         "id": 0,
@@ -47,7 +47,7 @@
           0,
           4
         ],
-        "status": "Failed",
+        "status": "Exhausted",
         "position": [
           -260.0,
           150.0
@@ -73,7 +73,7 @@
           4,
           5
         ],
-        "status": "Fresh",
+        "status": "Exhausted",
         "position": [
           0.0,
           200.0
@@ -98,7 +98,7 @@
           0,
           5
         ],
-        "status": "Fresh",
+        "status": "Exhausted",
         "position": [
           250.0,
           120.0
@@ -190,19 +190,19 @@
     ]
   },
   "last_mission_report": {
-    "headline": "Mission Failed",
-    "detail": "Station service restored your ship for 24 scrap.",
+    "headline": "Mission Complete",
+    "detail": "Encounter cleared, but no salvage was recovered.",
     "scrap_awarded": 0,
-    "total_scrap": 55,
+    "total_scrap": 31,
     "hottest_module": "reactor",
     "first_disabled_module": null,
     "repairs_performed": 0,
     "stabilizations_performed": 0,
-    "automation_used": false,
-    "automation_triggers": 0,
+    "automation_used": true,
+    "automation_triggers": 3002,
     "redesign_hints": [
       "Reactor ran hottest. Consider more spacing or cooler hull nearby.",
-      "Player ship vented during the run. Airlock placement or edge protection may be weak."
+      "Automation reduced reactor babysitting during the fight."
     ],
     "recovered_raw_salvage": 0,
     "processed_repair_charge": 0,
@@ -210,15 +210,15 @@
     "transfer_count": 0,
     "processor_cycles": 0,
     "logistics_bottleneck": null,
-    "logistics_automation_used": false,
+    "logistics_automation_used": true,
     "arch_primary_program": "TurretAssist",
     "arch_invalid_executions": 0,
     "arch_recent_writes": [
       "WTA0 <- off",
       "WTF0 <- off"
     ],
-    "node_name": "Latchline Debris",
-    "node_kind": "Salvage Field",
-    "travel_outcome": "Latchline Debris failed, +3 hull wear"
+    "node_name": "Calibration Ring",
+    "node_kind": "Test Range",
+    "travel_outcome": "Calibration Ring cleared, +0 scrap, +0 hull wear"
   }
 }

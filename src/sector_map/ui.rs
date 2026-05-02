@@ -8,11 +8,15 @@ use crate::{
     UI_TITLE_FONT_SIZE,
     state::{
         BackToStationButton, LaunchEncounterButton, SectorMapCanvas, SectorMapDetailText,
+        SectorMapLinkDash, SectorMapLinkLayer, SectorMapNodeBorder, SectorMapNodeLayer,
         SectorMapRoot, SectorMapStatusText, SectorNodeButton, SectorState,
     },
 };
 
-use super::layout::{node_button_color, projected_node, sector_detail_text, sector_status_text};
+use super::layout::{
+    node_border_color, node_button_color, projected_link_dash, projected_node, sector_detail_text,
+    sector_status_text,
+};
 
 pub(crate) fn spawn_sector_map_ui(
     mut commands: Commands,
@@ -48,38 +52,72 @@ pub(crate) fn spawn_sector_map_ui(
                 SectorMapCanvas,
             ))
             .with_children(|map| {
-                for node in &sector_state.nodes {
-                    let reachable = sector_state.is_reachable(node.id);
-                    let is_current = sector_state.current_node_id == node.id;
-                    let is_selected = sector_state.selected_node_id == Some(node.id);
-                    let base_color = node_button_color(
-                        node.kind,
-                        node.status,
-                        reachable,
-                        is_current,
-                        is_selected,
-                    );
-                    map.spawn((
-                        Button,
-                        projected_node(node.position, 1.0, Vec2::ZERO),
-                        BackgroundColor(base_color),
-                        SectorNodeButton { node_id: node.id },
-                    ))
-                    .with_child((
-                        Text::new(format!(
-                            "{}\nR{} {}",
-                            node.label,
-                            node.risk_tier,
-                            node.status.as_str()
-                        )),
-                        TextFont {
-                            font: mono_font.clone(),
-                            font_size: UI_BODY_FONT_SIZE,
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                    ));
-                }
+                map.spawn((Node::default(), SectorMapLinkLayer))
+                    .with_children(|links| {
+                        for node in sector_state.available_neighbors() {
+                            for dash_index in 0..12 {
+                                let (dash_node, dash_transform) = projected_link_dash(
+                                    sector_state
+                                        .current_node()
+                                        .map(|current| current.position)
+                                        .unwrap_or([0.0, 0.0]),
+                                    node.position,
+                                    1.0,
+                                    Vec2::ZERO,
+                                    dash_index,
+                                    12,
+                                );
+                                links.spawn((
+                                    dash_node,
+                                    dash_transform,
+                                    BackgroundColor(Color::srgb(0.88, 0.70, 0.30)),
+                                    SectorMapLinkDash {
+                                        target_node_id: node.id,
+                                        dash_index,
+                                        dash_count: 12,
+                                    },
+                                ));
+                            }
+                        }
+                    });
+
+                map.spawn((Node::default(), SectorMapNodeLayer))
+                    .with_children(|nodes| {
+                        for node in &sector_state.nodes {
+                            let reachable = sector_state.is_reachable(node.id);
+                            let is_current = sector_state.current_node_id == node.id;
+                            let is_selected = sector_state.selected_node_id == Some(node.id);
+                            let base_color = node_button_color(
+                                node.kind,
+                                node.status,
+                                reachable,
+                                is_current,
+                                is_selected,
+                            );
+                            nodes.spawn((
+                                Button,
+                                projected_node(node.position, 1.0, Vec2::ZERO),
+                                BackgroundColor(base_color),
+                                BorderColor::all(node_border_color(is_current, reachable)),
+                                SectorNodeButton { node_id: node.id },
+                                SectorMapNodeBorder,
+                            ))
+                            .with_child((
+                                Text::new(format!(
+                                    "{}\nR{} {}",
+                                    node.label,
+                                    node.risk_tier,
+                                    node.status.as_str()
+                                )),
+                                TextFont {
+                                    font: mono_font.clone(),
+                                    font_size: UI_BODY_FONT_SIZE,
+                                    ..default()
+                                },
+                                TextColor(Color::WHITE),
+                            ));
+                        }
+                    });
             });
 
             root.spawn((

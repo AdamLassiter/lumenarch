@@ -58,10 +58,18 @@ pub(crate) fn sync_presentation_from_rollback(
         rollback_state.sector.selected_node_id,
         rollback_state.sector.active_encounter_node_id
     );
-    editor_ship.ship = rollback_state.editor_ship.clone();
-    *progression = rollback_state.progression.clone();
-    *sector = rollback_state.sector.clone();
-    *last_mission_report = rollback_state.last_mission_report.clone();
+    if stable_hash(&editor_ship.ship) != stable_hash(&rollback_state.editor_ship) {
+        editor_ship.ship = rollback_state.editor_ship.clone();
+    }
+    if stable_hash(progression.as_ref()) != stable_hash(&rollback_state.progression) {
+        *progression = rollback_state.progression.clone();
+    }
+    if stable_hash(sector.as_ref()) != stable_hash(&rollback_state.sector) {
+        *sector = rollback_state.sector.clone();
+    }
+    if stable_hash(last_mission_report.as_ref()) != stable_hash(&rollback_state.last_mission_report) {
+        *last_mission_report = rollback_state.last_mission_report.clone();
+    }
 }
 
 pub(crate) fn sync_active_presentation_phase(
@@ -109,8 +117,8 @@ pub(crate) fn frontend_mode_is_session(frontend_mode: Res<State<FrontendMode>>) 
     *frontend_mode.get() == FrontendMode::Session
 }
 
-pub(crate) fn frontend_mode_is_menu(frontend_mode: Res<State<FrontendMode>>) -> bool {
-    *frontend_mode.get() == FrontendMode::Menu
+pub(crate) fn frontend_mode_is_lobby(frontend_mode: Res<State<FrontendMode>>) -> bool {
+    *frontend_mode.get() == FrontendMode::Lobby
 }
 
 pub(crate) fn frontend_mode_is_debug_enemy_editor(
@@ -119,8 +127,8 @@ pub(crate) fn frontend_mode_is_debug_enemy_editor(
     *frontend_mode.get() == FrontendMode::DebugEnemyEditor
 }
 
-pub(crate) fn frontend_mode_is_not_menu(frontend_mode: Res<State<FrontendMode>>) -> bool {
-    *frontend_mode.get() != FrontendMode::Menu
+pub(crate) fn frontend_mode_is_not_lobby(frontend_mode: Res<State<FrontendMode>>) -> bool {
+    *frontend_mode.get() != FrontendMode::Lobby
 }
 
 pub(crate) fn frontend_mode_is_not_debug_enemy_editor(

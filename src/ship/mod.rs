@@ -1,12 +1,16 @@
 pub mod arch;
 pub mod enemy;
+pub mod lumen;
 pub mod storage;
 
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use self::arch::{ArchProgram, ArchProgramTemplate};
+use self::{
+    arch::{ArchProgram, ArchProgramTemplate},
+    lumen::{LumenProgram, LumenProgramTemplate},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ModuleKind {
@@ -577,6 +581,8 @@ pub struct ShipModule {
     pub rotation_quadrants: u8,
     #[serde(default)]
     pub arch_program: Option<ArchProgram>,
+    #[serde(default)]
+    pub lumen_program: Option<LumenProgram>,
 }
 
 impl ShipModule {
@@ -596,6 +602,8 @@ impl ShipModule {
             rotation_quadrants: rotation_quadrants % 4,
             arch_program: (kind == ModuleKind::Computer)
                 .then(|| ArchProgram::from_template(ArchProgramTemplate::BalancedOps)),
+            lumen_program: (kind == ModuleKind::Computer)
+                .then(|| LumenProgram::from_template(LumenProgramTemplate::BalancedSupervision)),
         }
     }
 
