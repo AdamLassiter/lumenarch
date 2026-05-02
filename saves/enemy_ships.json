@@ -2,283 +2,12 @@
   "entries": [
     {
       "id": "raider_skiff",
-      "display_name": "Raider Skiff",
+      "display_name": "Untitled Knot",
       "threat_tier": 1,
       "behavior_tag": "skirmisher",
       "ship": {
-        "name": "Raider Skiff",
-        "modules": [
-          {
-            "id": 1,
-            "kind": "Core",
-            "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": -2,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 2,
-            "kind": "Engine",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": 1,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 3,
-            "kind": "Engine",
-            "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": 1,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 4,
-            "kind": "Reactor",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": 0,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 5,
-            "kind": "Reactor",
-            "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": 0,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 6,
-            "kind": "Battery",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": -1,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 7,
-            "kind": "Cockpit",
-            "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": -2,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 8,
-            "kind": "Interior",
-            "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": -2,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 9,
-            "kind": "Battery",
-            "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": -1,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 10,
-            "kind": "HullInnerCorner",
-            "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": -1,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 11,
-            "kind": "HullInnerCorner",
-            "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": -1,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 12,
-            "kind": "HullOuterCorner",
-            "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": 1,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 13,
-            "kind": "HullOuterCorner",
-            "variant": "Standard",
-            "grid_x": -4,
-            "grid_y": 1,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 14,
-            "kind": "HullOuterCorner",
-            "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": 1,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 15,
-            "kind": "HullOuterCorner",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": 1,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 16,
-            "kind": "HullOuterCorner",
-            "variant": "Standard",
-            "grid_x": -4,
-            "grid_y": -3,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 17,
-            "kind": "HullOuterCorner",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": -3,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 18,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -4,
-            "grid_y": 0,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 19,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -4,
-            "grid_y": -1,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 20,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -4,
-            "grid_y": -2,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 21,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": -3,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 22,
-            "kind": "Turret",
-            "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": -3,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 23,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": -3,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 24,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": -3,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 25,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": -2,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 26,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": -1,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 27,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": 0,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 28,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": 0,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 29,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": 0,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 30,
-            "kind": "Interior",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": -2,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          }
-        ]
+        "name": "Untitled Knot",
+        "modules": []
       }
     },
     {
@@ -292,405 +21,117 @@
           {
             "id": 1,
             "kind": "Core",
-            "variant": "Standard",
-            "grid_x": -1,
+            "variant": "ExpandedCore",
+            "grid_x": 0,
             "grid_y": 0,
             "rotation_quadrants": 0,
             "arch_program": null
           },
           {
             "id": 2,
-            "kind": "Engine",
+            "kind": "Cockpit",
             "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": 5,
-            "rotation_quadrants": 2,
+            "grid_x": 0,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
             "arch_program": null
           },
           {
             "id": 3,
-            "kind": "Engine",
-            "variant": "Standard",
+            "kind": "Reactor",
+            "variant": "Fusion",
             "grid_x": -1,
-            "grid_y": 5,
-            "rotation_quadrants": 2,
+            "grid_y": 0,
+            "rotation_quadrants": 3,
             "arch_program": null
           },
           {
             "id": 4,
-            "kind": "Engine",
-            "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": 5,
-            "rotation_quadrants": 2,
+            "kind": "Battery",
+            "variant": "Capacitor",
+            "grid_x": -2,
+            "grid_y": 0,
+            "rotation_quadrants": 3,
             "arch_program": null
           },
           {
             "id": 5,
-            "kind": "Interior",
+            "kind": "Engine",
             "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": -2,
+            "grid_x": 0,
+            "grid_y": -1,
             "rotation_quadrants": 2,
             "arch_program": null
           },
           {
             "id": 6,
-            "kind": "Cockpit",
+            "kind": "Engine",
             "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": -2,
-            "rotation_quadrants": 0,
+            "grid_x": 1,
+            "grid_y": -1,
+            "rotation_quadrants": 2,
             "arch_program": null
           },
           {
             "id": 7,
-            "kind": "Interior",
-            "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": -2,
-            "rotation_quadrants": 2,
+            "kind": "Turret",
+            "variant": "BallisticTurret",
+            "grid_x": 1,
+            "grid_y": 0,
+            "rotation_quadrants": 1,
             "arch_program": null
           },
           {
             "id": 8,
-            "kind": "Interior",
-            "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": -1,
-            "rotation_quadrants": 2,
+            "kind": "Turret",
+            "variant": "LaserTurret",
+            "grid_x": 2,
+            "grid_y": 0,
+            "rotation_quadrants": 1,
             "arch_program": null
           },
           {
             "id": 9,
-            "kind": "Interior",
-            "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": 0,
-            "rotation_quadrants": 2,
+            "kind": "Cargo",
+            "variant": "FuelTank",
+            "grid_x": -1,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
             "arch_program": null
           },
           {
             "id": 10,
-            "kind": "Cargo",
+            "kind": "Hull",
             "variant": "Standard",
-            "grid_x": 0,
+            "grid_x": -2,
             "grid_y": 1,
-            "rotation_quadrants": 0,
+            "rotation_quadrants": 3,
             "arch_program": null
           },
           {
             "id": 11,
-            "kind": "Interior",
+            "kind": "Hull",
             "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": 2,
-            "rotation_quadrants": 2,
+            "grid_x": 2,
+            "grid_y": 1,
+            "rotation_quadrants": 1,
             "arch_program": null
           },
           {
             "id": 12,
-            "kind": "Reactor",
+            "kind": "HullInnerCorner",
             "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": 3,
-            "rotation_quadrants": 0,
+            "grid_x": 2,
+            "grid_y": -1,
+            "rotation_quadrants": 2,
             "arch_program": null
           },
           {
             "id": 13,
-            "kind": "Interior",
-            "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": 4,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 14,
-            "kind": "Reactor",
-            "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": 4,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 15,
-            "kind": "Interior",
-            "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": 4,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 16,
-            "kind": "Reactor",
-            "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": 3,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 17,
-            "kind": "Interior",
-            "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": 2,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 18,
-            "kind": "Cargo",
-            "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": 1,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 19,
-            "kind": "Interior",
-            "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": 0,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 20,
-            "kind": "Interior",
-            "variant": "Standard",
+            "kind": "Shield",
+            "variant": "DirectionalShield",
             "grid_x": -2,
             "grid_y": -1,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 21,
-            "kind": "Interior",
-            "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": -1,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 22,
-            "kind": "Cargo",
-            "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": 1,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 23,
-            "kind": "Reactor",
-            "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": 2,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 24,
-            "kind": "Battery",
-            "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": 3,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 25,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": 4,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 26,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": 2,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 27,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": 3,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 28,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": 1,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 29,
-            "kind": "Airlock",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": 0,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 30,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": -1,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 31,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": -2,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 32,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": -2,
-            "grid_y": -3,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 33,
-            "kind": "Turret",
-            "variant": "Standard",
-            "grid_x": -1,
-            "grid_y": -3,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 34,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": -3,
-            "rotation_quadrants": 0,
-            "arch_program": null
-          },
-          {
-            "id": 35,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": -2,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 36,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": -1,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 37,
-            "kind": "Airlock",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": 0,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 38,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": 1,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 39,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": 2,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 40,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": 3,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 41,
-            "kind": "Hull",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": 4,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 42,
-            "kind": "HullOuterCorner",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": 5,
-            "rotation_quadrants": 3,
-            "arch_program": null
-          },
-          {
-            "id": 43,
-            "kind": "HullOuterCorner",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": 5,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 44,
-            "kind": "HullOuterCorner",
-            "variant": "Standard",
-            "grid_x": 1,
-            "grid_y": -3,
-            "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 45,
-            "kind": "HullOuterCorner",
-            "variant": "Standard",
-            "grid_x": -3,
-            "grid_y": -3,
             "rotation_quadrants": 0,
             "arch_program": null
           }

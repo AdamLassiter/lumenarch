@@ -46,6 +46,27 @@ pub(crate) enum RollbackMetaOp {
     LeaveEditor = 7,
 }
 
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum StationControlOp {
+    #[default]
+    None = 0,
+    HelmThrottle = 1,
+    HelmTurn = 2,
+    TurretAdjustAim = 3,
+    TurretFireToggle = 4,
+    ReactorAdjustRate = 5,
+    ReactorAdjustTurbine = 6,
+    LogisticsToggleStorageIntake = 7,
+    LogisticsToggleAirlock = 8,
+    LogisticsToggleManipulator = 9,
+    LogisticsCycleManipulatorTarget = 10,
+    LogisticsCycleResource = 11,
+    LogisticsToggleProcessor = 12,
+    ComputerToggleEnabled = 13,
+    ComputerCycleTemplate = 14,
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct PlayerGgrsInput {
@@ -57,6 +78,8 @@ pub(crate) struct PlayerGgrsInput {
     pub(crate) reactor_delta_milli: i16,
     pub(crate) turbine_delta_milli: i16,
     pub(crate) logistics_delta: i8,
+    pub(crate) station_op: u8,
+    pub(crate) station_arg0: i16,
     pub(crate) meta_op: u8,
     pub(crate) meta_arg0: i16,
     pub(crate) meta_arg1: i16,
@@ -78,6 +101,26 @@ impl PlayerGgrsInput {
             6 => RollbackMetaOp::ReturnToDock,
             7 => RollbackMetaOp::LeaveEditor,
             _ => RollbackMetaOp::None,
+        }
+    }
+
+    pub(crate) fn station_op(self) -> StationControlOp {
+        match self.station_op {
+            1 => StationControlOp::HelmThrottle,
+            2 => StationControlOp::HelmTurn,
+            3 => StationControlOp::TurretAdjustAim,
+            4 => StationControlOp::TurretFireToggle,
+            5 => StationControlOp::ReactorAdjustRate,
+            6 => StationControlOp::ReactorAdjustTurbine,
+            7 => StationControlOp::LogisticsToggleStorageIntake,
+            8 => StationControlOp::LogisticsToggleAirlock,
+            9 => StationControlOp::LogisticsToggleManipulator,
+            10 => StationControlOp::LogisticsCycleManipulatorTarget,
+            11 => StationControlOp::LogisticsCycleResource,
+            12 => StationControlOp::LogisticsToggleProcessor,
+            13 => StationControlOp::ComputerToggleEnabled,
+            14 => StationControlOp::ComputerCycleTemplate,
+            _ => StationControlOp::None,
         }
     }
 }
@@ -241,6 +284,15 @@ pub(crate) struct PendingMetaCommand {
 pub(crate) struct PendingLocalMetaCommand(pub(crate) Option<PendingMetaCommand>);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct PendingStationCommand {
+    pub(crate) op: StationControlOp,
+    pub(crate) arg0: i16,
+}
+
+#[derive(Resource, Default, Clone, Copy)]
+pub(crate) struct PendingLocalStationCommand(pub(crate) Option<PendingStationCommand>);
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct DecodedPlayerCommand {
     pub(crate) raw: PlayerGgrsInput,
     pub(crate) move_x: i8,
@@ -252,6 +304,7 @@ pub(crate) struct DecodedPlayerCommand {
     pub(crate) reactor_delta_milli: i16,
     pub(crate) turbine_delta_milli: i16,
     pub(crate) logistics_delta: i8,
+    pub(crate) station: PendingStationCommand,
     pub(crate) meta: PendingMetaCommand,
 }
 

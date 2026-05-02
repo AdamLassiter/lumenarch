@@ -39,6 +39,7 @@ pub(crate) use frontend::{
     FrontendMode,
     HostAddressText,
     JoinButton,
+    JoinButtonText,
     MainCamera,
     MenuRoot,
     OpenSectorMapButton,

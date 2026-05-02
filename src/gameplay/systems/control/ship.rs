@@ -25,6 +25,7 @@ pub(crate) fn update_station_command_input(
     let (_, ship_rotation) = ship_query.into_inner();
     let mut ship_controls = ship_control_query.into_inner();
     let mut mission_runtime = mission_query.into_inner();
+    let previous_throttle = ship_controls.throttle_demand;
     let mut control_states: Vec<_> = player_control_query.iter().collect();
     control_states.sort_by_key(|(handle, _)| handle.handle);
     let mut claimed_entities = BTreeSet::new();
@@ -41,11 +42,12 @@ pub(crate) fn update_station_command_input(
         match control_state.mode {
             ShipControlMode::Interior => {}
             ShipControlMode::Cockpit => {
-                ship_controls.throttle_demand = (Fx::from_num(command.throttle_milli)
-                    / Fx::from_num(1000))
-                .clamp(Fx::from_num(0), Fx::from_num(1));
-                ship_controls.turn_input = (Fx::from_num(command.turn_milli) / Fx::from_num(1000))
-                    .clamp(Fx::from_num(-1), Fx::from_num(1));
+                ship_controls.throttle_demand =
+                    (Fx::from_num(command.throttle_milli) / Fx::from_num(1000))
+                        .clamp(Fx::from_num(0), Fx::from_num(1));
+                ship_controls.turn_input =
+                    (Fx::from_num(command.turn_milli) / Fx::from_num(1000))
+                        .clamp(Fx::from_num(-1), Fx::from_num(1));
                 if command.raw.pressed(netcode::INPUT_FIRE) {
                     ship_controls.turn_input =
                         Fx::from_num(-command.aim_x_milli) / Fx::from_num(1000);
@@ -54,6 +56,19 @@ pub(crate) fn update_station_command_input(
                         + Fx::from_num(1))
                         / Fx::from_num(2))
                     .clamp(Fx::from_num(0), Fx::from_num(1));
+                }
+                match command.station.op {
+                    netcode::StationControlOp::HelmThrottle => {
+                        ship_controls.throttle_demand = (previous_throttle
+                            + Fx::from_num(command.station.arg0) / Fx::from_num(1000))
+                        .clamp(Fx::from_num(0), Fx::from_num(1));
+                    }
+                    netcode::StationControlOp::HelmTurn => {
+                        ship_controls.turn_input = (Fx::from_num(command.station.arg0)
+                            / Fx::from_num(1000))
+                        .clamp(Fx::from_num(-1), Fx::from_num(1));
+                    }
+                    _ => {}
                 }
             }
             ShipControlMode::Turret => {
@@ -80,8 +95,16 @@ pub(crate) fn update_station_command_input(
                 }
                 turret_state.desired_angle +=
                     dt * Fx::from_num(command.turn_milli) / Fx::from_num(1000) * Fx::from_num(1.8);
+                if command.station.op == netcode::StationControlOp::TurretAdjustAim {
+                    turret_state.desired_angle +=
+                        Fx::from_num(command.station.arg0) / Fx::from_num(1000);
+                }
                 turret_state.desired_angle = wrap_radians(turret_state.desired_angle);
-                turret_state.fire_intent = command.raw.pressed(netcode::INPUT_FIRE);
+                if command.station.op == netcode::StationControlOp::TurretFireToggle {
+                    turret_state.fire_intent = !turret_state.fire_intent;
+                } else {
+                    turret_state.fire_intent = command.raw.pressed(netcode::INPUT_FIRE);
+                }
                 ship_controls.fire_pressed |= turret_state.fire_intent;
             }
             ShipControlMode::Reactor => {
@@ -113,6 +136,19 @@ pub(crate) fn update_station_command_input(
                 reactor_state.turbine_load = reactor_state
                     .turbine_load
                     .clamp(Fx::from_num(0), Fx::from_num(1));
+                match command.station.op {
+                    netcode::StationControlOp::ReactorAdjustRate => {
+                        reactor_state.reaction_rate = (reactor_state.reaction_rate
+                            + Fx::from_num(command.station.arg0) / Fx::from_num(1000))
+                        .clamp(Fx::from_num(0), Fx::from_num(1));
+                    }
+                    netcode::StationControlOp::ReactorAdjustTurbine => {
+                        reactor_state.turbine_load = (reactor_state.turbine_load
+                            + Fx::from_num(command.station.arg0) / Fx::from_num(1000))
+                        .clamp(Fx::from_num(0), Fx::from_num(1));
+                    }
+                    _ => {}
+                }
             }
             ShipControlMode::Logistics => {
                 let Some(focused_entity) = control_state.focused_entity else {
@@ -140,12 +176,16 @@ pub(crate) fn update_station_command_input(
                     continue;
                 };
                 if let Some(mut airlock_state) = airlock_state {
-                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE) {
+                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE)
+                        || command.station.op == netcode::StationControlOp::LogisticsToggleAirlock
+                    {
                         airlock_state.open = !airlock_state.open;
                         mission_runtime.airlocks_cycled += 1;
                     }
                 } else if let Some(mut storage_cmd) = storage_cmd
-                    && command.raw.pressed(netcode::INPUT_SPACE_EDGE)
+                    && (command.raw.pressed(netcode::INPUT_SPACE_EDGE)
+                        || command.station.op
+                            == netcode::StationControlOp::LogisticsToggleStorageIntake)
                 {
                     storage_cmd.allow_intake = !storage_cmd.allow_intake;
                 }
@@ -153,7 +193,9 @@ pub(crate) fn update_station_command_input(
                     if command.raw.pressed(netcode::INPUT_AUX_EDGE) {
                         manipulator_cmd.manual_mode = !manipulator_cmd.manual_mode;
                     }
-                    if command.reactor_delta_milli != 0 {
+                    if command.reactor_delta_milli != 0
+                        || command.station.op == netcode::StationControlOp::LogisticsCycleResource
+                    {
                         manipulator_cmd.resource_kind = match manipulator_cmd.resource_kind {
                             crate::gameplay::components::ResourceKind::RawSalvage => {
                                 crate::gameplay::components::ResourceKind::RepairCharge
@@ -169,14 +211,22 @@ pub(crate) fn update_station_command_input(
                             }
                         };
                     }
-                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE) {
+                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE)
+                        || command.station.op == netcode::StationControlOp::LogisticsToggleManipulator
+                    {
                         manipulator_cmd.transfer_enabled = !manipulator_cmd.transfer_enabled;
                     }
                     if !candidate_ids.is_empty()
                         && (command.raw.pressed(netcode::INPUT_PREV_EDGE)
-                            || command.raw.pressed(netcode::INPUT_NEXT_EDGE))
+                            || command.raw.pressed(netcode::INPUT_NEXT_EDGE)
+                            || command.station.op
+                                == netcode::StationControlOp::LogisticsCycleManipulatorTarget)
                     {
-                        let direction = if command.raw.pressed(netcode::INPUT_PREV_EDGE) {
+                        let direction = if command.station.op
+                            == netcode::StationControlOp::LogisticsCycleManipulatorTarget
+                        {
+                            command.station.arg0 as i32
+                        } else if command.raw.pressed(netcode::INPUT_PREV_EDGE) {
                             -1
                         } else {
                             1
@@ -195,7 +245,10 @@ pub(crate) fn update_station_command_input(
                     }
                 }
                 if let Some(mut processor_cmd) = processor_cmd {
-                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE) {
+                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE)
+                        || command.station.op
+                            == netcode::StationControlOp::LogisticsToggleProcessor
+                    {
                         processor_cmd.enabled = !processor_cmd.enabled;
                     }
                     if command.reactor_delta_milli != 0 {
@@ -228,10 +281,14 @@ pub(crate) fn update_station_command_input(
                 let Some(mut arch_runtime) = arch_runtime else {
                     continue;
                 };
-                if command.raw.pressed(netcode::INPUT_SPACE_EDGE) {
+                if command.raw.pressed(netcode::INPUT_SPACE_EDGE)
+                    || command.station.op == netcode::StationControlOp::ComputerToggleEnabled
+                {
                     arch_runtime.enabled = !arch_runtime.enabled;
                 }
-                if command.raw.pressed(netcode::INPUT_CYCLE_TEMPLATE) {
+                if command.raw.pressed(netcode::INPUT_CYCLE_TEMPLATE)
+                    || command.station.op == netcode::StationControlOp::ComputerCycleTemplate
+                {
                     arch_runtime.program = crate::ship::arch::ArchProgram::from_template(
                         arch_runtime.program.template.next(),
                     );

@@ -13,11 +13,14 @@ use super::{
     LocalPlayerHandle,
     LumenGgrsConfig,
     PendingLocalMetaCommand,
+    PendingLocalStationCommand,
     PendingMetaCommand,
+    PendingStationCommand,
     PlayerGgrsInput,
     RollbackGameState,
     RollbackMetaOp,
     RollbackPhase,
+    StationControlOp,
     INPUT_AUX_EDGE,
     INPUT_CYCLE_TEMPLATE,
     INPUT_DOWN,
@@ -42,14 +45,17 @@ pub(crate) fn read_local_inputs(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
     mut pending_meta: ResMut<PendingLocalMetaCommand>,
+    mut pending_station: ResMut<PendingLocalStationCommand>,
     local_players: Res<LocalPlayers>,
 ) {
     let mut inputs = HashMap::default();
     let pending_meta_command = pending_meta.0.take();
+    let pending_station_command = pending_station.0.take();
     let input = input_from_hardware(
         &keyboard_input,
         &mouse_buttons,
         window_query.iter().next(),
+        pending_station_command,
         pending_meta_command,
     );
     if let Some(meta) = pending_meta_command {
@@ -61,11 +67,18 @@ pub(crate) fn read_local_inputs(
             meta.arg2
         );
     }
+    if let Some(station) = pending_station_command {
+        log::debug!(
+            "Queued local station command into input packet: op={:?}, arg0={}",
+            station.op,
+            station.arg0
+        );
+    }
     for handle in &local_players.0 {
         inputs.insert(*handle, input);
     }
     log::trace!(
-        "Publishing local inputs for handles {:?}: buttons=0x{:04x}, throttle={}, turn={}, aim=({}, {}), reactor_delta={}, turbine_delta={}, logistics_delta={}, meta={:?}",
+        "Publishing local inputs for handles {:?}: buttons=0x{:04x}, throttle={}, turn={}, aim=({}, {}), reactor_delta={}, turbine_delta={}, logistics_delta={}, station={:?}, meta={:?}",
         local_players.0,
         input.buttons,
         input.throttle_milli,
@@ -75,6 +88,7 @@ pub(crate) fn read_local_inputs(
         input.reactor_delta_milli,
         input.turbine_delta_milli,
         input.logistics_delta,
+        input.station_op(),
         input.meta_op()
     );
     commands.insert_resource(LocalInputs::<LumenGgrsConfig>(inputs));
@@ -91,11 +105,15 @@ pub(crate) fn decode_player_inputs(
     };
     for (handle, (input, _)) in player_inputs.iter().enumerate() {
         let command = decode_player_command(*input);
-        if command.meta.op != RollbackMetaOp::None || input.buttons != 0 {
+        if command.meta.op != RollbackMetaOp::None
+            || command.station.op != StationControlOp::None
+            || input.buttons != 0
+        {
             log::trace!(
-                "Decoded player input for handle {}: buttons=0x{:04x}, meta={:?}, move=({}, {}), throttle={}, turn={}, aim=({}, {})",
+                "Decoded player input for handle {}: buttons=0x{:04x}, station={:?}, meta={:?}, move=({}, {}), throttle={}, turn={}, aim=({}, {})",
                 handle,
                 input.buttons,
+                command.station.op,
                 command.meta.op,
                 command.move_x,
                 command.move_y,
@@ -247,6 +265,7 @@ fn input_from_hardware(
     keys: &ButtonInput<KeyCode>,
     mouse_buttons: &ButtonInput<MouseButton>,
     window: Option<&Window>,
+    pending_station: Option<PendingStationCommand>,
     pending_meta: Option<PendingMetaCommand>,
 ) -> PlayerGgrsInput {
     let mut input = PlayerGgrsInput::default();
@@ -328,6 +347,11 @@ fn input_from_hardware(
         input.aim_y_milli = (-y * 1000.0) as i16;
     }
 
+    if let Some(station) = pending_station {
+        input.station_op = station.op as u8;
+        input.station_arg0 = station.arg0;
+    }
+
     if let Some(meta) = pending_meta {
         input.meta_op = meta.op as u8;
         input.meta_arg0 = meta.arg0;
@@ -350,11 +374,34 @@ fn decode_player_command(input: PlayerGgrsInput) -> DecodedPlayerCommand {
         reactor_delta_milli: input.reactor_delta_milli,
         turbine_delta_milli: input.turbine_delta_milli,
         logistics_delta: input.logistics_delta,
+        station: PendingStationCommand {
+            op: input.station_op(),
+            arg0: input.station_arg0,
+        },
         meta: PendingMetaCommand {
             op: input.meta_op(),
             arg0: input.meta_arg0,
             arg1: input.meta_arg1,
             arg2: input.meta_arg2,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_station_command_from_ggrs_input() {
+        let input = PlayerGgrsInput {
+            station_op: StationControlOp::ReactorAdjustRate as u8,
+            station_arg0: 100,
+            ..Default::default()
+        };
+
+        let decoded = decode_player_command(input);
+
+        assert_eq!(decoded.station.op, StationControlOp::ReactorAdjustRate);
+        assert_eq!(decoded.station.arg0, 100);
     }
 }

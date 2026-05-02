@@ -2,118 +2,217 @@
 
 ## Goal
 
-Build the first real multiplayer slice for **LUMEN//ARCH**, while also tightening deterministic simulation testing and sync discipline.
+Ship the first working rollback multiplayer slice for **LUMEN//ARCH** using `bevy_ggrs`, with enough real game flow to prove the architecture instead of only proving packet transport.
 
-This slice should validate:
+This slice now validates:
 
-* the current game loop can run across host and client cleanly
-* deterministic simulation is stable enough to trust as the long-term model
-* sector play, ship operation, boarding, and component interaction can all remain coherent over the network
-* the project has testing and debugging tools for simulation drift
+* a host and at least one client can bootstrap into the same session
+* synchronized docked, sector-map, and encounter phase transitions work
+* encounter simulation runs through a shared-crew, one-ship model
+* rollback state is the authoritative in-session source of truth
+* the project has useful logging and diagnostics for session bootstrap, phase changes, and rollback inputs
 
-This slice should prove the loop:
+The loop this slice now proves is:
 
-`Connect -> Sync Ship / Sector State -> Play Shared Encounter -> Compare Outcomes -> Detect / Correct Drift`
+`Open Lobby -> Join Lobby -> Host Starts Session -> Shared Docked / Sector Flow -> Shared Encounter -> Return To Dock`
 
-## Why This Slice Here
+## What Changed During Implementation
 
-By this point, the project should have:
+This slice started from a custom host/client networking stack and moved through a deeper architectural rewrite than originally planned.
 
-* a deeper UI layer
-* more component variation
-* a stronger single-player simulation base
+The final direction for this slice is:
 
-That is the right moment to focus on multiplayer and determinism, because:
+* the old custom TCP gameplay sync stack was removed from active runtime use
+* `bevy_ggrs` now owns synchronized gameplay/session progression
+* a separate pre-session lobby/bootstrap channel exists so the host can discover connected clients and broadcast the final peer list
+* rollback phase is the only in-session phase authority
+* presentation/UI mirrors rollback state instead of fighting it
 
-* there is enough game to actually stress the model
-* the simulation is complex enough that drift detection matters
-* testing needs to happen before even more late-stage systems are added
+That means this slice became both:
 
-## Demo Pitch
+* a multiplayer feature slice
+* a simulation-architecture migration slice
 
-Two players can connect to the same session and participate in the same ship or encounter flow. The host remains authoritative for session progress, but deterministic client simulation is exercised and verified. Inputs, outcomes, and debug tools should make it possible to catch where the simulation diverges and why.
+## Final Demo Pitch
 
-This slice is not primarily about content expansion. It is about making the simulation architecture trustworthy under multiplayer conditions.
+One host and one or more clients can enter a pre-session lobby, start a shared rollback session, move together through docked and sector-map flow, and then enter the same encounter where multiple crew actors operate the same ship.
 
-Core loop for the demo:
+The host controls synchronized outer-loop decisions:
 
-`Host Session -> Join Session -> Operate Shared World -> Observe Sync Quality -> Debug Drift`
+* opening the sector map
+* entering/leaving the ship editor
+* selecting a sector node
+* launching an encounter
+* returning to dock
 
-## In Scope
+All peers then simulate the same in-session rollback state, and the local presentation follows that state instead of maintaining a second app-phase machine.
 
-* multiplayer host/client flow beyond the current bootstrap
-* deterministic simulation checks and drift diagnostics
-* session state synchronization for:
-  * sector state
-  * ship state
-  * player presence
-  * encounter selection
-* multiplayer-safe station interaction
-* multiplayer-safe boarding / EVA state
-* resync and mismatch reporting tools
-* test scenarios specifically for deterministic simulation stability
+## What This Slice Actually Implements
 
-## Explicitly Out Of Scope
+### 1. Rollback Session Ownership
 
-* production-ready matchmaking
-* internet-scale hosting infrastructure
-* large-scale persistence backend
-* rollback-first redesign unless truly required
-* full anti-cheat work
+The synchronized runtime now uses:
 
-## Core Design Rules
+* `PlayerGgrsInput` as the canonical per-peer gameplay/meta input packet
+* `RollbackGameState` as authoritative in-session state
+* `RollbackPhase` for:
+  * `Docked`
+  * `SectorMap`
+  * `Editing`
+  * `Encounter`
 
-### 1. Reliability comes before cleverness
+`FrontendMode` remains only as a shell router:
 
-The multiplayer model should remain understandable and debuggable, even if that means a conservative approach in places.
+* `Menu`
+* `Session`
+* `DebugEnemyEditor`
 
-### 2. Determinism must be observable
+This removed the old dual runtime state fight that caused UI flicker and client desync around phase changes.
 
-This slice should not only assume the simulation is deterministic. It should expose hashes, comparisons, and drift reports that make determinism testable.
+### 2. Pre-Session Lobby / Bootstrap Channel
 
-### 3. Existing systems must survive networking pressure
+The project now has a lightweight pre-session control channel used only before GGRS starts.
 
-It is not enough to sync ship translation. The slice should stress:
+The lobby flow is:
 
-* component interaction
-* logistics
-* boarding
-* atmosphere
-* hostile ships
+* host opens a lobby from the descriptor-based menu
+* clients connect and send a join message
+* host tracks connected players and reassigns handles
+* host broadcasts a full lobby snapshot whenever membership changes
+* host starts the session once ready
+* every peer receives the same final session bootstrap config and starts the same GGRS topology
 
-## First Systems To Prove
+This solved the earlier failure mode where host and client could accidentally start different peer topologies.
 
-### 1. Shared Session Flow
+### 3. Shared-Crew Encounter Runtime
 
-Deliver:
+The encounter runtime now spawns one synchronized crew entity per GGRS handle.
 
-* host and client enter same campaign/session
-* selected sector nodes and encounter transitions stay aligned
+This slice includes:
 
-### 2. Multi-Actor Presence
+* per-handle crew entity ownership
+* local observed-player tracking for camera/HUD
+* deterministic `PlayerHandleMap`
+* removal of the previous “real local player plus remote ghost” model from the active path
 
-Deliver:
+The intended gameplay model is now explicit:
 
-* more than one player represented in simulation
-* boarding / EVA / onboard movement remain coherent
+* one shared player ship
+* multiple synchronized crew actors
+* host-only outer-loop meta control
 
-### 3. Deterministic Verification
+### 4. GGRS-Driven Meta Transitions
 
-Deliver:
+The host now emits synchronized meta commands through rollback input rather than mutating runtime state locally.
 
-* state hashes
-* mismatch logging
-* tick-based sync diagnostics
+Implemented synchronized meta operations include:
 
-### 4. Recovery / Resync
+* open editor
+* leave editor
+* open sector map
+* select sector node
+* launch encounter
+* return to dock
+* repair ship
 
-Deliver:
+All peers apply the host handle’s meta input during rollback stepping.
 
-* pragmatic resync path when drift is detected
-* instrumentation for debugging what diverged
+### 5. Rollback / Presentation Separation
 
-## Relation To The Concept
+The slice now has a clearer split between authoritative and non-authoritative layers.
 
-The concept does not describe multiplayer as its core identity, but your technical direction already assumes a strong deterministic simulation architecture. This slice is where that promise becomes real engineering rather than a future intention.
+Rollback-owned:
 
-It also protects all later slices by forcing the simulation model to be tested under the kind of pressure that reveals architectural weaknesses early.
+* current in-session phase
+* shared ship definition
+* campaign/progression
+* sector state
+* mission return/report data
+* synchronized encounter state
+
+Presentation-only:
+
+* menu flow
+* shell routing
+* camera smoothing
+* HUD text/layout
+* local debug enemy editor
+
+### 6. Diagnostics And Logging
+
+Logging was expanded to make the new session model debuggable.
+
+The current logs cover:
+
+* lobby/bootstrap lifecycle
+* local handle assignment
+* session start
+* rollback state checkpoints
+* meta command publication and application
+* presentation phase transitions
+* encounter scene spawn/cleanup
+
+This is intentionally aimed at debugging the real failure modes found during implementation:
+
+* mismatched peer topology
+* host-only phase mutation
+* rollback/presentation phase fighting
+
+## Current Architecture Summary
+
+### Session Bootstrap
+
+* descriptor-based menu flow still exists
+* host opens lobby
+* clients join lobby
+* host starts session
+* lobby distributes canonical GGRS peer list and start state
+
+### In-Session Phase Control
+
+* session bootstrap always seeds rollback into `Docked`
+* docked, sector map, player editor, and encounter are all rollback-driven
+* clients do not author synchronized outer-loop state changes
+
+### Encounter Control Model
+
+* multiple crew entities are simulated
+* one local observed player drives camera/HUD
+* the runtime is structurally ready for full per-peer control/input decoding
+* not every gameplay path has been fully generalized yet
+
+## What Was Removed Or Superseded
+
+This slice superseded the older plan assumptions around:
+
+* custom authoritative gameplay networking
+* bespoke snapshot push/pull sync
+* drift-correction-first architecture
+* dual app-state/runtime-state phase control
+* remote-presence ghost modeling as the core multiplayer actor representation
+
+The implementation direction is now firmly rollback-first for synchronized gameplay.
+
+## Known Remaining Gaps
+
+This slice is working, but it is not yet the full end-state for the game’s multiplayer architecture.
+
+The biggest remaining gaps are:
+
+* synchronized player-editor content mutation is not fully encoded as deterministic per-frame editor ops yet
+* some gameplay systems still need deeper generalization from “observed local player” assumptions to fully per-peer authoritative application
+* several large gameplay/runtime files still need further structural cleanup
+* rollback coverage exists, but not the full determinism and multiplayer regression matrix originally envisioned
+
+So this slice proves the architecture and the primary runtime loop, but it does not yet mean “all multiplayer work is finished.”
+
+## Why This Slice Still Matters
+
+This slice now proves the most important things early:
+
+* the project can run real rollback multiplayer instead of only theorizing it
+* the outer loop and inner loop can share one synchronized state authority
+* the game can support multi-crew play on one ship
+* later content/system slices can build on a real multiplayer architecture instead of a placeholder
+
+That makes this slice less about “adding online play” and more about establishing the runtime model the rest of the game can safely build on.

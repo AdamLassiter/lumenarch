@@ -1,3 +1,5 @@
+use bevy::log;
+
 use super::*;
 
 pub(crate) fn station_panel_button_system(
@@ -9,176 +11,158 @@ pub(crate) fn station_panel_button_system(
         ),
         (Changed<Interaction>, With<Button>),
     >,
-    player_query: Single<&mut ShipboardControlState, With<ObservedLocalPlayerMarker>>,
-    ship_control_query: Single<&mut ShipControlState, (With<PlayerShip>, With<ShipRoot>)>,
-    mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
-    candidate_query: Query<&RuntimeShipModule>,
-    mut module_query: Query<(
-        Entity,
-        &RuntimeShipModule,
-        Option<&mut TurretCommandState>,
-        Option<&mut ReactorCommandState>,
-        Option<&mut StorageCommandState>,
-        Option<&mut ManipulatorCommandState>,
-        Option<&mut ProcessorCommandState>,
-        Option<&mut AirlockCommandState>,
-        Option<&mut RuntimeArchComputer>,
-    )>,
+    player_query: Single<&ShipboardControlState, With<ObservedLocalPlayerMarker>>,
+    mut pending_station: ResMut<netcode::PendingLocalStationCommand>,
 ) {
     let control_state = player_query.into_inner();
-    let mut ship_controls = ship_control_query.into_inner();
-    let mut mission_state = mission_query.into_inner();
 
     for (interaction, button, mut color) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
                 *color = BackgroundColor(Color::srgb(0.20, 0.31, 0.48));
-                let Some(focused_entity) = control_state.focused_entity else {
+                let Some(command) = pending_station_command(button.action, control_state) else {
+                    log::debug!(
+                        "Ignoring station panel action {:?} because the local player is not in a matching control state",
+                        button.action
+                    );
                     continue;
                 };
-                let Ok((
-                    _,
-                    runtime_module,
-                    turret_state,
-                    reactor_state,
-                    storage_state,
-                    manipulator_state,
-                    processor_state,
-                    airlock_state,
-                    arch_runtime,
-                )) = module_query.get_mut(focused_entity)
-                else {
-                    continue;
-                };
-
-                match button.action {
-                    StationPanelButtonAction::HelmThrottle { delta } => {
-                        if control_state.mode == ShipControlMode::Cockpit {
-                            ship_controls.throttle_demand = (ship_controls.throttle_demand
-                                + Fx::from_num(delta))
-                            .clamp(Fx::from_num(0), Fx::from_num(1));
-                        }
-                    }
-                    StationPanelButtonAction::HelmTurn { value } => {
-                        if control_state.mode == ShipControlMode::Cockpit {
-                            ship_controls.turn_input =
-                                Fx::from_num(value).clamp(Fx::from_num(-1), Fx::from_num(1));
-                        }
-                    }
-                    StationPanelButtonAction::TurretAdjustAim { delta } => {
-                        if control_state.mode == ShipControlMode::Turret
-                            && let Some(mut turret_state) = turret_state
-                        {
-                            turret_state.desired_angle += Fx::from_num(delta);
-                        }
-                    }
-                    StationPanelButtonAction::TurretFireToggle => {
-                        if control_state.mode == ShipControlMode::Turret
-                            && let Some(mut turret_state) = turret_state
-                        {
-                            turret_state.fire_intent = !turret_state.fire_intent;
-                        }
-                    }
-                    StationPanelButtonAction::ReactorAdjustRate { delta } => {
-                        if control_state.mode == ShipControlMode::Reactor
-                            && let Some(mut reactor_state) = reactor_state
-                        {
-                            reactor_state.reaction_rate = (reactor_state.reaction_rate
-                                + Fx::from_num(delta))
-                            .clamp(Fx::from_num(0), Fx::from_num(1));
-                        }
-                    }
-                    StationPanelButtonAction::ReactorAdjustTurbine { delta } => {
-                        if control_state.mode == ShipControlMode::Reactor
-                            && let Some(mut reactor_state) = reactor_state
-                        {
-                            reactor_state.turbine_load = (reactor_state.turbine_load
-                                + Fx::from_num(delta))
-                            .clamp(Fx::from_num(0), Fx::from_num(1));
-                        }
-                    }
-                    StationPanelButtonAction::LogisticsToggleStorageIntake => {
-                        if let Some(mut storage_state) = storage_state {
-                            storage_state.allow_intake = !storage_state.allow_intake;
-                        }
-                    }
-                    StationPanelButtonAction::LogisticsToggleAirlock => {
-                        if let Some(mut airlock_state) = airlock_state {
-                            airlock_state.open = !airlock_state.open;
-                            mission_state.airlocks_cycled += 1;
-                        }
-                    }
-                    StationPanelButtonAction::LogisticsToggleManipulator => {
-                        if let Some(mut manipulator_state) = manipulator_state {
-                            manipulator_state.transfer_enabled =
-                                !manipulator_state.transfer_enabled;
-                        }
-                    }
-                    StationPanelButtonAction::LogisticsCycleManipulatorTarget { direction } => {
-                        if let Some(mut manipulator_state) = manipulator_state {
-                            let candidate_ids = summary::nearby_logistics_target_ids(
-                                runtime_module.module_id,
-                                &candidate_query,
-                            );
-                            if !candidate_ids.is_empty() {
-                                let current_index = manipulator_state
-                                    .target_module_id
-                                    .and_then(|id| {
-                                        candidate_ids.iter().position(|candidate| *candidate == id)
-                                    })
-                                    .unwrap_or(0);
-                                let next_index = ((current_index as i32 + direction)
-                                    .rem_euclid(candidate_ids.len() as i32))
-                                    as usize;
-                                manipulator_state.target_module_id =
-                                    Some(candidate_ids[next_index]);
-                                manipulator_state.source_module_id = Some(runtime_module.module_id);
-                            }
-                        }
-                    }
-                    StationPanelButtonAction::LogisticsCycleResource => {
-                        if let Some(mut manipulator_state) = manipulator_state {
-                            manipulator_state.resource_kind = match manipulator_state.resource_kind
-                            {
-                                crate::gameplay::components::ResourceKind::RawSalvage => {
-                                    crate::gameplay::components::ResourceKind::RepairCharge
-                                }
-                                crate::gameplay::components::ResourceKind::RepairCharge => {
-                                    crate::gameplay::components::ResourceKind::Fuel
-                                }
-                                crate::gameplay::components::ResourceKind::Fuel => {
-                                    crate::gameplay::components::ResourceKind::Ammunition
-                                }
-                                crate::gameplay::components::ResourceKind::Ammunition => {
-                                    crate::gameplay::components::ResourceKind::RawSalvage
-                                }
-                            };
-                        }
-                    }
-                    StationPanelButtonAction::LogisticsToggleProcessor => {
-                        if let Some(mut processor_state) = processor_state {
-                            processor_state.enabled = !processor_state.enabled;
-                        }
-                    }
-                    StationPanelButtonAction::ComputerToggleEnabled => {
-                        if let Some(mut arch_runtime) = arch_runtime {
-                            arch_runtime.enabled = !arch_runtime.enabled;
-                        }
-                    }
-                    StationPanelButtonAction::ComputerCycleTemplate => {
-                        if let Some(mut arch_runtime) = arch_runtime {
-                            arch_runtime.program = crate::ship::arch::ArchProgram::from_template(
-                                arch_runtime.program.template.next(),
-                            );
-                        }
-                    }
-                }
+                pending_station.0 = Some(command);
             }
             Interaction::Hovered => {
                 *color = BackgroundColor(Color::srgb(0.30, 0.46, 0.68));
             }
             Interaction::None => {}
         }
+    }
+}
+
+fn pending_station_command(
+    action: StationPanelButtonAction,
+    control_state: &ShipboardControlState,
+) -> Option<netcode::PendingStationCommand> {
+    let requires_focus = !matches!(
+        action,
+        StationPanelButtonAction::HelmThrottle { .. } | StationPanelButtonAction::HelmTurn { .. }
+    );
+    if requires_focus && control_state.focused_entity.is_none() {
+        return None;
+    }
+
+    match action {
+        StationPanelButtonAction::HelmThrottle { delta }
+            if control_state.mode == ShipControlMode::Cockpit =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::HelmThrottle,
+                arg0: (delta * 1000.0) as i16,
+            })
+        }
+        StationPanelButtonAction::HelmTurn { value }
+            if control_state.mode == ShipControlMode::Cockpit =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::HelmTurn,
+                arg0: (value * 1000.0) as i16,
+            })
+        }
+        StationPanelButtonAction::TurretAdjustAim { delta }
+            if control_state.mode == ShipControlMode::Turret =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::TurretAdjustAim,
+                arg0: (delta * 1000.0) as i16,
+            })
+        }
+        StationPanelButtonAction::TurretFireToggle
+            if control_state.mode == ShipControlMode::Turret =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::TurretFireToggle,
+                arg0: 0,
+            })
+        }
+        StationPanelButtonAction::ReactorAdjustRate { delta }
+            if control_state.mode == ShipControlMode::Reactor =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::ReactorAdjustRate,
+                arg0: (delta * 1000.0) as i16,
+            })
+        }
+        StationPanelButtonAction::ReactorAdjustTurbine { delta }
+            if control_state.mode == ShipControlMode::Reactor =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::ReactorAdjustTurbine,
+                arg0: (delta * 1000.0) as i16,
+            })
+        }
+        StationPanelButtonAction::LogisticsToggleStorageIntake
+            if control_state.mode == ShipControlMode::Logistics =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::LogisticsToggleStorageIntake,
+                arg0: 0,
+            })
+        }
+        StationPanelButtonAction::LogisticsToggleAirlock
+            if control_state.mode == ShipControlMode::Logistics =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::LogisticsToggleAirlock,
+                arg0: 0,
+            })
+        }
+        StationPanelButtonAction::LogisticsToggleManipulator
+            if control_state.mode == ShipControlMode::Logistics =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::LogisticsToggleManipulator,
+                arg0: 0,
+            })
+        }
+        StationPanelButtonAction::LogisticsCycleManipulatorTarget { direction }
+            if control_state.mode == ShipControlMode::Logistics =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::LogisticsCycleManipulatorTarget,
+                arg0: direction as i16,
+            })
+        }
+        StationPanelButtonAction::LogisticsCycleResource
+            if control_state.mode == ShipControlMode::Logistics =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::LogisticsCycleResource,
+                arg0: 0,
+            })
+        }
+        StationPanelButtonAction::LogisticsToggleProcessor
+            if control_state.mode == ShipControlMode::Logistics =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::LogisticsToggleProcessor,
+                arg0: 0,
+            })
+        }
+        StationPanelButtonAction::ComputerToggleEnabled
+            if control_state.mode == ShipControlMode::Computer =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::ComputerToggleEnabled,
+                arg0: 0,
+            })
+        }
+        StationPanelButtonAction::ComputerCycleTemplate
+            if control_state.mode == ShipControlMode::Computer =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::ComputerCycleTemplate,
+                arg0: 0,
+            })
+        }
+        _ => None,
     }
 }
 

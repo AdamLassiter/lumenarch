@@ -14,6 +14,7 @@ use super::{
         EditorSessionState,
         HostAddressText,
         JoinButton,
+        JoinButtonText,
         MenuRoot,
         StatusText,
     },
@@ -120,13 +121,14 @@ pub(crate) fn spawn_menu_ui(
                             JoinButton,
                         ))
                         .with_child((
-                            Text::new("Join Host"),
+                            Text::new(join_button_label(&config.session_descriptor, &status)),
                             TextFont {
                                 font: title_font,
                                 font_size: 20.0,
                                 ..default()
                             },
                             TextColor(Color::WHITE),
+                            JoinButtonText,
                         ));
 
                     panel
@@ -154,7 +156,7 @@ pub(crate) fn spawn_menu_ui(
                         ));
 
                     panel.spawn((
-                        Text::new(menu_status_line(&status.phase, &config.session_descriptor)),
+                        Text::new(menu_status_line(&status, &config.session_descriptor)),
                         TextFont {
                             font: mono_font,
                             font_size: 16.0,
@@ -318,14 +320,19 @@ pub(crate) fn menu_keyboard_shortcuts(
 pub(crate) fn update_menu_status_text(
     status: Res<netcode::SessionStatus>,
     config: Res<netcode::SessionConfig>,
-    mut query: Query<&mut Text, With<StatusText>>,
+    mut status_query: Query<&mut Text, With<StatusText>>,
+    mut join_button_query: Query<&mut Text, (With<JoinButtonText>, Without<StatusText>)>,
 ) {
     if !status.is_changed() && !config.is_changed() {
         return;
     }
 
-    for mut text in &mut query {
-        **text = menu_status_line(&status.phase, &config.session_descriptor);
+    for mut text in &mut status_query {
+        **text = menu_status_line(&status, &config.session_descriptor);
+    }
+
+    for mut text in &mut join_button_query {
+        **text = join_button_label(&config.session_descriptor, &status).to_string();
     }
 }
 
@@ -352,8 +359,22 @@ fn host_address_line(server_addr: &str) -> String {
     format!("Session: {server_addr}")
 }
 
-fn menu_status_line(phase: &netcode::SessionPhase, server_addr: &str) -> String {
-    match phase {
+fn join_button_label(server_addr: &str, status: &netcode::SessionStatus) -> &'static str {
+    match (&status.phase, session_descriptor_role(server_addr)) {
+        (netcode::SessionPhase::Lobby, Some(netcode::SessionRole::Host)) => "Start Lobby",
+        (netcode::SessionPhase::Lobby, Some(netcode::SessionRole::Client)) => "Waiting for Host",
+        (_, Some(netcode::SessionRole::Host)) => "Host Lobby",
+        _ => "Join Lobby",
+    }
+}
+
+fn menu_status_line(status: &netcode::SessionStatus, server_addr: &str) -> String {
+    let lobby_count = status
+        .lobby_snapshot
+        .as_ref()
+        .map(|snapshot| snapshot.players.len());
+
+    match &status.phase {
         netcode::SessionPhase::Idle => {
             format!("Ready to start a rollback session at {server_addr}.")
         }
@@ -361,14 +382,36 @@ fn menu_status_line(phase: &netcode::SessionPhase, server_addr: &str) -> String 
             format!("Opening lobby channel for {server_addr}...")
         }
         netcode::SessionPhase::Lobby => {
-            format!("Lobby active for {server_addr}. Host can press Join/Enter again to start once everyone is present.")
+            let players = lobby_count.unwrap_or(1);
+            if status.role == Some(netcode::SessionRole::Host) {
+                format!(
+                    "Lobby active for {server_addr}. {players} player(s) connected. Press Start Lobby or Enter once everyone is present."
+                )
+            } else {
+                format!(
+                    "Lobby active for {server_addr}. {players} player(s) connected. Waiting for host to start the match."
+                )
+            }
         }
         netcode::SessionPhase::Starting => {
-            "Lobby locked. Starting deterministic rollback session...".to_string()
+            let players = lobby_count.unwrap_or(status.total_players.max(1));
+            format!(
+                "Lobby locked with {players} player(s). Starting deterministic rollback session..."
+            )
         }
         netcode::SessionPhase::Connected => {
             "Rollback session running. Loading deterministic game state...".to_string()
         }
         netcode::SessionPhase::Failed(message) => format!("Session bootstrap failed: {message}"),
+    }
+}
+
+fn session_descriptor_role(server_addr: &str) -> Option<netcode::SessionRole> {
+    if server_addr.starts_with("host@") {
+        Some(netcode::SessionRole::Host)
+    } else if server_addr.starts_with("client") {
+        Some(netcode::SessionRole::Client)
+    } else {
+        None
     }
 }

@@ -1,296 +1,189 @@
 # TODO — Multiplayer Demo Implementation Breakdown
 
-This file turns `12_MULTIPLAYER_DEMO.md` into an implementation plan tied to the current codebase.
+This file now records what went into the multiplayer slice that was actually implemented, plus the remaining work that still belongs conceptually to this slice.
 
-## Guiding Constraints
+## Final Constraints Chosen For This Slice
 
-* preserve the deterministic fixed-step architecture as the long-term simulation base
-* keep host authority and client simulation roles understandable
-* prioritize drift detection, observability, and recovery over feature breadth
-* avoid requiring a rollback-first redesign unless testing proves it necessary
-* treat multiplayer as a simulation-quality slice, not only a networking slice
+The implementation locked these decisions in:
 
-## Expected Areas Of Change
+* `bevy_ggrs` rollback networking is the active synchronized gameplay path
+* shared-crew, one-ship multiplayer is the gameplay model
+* the host controls synchronized docked / sector-map / player-editor state changes
+* menu/lobby/bootstrap remain outside rollback
+* late join and host migration are still out of scope
+* the debug enemy editor remains local-only and outside synchronized rollback flow
 
-Likely touched modules:
+## Major Implementation Areas Completed
 
-* `src/client/mod.rs`
-* `src/client/net.rs`
-* `src/client/state.rs`
-* `src/client/docked.rs`
-* `src/client/sector_map.rs`
-* `src/client/gameplay/`
-* `src/ship/storage.rs`
-* host/runtime networking modules
-* protocol definitions
+### Phase 1 — Remove The Old Gameplay Netcode Direction
 
-Likely new module areas:
+Goal:
 
-* deterministic hash / state-audit helpers
-* sync packet types
-* resync handlers
-* multiplayer player/session state
-* automated determinism test harnesses
+Replace the old bespoke gameplay sync direction with rollback-owned session flow.
 
----
+Completed:
 
-## Phase 1 — Session Model And Protocol Audit
-
-### Goal
-
-Define what a multiplayer session must synchronize.
-
-### Tasks
-
-- [x] Audit the current host/client bootstrap and protocol.
-- [x] Define session state boundaries for:
-  - campaign / sector state
-  - ship state
-  - player presence
-  - encounter state
-- [x] Decide what is:
-  - authoritative host state
-  - deterministic client-simulated state
-  - replicated presentation-only state
-- [x] Update protocol notes/types accordingly.
+- [x] Disconnect the old custom multiplayer modules from the active app runtime.
+- [x] Remove the old host/snapshot/protocol stack from the active gameplay path.
+- [x] Replace the temporary sync-test-first bootstrap with a real P2P session direction.
+- [x] Update project docs and notes to reflect rollback as the intended implementation model.
 
 Definition of done:
 
-* the project has a clear multiplayer state contract
+* the active runtime no longer depends on the old custom gameplay networking stack
 
 ---
 
-## Phase 2 — Multi-Player Actor Representation
+### Phase 2 — Add Pre-Session Lobby / Bootstrap Control Channel
 
-### Goal
+Goal:
 
-Represent more than one player in the same simulation cleanly.
+Make the host the source of truth for connected players and the final GGRS peer topology.
 
-### Tasks
+Completed:
 
-- [x] Add runtime support for multiple player entities.
-- [x] Distinguish local player from remote players.
-- [x] Represent boarding/EVA/onboard state per player.
-- [x] Ensure player visuals and interaction targeting scale beyond one actor.
+- [x] Add a lightweight lobby/bootstrap channel separate from rollback gameplay sync.
+- [x] Let clients send a join event before session start.
+- [x] Track connected clients on the host.
+- [x] Broadcast a full lobby snapshot whenever membership changes.
+- [x] Broadcast a canonical `StartSession` config so every peer starts the same GGRS topology.
+- [x] Fix the earlier “host started a one-player session while a client started a two-player session” failure mode.
 
 Definition of done:
 
-* the simulation can host multiple embodied players without collapsing into one-player assumptions
+* host and clients no longer rely on manually matching full peer topology by hand
 
 ---
 
-## Phase 3 — Input Replication And Commitment
+### Phase 3 — Collapse Runtime Authority To Rollback Phase
 
-### Goal
+Goal:
 
-Synchronize player intent rather than raw outcomes where possible.
+Remove the duplicated in-session state machine and make rollback the only runtime authority.
 
-### Tasks
+Completed:
 
-- [x] Define per-tick replicated input payloads.
-- [x] Replicate manual control inputs for:
-  - movement
-  - station use
-  - cockpit/turret control
-  - cargo interaction
-- [x] Commit inputs on the simulation tick model.
-- [x] Ensure locally-hosted single-player still follows the same path.
+- [x] Remove the old in-session `ClientAppState` phase ownership model.
+- [x] Replace it with `FrontendMode` for shell routing only.
+- [x] Keep `RollbackPhase` as the only in-session phase authority.
+- [x] Drive presentation phase transitions from rollback state instead of state-entry/state-exit hooks.
+- [x] Fix host UI phase flicker caused by rollback/presentation state fighting.
+- [x] Fix clients staying in menu because phase transitions were previously host-local.
 
 Definition of done:
 
-* multiplayer uses a consistent input-driven simulation path
+* docked, sector-map, editor, and encounter presentation now follow rollback phase instead of competing with it
 
 ---
 
-## Phase 4 — Shared Campaign And Encounter Flow
+### Phase 4 — Add GGRS Meta Commands For Shared Session Flow
 
-### Goal
+Goal:
 
-Keep both peers aligned through the outer and inner loop.
+Synchronize outer-loop transitions through rollback input rather than local UI mutations.
 
-### Tasks
+Completed:
 
-- [x] Sync docked/sector/encounter state transitions.
-- [x] Sync selected sector nodes and encounter specs.
-- [x] Sync mission return flow and results.
-- [x] Ensure save/load-backed session progression remains coherent for the host.
+- [x] Add `RollbackMetaOp`.
+- [x] Route host-authored docked/sector/player-editor transitions through `PlayerGgrsInput`.
+- [x] Apply host meta ops on every peer during rollback stepping.
+- [x] Synchronize:
+  - open sector map
+  - select node
+  - launch encounter
+  - open editor
+  - leave editor
+  - return to dock
+  - repair ship
+- [x] Fix the earlier bug where clients did not follow host transitions.
 
 Definition of done:
 
-* both peers move through the same campaign/encounter loop reliably
+* synchronized outer-loop transitions now happen through rollback input instead of local state writes
 
 ---
 
-## Phase 5 — Multi-Actor Interaction Safety
+### Phase 5 — Establish Multi-Crew Encounter Runtime
 
-### Goal
+Goal:
 
-Make component/station interactions safe under multiplayer pressure.
+Replace the single-local-player runtime assumption with synchronized crew entities.
 
-### Tasks
+Completed:
 
-- [x] Decide first-pass authority/locking semantics for stations.
-- [x] Prevent conflicting writes from causing undefined behavior.
-- [ ] Ensure interactions on hostile ships work for multiple players.
-- [ ] Ensure shared-player-ship operation remains deterministic.
+- [x] Spawn one crew entity per GGRS handle.
+- [x] Add stable per-player handle ownership (`PlayerHandleComponent` / `PlayerHandleMap`).
+- [x] Add observed-local-player presentation tracking for camera/HUD.
+- [x] Remove the active remote-ghost model from the main path.
+- [x] Make several interaction / field / atmosphere paths operate over multiple crew entities in stable order.
 
 Definition of done:
 
-* multiple players can interact with the same world without silently corrupting state
+* encounter runtime can represent shared-crew play structurally instead of pretending multiplayer is only local-plus-ghosts
 
 ---
 
-## Phase 6 — Deterministic State Hashing
+### Phase 6 — Push Deterministic Execution Onto Rollback Scheduling
 
-### Goal
+Goal:
 
-Make drift visible rather than speculative.
+Move synchronized logic away from ad hoc local-input/runtime-state flow and into the rollback path.
 
-### Tasks
+Completed:
 
-- [x] Define deterministic state-hash boundaries.
-- [x] Compute periodic hashes for:
-  - ship runtime state
-  - player state
-  - encounter state
-  - campaign state where appropriate
-- [x] Compare host/client hashes.
-- [x] Log mismatches with enough context to debug them.
+- [x] Expand `PlayerGgrsInput` into the current canonical synchronized input packet.
+- [x] Add decoded per-peer rollback command state.
+- [x] Move authoritative simulation work onto `GgrsSchedule`.
+- [x] Route synchronized control/meta input away from direct local state changes.
+- [x] Register a broader set of rollback resources/components than the original scaffolding.
 
 Definition of done:
 
-* the game can tell when simulation divergence has happened
+* the active multiplayer runtime is now genuinely rollback-driven, not just rollback-bootstrapped
 
 ---
 
-## Phase 7 — Drift Diagnostics And Debug UI
+### Phase 7 — Improve Logging And Debuggability
 
-### Goal
+Goal:
 
-Make it practical to investigate determinism failures.
+Make the new multiplayer/runtime model inspectable when things go wrong.
 
-### Tasks
+Completed:
 
-- [x] Add debug output for last matching / first mismatching tick.
-- [x] Add readable mismatch categories where possible.
-- [x] Surface hash/drift status in a debug overlay or diagnostics panel.
-- [x] Keep this tooling available in local-host development flows.
+- [x] Add `info` logs for one-time bootstrap/session/phase transitions.
+- [x] Add `debug`/`trace` logs for input publication, decoded commands, rollback checkpoints, and lobby updates.
+- [x] Reserve `warn` for rollback regressions, lobby failures, and other non-ideal events.
+- [x] Add related logs in menu, docked, sector-map, and scene-spawn paths to correlate user action with rollback transition.
 
 Definition of done:
 
-* determinism failures are debuggable without deep ad hoc instrumentation every time
+* multiplayer issues can now be debugged from logs without guessing where phase/input ownership broke
 
 ---
 
-## Phase 8 — Resync / Recovery Path
+## Remaining Work Still Belonging To This Slice
 
-### Goal
+These items are still conceptually part of the multiplayer slice, even though the main architecture is now in place.
 
-Recover from drift pragmatically without requiring a whole rollback architecture first.
+### Remaining Gameplay / Synchronization Work
 
-### Tasks
+- [ ] Finish synchronized player-editor mutations as deterministic rollback input operations instead of direct host-side rollback resource edits.
+- [ ] Continue removing remaining observed-local-player assumptions from authoritative gameplay logic.
+- [ ] Continue pushing synchronized gameplay-critical systems toward full per-peer deterministic command application.
+- [ ] Expand multiplayer/determinism regression coverage beyond the current small test set.
 
-- [x] Define first-pass resync payloads.
-- [x] Support reapplying authoritative host state when mismatch is detected.
-- [x] Limit the first pass to scoped or encounter-level resync if needed.
-- [x] Ensure resync restores continued play rather than forcing full restart.
+### Remaining Codebase Cleanup
 
-Definition of done:
+- [ ] Continue breaking up oversized gameplay/runtime files that still concentrate too many systems or responsibilities.
+- [ ] Keep aligning module layout with ECS/gameplay concepts so multiplayer-specific logic remains debuggable.
 
-* the session can recover from at least common drift cases
+## Slice Outcome
 
----
+This slice should now be considered:
 
-## Phase 9 — Deterministic Test Harness
+* **architecturally successful**
+* **runtime-functional for host/client sector and encounter flow**
+* **not yet feature-complete for all remaining multiplayer polish and determinism tooling**
 
-### Goal
-
-Add repeatable testing around the simulation contract.
-
-### Tasks
-
-- [ ] Add automated deterministic playback / replay tests where practical.
-- [ ] Add test fixtures for:
-  - ship movement
-  - boarding
-  - atmosphere
-  - logistics
-  - combat
-- [ ] Add host/client consistency checks in integration-style tests.
-- [x] Preserve repeatable seeds and inputs for debugging.
-
-Definition of done:
-
-* determinism regressions become testable and catchable in CI/dev workflows
-
----
-
-## Phase 10 — Multiplayer UX Pass
-
-### Goal
-
-Make the multiplayer flow understandable for humans, not only technically functional.
-
-### Tasks
-
-- [x] Improve join/connect state messaging.
-- [x] Show peer presence/state where useful.
-- [x] Show sync or waiting states clearly.
-- [x] Keep local-host single-player flow painless.
-
-Definition of done:
-
-* multiplayer is usable enough to test without guessing what the session is doing
-
----
-
-## Phase 11 — Stress Scenarios
-
-### Goal
-
-Test the architecture against the systems most likely to drift.
-
-### Tasks
-
-- [ ] Run scenarios with:
-  - simultaneous station use
-  - ship movement while boarding
-  - atmosphere venting
-  - cargo carrying / depositing
-  - hostile ship destruction
-- [ ] Record observed drift hotspots.
-- [ ] Fix the most common deterministic breakpoints.
-
-Definition of done:
-
-* the main simulation stressors are exercised, not merely assumed safe
-
----
-
-## Phase 12 — Tuning And Reliability Pass
-
-### Goal
-
-Decide whether the current deterministic multiplayer model is sufficient.
-
-### Tasks
-
-- [ ] Tune input delay / synchronization cadence.
-- [ ] Tune hash/resync frequency.
-- [ ] Verify play remains coherent under realistic interaction load.
-- [x] Decide whether rollback is still avoidable for the current design.
-- [x] Capture the remaining known limits honestly.
-
-Definition of done:
-
-* the multiplayer architecture is either validated or has clear next constraints identified
-
-## Immediate Next Task
-
-Start with **Phase 1**:
-
-* audit the existing protocol and session model
-* define exact authoritative vs deterministic state ownership
-* identify what needs hashing and what does not
-
-That foundation determines whether the later multiplayer work stays coherent.
+That is an important distinction. The slice is no longer “planned multiplayer work”; it is now “working rollback multiplayer with known follow-up gaps.”

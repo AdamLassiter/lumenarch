@@ -8,7 +8,8 @@ use serde::Serialize;
 use super::{
     lobby::{shutdown_lobby_runtime, start_lobby_runtime, LobbyControlCommand},
     types::{
-        LumenGgrsConfig, PendingLocalMetaCommand, RollbackGameState, RollbackPhase,
+        LumenGgrsConfig, PendingLocalMetaCommand, PendingLocalStationCommand,
+        RollbackGameState, RollbackPhase,
         SessionBootstrapConfig, SessionConfig, SessionPhase, SessionRole, SessionStatus,
     },
     DecodedPlayerCommands,
@@ -147,6 +148,7 @@ pub(crate) fn finalize_pending_session_bootstrap(
     mut rollback_state: ResMut<RollbackGameState>,
     mut next_mode: ResMut<NextState<FrontendMode>>,
     mut pending_meta: ResMut<PendingLocalMetaCommand>,
+    mut pending_station: ResMut<PendingLocalStationCommand>,
     mut decoded_commands: ResMut<DecodedPlayerCommands>,
     mut lobby_runtime: ResMut<LobbyRuntime>,
 ) {
@@ -177,6 +179,7 @@ pub(crate) fn finalize_pending_session_bootstrap(
             status.active_ship_snapshot = Some(bootstrap.initial_state.editor_ship.clone());
             *rollback_state = bootstrap.initial_state.clone();
             pending_meta.0 = None;
+            pending_station.0 = None;
             decoded_commands.by_handle.clear();
             bootstrap.pending_start = false;
             shutdown_lobby_runtime(lobby_runtime.as_mut());

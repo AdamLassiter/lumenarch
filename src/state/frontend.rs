@@ -45,6 +45,9 @@ pub(crate) struct MainCamera;
 pub(crate) struct JoinButton;
 
 #[derive(Component)]
+pub(crate) struct JoinButtonText;
+
+#[derive(Component)]
 pub(crate) struct DebugEnemyEditorButton;
 
 #[derive(Component)]

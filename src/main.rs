@@ -36,7 +36,7 @@ use self::state::{
 };
 use crate::{netcode::LumenGgrsConfig, ship::ModuleKind};
 
-pub(crate) const TICK_FPS: u64 = 20;
+pub(crate) const TICK_FPS: u64 = 30;
 pub(crate) const TICK_MILLIS: u64 = 1000 / TICK_FPS;
 
 pub(crate) const DEFAULT_HOST_ADDR: &str = "127.0.0.1:5000";
@@ -59,7 +59,7 @@ pub fn run_client() {
 
     App::new()
         .insert_resource(Time::<Fixed>::from_duration(Duration::from_millis(
-            TICK_MILLIS,
+            TICK_MILLIS / 2,
         )))
         .insert_resource(RollbackFrameRate(TICK_FPS as usize))
         .insert_resource(ClearColor(Color::srgb(0.04, 0.05, 0.08)))
@@ -73,6 +73,7 @@ pub fn run_client() {
         .insert_resource(netcode::PlayerHandleMap::default())
         .insert_resource(netcode::ObservedLocalPlayer::default())
         .insert_resource(netcode::PendingLocalMetaCommand::default())
+        .insert_resource(netcode::PendingLocalStationCommand::default())
         .insert_resource(netcode::DecodedPlayerCommands::default())
         .insert_resource(netcode::ChecksumHistory::default())
         .insert_resource(netcode::ActivePresentationPhase::default())

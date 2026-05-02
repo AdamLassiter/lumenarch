@@ -9,7 +9,7 @@ pub(crate) struct BackToStationButton;
 #[derive(Component)]
 pub(crate) struct LaunchEncounterButton;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) enum StationPanelButtonAction {
     HelmThrottle { delta: f32 },
     HelmTurn { value: f32 },
