@@ -3,7 +3,7 @@ mod hud;
 mod salvage;
 
 use arena::spawn_test_arena;
-use bevy::prelude::*;
+use bevy::{log, prelude::*};
 use hud::spawn_runtime_hud;
 use salvage::spawn_salvage_wreck;
 
@@ -32,12 +32,30 @@ pub(crate) fn spawn_runtime_scene(
     observed_local_player.entity = None;
     observed_local_player.handle = local_handle.0;
 
+    log::info!(
+        "Spawning runtime encounter scene: local_handle={:?}, total_players={}, current_node={}, active_node={:?}, selected_node={:?}",
+        local_handle.0,
+        session_status.total_players,
+        sector_state.current_node_id,
+        sector_state.active_encounter_node_id,
+        sector_state.selected_node_id
+    );
+
     spawn_runtime_hud(&mut commands, &asset_server, &editor_ship.ship);
     let active_node = sector_state
         .active_node()
         .or_else(|| sector_state.selected_node())
         .cloned()
         .unwrap_or_else(|| sector_state.nodes[1].clone());
+    log::debug!(
+        "Runtime encounter source node: id={}, label='{}', hostile_count={}, enemy_ship_ids={:?}, salvage_value={}, reward_multiplier={}",
+        active_node.id,
+        active_node.label,
+        active_node.encounter.hostile_count,
+        active_node.encounter.enemy_ship_ids,
+        active_node.encounter.salvage_value,
+        active_node.encounter.reward_multiplier
+    );
     spawn_test_arena(
         &mut commands,
         &balance,
@@ -110,6 +128,11 @@ pub(crate) fn cleanup_runtime_entities(
 ) {
     player_handle_map.entities.clear();
     observed_local_player.entity = None;
+    let entity_count = query.iter().count();
+    log::info!(
+        "Cleaning up runtime encounter scene and {} presentation/runtime entities",
+        entity_count
+    );
     for entity in &query {
         commands.entity(entity).despawn();
     }

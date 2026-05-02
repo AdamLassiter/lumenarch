@@ -67,6 +67,7 @@ pub fn run_client() {
         .insert_resource(netcode::SessionConfig::default())
         .insert_resource(netcode::SessionStatus::default())
         .insert_resource(netcode::SessionBootstrapConfig::default())
+        .insert_resource(netcode::LobbyRuntime::default())
         .insert_resource(netcode::RollbackGameState::default())
         .insert_resource(netcode::LocalPlayerHandle::default())
         .insert_resource(netcode::PlayerHandleMap::default())
@@ -167,8 +168,12 @@ pub fn run_client() {
         .add_systems(
             bevy_ggrs::GgrsSchedule,
             (
-                netcode::apply_host_meta_ops.ambiguous_with_all(),
-                netcode::decode_player_inputs.ambiguous_with_all(),
+                (
+                    netcode::decode_player_inputs,
+                    netcode::apply_host_meta_ops,
+                )
+                    .chain()
+                    .ambiguous_with_all(),
                 (
                     gameplay::toggle_shipboard_control_mode,
                     gameplay::exit_focused_station,
@@ -283,6 +288,7 @@ pub fn run_client() {
                 menu::menu_keyboard_shortcuts.run_if(in_state(FrontendMode::Menu)),
                 menu::update_menu_status_text.run_if(in_state(FrontendMode::Menu)),
                 menu::update_host_address_text.run_if(in_state(FrontendMode::Menu)),
+                netcode::poll_lobby_runtime_events,
                 netcode::finalize_pending_session_bootstrap,
                 exit_on_escape,
             ),

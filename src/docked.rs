@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{log, prelude::*};
 
 use super::{
     HOVERED_BUTTON,
@@ -263,18 +263,21 @@ pub(crate) fn docked_button_system(
                 if refit.is_some() {
                     *background = BackgroundColor(PRESSED_BUTTON);
                     editor_session.mode = EditorMode::Player;
+                    log::debug!("Docked UI queued OpenEditor meta command");
                     pending_meta.0 = Some(netcode::PendingMetaCommand {
                         op: netcode::RollbackMetaOp::OpenEditor,
                         ..Default::default()
                     });
                 } else if open_map.is_some() {
                     *background = BackgroundColor(Color::srgb(0.12, 0.40, 0.24));
+                    log::debug!("Docked UI queued OpenSectorMap meta command");
                     pending_meta.0 = Some(netcode::PendingMetaCommand {
                         op: netcode::RollbackMetaOp::OpenSectorMap,
                         ..Default::default()
                     });
                 } else if repair.is_some() {
                     *background = BackgroundColor(Color::srgb(0.62, 0.44, 0.16));
+                    log::debug!("Docked UI queued RepairShip meta command");
                     pending_meta.0 = Some(netcode::PendingMetaCommand {
                         op: netcode::RollbackMetaOp::RepairShip,
                         ..Default::default()

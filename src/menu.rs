@@ -172,7 +172,12 @@ pub(crate) fn edit_host_address(
     mut config: ResMut<netcode::SessionConfig>,
     status: Res<netcode::SessionStatus>,
 ) {
-    if matches!(status.phase, netcode::SessionPhase::Connecting) {
+    if matches!(
+        status.phase,
+        netcode::SessionPhase::Connecting
+            | netcode::SessionPhase::Lobby
+            | netcode::SessionPhase::Starting
+    ) {
         return;
     }
 
@@ -230,6 +235,7 @@ pub(crate) fn menu_button_system(
     config: Res<netcode::SessionConfig>,
     mut status: ResMut<netcode::SessionStatus>,
     mut bootstrap: ResMut<netcode::SessionBootstrapConfig>,
+    mut lobby_runtime: ResMut<netcode::LobbyRuntime>,
     mut editor_session: ResMut<EditorSessionState>,
     mut next_mode: ResMut<NextState<FrontendMode>>,
 ) {
@@ -238,9 +244,28 @@ pub(crate) fn menu_button_system(
             Interaction::Pressed => {
                 if join.is_some() {
                     *background = BackgroundColor(PRESSED_BUTTON);
-                    editor_session.mode = EditorMode::Player;
-                    netcode::begin_session_attempt(&config, &mut status, &mut bootstrap);
-                    commands.insert_resource(netcode::LocalPlayerHandle::default());
+                    if matches!(status.phase, netcode::SessionPhase::Lobby)
+                        && status.role == Some(netcode::SessionRole::Host)
+                    {
+                        netcode::request_lobby_session_start(
+                            &mut status,
+                            &bootstrap,
+                            lobby_runtime.as_ref(),
+                        );
+                    } else {
+                        editor_session.mode = EditorMode::Player;
+                        log::info!(
+                            "Menu join requested with session descriptor '{}'",
+                            config.session_descriptor
+                        );
+                        netcode::begin_session_attempt(
+                            &config,
+                            &mut status,
+                            &mut bootstrap,
+                            lobby_runtime.as_mut(),
+                        );
+                        commands.insert_resource(netcode::LocalPlayerHandle::default());
+                    }
                 } else if debug_enemy.is_some() {
                     *background = BackgroundColor(Color::srgb(0.36, 0.24, 0.16));
                     editor_session.mode = EditorMode::Enemy;
@@ -268,9 +293,25 @@ pub(crate) fn menu_keyboard_shortcuts(
     config: Res<netcode::SessionConfig>,
     mut status: ResMut<netcode::SessionStatus>,
     mut bootstrap: ResMut<netcode::SessionBootstrapConfig>,
+    mut lobby_runtime: ResMut<netcode::LobbyRuntime>,
 ) {
     if keys.just_pressed(KeyCode::Enter) {
-        netcode::begin_session_attempt(&config, &mut status, &mut bootstrap);
+        if matches!(status.phase, netcode::SessionPhase::Lobby)
+            && status.role == Some(netcode::SessionRole::Host)
+        {
+            netcode::request_lobby_session_start(&mut status, &bootstrap, lobby_runtime.as_ref());
+        } else {
+            log::info!(
+                "Menu keyboard shortcut requested session start for descriptor '{}'",
+                config.session_descriptor
+            );
+            netcode::begin_session_attempt(
+                &config,
+                &mut status,
+                &mut bootstrap,
+                lobby_runtime.as_mut(),
+            );
+        }
     }
 }
 
@@ -317,7 +358,13 @@ fn menu_status_line(phase: &netcode::SessionPhase, server_addr: &str) -> String 
             format!("Ready to start a rollback session at {server_addr}.")
         }
         netcode::SessionPhase::Connecting => {
-            format!("Bootstrapping deterministic rollback session for {server_addr}...")
+            format!("Opening lobby channel for {server_addr}...")
+        }
+        netcode::SessionPhase::Lobby => {
+            format!("Lobby active for {server_addr}. Host can press Join/Enter again to start once everyone is present.")
+        }
+        netcode::SessionPhase::Starting => {
+            "Lobby locked. Starting deterministic rollback session...".to_string()
         }
         netcode::SessionPhase::Connected => {
             "Rollback session running. Loading deterministic game state...".to_string()
