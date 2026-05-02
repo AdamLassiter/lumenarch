@@ -49,10 +49,10 @@ pub(crate) fn spawn_menu_ui(
                         padding: UiRect::all(Val::Px(24.0)),
                         flex_direction: FlexDirection::Column,
                         row_gap: Val::Px(16.0),
+                        border_radius: BorderRadius::all(Val::Px(14.0)),
                         ..default()
                     },
                     BackgroundColor(Color::srgba(0.09, 0.12, 0.18, 0.94)),
-                    BorderRadius::all(Val::Px(14.0)),
                 ))
                 .with_children(|panel| {
                     panel.spawn((
@@ -68,7 +68,12 @@ pub(crate) fn spawn_menu_ui(
                     panel.spawn((
 
                         Text::new(
-                            format!("Type a session descriptor, Backspace to delete, Enter to start.\nExamples: host@{} or client1@127.0.0.1:5001>{}", super::DEFAULT_HOST_ADDR, super::DEFAULT_HOST_ADDR),
+                            format!(
+                                    "Type a session descriptor, Backspace to delete, Enter to start.\nExamples: host@{} or client1@{}>{}",
+                                    super::DEFAULT_HOST_ADDR,
+                                    super::DEFAULT_CLIENT_ADDR,
+                                    super::DEFAULT_HOST_ADDR
+                                ),
                         ),
                         TextFont {
                             font: title_font.clone(),
@@ -83,10 +88,10 @@ pub(crate) fn spawn_menu_ui(
                             Node {
                                 width: Val::Percent(100.0),
                                 padding: UiRect::all(Val::Px(14.0)),
+                                border_radius: BorderRadius::all(Val::Px(10.0)),
                                 ..default()
                             },
                             BackgroundColor(Color::srgba(0.13, 0.17, 0.24, 1.0)),
-                            BorderRadius::all(Val::Px(10.0)),
                         ))
                         .with_children(|field| {
                             field.spawn((
@@ -109,9 +114,9 @@ pub(crate) fn spawn_menu_ui(
                                 height: Val::Px(52.0),
                                 justify_content: JustifyContent::Center,
                                 align_items: AlignItems::Center,
+                                border_radius: BorderRadius::all(Val::Px(10.0)),
                                 ..default()
                             },
-                            BorderRadius::all(Val::Px(10.0)),
                             BackgroundColor(NORMAL_BUTTON),
                             JoinButton,
                         ))
@@ -133,9 +138,9 @@ pub(crate) fn spawn_menu_ui(
                                 height: Val::Px(44.0),
                                 justify_content: JustifyContent::Center,
                                 align_items: AlignItems::Center,
+                                border_radius: BorderRadius::all(Val::Px(10.0)),
                                 ..default()
                             },
-                            BorderRadius::all(Val::Px(10.0)),
                             BackgroundColor(Color::srgb(0.46, 0.34, 0.22)),
                             DebugEnemyEditorButton,
                         ))
@@ -164,12 +169,22 @@ pub(crate) fn spawn_menu_ui(
 }
 
 pub(crate) fn edit_host_address(
-    mut keyboard_events: EventReader<KeyboardInput>,
+    mut keyboard_events: MessageReader<KeyboardInput>,
     mut config: ResMut<netcode::SessionConfig>,
     status: Res<netcode::SessionStatus>,
 ) {
     if matches!(status.phase, netcode::SessionPhase::Connecting) {
         return;
+    }
+
+    if matches!(status.phase, netcode::SessionPhase::Failed(_))
+        && config.session_descriptor.starts_with("host@")
+    {
+        config.session_descriptor = format!(
+            "client1@{}>{}",
+            super::DEFAULT_CLIENT_ADDR,
+            super::DEFAULT_HOST_ADDR
+        );
     }
 
     for event in keyboard_events.read() {
@@ -274,7 +289,7 @@ pub(crate) fn update_menu_status_text(
 
 pub(crate) fn cleanup_menu_ui(mut commands: Commands, query: Query<Entity, With<MenuRoot>>) {
     for entity in &query {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 

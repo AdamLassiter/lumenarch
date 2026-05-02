@@ -52,15 +52,11 @@ pub(super) fn spawn_runtime_hud(
 }
 
 fn panel_shell(node: Node) -> impl Bundle {
-    (
-        node,
-        BackgroundColor(Color::srgba(0.05, 0.08, 0.13, 0.93)),
-        BorderRadius::all(Val::Px(14.0)),
-    )
+    (node, BackgroundColor(Color::srgba(0.05, 0.08, 0.13, 0.93)))
 }
 
 fn spawn_top_banner(
-    root: &mut ChildBuilder,
+    root: &mut ChildSpawnerCommands,
     title_font: Handle<Font>,
     mono_font: Handle<Font>,
     ship: &ShipDefinition,
@@ -73,6 +69,7 @@ fn spawn_top_banner(
         padding: UiRect::axes(Val::Px(16.0), Val::Px(10.0)),
         flex_direction: FlexDirection::Column,
         row_gap: Val::Px(6.0),
+        border_radius: BorderRadius::all(Val::Px(14.0)),
         ..default()
     }))
     .with_children(|panel| {
@@ -99,7 +96,7 @@ fn spawn_top_banner(
 }
 
 fn spawn_compact_status_panel(
-    root: &mut ChildBuilder,
+    root: &mut ChildSpawnerCommands,
     title_font: Handle<Font>,
     mono_font: Handle<Font>,
 ) {
@@ -111,6 +108,7 @@ fn spawn_compact_status_panel(
         padding: UiRect::all(Val::Px(14.0)),
         flex_direction: FlexDirection::Column,
         row_gap: Val::Px(10.0),
+        border_radius: BorderRadius::all(Val::Px(14.0)),
         ..default()
     }))
     .with_children(|panel| {
@@ -179,7 +177,7 @@ fn spawn_compact_status_panel(
 }
 
 fn spawn_bar(
-    panel: &mut ChildBuilder,
+    panel: &mut ChildSpawnerCommands,
     mono_font: Handle<Font>,
     label: &str,
     kind: GameplayBarKind,
@@ -207,20 +205,20 @@ fn spawn_bar(
                 Node {
                     width: Val::Percent(100.0),
                     height: Val::Px(10.0),
+                    border_radius: BorderRadius::all(Val::Px(999.0)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.20, 0.24, 0.30, 0.95)),
-                BorderRadius::all(Val::Px(999.0)),
             ))
             .with_children(|track| {
                 track.spawn((
                     Node {
                         width: Val::Percent(0.0),
                         height: Val::Percent(100.0),
+                        border_radius: BorderRadius::all(Val::Px(999.0)),
                         ..default()
                     },
                     BackgroundColor(fill_color),
-                    BorderRadius::all(Val::Px(999.0)),
                     GameplayBarFill { kind },
                 ));
             });
@@ -228,7 +226,7 @@ fn spawn_bar(
 }
 
 fn spawn_inspection_panel(
-    root: &mut ChildBuilder,
+    root: &mut ChildSpawnerCommands,
     title_font: Handle<Font>,
     mono_font: Handle<Font>,
 ) {
@@ -240,6 +238,7 @@ fn spawn_inspection_panel(
         padding: UiRect::all(Val::Px(14.0)),
         flex_direction: FlexDirection::Column,
         row_gap: Val::Px(8.0),
+        border_radius: BorderRadius::all(Val::Px(14.0)),
         ..default()
     }))
     .with_children(|panel| {
@@ -265,7 +264,11 @@ fn spawn_inspection_panel(
     });
 }
 
-fn spawn_alerts_panel(root: &mut ChildBuilder, title_font: Handle<Font>, mono_font: Handle<Font>) {
+fn spawn_alerts_panel(
+    root: &mut ChildSpawnerCommands,
+    title_font: Handle<Font>,
+    mono_font: Handle<Font>,
+) {
     root.spawn(panel_shell(Node {
         position_type: PositionType::Absolute,
         right: Val::Px(18.0),
@@ -274,6 +277,7 @@ fn spawn_alerts_panel(root: &mut ChildBuilder, title_font: Handle<Font>, mono_fo
         padding: UiRect::all(Val::Px(14.0)),
         flex_direction: FlexDirection::Column,
         row_gap: Val::Px(8.0),
+        border_radius: BorderRadius::all(Val::Px(14.0)),
         ..default()
     }))
     .with_children(|panel| {
@@ -299,7 +303,11 @@ fn spawn_alerts_panel(root: &mut ChildBuilder, title_font: Handle<Font>, mono_fo
     });
 }
 
-fn spawn_station_panel(root: &mut ChildBuilder, title_font: Handle<Font>, mono_font: Handle<Font>) {
+fn spawn_station_panel(
+    root: &mut ChildSpawnerCommands,
+    title_font: Handle<Font>,
+    mono_font: Handle<Font>,
+) {
     let actions = [
         StationPanelButtonAction::HelmThrottle { delta: -0.2 },
         StationPanelButtonAction::HelmThrottle { delta: 0.2 },
@@ -334,10 +342,10 @@ fn spawn_station_panel(root: &mut ChildBuilder, title_font: Handle<Font>, mono_f
             padding: UiRect::all(Val::Px(18.0)),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(10.0),
+            border_radius: BorderRadius::all(Val::Px(16.0)),
             ..default()
         },
         BackgroundColor(Color::srgba(0.04, 0.06, 0.11, 0.96)),
-        BorderRadius::all(Val::Px(16.0)),
         GameplayStationPanel,
     ))
     .with_children(|panel| {
@@ -380,10 +388,10 @@ fn spawn_station_panel(root: &mut ChildBuilder, title_font: Handle<Font>, mono_f
                                 justify_content: JustifyContent::Center,
                                 align_items: AlignItems::Center,
                                 padding: UiRect::horizontal(Val::Px(8.0)),
+                                border_radius: BorderRadius::all(Val::Px(10.0)),
                                 ..default()
                             },
                             BackgroundColor(Color::srgb(0.24, 0.38, 0.58)),
-                            BorderRadius::all(Val::Px(10.0)),
                             GameplayStationPanelButton { action },
                         ))
                         .with_children(|button| {
@@ -404,7 +412,7 @@ fn spawn_station_panel(root: &mut ChildBuilder, title_font: Handle<Font>, mono_f
 }
 
 fn spawn_controls_panel(
-    root: &mut ChildBuilder,
+    root: &mut ChildSpawnerCommands,
     title_font: Handle<Font>,
     mono_font: Handle<Font>,
 ) {
@@ -416,6 +424,7 @@ fn spawn_controls_panel(
         padding: UiRect::all(Val::Px(14.0)),
         flex_direction: FlexDirection::Column,
         row_gap: Val::Px(8.0),
+        border_radius: BorderRadius::all(Val::Px(14.0)),
         ..default()
     }))
     .with_children(|panel| {
@@ -446,10 +455,10 @@ fn spawn_controls_panel(
                     height: Val::Px(40.0),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
+                    border_radius: BorderRadius::all(Val::Px(10.0)),
                     ..default()
                 },
                 BackgroundColor(Color::srgb(0.52, 0.27, 0.18)),
-                BorderRadius::all(Val::Px(10.0)),
                 AbortEncounterButton,
             ))
             .with_child((

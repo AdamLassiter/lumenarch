@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ecs::relationship::Relationship, prelude::*};
 
 use crate::{
     balance::BalanceConfig,
@@ -40,7 +40,7 @@ pub(crate) fn sample_ship_fields(
     mut module_query: Query<(
         Entity,
         &RuntimeShipModule,
-        &Parent,
+        &ChildOf,
         &ModuleFieldEmitter,
         &Integrity,
         &mut ModuleRuntimeState,
@@ -177,7 +177,7 @@ pub(crate) fn update_module_runtime_state(
     balance: Res<BalanceConfig>,
     mut module_query: Query<(
         &RuntimeShipModule,
-        &Parent,
+        &ChildOf,
         &Integrity,
         &mut ModuleRuntimeState,
         Option<&mut ReactorCommandState>,
@@ -185,7 +185,7 @@ pub(crate) fn update_module_runtime_state(
         Option<&mut TurretCommandState>,
         Option<&DestroyedModule>,
     )>,
-    mut storage_query: Query<(&RuntimeShipModule, &Parent, &mut StorageModule)>,
+    mut storage_query: Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
 ) {
     let dt = fx_from_time_delta(&time);
 

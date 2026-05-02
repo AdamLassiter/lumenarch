@@ -141,11 +141,14 @@ pub(crate) fn sync_toolbox_visuals(
 
 pub(crate) fn draw_grid_overlay(
     window: Single<&Window, With<PrimaryWindow>>,
-    camera_query: Single<(&Transform, &OrthographicProjection), (With<Camera2d>, With<MainCamera>)>,
+    camera_query: Single<(&Transform, &Projection), (With<Camera2d>, With<MainCamera>)>,
     mut gizmos: Gizmos,
 ) {
     let window = window.into_inner();
     let (camera_transform, projection) = camera_query.into_inner();
+    let Projection::Orthographic(projection) = projection else {
+        return;
+    };
     let half_w = (window.width() * projection.scale * 0.5) + TILE_SIZE * 4.0;
     let half_h = (window.height() * projection.scale * 0.5) + TILE_SIZE * 4.0;
     let min_world_x = camera_transform.translation.x - half_w;

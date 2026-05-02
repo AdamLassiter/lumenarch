@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ecs::relationship::Relationship, prelude::*};
 
 use crate::gameplay::{
     components::{
@@ -20,7 +20,7 @@ pub(crate) fn detect_nearby_interactions(
     module_query: Query<(
         Entity,
         &RuntimeShipModule,
-        &Parent,
+        &ChildOf,
         &Integrity,
         &ModuleRuntimeState,
         Option<&DestroyedModule>,

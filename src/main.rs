@@ -13,7 +13,8 @@ pub(crate) mod state;
 use std::time::Duration;
 
 use bevy::{app::AppExit, prelude::*};
-use bevy_ggrs::{GgrsApp, GgrsPlugin};
+use bevy_ggrs::{GgrsPlugin, RollbackApp, RollbackFrameRate};
+use bevy_roll_safe::RollApp;
 
 use self::state::{
     ArchEditorState,
@@ -36,9 +37,11 @@ use self::state::{
 };
 use crate::{netcode::LumenGgrsConfig, ship::ModuleKind};
 
-pub(crate) const TICK_MILLIS: u64 = 30;
+pub(crate) const TICK_FPS: u64 = 20;
+pub(crate) const TICK_MILLIS: u64 = 1000 / TICK_FPS;
 
 pub(crate) const DEFAULT_HOST_ADDR: &str = "127.0.0.1:5000";
+pub(crate) const DEFAULT_CLIENT_ADDR: &str = "127.0.0.1:5001";
 pub(crate) const TILE_SIZE: f32 = 32.0;
 pub(crate) const HALF_TILE_SIZE: f32 = TILE_SIZE * 0.5;
 pub(crate) const TOOLBOX_WIDTH: f32 = 280.0;
@@ -59,6 +62,7 @@ pub fn run_client() {
         .insert_resource(Time::<Fixed>::from_duration(Duration::from_millis(
             TICK_MILLIS,
         )))
+        .insert_resource(RollbackFrameRate(TICK_FPS as usize))
         .insert_resource(ClearColor(Color::srgb(0.04, 0.05, 0.08)))
         .insert_resource(balance_config)
         .insert_resource(netcode::SessionConfig::default())
@@ -92,14 +96,13 @@ pub fn run_client() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "LUMEN//ARCH".to_string(),
-                        resolution: (1280.0, 720.0).into(),
+                        resolution: (1280, 720).into(),
                         ..default()
                     }),
                     ..default()
                 }),
         )
         .add_plugins(GgrsPlugin::<LumenGgrsConfig>::default())
-        .set_rollback_schedule_fps((1000 / TICK_MILLIS) as usize)
         .rollback_resource_with_clone::<netcode::RollbackGameState>()
         .rollback_resource_with_clone::<netcode::PlayerHandleMap>()
         .rollback_resource_with_clone::<netcode::DecodedPlayerCommands>()
@@ -152,10 +155,10 @@ pub fn run_client() {
         .update_component_with_map_entities::<gameplay::components::ShipboardControlState>()
         .update_component_with_map_entities::<gameplay::components::NearbyInteraction>()
         .update_component_with_map_entities::<gameplay::components::HeldInteraction>()
-        .init_state::<ClientAppState>()
-        .add_event::<gameplay::components::InteractWithModule>()
-        .add_event::<gameplay::components::BeginHeldInteraction>()
-        .add_event::<gameplay::components::CompleteHeldInteraction>()
+        .init_roll_state::<ClientAppState>()
+        .add_message::<gameplay::components::InteractWithModule>()
+        .add_message::<gameplay::components::BeginHeldInteraction>()
+        .add_message::<gameplay::components::CompleteHeldInteraction>()
         .add_systems(Startup, setup_camera)
         // Inputs
         .add_systems(bevy_ggrs::ReadInputs, netcode::read_local_inputs)
@@ -345,9 +348,9 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn((Camera2d, MainCamera));
 }
 
-fn exit_on_escape(keys: Res<ButtonInput<KeyCode>>, mut exit: EventWriter<AppExit>) {
+fn exit_on_escape(keys: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
     if keys.just_pressed(KeyCode::Escape) {
-        exit.send(AppExit::Success);
+        exit.write(AppExit::Success);
     }
 }
 

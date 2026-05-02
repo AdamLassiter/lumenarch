@@ -166,7 +166,7 @@ pub(crate) fn sync_runtime_ship_state(
 
     for child in children.iter() {
         let Ok((runtime_module, integrity, runtime_state, reactor_state, destroyed, weapon_module)) =
-            module_query.get(*child)
+            module_query.get(child)
         else {
             continue;
         };

@@ -1,4 +1,7 @@
-use bevy::{ecs::system::SystemParam, prelude::*};
+use bevy::{
+    ecs::{relationship::Relationship, system::SystemParam},
+    prelude::*,
+};
 
 use crate::{
     balance::BalanceConfig,
@@ -298,7 +301,7 @@ pub(crate) fn update_gameplay_status_text(
             Color::srgba(0.24, 0.38, 0.58, 0.18)
         });
         for child in children.iter() {
-            if let Ok((label, mut text)) = hud_ui.text_queries.p6().get_mut(*child) {
+            if let Ok((label, mut text)) = hud_ui.text_queries.p6().get_mut(child) {
                 **text =
                     station_button_label(label.action, control_mode.mode, active_station_flags);
             }
@@ -318,7 +321,7 @@ pub(crate) struct GameplayStatusWorldQueries<'w, 's> {
         ),
         With<ShipRoot>,
     >,
-    module_parent_query: Query<'w, 's, &'static Parent, With<RuntimeShipModule>>,
+    module_parent_query: Query<'w, 's, &'static ChildOf, With<RuntimeShipModule>>,
     hostile_query: Query<'w, 's, Entity, With<HostileTarget>>,
     projectile_query: Query<'w, 's, Entity, With<Projectile>>,
     module_query: Query<
@@ -1000,7 +1003,7 @@ fn summarize_modules(
 
     for child in children.iter() {
         let Ok((_, _, integrity, runtime_state, _, _, _, _, _, _, _, _, _, _, destroyed)) =
-            module_query.get(*child)
+            module_query.get(child)
         else {
             continue;
         };
@@ -1051,7 +1054,7 @@ fn summarize_arch(
 ) -> ArchSummary {
     for child in children.iter() {
         let Ok((_, _, _, _, computer, _, _, _, _, _, _, _, _, _, destroyed)) =
-            module_query.get(*child)
+            module_query.get(child)
         else {
             continue;
         };

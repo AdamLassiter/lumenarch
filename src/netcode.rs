@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, net::SocketAddr};
 
 use bevy::{
     ecs::entity::{EntityMapper, MapEntities},
+    platform::collections::HashMap,
     prelude::*,
 };
 use bevy_ggrs::{
@@ -365,7 +366,7 @@ pub(crate) fn read_local_inputs(
     mut pending_meta: ResMut<PendingLocalMetaCommand>,
     local_players: Res<LocalPlayers>,
 ) {
-    let mut inputs = bevy::utils::HashMap::default();
+    let mut inputs = HashMap::default();
     let input = input_from_hardware(
         &keyboard_input,
         &mouse_buttons,
@@ -426,7 +427,7 @@ pub(crate) fn is_host_authority(status: &SessionStatus) -> bool {
 impl MapEntities for PlayerHandleMap {
     fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
         for entity in self.entities.values_mut() {
-            *entity = entity_mapper.map_entity(*entity);
+            *entity = entity_mapper.get_mapped(*entity);
         }
     }
 }
@@ -511,6 +512,7 @@ fn build_p2p_session(
     let player_count = peer_addrs.len() + 1;
     let mut builder = SessionBuilder::<LumenGgrsConfig>::new()
         .with_num_players(player_count)
+        .unwrap()
         .with_input_delay(input_delay)
         .with_check_distance(check_distance);
 

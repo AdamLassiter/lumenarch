@@ -1,6 +1,6 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, ops::DerefMut};
 
-use bevy::prelude::*;
+use bevy::{ecs::relationship::Relationship, prelude::*};
 use bevy_ggrs::PlayerInputs;
 
 use super::super::{
@@ -123,15 +123,16 @@ pub(crate) fn camera_follow_player_ship(
     ship_query: Single<&ShipboardControlState, With<ObservedLocalPlayerMarker>>,
     player_query: Single<(&PlayerMotionState, &CurrentStation), With<ObservedLocalPlayerMarker>>,
     ship_frame_query: Query<(Entity, &SimPosition, &SimRotation), With<ShipRoot>>,
-    module_query: Query<(&RuntimeShipModule, &Parent)>,
-    camera_query: Single<
-        (&mut Transform, &mut OrthographicProjection),
-        (With<Camera2d>, With<MainCamera>),
-    >,
+    module_query: Query<(&RuntimeShipModule, &ChildOf)>,
+    camera_query: Single<(&mut Transform, &mut Projection), (With<Camera2d>, With<MainCamera>)>,
 ) {
     let control_state = ship_query.into_inner();
     let (player_motion, current_station) = player_query.into_inner();
     let (mut camera_transform, mut projection) = camera_query.into_inner();
+
+    let Projection::Orthographic(projection) = projection.deref_mut() else {
+        return;
+    };
 
     let active_ship = match player_motion.frame {
         PlayerReferenceFrame::World => None,
@@ -356,7 +357,7 @@ pub(crate) fn move_shipboard_player(
     >,
     module_query: Query<
         (
-            &Parent,
+            &ChildOf,
             &RuntimeShipModule,
             Option<&AirlockCommandState>,
             Option<&DestroyedModule>,
@@ -505,14 +506,14 @@ pub(crate) fn sync_shipboard_player_visual(
 pub(crate) fn sync_player_reference_frame_parenting(
     mut commands: Commands,
     player_query: Single<
-        (Entity, &PlayerMotionState, Option<&Parent>),
+        (Entity, &PlayerMotionState, Option<&ChildOf>),
         With<ObservedLocalPlayerMarker>,
     >,
 ) {
     let (player_entity, motion, parent) = player_query.into_inner();
     match motion.frame {
         PlayerReferenceFrame::Ship(ship_entity) => {
-            if parent.map(Parent::get) != Some(ship_entity) {
+            if parent.map(ChildOf::get) != Some(ship_entity) {
                 commands
                     .entity(player_entity)
                     .set_parent_in_place(ship_entity);
@@ -528,7 +529,7 @@ pub(crate) fn sync_player_reference_frame_parenting(
 
 pub(crate) fn update_current_station(
     ship_query: Query<(Entity, &SimPosition, &SimRotation), With<ShipRoot>>,
-    module_query: Query<(&RuntimeShipModule, &Parent)>,
+    module_query: Query<(&RuntimeShipModule, &ChildOf)>,
     mut player_query: Query<
         (
             &PlayerHandleComponent,
@@ -596,7 +597,7 @@ pub(crate) fn handle_player_cargo_interaction(
         (With<ObservedLocalPlayerMarker>, With<PlayerShipAssignment>),
     >,
     mut loose_cargo_query: Query<(Entity, &SimPosition, &LooseCargo)>,
-    mut storage_query: Query<(&RuntimeShipModule, &Parent, &mut StorageModule)>,
+    mut storage_query: Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
 ) {
     let session_input = netcode::local_player_input(session_inputs, local_handle);
     let pickup_pressed =
@@ -644,7 +645,7 @@ pub(crate) fn handle_player_cargo_interaction(
                     resource_label(cargo.kind)
                 ));
                 mission_state.recent_action_timer = Fx::from_num(1.5);
-                commands.entity(entity).despawn_recursive();
+                commands.entity(entity).despawn();
                 return;
             }
         }
@@ -1187,7 +1188,7 @@ fn anchor_player_to_focused_station(
     >,
     module_query: &Query<
         (
-            &Parent,
+            &ChildOf,
             &RuntimeShipModule,
             Option<&AirlockCommandState>,
             Option<&DestroyedModule>,
@@ -1232,7 +1233,7 @@ fn ship_collision_tiles(
     atmosphere_state: &ShipAtmosphereState,
     module_query: &Query<
         (
-            &Parent,
+            &ChildOf,
             &RuntimeShipModule,
             Option<&AirlockCommandState>,
             Option<&DestroyedModule>,

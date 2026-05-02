@@ -21,7 +21,7 @@ use crate::{
 };
 
 pub(crate) fn begin_held_interactions(
-    mut events: EventReader<BeginHeldInteraction>,
+    mut events: MessageReader<BeginHeldInteraction>,
     mut player_query: Query<&mut HeldInteraction, With<ShipboardPlayer>>,
 ) {
     for event in events.read() {
@@ -49,7 +49,7 @@ pub(crate) fn complete_held_interactions(
         ),
         With<ShipboardPlayer>,
     >,
-    mut complete_events: EventWriter<CompleteHeldInteraction>,
+    mut complete_events: MessageWriter<CompleteHeldInteraction>,
 ) {
     let mission_state = mission_query.into_inner();
     let mut players: Vec<_> = player_query.iter_mut().collect();
@@ -78,7 +78,7 @@ pub(crate) fn complete_held_interactions(
         held.progress += fx_from_time_delta(&time);
         if held.progress >= held.required {
             if let Some(kind) = held.kind {
-                complete_events.send(CompleteHeldInteraction {
+                complete_events.write(CompleteHeldInteraction {
                     player,
                     target,
                     kind,

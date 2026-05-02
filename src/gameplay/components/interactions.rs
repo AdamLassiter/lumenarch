@@ -37,14 +37,14 @@ pub(crate) enum InteractionKind {
 #[derive(Component)]
 pub(crate) struct Interactable;
 
-#[derive(Event)]
+#[derive(Message)]
 pub(crate) struct InteractWithModule {
     pub(crate) player: Entity,
     pub(crate) target: Entity,
     pub(crate) kind: InteractionKind,
 }
 
-#[derive(Event)]
+#[derive(Message)]
 pub(crate) struct BeginHeldInteraction {
     pub(crate) player: Entity,
     pub(crate) target: Entity,
@@ -52,7 +52,7 @@ pub(crate) struct BeginHeldInteraction {
     pub(crate) required: Fx,
 }
 
-#[derive(Event)]
+#[derive(Message)]
 pub(crate) struct CompleteHeldInteraction {
     pub(crate) player: Entity,
     pub(crate) target: Entity,
@@ -62,7 +62,7 @@ pub(crate) struct CompleteHeldInteraction {
 impl MapEntities for NearbyInteraction {
     fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
         if let Some(entity) = self.target {
-            self.target = Some(entity_mapper.map_entity(entity));
+            self.target = Some(entity_mapper.get_mapped(entity));
         }
     }
 }
@@ -70,7 +70,7 @@ impl MapEntities for NearbyInteraction {
 impl MapEntities for HeldInteraction {
     fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
         if let Some(entity) = self.target {
-            self.target = Some(entity_mapper.map_entity(entity));
+            self.target = Some(entity_mapper.get_mapped(entity));
         }
     }
 }

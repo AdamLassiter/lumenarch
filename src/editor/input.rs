@@ -1,3 +1,5 @@
+use std::ops::DerefMut;
+
 use bevy::{
     input::mouse::{MouseButton, MouseWheel},
     prelude::*,
@@ -335,18 +337,21 @@ pub(crate) fn save_editor_ship_shortcut(
 }
 
 pub(crate) fn pan_and_zoom_editor_view(
-    mut mouse_wheel: EventReader<MouseWheel>,
+    mut mouse_wheel: MessageReader<MouseWheel>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     window: Single<&Window, With<PrimaryWindow>>,
     mut pan_state: ResMut<EditorPanState>,
     mut view_state: ResMut<EditorViewState>,
     camera_query: Single<
-        (&mut Transform, &mut OrthographicProjection),
+        (&mut Transform, &mut Projection),
         (With<Camera2d>, With<crate::state::MainCamera>),
     >,
 ) {
     let window = window.into_inner();
     let (mut camera_transform, mut projection) = camera_query.into_inner();
+    let Projection::Orthographic(projection) = projection.deref_mut() else {
+        return;
+    };
 
     for event in mouse_wheel.read() {
         let zoom_step = (1.0 - event.y * 0.08).clamp(0.75, 1.25);

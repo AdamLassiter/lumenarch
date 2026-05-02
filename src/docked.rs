@@ -204,10 +204,10 @@ pub(crate) fn spawn_docked_ui(
                     top: Val::Px(48.0),
                     width: Val::Px(520.0),
                     padding: UiRect::all(Val::Px(16.0)),
+                    border_radius: BorderRadius::all(Val::Px(12.0)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.09, 0.12, 0.18, 0.90)),
-                BorderRadius::all(Val::Px(12.0)),
             ))
             .with_children(|panel| {
                 panel.spawn((
@@ -227,7 +227,7 @@ pub(crate) fn spawn_docked_ui(
 
 pub(crate) fn cleanup_docked_ui(mut commands: Commands, query: Query<Entity, With<DockedRoot>>) {
     for entity in &query {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
@@ -315,7 +315,7 @@ pub(crate) fn update_docked_status_text(
 }
 
 fn spawn_action_button<T: Bundle + 'static>(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     label: &str,
     color: Color,
     marker: T,
@@ -329,9 +329,9 @@ fn spawn_action_button<T: Bundle + 'static>(
                 height: Val::Px(48.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(Val::Px(10.0)),
                 ..default()
             },
-            BorderRadius::all(Val::Px(10.0)),
             BackgroundColor(color),
             marker,
         ))

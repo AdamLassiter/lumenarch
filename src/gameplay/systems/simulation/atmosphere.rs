@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bevy::prelude::*;
+use bevy::{ecs::relationship::Relationship, prelude::*};
 
 use crate::{
     balance::BalanceConfig,
@@ -38,7 +38,7 @@ pub(crate) fn update_ship_atmosphere(
         With<ShipRoot>,
     >,
     module_query: Query<(
-        &Parent,
+        &ChildOf,
         &RuntimeShipModule,
         Option<&AirlockCommandState>,
         Option<&DestroyedModule>,

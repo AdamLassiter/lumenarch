@@ -26,8 +26,8 @@ use crate::gameplay::{
 };
 
 pub(crate) fn apply_module_interactions(
-    mut instant_events: EventReader<InteractWithModule>,
-    mut complete_events: EventReader<CompleteHeldInteraction>,
+    mut instant_events: MessageReader<InteractWithModule>,
+    mut complete_events: MessageReader<CompleteHeldInteraction>,
     mut player_query: Query<&mut ShipboardControlState, With<ShipboardPlayer>>,
     mission_query: Single<
         &mut MissionState,

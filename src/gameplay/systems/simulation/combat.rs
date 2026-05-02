@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ecs::relationship::Relationship, prelude::*};
 
 use crate::{
     TILE_SIZE,
@@ -82,7 +82,7 @@ pub(crate) fn fire_player_weapons(
         ),
         With<WeaponModule>,
     >,
-    mut storage_query: Query<(&Parent, &mut StorageModule)>,
+    mut storage_query: Query<(&ChildOf, &mut StorageModule)>,
 ) {
     let (children, ship_position, ship_rotation, power_state, arch_commands, mut weapon_state) =
         player_ship_query.into_inner();
@@ -111,7 +111,7 @@ pub(crate) fn fire_player_weapons(
             weapon_stats,
             turret_state,
             destroyed,
-        )) = weapon_query.get(*child)
+        )) = weapon_query.get(child)
         else {
             continue;
         };
@@ -211,7 +211,7 @@ pub(crate) fn sync_hostile_ship_state(
 
         for child in children.iter() {
             let Ok((runtime_module, integrity, runtime_state, destroyed, weapon_module)) =
-                module_query.get(*child)
+                module_query.get(child)
             else {
                 continue;
             };
@@ -303,7 +303,7 @@ pub(crate) fn drive_hostile_ships(
     >,
     mut turret_query: Query<
         (
-            &Parent,
+            &ChildOf,
             &RuntimeShipModule,
             &ModuleRuntimeState,
             &mut TurretCommandState,
@@ -463,7 +463,7 @@ pub(crate) fn fire_hostile_ship_weapons(
     >,
     weapon_query: Query<
         (
-            &Parent,
+            &ChildOf,
             &RuntimeShipModule,
             &ModuleRuntimeState,
             &WeaponModule,
@@ -472,7 +472,7 @@ pub(crate) fn fire_hostile_ship_weapons(
         ),
         With<WeaponModule>,
     >,
-    mut storage_query: Query<(&Parent, &mut StorageModule)>,
+    mut storage_query: Query<(&ChildOf, &mut StorageModule)>,
 ) {
     let mission_state = mission_query.into_inner();
     if mission_state.failed || mission_state.completed {
@@ -493,7 +493,7 @@ pub(crate) fn fire_hostile_ship_weapons(
         let mut cooldown_after_shot = Fx::from_num(0);
         for child in children.iter() {
             let Ok((parent, weapon_module, runtime_state, weapon_stats, turret_state, destroyed)) =
-                weapon_query.get(*child)
+                weapon_query.get(child)
             else {
                 continue;
             };
@@ -657,7 +657,7 @@ pub(crate) fn handle_projectile_hits(
     mut hostile_module_query: Query<
         (
             Entity,
-            &Parent,
+            &ChildOf,
             &RuntimeShipModule,
             &mut Integrity,
             &mut ModuleRuntimeState,
@@ -665,7 +665,7 @@ pub(crate) fn handle_projectile_hits(
         ),
         With<HostileShipModule>,
     >,
-    mut hostile_shield_query: Query<(&Parent, &mut ShieldCommandState), With<HostileShipModule>>,
+    mut hostile_shield_query: Query<(&ChildOf, &mut ShieldCommandState), With<HostileShipModule>>,
     mut static_hostile_query: Query<
         (Entity, &SimPosition, &mut Integrity),
         (
@@ -730,7 +730,7 @@ pub(crate) fn handle_projectile_hits(
                     }
                     for child in children.iter() {
                         let Ok((module_entity, parent, runtime_module, integrity, _, destroyed)) =
-                            hostile_module_query.get(*child)
+                            hostile_module_query.get(child)
                         else {
                             continue;
                         };
@@ -784,7 +784,7 @@ pub(crate) fn handle_projectile_hits(
                             commands.entity(module_entity).insert(DestroyedModule);
                             if module_kind == ModuleKind::Core {
                                 spawn_hostile_salvage(&mut commands, root_position, salvage_reward);
-                                commands.entity(root_entity).despawn_recursive();
+                                commands.entity(root_entity).despawn();
                             }
                         }
                     }
@@ -811,7 +811,7 @@ pub(crate) fn handle_projectile_hits(
                     {
                         integrity.current = remaining_integrity;
                         if integrity.current <= 0 {
-                            commands.entity(hostile_entity).despawn_recursive();
+                            commands.entity(hostile_entity).despawn();
                         }
                     }
                     commands.entity(projectile_entity).despawn();
@@ -896,13 +896,13 @@ fn spawn_hostile_salvage(commands: &mut Commands, position: SimVec, salvage_rewa
 type SimVec = crate::gameplay::helpers::FixedVec2;
 
 fn consume_ship_resource(
-    storage_query: &mut Query<(&Parent, &mut StorageModule)>,
+    storage_query: &mut Query<(&ChildOf, &mut StorageModule)>,
     children: &Children,
     resource_kind: crate::gameplay::components::ResourceKind,
     amount: u32,
 ) -> bool {
     for child in children.iter() {
-        let Ok((_parent, mut storage)) = storage_query.get_mut(*child) else {
+        let Ok((_parent, mut storage)) = storage_query.get_mut(child) else {
             continue;
         };
         if !storage.accepts(resource_kind) {
@@ -919,7 +919,7 @@ fn absorb_hostile_shield_hit(
     root_entity: Entity,
     ship_rotation: Fx,
     projectile: &Projectile,
-    shield_query: &mut Query<(&Parent, &mut ShieldCommandState), With<HostileShipModule>>,
+    shield_query: &mut Query<(&ChildOf, &mut ShieldCommandState), With<HostileShipModule>>,
 ) -> bool {
     for (parent, mut shield) in shield_query.iter_mut() {
         if parent.get() != root_entity || shield.strength <= Fx::from_num(0) {

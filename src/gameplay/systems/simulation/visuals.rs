@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ecs::relationship::Relationship, prelude::*};
 
 use crate::{
     TILE_SIZE,
@@ -45,7 +45,7 @@ pub(crate) fn draw_debug_overlay(
         Option<&TurretCommandState>,
         Option<&DestroyedModule>,
     )>,
-    mut turret_top_query: Query<(&Parent, &mut Transform), With<TurretTopSprite>>,
+    mut turret_top_query: Query<(&ChildOf, &mut Transform), With<TurretTopSprite>>,
     mut gizmos: Gizmos,
 ) {
     let (ship_position, ship_rotation) = player_ship_query.into_inner();
@@ -203,7 +203,7 @@ fn update_turret_top_visuals(
         Option<&TurretCommandState>,
         Option<&DestroyedModule>,
     )>,
-    turret_top_query: &mut Query<(&Parent, &mut Transform), With<TurretTopSprite>>,
+    turret_top_query: &mut Query<(&ChildOf, &mut Transform), With<TurretTopSprite>>,
 ) {
     for (parent, mut transform) in turret_top_query.iter_mut() {
         let parent_entity = parent.get();

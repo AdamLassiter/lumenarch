@@ -116,7 +116,7 @@ pub(crate) fn run_arch_automation(
             _storage,
             _processor,
             destroyed,
-        )) = module_query.get_mut(*child)
+        )) = module_query.get_mut(child)
         else {
             continue;
         };
@@ -218,7 +218,7 @@ pub(crate) fn run_arch_automation(
     if aggregate.reactor_bias > Fx::from_num(0) {
         for child in children.iter() {
             let Ok((_, runtime_module, mut runtime_state, _, _, _, _, destroyed)) =
-                module_query.get_mut(*child)
+                module_query.get_mut(child)
             else {
                 continue;
             };
@@ -283,7 +283,7 @@ fn build_snapshot(
 
     for child in children.iter() {
         let Ok((_, runtime_module, runtime_state, _, _, storage, processor, destroyed)) =
-            module_query.get(*child)
+            module_query.get(child)
         else {
             continue;
         };

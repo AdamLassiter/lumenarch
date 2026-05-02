@@ -111,6 +111,6 @@ pub(crate) fn cleanup_runtime_entities(
     player_handle_map.entities.clear();
     observed_local_player.entity = None;
     for entity in &query {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }

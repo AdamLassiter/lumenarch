@@ -204,14 +204,14 @@ pub(crate) struct PlayerFieldState {
 
 impl MapEntities for PlayerShipAssignment {
     fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
-        self._ship_entity = entity_mapper.map_entity(self._ship_entity);
+        self._ship_entity = entity_mapper.get_mapped(self._ship_entity);
     }
 }
 
 impl MapEntities for PlayerReferenceFrame {
     fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
         if let Self::Ship(entity) = self {
-            *entity = entity_mapper.map_entity(*entity);
+            *entity = entity_mapper.get_mapped(*entity);
         }
     }
 }
@@ -225,7 +225,7 @@ impl MapEntities for PlayerMotionState {
 impl MapEntities for ShipboardControlState {
     fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
         if let Some(entity) = self.focused_entity {
-            self.focused_entity = Some(entity_mapper.map_entity(entity));
+            self.focused_entity = Some(entity_mapper.get_mapped(entity));
         }
     }
 }

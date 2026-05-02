@@ -53,10 +53,10 @@ pub(crate) fn spawn_sector_map_ui(
                     padding: UiRect::all(Val::Px(16.0)),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(12.0),
+                    border_radius: BorderRadius::all(Val::Px(12.0)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.94)),
-                BorderRadius::all(Val::Px(12.0)),
             ))
             .with_children(|panel| {
                 panel.spawn((
@@ -97,9 +97,9 @@ pub(crate) fn spawn_sector_map_ui(
                             height: Val::Px(44.0),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
+                            border_radius: BorderRadius::all(Val::Px(10.0)),
                             ..default()
                         },
-                        BorderRadius::all(Val::Px(10.0)),
                         BackgroundColor(Color::srgb(0.18, 0.50, 0.30)),
                         LaunchEncounterButton,
                     ))
@@ -121,9 +121,9 @@ pub(crate) fn spawn_sector_map_ui(
                             height: Val::Px(40.0),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
+                            border_radius: BorderRadius::all(Val::Px(10.0)),
                             ..default()
                         },
-                        BorderRadius::all(Val::Px(10.0)),
                         BackgroundColor(Color::srgb(0.32, 0.24, 0.18)),
                         BackToStationButton,
                     ))
@@ -145,10 +145,10 @@ pub(crate) fn spawn_sector_map_ui(
                     right: Val::Px(24.0),
                     top: Val::Px(24.0),
                     bottom: Val::Px(24.0),
+                    border_radius: BorderRadius::all(Val::Px(14.0)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.05, 0.07, 0.10, 0.88)),
-                BorderRadius::all(Val::Px(14.0)),
                 SectorMapCanvas,
             ))
             .with_children(|map| {
@@ -166,7 +166,6 @@ pub(crate) fn spawn_sector_map_ui(
                     map.spawn((
                         Button,
                         projected_node(node.position, 1.0, Vec2::ZERO),
-                        BorderRadius::all(Val::Px(10.0)),
                         BackgroundColor(base_color),
                         SectorNodeButton { node_id: node.id },
                     ))
@@ -192,7 +191,7 @@ pub(crate) fn spawn_sector_map_ui(
 pub(crate) fn pan_and_zoom_sector_map(
     window: Single<&Window, With<PrimaryWindow>>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
-    mut mouse_wheel: EventReader<MouseWheel>,
+    mut mouse_wheel: MessageReader<MouseWheel>,
     mut pan_state: ResMut<SectorMapPanState>,
     mut view_state: ResMut<SectorMapViewState>,
 ) {
@@ -239,7 +238,7 @@ pub(crate) fn cleanup_sector_map_ui(
     query: Query<Entity, With<SectorMapRoot>>,
 ) {
     for entity in &query {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
@@ -440,6 +439,7 @@ fn projected_node(position: [f32; 2], zoom: f32, offset: Vec2) -> Node {
         justify_content: JustifyContent::Center,
         align_items: AlignItems::Center,
         padding: UiRect::horizontal(Val::Px(8.0)),
+        border_radius: BorderRadius::all(Val::Px(10.0)),
         ..default()
     }
 }

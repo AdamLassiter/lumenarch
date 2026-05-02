@@ -194,9 +194,9 @@ pub(crate) fn spawn_editor_ui(
                                 justify_content: JustifyContent::SpaceBetween,
                                 align_items: AlignItems::Center,
                                 padding: UiRect::horizontal(Val::Px(10.0)),
+                                border_radius: BorderRadius::all(Val::Px(8.0)),
                                 ..default()
                             },
-                            BorderRadius::all(Val::Px(8.0)),
                             BackgroundColor(super::super::NORMAL_BUTTON),
                             super::super::state::ToolboxButton { kind },
                         ))
@@ -251,9 +251,9 @@ pub(crate) fn spawn_editor_ui(
                                 height: Val::Px(34.0),
                                 justify_content: JustifyContent::Center,
                                 align_items: AlignItems::Center,
+                                border_radius: BorderRadius::all(Val::Px(8.0)),
                                 ..default()
                             },
-                            BorderRadius::all(Val::Px(8.0)),
                             BackgroundColor(Color::srgb(0.24, 0.32, 0.48)),
                         ));
                         let button = match marker {
@@ -281,9 +281,9 @@ pub(crate) fn spawn_editor_ui(
                             height: Val::Px(46.0),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
+                            border_radius: BorderRadius::all(Val::Px(8.0)),
                             ..default()
                         },
-                        BorderRadius::all(Val::Px(8.0)),
                         BackgroundColor(Color::srgb(0.46, 0.34, 0.22)),
                         LeaveEditorButton,
                     ))
@@ -307,10 +307,10 @@ pub(crate) fn spawn_editor_ui(
                     right: Val::Px(16.0),
                     top: Val::Px(16.0),
                     padding: UiRect::all(Val::Px(12.0)),
+                    border_radius: BorderRadius::all(Val::Px(10.0)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
-                BorderRadius::all(Val::Px(10.0)),
             ))
             .with_children(|hud| {
                 hud.spawn((
@@ -346,10 +346,10 @@ pub(crate) fn spawn_editor_ui(
                     padding: UiRect::all(Val::Px(12.0)),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(10.0),
+                    border_radius: BorderRadius::all(Val::Px(10.0)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
-                BorderRadius::all(Val::Px(10.0)),
                 ComputerProgramPanel,
             ));
 
@@ -360,10 +360,10 @@ pub(crate) fn spawn_editor_ui(
                     bottom: Val::Px(16.0),
                     padding: UiRect::all(Val::Px(12.0)),
                     max_width: Val::Px(320.0),
+                    border_radius: BorderRadius::all(Val::Px(10.0)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
-                BorderRadius::all(Val::Px(10.0)),
             ))
             .with_children(|panel| {
                 panel.spawn((
@@ -433,7 +433,7 @@ pub(crate) fn cleanup_editor_entities(
     query: Query<Entity, With<EditingCleanup>>,
 ) {
     for entity in &query {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
 
@@ -450,7 +450,7 @@ pub(crate) fn sync_computer_program_entries(
     }
 
     for entity in &existing_query {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 
     let panel = panel_query.into_inner();
@@ -547,10 +547,10 @@ pub(crate) fn sync_computer_program_entries(
                     padding: UiRect::all(Val::Px(12.0)),
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(8.0),
+                    border_radius: BorderRadius::all(Val::Px(8.0)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.12, 0.14, 0.18, 0.92)),
-                BorderRadius::all(Val::Px(8.0)),
                 ComputerProgramEntry,
             ))
             .with_children(|entry| {
@@ -632,6 +632,7 @@ pub(crate) fn sync_computer_program_entries(
                                 padding: UiRect::all(Val::Px(10.0)),
                                 flex_direction: FlexDirection::Column,
                                 row_gap: Val::Px(6.0),
+                                border_radius: BorderRadius::all(Val::Px(8.0)),
                                 ..default()
                             },
                             BackgroundColor(if selected {
@@ -639,7 +640,6 @@ pub(crate) fn sync_computer_program_entries(
                             } else {
                                 Color::srgba(0.15, 0.18, 0.24, 0.92)
                             }),
-                            BorderRadius::all(Val::Px(8.0)),
                         ))
                         .with_children(|line| {
                             line.spawn((
@@ -812,7 +812,7 @@ pub(crate) fn sync_computer_program_entries(
 }
 
 fn spawn_program_button(
-    entry: &mut ChildBuilder,
+    entry: &mut ChildSpawnerCommands,
     font: &Handle<Font>,
     label: &str,
     module_id: u64,
@@ -826,10 +826,10 @@ fn spawn_program_button(
                 height: Val::Px(28.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(Val::Px(6.0)),
                 ..default()
             },
             BackgroundColor(Color::srgb(0.24, 0.47, 0.78)),
-            BorderRadius::all(Val::Px(6.0)),
             ComputerProgramButton { module_id, action },
         ))
         .with_child((
@@ -844,7 +844,7 @@ fn spawn_program_button(
 }
 
 fn spawn_arch_editor_button(
-    entry: &mut ChildBuilder,
+    entry: &mut ChildSpawnerCommands,
     font: &Handle<Font>,
     label: &str,
     action: ArchEditorButtonAction,
@@ -857,10 +857,10 @@ fn spawn_arch_editor_button(
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 padding: UiRect::horizontal(Val::Px(8.0)),
+                border_radius: BorderRadius::all(Val::Px(6.0)),
                 ..default()
             },
             BackgroundColor(Color::srgb(0.20, 0.40, 0.62)),
-            BorderRadius::all(Val::Px(6.0)),
             ArchEditorButton { action },
         ))
         .with_child((

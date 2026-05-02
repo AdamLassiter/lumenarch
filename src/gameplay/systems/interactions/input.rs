@@ -27,8 +27,8 @@ pub(crate) fn run_shipboard_interaction_input(
         ),
         With<ShipboardPlayer>,
     >,
-    mut interact_events: EventWriter<InteractWithModule>,
-    mut begin_events: EventWriter<BeginHeldInteraction>,
+    mut interact_events: MessageWriter<InteractWithModule>,
+    mut begin_events: MessageWriter<BeginHeldInteraction>,
 ) {
     let mut players: Vec<_> = player_query.iter().collect();
     players.sort_by_key(|(_, handle, _, _)| handle.handle);
@@ -44,7 +44,7 @@ pub(crate) fn run_shipboard_interaction_input(
 
         if is_hold_interaction(kind) {
             if input.pressed(netcode::INPUT_INTERACT) && held.target.is_none() {
-                begin_events.send(BeginHeldInteraction {
+                begin_events.write(BeginHeldInteraction {
                     player,
                     target,
                     kind,
@@ -52,7 +52,7 @@ pub(crate) fn run_shipboard_interaction_input(
                 });
             }
         } else if input.pressed(netcode::INPUT_INTERACT) {
-            interact_events.send(InteractWithModule {
+            interact_events.write(InteractWithModule {
                 player,
                 target,
                 kind,
