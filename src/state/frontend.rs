@@ -121,12 +121,35 @@ impl LocalPlayerProfile {
 }
 
 #[derive(Resource, Default)]
-pub(crate) struct LobbyProfileEditState {
-    pub(crate) editing_name: bool,
+pub(crate) struct FocusedTextBox {
+    pub(crate) field: Option<TextBoxField>,
+    pub(crate) cursor_index: usize,
+    pub(crate) select_all: bool,
+}
+
+#[derive(Resource, Default)]
+pub(crate) struct TextBoxClipboard {
+    pub(crate) contents: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum TextBoxField {
+    SessionDescriptor,
+    PlayerName,
 }
 
 #[derive(Component)]
 pub(crate) struct LobbyRoot;
+
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct TextBoxRoot {
+    pub(crate) field: TextBoxField,
+}
+
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct TextBoxText {
+    pub(crate) field: TextBoxField,
+}
 
 #[derive(Component)]
 pub(crate) struct DockedRoot;
@@ -154,12 +177,6 @@ pub(crate) struct RepairShipButton;
 
 #[derive(Component)]
 pub(crate) struct StatusText;
-
-#[derive(Component)]
-pub(crate) struct HostAddressText;
-
-#[derive(Component)]
-pub(crate) struct LobbyNameText;
 
 #[derive(Component)]
 pub(crate) struct LobbyRoleText;

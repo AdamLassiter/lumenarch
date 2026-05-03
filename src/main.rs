@@ -124,7 +124,8 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
     .insert_resource(netcode::ActivePresentationPhase::default())
     .insert_resource(state::GameplayInfoPanelMode::default())
     .insert_resource(state::LocalPlayerProfile::default())
-    .insert_resource(state::LobbyProfileEditState::default())
+    .insert_resource(state::FocusedTextBox::default())
+    .insert_resource(state::TextBoxClipboard::default())
     .insert_resource(EditorShip::default())
     .insert_resource(EditorSessionState::default())
     .insert_resource(EnemyEditorState::default())
@@ -401,12 +402,13 @@ fn add_lobby_ui_fixed_systems(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (
-            lobby::edit_host_address.run_if(in_state(FrontendMode::Lobby)),
+            lobby::focus_textbox_on_click.run_if(in_state(FrontendMode::Lobby)),
+            lobby::edit_lobby_textboxes.run_if(in_state(FrontendMode::Lobby)),
             lobby::lobby_button_system.run_if(in_state(FrontendMode::Lobby)),
             lobby::lobby_keyboard_shortcuts.run_if(in_state(FrontendMode::Lobby)),
             netcode::sync_lobby_profile_changes.run_if(in_state(FrontendMode::Lobby)),
+            lobby::update_lobby_textboxes.run_if(in_state(FrontendMode::Lobby)),
             lobby::update_lobby_status_text.run_if(in_state(FrontendMode::Lobby)),
-            lobby::update_host_address_text.run_if(in_state(FrontendMode::Lobby)),
         ),
     );
 }
@@ -505,6 +507,7 @@ fn add_encounter_presentation_systems(app: &mut App) {
             (
                 gameplay::update_destroyed_module_visuals,
                 gameplay::sync_shipboard_player_visual,
+                gameplay::sync_crew_name_labels,
                 gameplay::integrate_player_ship_motion,
                 gameplay::integrate_hostile_ship_motion,
                 gameplay::handle_ship_collisions,

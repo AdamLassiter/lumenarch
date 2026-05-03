@@ -8,6 +8,7 @@ mod simulation;
 pub(crate) use actors::{
     CarriedItemKind,
     CarriedResource,
+    CrewNameLabel,
     CurrentStation,
     EquippedSuit,
     HostileShip,

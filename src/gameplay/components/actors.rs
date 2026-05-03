@@ -46,6 +46,11 @@ pub(crate) struct ShipInertiaField {
     pub(crate) radius: Fx,
 }
 
+#[derive(Component, Clone, Copy)]
+pub(crate) struct CrewNameLabel {
+    pub(crate) player_entity: Entity,
+}
+
 #[derive(Component, Clone)]
 pub(crate) struct PlayerShipAssignment {
     pub(crate) _ship_entity: Entity,

@@ -15,6 +15,7 @@ use crate::{
             AngularVelocity,
             CarriedItemKind,
             CarriedResource,
+            CrewNameLabel,
             CurrentStation,
             EquippedSuit,
             HeldInteraction,
@@ -428,19 +429,24 @@ pub(crate) fn spawn_runtime_ship(
                 entity_commands.insert(ObservedLocalPlayerMarker);
             }
             let entity = entity_commands.id();
-            commands.entity(entity).with_children(|parent| {
-                parent.spawn((
-                    Text2d::new(player_profile.name.clone()),
-                    TextFont {
-                        font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                        font_size: 10.0,
-                        ..default()
-                    },
-                    TextColor(player_profile.color()),
-                    Transform::from_xyz(0.0, 15.0, 0.2),
-                    PlayingCleanup,
-                ));
-            });
+            commands.spawn((
+                Text2d::new(player_profile.name.clone()),
+                TextFont {
+                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                    font_size: 10.0,
+                    ..default()
+                },
+                TextColor(player_profile.color()),
+                Transform::from_xyz(
+                    spawn_node.local_position.x.to_num::<f32>(),
+                    spawn_node.local_position.y.to_num::<f32>() + 15.0,
+                    6.2,
+                ),
+                CrewNameLabel {
+                    player_entity: entity,
+                },
+                PlayingCleanup,
+            ));
             player_handle_map.entities.insert(*handle, entity);
             if Some(*handle) == local_handle {
                 observed_local_player.handle = Some(*handle);

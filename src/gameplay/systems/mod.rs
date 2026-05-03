@@ -13,6 +13,7 @@ pub(crate) use control::{
     move_shipboard_player,
     return_button_system,
     return_keyboard_shortcut,
+    sync_crew_name_labels,
     sync_player_reference_frame_parenting,
     sync_shipboard_player_visual,
     toggle_shipboard_control_mode,
@@ -59,5 +60,4 @@ pub(crate) use ui::{
     station_panel_button_system,
     toggle_gameplay_info_panel,
     update_gameplay_status_text,
-    update_inspection_and_alerts_text,
 };

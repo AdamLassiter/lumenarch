@@ -310,7 +310,7 @@ pub(crate) fn sync_shipboard_player_visual(
             PlayerReferenceFrame::World => render_translation(position.world_position, 6.0),
         };
         transform.rotation = Quat::from_rotation_z(
-            position.facing_radians.to_num::<f32>() + std::f32::consts::FRAC_PI_2,
+            position.facing_radians.to_num::<f32>() - std::f32::consts::FRAC_PI_2,
         );
         if observed.is_some() {
             sprite.color = match control_state.mode {
@@ -336,6 +336,21 @@ pub(crate) fn sync_shipboard_player_visual(
         } else {
             *visibility = Visibility::Visible;
         }
+    }
+}
+
+pub(crate) fn sync_crew_name_labels(
+    player_query: Query<(&PlayerMotionState, &Visibility), With<ShipboardPlayer>>,
+    mut label_query: Query<(&CrewNameLabel, &mut Transform, &mut Visibility)>,
+) {
+    for (label, mut transform, mut visibility) in &mut label_query {
+        let Ok((motion, player_visibility)) = player_query.get(label.player_entity) else {
+            continue;
+        };
+        transform.translation =
+            render_translation(motion.world_position, 6.2) + Vec3::new(0.0, 15.0, 0.0);
+        transform.rotation = Quat::IDENTITY;
+        *visibility = *player_visibility;
     }
 }
 
