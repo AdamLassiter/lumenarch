@@ -47,6 +47,33 @@ jobs:
           mkdir bin
           curl -sSL $url | tar -xz --directory=bin
           echo "$(pwd)/bin" >> $GITHUB_PATH
+      - name: Stage notes into mdBook source
+        run: |
+          mkdir -p docs/src/notes
+
+          cat > docs/src/notes/README.md <<'EOF'
+          # Notes
+
+          This section contains implementation notes, vertical-slice plans, and TODO trackers
+          from active development of LUMEN//ARCH.
+          EOF
+
+          find notes -maxdepth 1 -type f -name '*.md' -print0 | while IFS= read -r -d '' file; do
+            cp "$file" "docs/src/notes/$(basename "$file")"
+          done
+
+          cp docs/src/SUMMARY.md docs/src/SUMMARY.md.bak
+          {
+            cat docs/src/SUMMARY.md.bak
+            printf '\n- [Notes](./notes/README.md)\n'
+            find notes -maxdepth 1 -type f -name '*.md' -printf '%f\n' \
+              | sort -V \
+              | while IFS= read -r name; do
+                  stem="${name%.md}"
+                  title="${stem//_/ }"
+                  printf '  - [%s](./notes/%s)\n' "$title" "$name"
+                done
+          } > docs/src/SUMMARY.md
       - run: |
           cd docs
           mdbook build
@@ -55,7 +82,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'book'
+          path: 'docs/book'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
