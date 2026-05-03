@@ -33,11 +33,7 @@ use crate::{
     },
     netcode,
     ship::ModuleKind,
-    state::{
-        LastMissionReport,
-        SectorNodeStatus,
-        TravelOutcome,
-    },
+    state::{LastMissionReport, SectorNodeStatus, StoredComponentStack, TravelOutcome},
 };
 
 pub(crate) fn update_mission_telemetry(
@@ -275,10 +271,25 @@ pub(crate) fn return_after_mission_resolution(
 
     let mut raw_salvage_returned = 0u32;
     let mut repair_charge_returned = 0u32;
+    let mut returned_damaged_components: Vec<StoredComponentStack> = Vec::new();
     for (_, storage, processor) in &inventory_query {
         if let Some(storage) = storage {
             raw_salvage_returned += storage.inventory.raw_salvage;
             repair_charge_returned += storage.inventory.repair_charge;
+            for component in &storage.damaged_components {
+                if let Some(existing) = returned_damaged_components.iter_mut().find(|entry| {
+                    entry.kind == component.kind && entry.variant == component.variant
+                }) {
+                    existing.damaged += component.amount;
+                } else {
+                    returned_damaged_components.push(StoredComponentStack {
+                        kind: component.kind,
+                        variant: component.variant,
+                        ready: 0,
+                        damaged: component.amount,
+                    });
+                }
+            }
         }
         if let Some(processor) = processor {
             raw_salvage_returned += processor.inventory.raw_salvage;
@@ -289,6 +300,9 @@ pub(crate) fn return_after_mission_resolution(
         * mission_state.reward_multiplier.max(1);
     let mut progression = rollback_state.progression.clone();
     progression.scrap += logistics_payout;
+    for component in returned_damaged_components {
+        progression.add_damaged_component(component.kind, component.variant, component.damaged);
+    }
     mission_state.salvage_scrap_awarded = logistics_payout;
 
     let hull_wear_delta = if mission_state.failed {
@@ -464,7 +478,13 @@ pub(crate) fn return_after_mission_resolution(
     rollback_state.last_mission_report = last_mission_report.clone();
     rollback_state.phase = netcode::RollbackPhase::Docked;
     mission_state.return_delay_remaining = None;
-    log::info!("Mission resolved with outcome: {}", last_mission_report.travel_outcome.clone().unwrap_or_default());
+    log::info!(
+        "Mission resolved with outcome: {}",
+        last_mission_report
+            .travel_outcome
+            .clone()
+            .unwrap_or_default()
+    );
     log::info!("Returning to Docked state");
 }
 

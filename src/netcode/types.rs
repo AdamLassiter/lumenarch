@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     DEFAULT_HOST_ADDR,
     ship::ShipDefinition,
-    state::{DemoProgression, LastMissionReport, SectorState},
+    state::{DemoProgression, LastMissionReport, LocalPlayerProfile, SectorState},
 };
 
 pub(crate) type LumenGgrsConfig = bevy_ggrs::GgrsConfig<PlayerGgrsInput, SocketAddr, u128>;
@@ -264,6 +264,7 @@ pub(crate) struct LobbyPlayerInfo {
     pub(crate) handle: PlayerHandle,
     pub(crate) bind_addr: SocketAddr,
     pub(crate) is_host: bool,
+    pub(crate) profile: LocalPlayerProfile,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

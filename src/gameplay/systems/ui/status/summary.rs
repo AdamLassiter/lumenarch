@@ -40,6 +40,7 @@ pub(super) fn build_top_banner(
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn build_compact_status(
+    player_identity: &PlayerIdentity,
     player_motion: &PlayerMotionState,
     ship_position: &SimPosition,
     linear_velocity: &LinearVelocity,
@@ -54,15 +55,50 @@ pub(super) fn build_compact_status(
     degraded_modules: usize,
     disabled_modules: usize,
     atmosphere_state: &ShipAtmosphereState,
+    equipped_suit: &EquippedSuit,
     carried_resource: &CarriedResource,
+    player_condition: &PlayerConditionState,
     mission_state: &MissionState,
     scrap_total: u32,
     arch_summary: &ArchSummary,
     rollback_frame: i32,
     checksum: u128,
 ) -> String {
+    let condition_line = if player_condition.health <= 0 {
+        "Downed".to_string()
+    } else if player_condition.stun_remaining > Fx::from_num(0) {
+        format!(
+            "Stunned {}s",
+            format_fx1(player_condition.stun_remaining.max(Fx::from_num(0)))
+        )
+    } else {
+        let mut flags = Vec::new();
+        if player_condition.blackout > Fx::from_num(0.05) {
+            flags.push(format!(
+                "Blackout {}%",
+                (player_condition.blackout * Fx::from_num(100)).to_num::<i32>()
+            ));
+        }
+        if player_condition.heat_buildup > Fx::from_num(0.2) {
+            flags.push(format!(
+                "Heat {}",
+                format_fx1(player_condition.heat_buildup)
+            ));
+        }
+        if player_condition.electrical_buildup > Fx::from_num(0.2) {
+            flags.push(format!(
+                "Charge {}",
+                format_fx1(player_condition.electrical_buildup)
+            ));
+        }
+        if flags.is_empty() {
+            "Stable".to_string()
+        } else {
+            flags.join("  |  ")
+        }
+    };
     format!(
-        "Mode: {}  |  Focus: {}\nFrame: {}\nContext: {}\nStation: {}\nPlayer: {}, {} @ {}\nShip: {}, {} @ {}\nTurn: {}\nModules: {} active  |  {} degraded  |  {} disabled\nIntegrity: {} / {}\nAtmosphere: {} avg / {} min  |  venting {}\nCargo: {}\nMission Ops: repairs {}  stabs {}  transfers {}  cycles {}\nARCH: {}  [{}]  writes {}  invalid {}\nRollback: frame {}  checksum {:016x}\nScrap: {}",
+        "Mode: {}  |  Focus: {}\nFrame: {}\nContext: {}\nStation: {}\nCrew: {} ({})\nPlayer: {}, {} @ {}\nHealth: {} / {}  |  {}\nShip: {}, {} @ {}\nTurn: {}\nModules: {} active  |  {} degraded  |  {} disabled\nIntegrity: {} / {}\nAtmosphere: {} avg / {} min  |  venting {}\nSuit: {}\nCargo: {}\nMission Ops: repairs {}  stabs {}  transfers {}  cycles {}\nARCH: {}  [{}]  writes {}  invalid {}\nRollback: frame {}  checksum {:016x}\nScrap: {}",
         control_mode.mode.as_str(),
         control_mode
             .focused_family
@@ -71,9 +107,14 @@ pub(super) fn build_compact_status(
         frame_label,
         focused_station_context,
         module_display_name(current_station.kind),
+        player_identity.name,
+        player_identity.role.as_str(),
         format_fx0(player_motion.world_position.x),
         format_fx0(player_motion.world_position.y),
         format_fx1(player_motion.world_velocity.length()),
+        player_condition.health,
+        player_condition.max_health,
+        condition_line,
         format_fx0(ship_position.value.x),
         format_fx0(ship_position.value.y),
         format_fx1(linear_velocity.value.length()),
@@ -86,9 +127,10 @@ pub(super) fn build_compact_status(
         format_fx1(atmosphere_state.average_oxygen),
         format_fx1(atmosphere_state.minimum_oxygen),
         atmosphere_state.venting_tiles,
+        equipped_suit.suit.as_str(),
         carried_resource
             .kind
-            .map(|kind| format!("{} {}", carried_resource.amount, resource_kind_label(kind)))
+            .map(|kind| format!("{} {}", carried_resource.amount, kind.label()))
             .unwrap_or_else(|| "none".to_string()),
         mission_state.repairs_performed,
         mission_state.stabilizations_performed,
@@ -199,14 +241,12 @@ pub(super) fn summarize_arch(
                 program_name: if computer.last_result.program_name.is_empty() {
                     format!(
                         "{} / {}",
-                        computer.program.name,
-                        computer.lumen_program.name
+                        computer.program.name, computer.lumen_program.name
                     )
                 } else {
                     format!(
                         "{} / {}",
-                        computer.last_result.program_name,
-                        computer.last_lumen_result.program_name
+                        computer.last_result.program_name, computer.last_lumen_result.program_name
                     )
                 },
                 exec_summary: format!(
@@ -240,7 +280,7 @@ pub(super) fn summarize_arch(
 pub(super) fn controls_help_text(mode: ShipControlMode) -> String {
     match mode {
         ShipControlMode::Interior => {
-            "Walk / EVA\nWASD move or thrust\nE enter station\nF pick up/deposit cargo\nG drop cargo\nQ or Esc leave station\nF3 diagnostics  |  Tab station hub".to_string()
+            "Walk / EVA\nWASD move or thrust\nE enter station / work\nF pick up, equip suit, or deposit\nG drop carried item\nQ or Esc leave station\nF3 diagnostics  |  Tab station hub".to_string()
         }
         ShipControlMode::Cockpit => {
             "Helm\nW/S throttle  |  A/D steer\nMouse can also drive helm\nUse on-panel controls for coarse trim\nQ or Esc leave cockpit".to_string()

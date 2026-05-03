@@ -1,4 +1,6 @@
-use bevy::prelude::*;
+use std::path::Path;
+
+use bevy::{log, prelude::*};
 use ggrs::PlayerHandle;
 
 use super::{
@@ -11,22 +13,28 @@ use crate::{
         RUNTIME_SHIP_ORIGIN,
         components::{
             AngularVelocity,
+            CarriedItemKind,
             CarriedResource,
             CurrentStation,
+            EquippedSuit,
             HeldInteraction,
             HostileShip,
             HostileShipAi,
             InternalPosition,
             LinearVelocity,
+            LooseCargo,
             MissionState,
             NearbyInteraction,
             ObservedLocalPlayerMarker,
+            PlayerConditionState,
             PlayerFieldState,
             PlayerHandleComponent,
+            PlayerIdentity,
             PlayerMotionState,
             PlayerReferenceFrame,
             PlayerShip,
             PlayerShipAssignment,
+            PlayerSuit,
             ShipArchCommandState,
             ShipAtmosphereState,
             ShipAutomationMode,
@@ -50,6 +58,7 @@ use crate::{
             FixedVec2,
             Fx,
             module_local_position,
+            render_translation,
             ship_movement_model_with_effective,
             ship_power_model_with_effective,
         },
@@ -138,6 +147,7 @@ pub(crate) fn spawn_runtime_ship(
     local_handle: Option<PlayerHandle>,
     player_handle_map: &mut netcode::PlayerHandleMap,
     observed_local_player: &mut netcode::ObservedLocalPlayer,
+    lobby_snapshot: Option<&netcode::LobbySnapshot>,
     balance: &BalanceConfig,
     node_id: u32,
     node_name: &str,
@@ -335,19 +345,22 @@ pub(crate) fn spawn_runtime_ship(
             .length_sq()
             .to_num::<i128>()
     });
-    let palette = [
-        Color::srgb(0.82, 0.96, 0.62),
-        Color::srgb(0.62, 0.90, 0.96),
-        Color::srgb(0.96, 0.86, 0.62),
-        Color::srgb(0.94, 0.70, 0.82),
-    ];
     let shipboard_markers: Vec<_> = player_handles
         .iter()
         .enumerate()
         .map(|(index, handle)| {
             let spawn_node = spawn_nodes.get(index).unwrap_or(&start_station);
+            let player_profile = lobby_snapshot
+                .and_then(|snapshot| {
+                    snapshot
+                        .players
+                        .iter()
+                        .find(|player| player.handle == *handle)
+                })
+                .map(|player| player.profile.clone())
+                .unwrap_or_default();
             let mut entity_commands = commands.spawn((
-                Sprite::from_color(palette[index % palette.len()], Vec2::splat(12.0)),
+                actor_sprite_for_profile(asset_server, &player_profile),
                 Transform::from_xyz(
                     spawn_node.local_position.x.to_num::<f32>(),
                     spawn_node.local_position.y.to_num::<f32>(),
@@ -356,6 +369,11 @@ pub(crate) fn spawn_runtime_ship(
                 ShipboardPlayer,
                 ShipboardMarker,
                 PlayerHandleComponent { handle: *handle },
+                PlayerIdentity {
+                    name: player_profile.name.clone(),
+                    role: player_profile.role,
+                    color_index: player_profile.color_index,
+                },
                 PlayerShipAssignment {
                     _ship_entity: root_entity,
                 },
@@ -372,6 +390,7 @@ pub(crate) fn spawn_runtime_ship(
                     world_velocity: FixedVec2::zero(),
                     local_position: spawn_node.local_position,
                     local_velocity: FixedVec2::zero(),
+                    facing_radians: Fx::from_num(0),
                 },
                 CarriedResource::default(),
                 CurrentStation {
@@ -387,6 +406,9 @@ pub(crate) fn spawn_runtime_ship(
                     focused_family: None,
                 },
                 NearbyInteraction::default(),
+                PlayingCleanup,
+            ));
+            entity_commands.insert((
                 HeldInteraction::default(),
                 PlayerFieldState {
                     local_heat: Fx::from_num(0),
@@ -397,12 +419,28 @@ pub(crate) fn spawn_runtime_ship(
                     oxygen_warning: false,
                     oxygen_critical: false,
                 },
-                PlayingCleanup,
+                PlayerConditionState::default(),
             ));
+            entity_commands.insert(EquippedSuit {
+                suit: player_profile.starting_suit(),
+            });
             if Some(*handle) == local_handle {
                 entity_commands.insert(ObservedLocalPlayerMarker);
             }
             let entity = entity_commands.id();
+            commands.entity(entity).with_children(|parent| {
+                parent.spawn((
+                    Text2d::new(player_profile.name.clone()),
+                    TextFont {
+                        font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                        font_size: 10.0,
+                        ..default()
+                    },
+                    TextColor(player_profile.color()),
+                    Transform::from_xyz(0.0, 15.0, 0.2),
+                    PlayingCleanup,
+                ));
+            });
             player_handle_map.entities.insert(*handle, entity);
             if Some(*handle) == local_handle {
                 observed_local_player.handle = Some(*handle);
@@ -411,6 +449,36 @@ pub(crate) fn spawn_runtime_ship(
             entity
         })
         .collect();
+
+    let suit_positions = [
+        (
+            start_station.local_position + FixedVec2::from_num(-24.0, -28.0),
+            PlayerSuit::Radiation,
+        ),
+        (
+            start_station.local_position + FixedVec2::from_num(0.0, -28.0),
+            PlayerSuit::Welder,
+        ),
+        (
+            start_station.local_position + FixedVec2::from_num(24.0, -28.0),
+            PlayerSuit::Eva,
+        ),
+    ];
+    for (local_position, suit) in suit_positions {
+        let world_position = FixedVec2::from_vec2(RUNTIME_SHIP_ORIGIN.truncate()) + local_position;
+        commands.spawn((
+            Sprite::from_color(suit.color(), Vec2::splat(10.0)),
+            Transform::from_translation(render_translation(world_position, 5.1)),
+            SimPosition {
+                value: world_position,
+            },
+            LooseCargo {
+                kind: CarriedItemKind::Suit(suit),
+                amount: 1,
+            },
+            PlayingCleanup,
+        ));
+    }
 
     commands.entity(root_entity).insert((
         ShipInteriorMap {
@@ -440,6 +508,13 @@ pub(crate) fn spawn_hostile_ship(
     aggression: Fx,
     salvage_reward: u32,
 ) {
+    log::debug!(
+        "Constructing hostile ship '{}' with {} modules at ({:.1}, {:.1})",
+        ship.name,
+        ship.modules.len(),
+        spawn_position.x.to_num::<f32>(),
+        spawn_position.y.to_num::<f32>()
+    );
     let totals = accumulate_ship_variant_totals(ship);
     let movement_model = ship_movement_model_with_variant_totals(ship, &totals, balance);
     let power_model = ship_power_model_with_effective(
@@ -601,4 +676,24 @@ fn ship_movement_model_with_variant_totals(
         totals.effective_helm,
         balance,
     )
+}
+
+fn actor_sprite_for_profile(
+    asset_server: &AssetServer,
+    profile: &crate::state::LocalPlayerProfile,
+) -> Sprite {
+    let sprite_path = match profile.starting_suit() {
+        PlayerSuit::Standard => "actors/player_default.png",
+        PlayerSuit::Radiation => "actors/player_radiation.png",
+        PlayerSuit::Welder => "actors/player_welder.png",
+        PlayerSuit::Eva => "actors/player_eva.png",
+    };
+    if Path::new("assets").join(sprite_path).exists() {
+        let mut sprite = Sprite::from_image(asset_server.load(sprite_path));
+        sprite.color = profile.color();
+        sprite.custom_size = Some(Vec2::splat(16.0));
+        sprite
+    } else {
+        Sprite::from_color(profile.color(), Vec2::splat(12.0))
+    }
 }

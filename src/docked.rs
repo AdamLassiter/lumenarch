@@ -1,5 +1,6 @@
-use bevy::{log, prelude::*};
 use std::hash::{Hash, Hasher};
+
+use bevy::{log, prelude::*};
 
 use super::{
     HOVERED_BUTTON,
@@ -26,13 +27,18 @@ use super::{
         EditorShip,
         EnemyShipLibraryState,
         LastMissionReport,
+        LocalPlayerProfile,
         OpenSectorMapButton,
         RefitButton,
         RepairShipButton,
         SectorState,
     },
 };
-use crate::ship::{ShipDefinition, enemy::load_default_enemy_library, storage::load_default_ship};
+use crate::ship::{
+    ShipDefinition,
+    enemy::load_validated_default_enemy_library,
+    storage::load_default_ship,
+};
 
 #[derive(Component)]
 pub(crate) struct DockedPreviewRoot;
@@ -66,7 +72,65 @@ pub(crate) fn initialize_campaign_state(
                 Ok(Some(save)) => {
                     *progression = save.progression;
                     *sector_state = save.sector;
+                    let previous_enemy_ship_ids = sector_state
+                        .nodes
+                        .iter()
+                        .map(|node| {
+                            (
+                                node.id,
+                                node.encounter.enemy_ship_ids.clone(),
+                                node.encounter.hostile_count,
+                            )
+                        })
+                        .collect::<Vec<_>>();
                     sector_state.ensure_latest_layout();
+                    let refreshed_enemy_ship_nodes = sector_state
+                        .nodes
+                        .iter()
+                        .filter_map(|node| {
+                            previous_enemy_ship_ids
+                                .iter()
+                                .find(|(id, _, _)| *id == node.id)
+                                .and_then(|(_, previous_ids, previous_hostile_count)| {
+                                    if *previous_ids != node.encounter.enemy_ship_ids
+                                        || *previous_hostile_count != node.encounter.hostile_count
+                                    {
+                                        Some((
+                                            node.id,
+                                            previous_ids.clone(),
+                                            node.encounter.enemy_ship_ids.clone(),
+                                            *previous_hostile_count,
+                                            node.encounter.hostile_count,
+                                        ))
+                                    } else {
+                                        None
+                                    }
+                                })
+                        })
+                        .collect::<Vec<_>>();
+                    if !refreshed_enemy_ship_nodes.is_empty() {
+                        log::warn!(
+                            "Campaign sector data differed from current sector layout; refreshed {} node(s) while entering docked flow",
+                            refreshed_enemy_ship_nodes.len()
+                        );
+                        for (
+                            node_id,
+                            previous_ids,
+                            refreshed_ids,
+                            previous_hostile_count,
+                            refreshed_hostile_count,
+                        ) in &refreshed_enemy_ship_nodes
+                        {
+                            log::debug!(
+                                "Refreshed docked sector node {} hostile config: enemy_ship_ids {:?} -> {:?}, hostile_count {} -> {}",
+                                node_id,
+                                previous_ids,
+                                refreshed_ids,
+                                previous_hostile_count,
+                                refreshed_hostile_count
+                            );
+                        }
+                    }
                     *last_mission_report = save.last_mission_report;
                 }
                 Ok(None) => {
@@ -90,8 +154,9 @@ pub(crate) fn initialize_campaign_state(
                 editor_ship.ship = ShipDefinition::empty("Untitled Knot");
             }
 
-            if let Ok(Some(library)) = load_default_enemy_library() {
-                enemy_library_state.library = library;
+            if let Ok(Some(validated)) = load_validated_default_enemy_library() {
+                enemy_library_state.library = validated.library;
+                enemy_library_state.entry_statuses = validated.statuses;
                 enemy_library_state.library.ensure_seeded();
             }
 
@@ -137,6 +202,7 @@ pub(crate) fn spawn_docked_ui(
     last_mission_report: Res<LastMissionReport>,
     editor_ship: Res<EditorShip>,
     status: Res<netcode::SessionStatus>,
+    local_profile: Res<LocalPlayerProfile>,
 ) {
     let title_font = asset_server.load("fonts/FiraSans-Bold.ttf");
     let mono_font = asset_server.load("fonts/FiraMono-Medium.ttf");
@@ -190,6 +256,7 @@ pub(crate) fn spawn_docked_ui(
                         &progression,
                         &editor_ship,
                         &last_mission_report,
+                        &local_profile,
                     )),
                     TextFont {
                         font: mono_font.clone(),
@@ -316,7 +383,12 @@ pub(crate) fn rotate_docked_ship_preview(
     time: Res<Time>,
     mut query: Query<&mut Transform, With<DockedPreviewRoot>>,
 ) {
+    let panel_width = TOOLBOX_WIDTH + 80.0;
+    let desired_x = panel_width * 0.5;
+    let desired_y = 0.0f32;
     for mut transform in &mut query {
+        transform.translation.x = desired_x;
+        transform.translation.y = desired_y;
         transform.rotate_z(0.12 * time.delta_secs());
     }
 }
@@ -395,12 +467,14 @@ pub(crate) fn update_docked_status_text(
     progression: Res<DemoProgression>,
     last_mission_report: Res<LastMissionReport>,
     editor_ship: Res<EditorShip>,
+    local_profile: Res<LocalPlayerProfile>,
     mut query: Query<&mut Text, With<DockedStatusText>>,
 ) {
     if !docked_state.is_changed()
         && !progression.is_changed()
         && !last_mission_report.is_changed()
         && !editor_ship.is_changed()
+        && !local_profile.is_changed()
     {
         return;
     }
@@ -411,6 +485,7 @@ pub(crate) fn update_docked_status_text(
             &progression,
             &editor_ship,
             &last_mission_report,
+            &local_profile,
         );
     }
 }
@@ -452,6 +527,7 @@ fn docked_status_text(
     progression: &DemoProgression,
     editor_ship: &EditorShip,
     last_mission_report: &LastMissionReport,
+    local_profile: &LocalPlayerProfile,
 ) -> String {
     let mission = match (&last_mission_report.headline, &last_mission_report.detail) {
         (Some(headline), Some(detail)) => format!("{headline}\n{detail}"),
@@ -459,10 +535,23 @@ fn docked_status_text(
         _ => "No completed sorties yet.".to_string(),
     };
 
+    let damaged_components = progression
+        .damaged_components()
+        .map(|entry| format!("{} x{}", entry.label(), entry.damaged))
+        .collect::<Vec<_>>();
+
     format!(
-        "Hub: {}\nScrap: {}\nHull Wear: {}\nJumps: {}\nShip: {}\nModules: {}\n\nLast Result\n{}",
+        "Hub: {}\nCrew: {} ({})\nDefault Suit: {}\nScrap: {}\nDamaged Parts: {}\nHull Wear: {}\nJumps: {}\nShip: {}\nModules: {}\n\nLast Result\n{}",
         docked_state.station_title,
+        local_profile.name,
+        local_profile.role.as_str(),
+        local_profile.starting_suit().as_str(),
         progression.scrap,
+        if damaged_components.is_empty() {
+            "none".to_string()
+        } else {
+            damaged_components.join(", ")
+        },
         progression.hull_wear,
         progression.jump_count,
         editor_ship.ship.name,
@@ -497,7 +586,7 @@ fn spawn_docked_ship_preview(
 
     commands
         .spawn((
-            Transform::from_xyz(360.0, 10.0, 0.0),
+            Transform::from_xyz((TOOLBOX_WIDTH + 80.0) * 0.5, 0.0, 0.0),
             GlobalTransform::default(),
             Visibility::Visible,
             InheritedVisibility::VISIBLE,
@@ -509,7 +598,8 @@ fn spawn_docked_ship_preview(
             for module in &ship.modules {
                 root.spawn((
                     Sprite::from_image(
-                        asset_server.load(docked_sprite_path_for_kind(&module.kind, module.variant)),
+                        asset_server
+                            .load(docked_sprite_path_for_kind(&module.kind, module.variant)),
                     ),
                     Transform {
                         translation: Vec3::new(

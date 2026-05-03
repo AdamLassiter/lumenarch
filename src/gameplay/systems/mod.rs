@@ -30,6 +30,7 @@ pub(crate) use interactions::{
 pub(crate) use simulation::{
     advance_projectiles,
     aim_hostile_turrets,
+    apply_player_environmental_effects,
     collect_salvage,
     draw_debug_overlay,
     drive_hostile_ships,
@@ -37,6 +38,7 @@ pub(crate) use simulation::{
     fire_hostile_targets,
     fire_player_weapons,
     handle_projectile_hits,
+    handle_ship_collisions,
     integrate_hostile_ship_motion,
     return_after_mission_resolution,
     run_arch_automation,

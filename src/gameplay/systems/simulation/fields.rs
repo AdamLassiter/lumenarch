@@ -5,10 +5,12 @@ use crate::{
     gameplay::{
         components::{
             DestroyedModule,
+            EquippedSuit,
             Integrity,
             MissionState,
             ModuleFieldEmitter,
             ModuleRuntimeState,
+            PlayerConditionState,
             PlayerFieldState,
             PlayerHandleComponent,
             PlayerMotionState,
@@ -51,6 +53,7 @@ pub(crate) fn sample_ship_fields(
         (
             &PlayerHandleComponent,
             &PlayerMotionState,
+            &EquippedSuit,
             &mut PlayerFieldState,
         ),
         With<ShipboardPlayer>,
@@ -122,8 +125,8 @@ pub(crate) fn sample_ship_fields(
     }
 
     let mut players: Vec<_> = player_query.iter_mut().collect();
-    players.sort_by_key(|(handle, _, _)| handle.handle);
-    for (_, player_motion, mut player_fields) in players {
+    players.sort_by_key(|(handle, _, _, _)| handle.handle);
+    for (_, player_motion, equipped_suit, mut player_fields) in players {
         let Some(active_ship) = (match player_motion.frame {
             PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
             PlayerReferenceFrame::World => None,
@@ -161,10 +164,14 @@ pub(crate) fn sample_ship_fields(
             electrical += (*source_electrical - *source_grounding) * attenuation;
         }
 
-        player_fields.local_heat =
-            (heat + mission_state.ambient_heat_pressure).max(Fx::from_num(0));
-        player_fields.local_electrical =
-            (electrical + mission_state.ambient_electrical_pressure).max(Fx::from_num(0));
+        player_fields.local_heat = ((heat + mission_state.ambient_heat_pressure)
+            .max(Fx::from_num(0))
+            * equipped_suit.suit.heat_multiplier())
+        .max(Fx::from_num(0));
+        player_fields.local_electrical = ((electrical + mission_state.ambient_electrical_pressure)
+            .max(Fx::from_num(0))
+            * equipped_suit.suit.electrical_multiplier())
+        .max(Fx::from_num(0));
         player_fields.heat_danger =
             player_fields.local_heat >= Fx::from_num(balance.fields.player_heat_warning_threshold);
         player_fields.electrical_danger = player_fields.local_electrical
@@ -344,5 +351,107 @@ pub(crate) fn update_module_runtime_state(
             >= Fx::from_num(balance.fields.disabled_heat_threshold)
             || runtime_state.electrical_instability
                 >= Fx::from_num(balance.fields.disabled_electrical_threshold);
+    }
+}
+
+pub(crate) fn apply_player_environmental_effects(
+    time: Res<Time>,
+    balance: Res<BalanceConfig>,
+    mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
+    mut player_query: Query<
+        (
+            &PlayerHandleComponent,
+            &PlayerFieldState,
+            &mut PlayerConditionState,
+        ),
+        With<ShipboardPlayer>,
+    >,
+) {
+    let dt = fx_from_time_delta(&time);
+    let mut mission_state = mission_query.into_inner();
+    let mut players: Vec<_> = player_query.iter_mut().collect();
+    players.sort_by_key(|(handle, _, _)| handle.handle);
+
+    for (_, field_state, mut condition) in players {
+        condition.stun_remaining = (condition.stun_remaining - dt).max(Fx::from_num(0));
+
+        let excess_heat = (field_state.local_heat
+            - Fx::from_num(balance.fields.player_heat_warning_threshold))
+        .max(Fx::from_num(0));
+        if excess_heat > Fx::from_num(0) {
+            condition.heat_buildup = (condition.heat_buildup
+                + excess_heat * Fx::from_num(0.12) * dt)
+                .min(Fx::from_num(12));
+        } else {
+            condition.heat_buildup =
+                (condition.heat_buildup - Fx::from_num(1.4) * dt).max(Fx::from_num(0));
+        }
+
+        if condition.heat_buildup > Fx::from_num(2.5) {
+            let heat_damage_step =
+                (condition.heat_buildup - Fx::from_num(2.5)) * Fx::from_num(0.22) * dt;
+            condition.heat_damage_progress += heat_damage_step;
+            while condition.heat_damage_progress >= Fx::from_num(1) {
+                condition.heat_damage_progress -= Fx::from_num(1);
+                condition.health = (condition.health - 1).max(0);
+                mission_state.recent_action = Some("Crew burned by excess heat".to_string());
+                mission_state.recent_action_timer = Fx::from_num(1.5);
+            }
+        } else {
+            condition.heat_damage_progress =
+                (condition.heat_damage_progress - dt).max(Fx::from_num(0));
+        }
+
+        let excess_electrical = (field_state.local_electrical
+            - Fx::from_num(balance.fields.player_electrical_warning_threshold))
+        .max(Fx::from_num(0));
+        if excess_electrical > Fx::from_num(0) {
+            condition.electrical_buildup += excess_electrical * Fx::from_num(0.32) * dt;
+        } else {
+            condition.electrical_buildup =
+                (condition.electrical_buildup - Fx::from_num(2.0) * dt).max(Fx::from_num(0));
+        }
+        if condition.electrical_buildup >= Fx::from_num(3.0)
+            && condition.stun_remaining <= Fx::from_num(0)
+        {
+            condition.health = (condition.health - 2).max(0);
+            condition.stun_remaining = Fx::from_num(2.8);
+            condition.electrical_buildup = Fx::from_num(0);
+            mission_state.recent_action = Some("Crew stunned by electrical discharge".to_string());
+            mission_state.recent_action_timer = Fx::from_num(1.8);
+        }
+
+        if field_state.local_oxygen <= Fx::from_num(0.2) {
+            condition.blackout =
+                (condition.blackout + Fx::from_num(0.40) * dt).min(Fx::from_num(1));
+        } else if field_state.oxygen_critical {
+            condition.blackout =
+                (condition.blackout + Fx::from_num(0.18) * dt).min(Fx::from_num(1));
+        } else if field_state.oxygen_warning {
+            condition.blackout =
+                (condition.blackout + Fx::from_num(0.08) * dt).min(Fx::from_num(1));
+        } else {
+            condition.blackout =
+                (condition.blackout - Fx::from_num(0.22) * dt).max(Fx::from_num(0));
+        }
+
+        if condition.blackout >= Fx::from_num(0.98) {
+            condition.blackout_damage_progress += Fx::from_num(0.18) * dt;
+            while condition.blackout_damage_progress >= Fx::from_num(1) {
+                condition.blackout_damage_progress -= Fx::from_num(1);
+                condition.health = (condition.health - 1).max(0);
+                mission_state.recent_action =
+                    Some("Crew collapsing from oxygen starvation".to_string());
+                mission_state.recent_action_timer = Fx::from_num(1.8);
+            }
+        } else {
+            condition.blackout_damage_progress =
+                (condition.blackout_damage_progress - dt).max(Fx::from_num(0));
+        }
+
+        if condition.health <= 0 {
+            condition.stun_remaining = condition.stun_remaining.max(Fx::from_num(4.0));
+            condition.blackout = Fx::from_num(1);
+        }
     }
 }

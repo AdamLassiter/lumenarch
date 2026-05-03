@@ -2,8 +2,8 @@ use std::{
     io::{Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
     sync::{
-        mpsc::{self, Receiver, Sender, TryRecvError},
         Mutex,
+        mpsc::{self, Receiver, Sender, TryRecvError},
     },
     thread,
     time::Duration,
@@ -13,13 +13,14 @@ use bevy::{log, prelude::*};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    bootstrap::ParsedSessionDescriptor,
     RollbackGameState,
     SessionBootstrapConfig,
     SessionPhase,
     SessionRole,
     SessionStatus,
+    bootstrap::ParsedSessionDescriptor,
 };
+use crate::state::LocalPlayerProfile;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct LobbySessionStart {
@@ -32,7 +33,13 @@ pub(crate) struct LobbySessionStart {
 
 #[derive(Serialize, Deserialize, Debug)]
 enum LobbyClientMessage {
-    Join { bind_addr: SocketAddr },
+    Join {
+        bind_addr: SocketAddr,
+        profile: LocalPlayerProfile,
+    },
+    UpdateProfile {
+        profile: LocalPlayerProfile,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -49,6 +56,9 @@ pub(crate) enum LobbyRuntimeEvent {
 
 pub(crate) enum LobbyControlCommand {
     Shutdown,
+    UpdateProfile {
+        profile: LocalPlayerProfile,
+    },
     StartSession {
         initial_state: RollbackGameState,
         input_delay: usize,
@@ -76,6 +86,7 @@ struct HostClientConn {
     recv_buffer: Vec<u8>,
     bind_addr: Option<SocketAddr>,
     handle: Option<usize>,
+    profile: Option<LocalPlayerProfile>,
 }
 
 pub(crate) fn poll_lobby_runtime_events(
@@ -101,7 +112,10 @@ pub(crate) fn poll_lobby_runtime_events(
             Ok(LobbyRuntimeEvent::Snapshot(snapshot)) => {
                 status.total_players = snapshot.players.len();
                 status.lobby_snapshot = Some(snapshot.clone());
-                if !matches!(status.phase, SessionPhase::Starting | SessionPhase::Connected) {
+                if !matches!(
+                    status.phase,
+                    SessionPhase::Starting | SessionPhase::Connected
+                ) {
                     status.phase = SessionPhase::Lobby;
                 }
                 log::info!(
@@ -151,21 +165,25 @@ pub(crate) fn poll_lobby_runtime_events(
 
 pub(crate) fn start_lobby_runtime(
     descriptor: &ParsedSessionDescriptor,
+    profile: &LocalPlayerProfile,
 ) -> Result<LobbyRuntime, String> {
     let (control_tx, control_rx) = mpsc::channel();
     let (event_tx, event_rx) = mpsc::channel();
     match descriptor.role {
         SessionRole::Host => {
             let bind_addr = descriptor.local_bind_addr;
-            thread::spawn(move || run_host_lobby(bind_addr, event_tx, control_rx));
+            let profile = profile.clone();
+            thread::spawn(move || run_host_lobby(bind_addr, profile, event_tx, control_rx));
         }
         SessionRole::Client => {
-            let host_addr = *descriptor
-                .peer_addrs
-                .first()
-                .ok_or_else(|| "client descriptor must include a host address after '>'".to_string())?;
+            let host_addr = *descriptor.peer_addrs.first().ok_or_else(|| {
+                "client descriptor must include a host address after '>'".to_string()
+            })?;
             let bind_addr = descriptor.local_bind_addr;
-            thread::spawn(move || run_client_lobby(bind_addr, host_addr, event_tx, control_rx));
+            let profile = profile.clone();
+            thread::spawn(move || {
+                run_client_lobby(bind_addr, host_addr, profile, event_tx, control_rx)
+            });
         }
     }
     Ok(LobbyRuntime {
@@ -181,8 +199,37 @@ pub(crate) fn shutdown_lobby_runtime(lobby_runtime: &mut LobbyRuntime) {
     lobby_runtime.event_rx = None;
 }
 
+pub(crate) fn sync_lobby_profile_changes(
+    local_profile: Res<LocalPlayerProfile>,
+    status: Res<SessionStatus>,
+    lobby_runtime: Res<LobbyRuntime>,
+) {
+    if !local_profile.is_changed() {
+        return;
+    }
+    if !matches!(status.phase, SessionPhase::Connecting | SessionPhase::Lobby) {
+        return;
+    }
+    let Some(control_tx) = lobby_runtime.control_tx.as_ref() else {
+        return;
+    };
+    if let Err(error) = control_tx.send(LobbyControlCommand::UpdateProfile {
+        profile: local_profile.clone(),
+    }) {
+        log::warn!("Failed to send lobby profile update: {}", error);
+    } else {
+        log::info!(
+            "Queued lobby profile update: name='{}', role={}, color={}",
+            local_profile.name,
+            local_profile.role.as_str(),
+            local_profile.color_index
+        );
+    }
+}
+
 fn run_host_lobby(
     bind_addr: SocketAddr,
+    initial_host_profile: LocalPlayerProfile,
     event_tx: Sender<LobbyRuntimeEvent>,
     control_rx: Receiver<LobbyControlCommand>,
 ) {
@@ -202,8 +249,9 @@ fn run_host_lobby(
         return;
     }
 
+    let mut host_profile = initial_host_profile;
     let mut clients: Vec<HostClientConn> = Vec::new();
-    let mut snapshot = host_snapshot(bind_addr, &clients);
+    let mut snapshot = host_snapshot(bind_addr, &host_profile, &clients);
     let _ = event_tx.send(LobbyRuntimeEvent::Snapshot(snapshot.clone()));
     log::info!("Host lobby listening on {}", bind_addr);
 
@@ -212,6 +260,14 @@ fn run_host_lobby(
             Ok(LobbyControlCommand::Shutdown) => {
                 log::info!("Shutting down host lobby runtime");
                 break 'outer;
+            }
+            Ok(LobbyControlCommand::UpdateProfile { profile }) => {
+                if host_profile != profile {
+                    host_profile = profile;
+                    snapshot = host_snapshot(bind_addr, &host_profile, &clients);
+                    let _ = event_tx.send(LobbyRuntimeEvent::Snapshot(snapshot.clone()));
+                    broadcast_lobby_snapshot(&mut clients, &snapshot);
+                }
             }
             Ok(LobbyControlCommand::StartSession {
                 initial_state,
@@ -244,7 +300,7 @@ fn run_host_lobby(
                 );
                 break 'outer;
             }
-            Err(TryRecvError::Empty) => {},
+            Err(TryRecvError::Empty) => {}
             Err(TryRecvError::Disconnected) => break 'outer,
         }
 
@@ -265,6 +321,7 @@ fn run_host_lobby(
                         recv_buffer: Vec::new(),
                         bind_addr: None,
                         handle: None,
+                        profile: None,
                     });
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
@@ -295,20 +352,33 @@ fn run_host_lobby(
                         {
                             let line = client.recv_buffer.drain(..=position).collect::<Vec<_>>();
                             let line = String::from_utf8_lossy(&line);
-                            if let Ok(LobbyClientMessage::Join { bind_addr }) =
-                                serde_json::from_str::<LobbyClientMessage>(line.trim())
-                            {
-                                let previous_addr = client.bind_addr;
-                                client.bind_addr = Some(bind_addr);
-                                if previous_addr != Some(bind_addr) {
-                                    log::info!("Lobby join registered for {}", bind_addr);
-                                    snapshot_changed = true;
+                            match serde_json::from_str::<LobbyClientMessage>(line.trim()) {
+                                Ok(LobbyClientMessage::Join { bind_addr, profile }) => {
+                                    let previous_addr = client.bind_addr;
+                                    let previous_profile = client.profile.clone();
+                                    client.bind_addr = Some(bind_addr);
+                                    client.profile = Some(profile);
+                                    if previous_addr != Some(bind_addr) {
+                                        log::info!("Lobby join registered for {}", bind_addr);
+                                        snapshot_changed = true;
+                                    }
+                                    if previous_profile != client.profile {
+                                        snapshot_changed = true;
+                                    }
                                 }
-                            } else {
-                                log::warn!(
-                                    "Failed to parse host lobby message '{}'",
-                                    line.trim()
-                                );
+                                Ok(LobbyClientMessage::UpdateProfile { profile }) => {
+                                    let previous_profile = client.profile.clone();
+                                    client.profile = Some(profile);
+                                    if previous_profile != client.profile {
+                                        snapshot_changed = true;
+                                    }
+                                }
+                                Err(_) => {
+                                    log::warn!(
+                                        "Failed to parse host lobby message '{}'",
+                                        line.trim()
+                                    );
+                                }
                             }
                         }
                     }
@@ -337,7 +407,7 @@ fn run_host_lobby(
 
         if snapshot_changed {
             reassign_host_client_handles(&mut clients);
-            snapshot = host_snapshot(bind_addr, &clients);
+            snapshot = host_snapshot(bind_addr, &host_profile, &clients);
             let _ = event_tx.send(LobbyRuntimeEvent::Snapshot(snapshot.clone()));
             broadcast_lobby_snapshot(&mut clients, &snapshot);
         }
@@ -349,6 +419,7 @@ fn run_host_lobby(
 fn run_client_lobby(
     local_bind_addr: SocketAddr,
     host_addr: SocketAddr,
+    local_profile: LocalPlayerProfile,
     event_tx: Sender<LobbyRuntimeEvent>,
     control_rx: Receiver<LobbyControlCommand>,
 ) {
@@ -363,6 +434,7 @@ fn run_client_lobby(
                 log::info!("Shutting down client lobby runtime");
                 return;
             }
+            Ok(LobbyControlCommand::UpdateProfile { .. }) => {}
             Ok(LobbyControlCommand::StartSession { .. }) | Err(TryRecvError::Empty) => {}
         }
 
@@ -379,6 +451,7 @@ fn run_client_lobby(
                     &mut stream,
                     &LobbyClientMessage::Join {
                         bind_addr: local_bind_addr,
+                        profile: local_profile.clone(),
                     },
                 ) {
                     let _ = event_tx.send(LobbyRuntimeEvent::Failed(format!(
@@ -394,13 +467,25 @@ fn run_client_lobby(
                 let mut recv_buffer = Vec::new();
                 loop {
                     match control_rx.try_recv() {
-                        Ok(LobbyControlCommand::Shutdown)
-                        | Err(TryRecvError::Disconnected) => {
+                        Ok(LobbyControlCommand::Shutdown) | Err(TryRecvError::Disconnected) => {
                             log::info!("Shutting down client lobby runtime");
                             return;
                         }
-                        Ok(LobbyControlCommand::StartSession { .. })
-                        | Err(TryRecvError::Empty) => {}
+                        Ok(LobbyControlCommand::UpdateProfile { profile }) => {
+                            if let Err(error) = send_json_line(
+                                &mut stream,
+                                &LobbyClientMessage::UpdateProfile { profile },
+                            ) {
+                                log::warn!(
+                                    "Failed to send lobby profile update to host {}: {}",
+                                    host_addr,
+                                    error
+                                );
+                                break;
+                            }
+                        }
+                        Ok(LobbyControlCommand::StartSession { .. }) | Err(TryRecvError::Empty) => {
+                        }
                     }
 
                     let mut buffer = [0u8; 1024];
@@ -421,7 +506,8 @@ fn run_client_lobby(
                                 let line = String::from_utf8_lossy(&line);
                                 match serde_json::from_str::<LobbyServerMessage>(line.trim()) {
                                     Ok(LobbyServerMessage::Snapshot(snapshot)) => {
-                                        let _ = event_tx.send(LobbyRuntimeEvent::Snapshot(snapshot));
+                                        let _ =
+                                            event_tx.send(LobbyRuntimeEvent::Snapshot(snapshot));
                                     }
                                     Ok(LobbyServerMessage::StartSession(start)) => {
                                         let _ =
@@ -466,26 +552,38 @@ fn run_client_lobby(
 
 fn reassign_host_client_handles(clients: &mut [HostClientConn]) {
     let mut next_handle = 1;
-    for client in clients.iter_mut().filter(|client| client.bind_addr.is_some()) {
+    for client in clients
+        .iter_mut()
+        .filter(|client| client.bind_addr.is_some())
+    {
         client.handle = Some(next_handle);
         next_handle += 1;
     }
 }
 
-fn host_snapshot(host_addr: SocketAddr, clients: &[HostClientConn]) -> super::LobbySnapshot {
+fn host_snapshot(
+    host_addr: SocketAddr,
+    host_profile: &LocalPlayerProfile,
+    clients: &[HostClientConn],
+) -> super::LobbySnapshot {
     let mut players = vec![super::LobbyPlayerInfo {
         handle: 0,
         bind_addr: host_addr,
         is_host: true,
+        profile: host_profile.clone(),
     }];
-    for client in clients
-        .iter()
-        .filter_map(|client| client.bind_addr.zip(client.handle))
-    {
+    for client in clients.iter() {
+        let Some(bind_addr) = client.bind_addr else {
+            continue;
+        };
+        let Some(handle) = client.handle else {
+            continue;
+        };
         players.push(super::LobbyPlayerInfo {
-            handle: client.1,
-            bind_addr: client.0,
+            handle,
+            bind_addr,
             is_host: false,
+            profile: client.profile.clone().unwrap_or_default(),
         });
     }
     players.sort_by_key(|player| player.handle);
@@ -493,10 +591,14 @@ fn host_snapshot(host_addr: SocketAddr, clients: &[HostClientConn]) -> super::Lo
 }
 
 fn broadcast_lobby_snapshot(clients: &mut [HostClientConn], snapshot: &super::LobbySnapshot) {
-    for client in clients.iter_mut().filter(|client| client.bind_addr.is_some()) {
-        if let Err(error) =
-            send_json_line(&mut client.stream, &LobbyServerMessage::Snapshot(snapshot.clone()))
-        {
+    for client in clients
+        .iter_mut()
+        .filter(|client| client.bind_addr.is_some())
+    {
+        if let Err(error) = send_json_line(
+            &mut client.stream,
+            &LobbyServerMessage::Snapshot(snapshot.clone()),
+        ) {
             log::warn!(
                 "Failed to send lobby snapshot to client {:?}: {}",
                 client.bind_addr,
@@ -517,7 +619,10 @@ fn broadcast_start_session(
         .iter()
         .map(|player| player.bind_addr)
         .collect::<Vec<_>>();
-    for client in clients.iter_mut().filter(|client| client.bind_addr.is_some()) {
+    for client in clients
+        .iter_mut()
+        .filter(|client| client.bind_addr.is_some())
+    {
         let Some(local_handle) = client.handle else {
             continue;
         };

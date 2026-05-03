@@ -1,14 +1,20 @@
 use bevy::{input::mouse::MouseWheel, log, prelude::*, window::PrimaryWindow};
 
+use super::layout::node_button_color;
 use crate::{
-    HOVERED_BUTTON, PRESSED_BUTTON, netcode,
+    HOVERED_BUTTON,
+    PRESSED_BUTTON,
+    netcode,
     state::{
-        BackToStationButton, LaunchEncounterButton, SectorMapPanState, SectorMapViewState,
-        SectorNodeButton, SectorNodeKind, SectorState,
+        BackToStationButton,
+        LaunchEncounterButton,
+        SectorMapPanState,
+        SectorMapViewState,
+        SectorNodeButton,
+        SectorNodeKind,
+        SectorState,
     },
 };
-
-use super::layout::node_button_color;
 
 pub(crate) fn pan_and_zoom_sector_map(
     window: Single<&Window, With<PrimaryWindow>>,

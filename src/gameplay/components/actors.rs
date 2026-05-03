@@ -3,12 +3,13 @@ use bevy::{
     prelude::*,
 };
 use ggrs::PlayerHandle;
+use serde::{Deserialize, Serialize};
 
 use super::{
     super::helpers::{FixedVec2, Fx},
     logistics::ResourceKind,
 };
-use crate::ship::ModuleKind;
+use crate::{ship::ModuleKind, state::PlayerRole};
 
 #[derive(Component)]
 pub(crate) struct PlayerShip;
@@ -63,12 +64,154 @@ pub(crate) struct PlayerMotionState {
     pub(crate) world_velocity: FixedVec2,
     pub(crate) local_position: FixedVec2,
     pub(crate) local_velocity: FixedVec2,
+    pub(crate) facing_radians: Fx,
 }
 
 #[derive(Component, Default, Clone)]
 pub(crate) struct CarriedResource {
-    pub(crate) kind: Option<ResourceKind>,
+    pub(crate) kind: Option<CarriedItemKind>,
     pub(crate) amount: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum PlayerSuit {
+    Standard,
+    Radiation,
+    Welder,
+    Eva,
+}
+
+impl PlayerSuit {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Standard => "Standard Suit",
+            Self::Radiation => "Radiation Suit",
+            Self::Welder => "Welder Suit",
+            Self::Eva => "EVA Suit",
+        }
+    }
+
+    pub(crate) fn heat_multiplier(self) -> Fx {
+        match self {
+            Self::Standard => Fx::from_num(1.0),
+            Self::Radiation => Fx::from_num(0.55),
+            Self::Welder => Fx::from_num(0.8),
+            Self::Eva => Fx::from_num(0.9),
+        }
+    }
+
+    pub(crate) fn electrical_multiplier(self) -> Fx {
+        match self {
+            Self::Standard => Fx::from_num(1.0),
+            Self::Radiation => Fx::from_num(0.6),
+            Self::Welder => Fx::from_num(0.85),
+            Self::Eva => Fx::from_num(0.95),
+        }
+    }
+
+    pub(crate) fn oxygen_warning_threshold(self) -> Fx {
+        match self {
+            Self::Standard => Fx::from_num(6),
+            Self::Radiation => Fx::from_num(4),
+            Self::Welder => Fx::from_num(5),
+            Self::Eva => Fx::from_num(2),
+        }
+    }
+
+    pub(crate) fn oxygen_critical_threshold(self) -> Fx {
+        match self {
+            Self::Standard => Fx::from_num(3),
+            Self::Radiation => Fx::from_num(2),
+            Self::Welder => Fx::from_num(2),
+            Self::Eva => Fx::from_num(1),
+        }
+    }
+
+    pub(crate) fn eva_speed_multiplier(self) -> Fx {
+        match self {
+            Self::Standard => Fx::from_num(1.0),
+            Self::Radiation => Fx::from_num(0.95),
+            Self::Welder => Fx::from_num(0.85),
+            Self::Eva => Fx::from_num(1.65),
+        }
+    }
+
+    pub(crate) fn color(self) -> Color {
+        match self {
+            Self::Standard => Color::srgb(0.82, 0.96, 0.62),
+            Self::Radiation => Color::srgb(0.54, 0.96, 0.54),
+            Self::Welder => Color::srgb(0.98, 0.68, 0.26),
+            Self::Eva => Color::srgb(0.56, 0.82, 0.98),
+        }
+    }
+}
+
+#[derive(Component, Clone, Copy)]
+pub(crate) struct EquippedSuit {
+    pub(crate) suit: PlayerSuit,
+}
+
+impl Default for EquippedSuit {
+    fn default() -> Self {
+        Self {
+            suit: PlayerSuit::Standard,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CarriedItemKind {
+    Resource(ResourceKind),
+    Suit(PlayerSuit),
+    ExtractedComponent {
+        kind: ModuleKind,
+        variant: crate::ship::ModuleVariant,
+    },
+}
+
+impl CarriedItemKind {
+    pub(crate) fn label(self) -> String {
+        match self {
+            Self::Resource(kind) => match kind {
+                ResourceKind::RawSalvage => "raw salvage".to_string(),
+                ResourceKind::RepairCharge => "repair charge".to_string(),
+                ResourceKind::Fuel => "fuel".to_string(),
+                ResourceKind::Ammunition => "ammunition".to_string(),
+            },
+            Self::Suit(suit) => suit.as_str().to_string(),
+            Self::ExtractedComponent { kind, variant } => {
+                format!("{} {} component", variant.display_name(), kind.as_str())
+            }
+        }
+    }
+
+    pub(crate) fn color(self) -> Color {
+        match self {
+            Self::Resource(kind) => match kind {
+                ResourceKind::RawSalvage => Color::srgb(0.90, 0.78, 0.34),
+                ResourceKind::RepairCharge => Color::srgb(0.38, 0.88, 0.98),
+                ResourceKind::Fuel => Color::srgb(0.98, 0.52, 0.22),
+                ResourceKind::Ammunition => Color::srgb(0.86, 0.86, 0.90),
+            },
+            Self::Suit(suit) => suit.color(),
+            Self::ExtractedComponent { .. } => Color::srgb(0.94, 0.76, 0.54),
+        }
+    }
+}
+
+#[derive(Component, Clone, Serialize, Deserialize)]
+pub(crate) struct PlayerIdentity {
+    pub(crate) name: String,
+    pub(crate) role: PlayerRole,
+    pub(crate) color_index: u8,
+}
+
+impl PlayerIdentity {
+    pub(crate) fn color(&self) -> Color {
+        let [r, g, b, a] = crate::state::LocalPlayerProfile::PALETTE
+            [self.color_index as usize % crate::state::LocalPlayerProfile::PALETTE.len()];
+        Color::srgba(r, g, b, a)
+    }
 }
 
 #[derive(Clone)]
@@ -200,6 +343,39 @@ pub(crate) struct PlayerFieldState {
     pub(crate) electrical_danger: bool,
     pub(crate) oxygen_warning: bool,
     pub(crate) oxygen_critical: bool,
+}
+
+#[derive(Component, Clone)]
+pub(crate) struct PlayerConditionState {
+    pub(crate) health: i32,
+    pub(crate) max_health: i32,
+    pub(crate) heat_buildup: Fx,
+    pub(crate) electrical_buildup: Fx,
+    pub(crate) blackout: Fx,
+    pub(crate) stun_remaining: Fx,
+    pub(crate) heat_damage_progress: Fx,
+    pub(crate) blackout_damage_progress: Fx,
+}
+
+impl Default for PlayerConditionState {
+    fn default() -> Self {
+        Self {
+            health: 10,
+            max_health: 10,
+            heat_buildup: Fx::from_num(0),
+            electrical_buildup: Fx::from_num(0),
+            blackout: Fx::from_num(0),
+            stun_remaining: Fx::from_num(0),
+            heat_damage_progress: Fx::from_num(0),
+            blackout_damage_progress: Fx::from_num(0),
+        }
+    }
+}
+
+impl PlayerConditionState {
+    pub(crate) fn control_disabled(&self) -> bool {
+        self.health <= 0 || self.stun_remaining > Fx::from_num(0)
+    }
 }
 
 impl MapEntities for PlayerShipAssignment {

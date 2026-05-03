@@ -1,26 +1,10 @@
-use bevy::{
-    log,
-    platform::collections::HashMap,
-    prelude::*,
-    window::PrimaryWindow,
-};
+use bevy::{log, platform::collections::HashMap, prelude::*, window::PrimaryWindow};
 use bevy_ggrs::{LocalInputs, LocalPlayers, PlayerInputs};
 use ggrs::PlayerHandle;
 
 use super::{
     DecodedPlayerCommand,
     DecodedPlayerCommands,
-    LocalPlayerHandle,
-    LumenGgrsConfig,
-    PendingLocalMetaCommand,
-    PendingLocalStationCommand,
-    PendingMetaCommand,
-    PendingStationCommand,
-    PlayerGgrsInput,
-    RollbackGameState,
-    RollbackMetaOp,
-    RollbackPhase,
-    StationControlOp,
     INPUT_AUX_EDGE,
     INPUT_CYCLE_TEMPLATE,
     INPUT_DOWN,
@@ -37,6 +21,17 @@ use super::{
     INPUT_TOGGLE_DEBUG,
     INPUT_TOGGLE_STATION,
     INPUT_UP,
+    LocalPlayerHandle,
+    LumenGgrsConfig,
+    PendingLocalMetaCommand,
+    PendingLocalStationCommand,
+    PendingMetaCommand,
+    PendingStationCommand,
+    PlayerGgrsInput,
+    RollbackGameState,
+    RollbackMetaOp,
+    RollbackPhase,
+    StationControlOp,
 };
 
 pub(crate) fn read_local_inputs(

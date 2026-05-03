@@ -3,8 +3,15 @@ use bevy::prelude::*;
 use crate::{
     UI_BUTTON_RADIUS,
     state::{
-        SectorMapDetailText, SectorMapLinkDash, SectorMapStatusText, SectorMapViewState,
-        SectorMapNodeBorder, SectorNodeButton, SectorNodeKind, SectorNodeStatus, SectorState,
+        SectorMapDetailText,
+        SectorMapLinkDash,
+        SectorMapNodeBorder,
+        SectorMapStatusText,
+        SectorMapViewState,
+        SectorNodeButton,
+        SectorNodeKind,
+        SectorNodeStatus,
+        SectorState,
     },
 };
 
@@ -17,11 +24,21 @@ pub(crate) fn sync_sector_map_layout(
     sector_state: Res<SectorState>,
     view_state: Res<SectorMapViewState>,
     mut node_query: Query<
-        (&SectorNodeButton, &mut Node, &mut BackgroundColor, &mut BorderColor),
+        (
+            &SectorNodeButton,
+            &mut Node,
+            &mut BackgroundColor,
+            &mut BorderColor,
+        ),
         (With<SectorMapNodeBorder>, Without<SectorMapLinkDash>),
     >,
     mut dash_query: Query<
-        (&SectorMapLinkDash, &mut Node, &mut Transform, &mut BackgroundColor),
+        (
+            &SectorMapLinkDash,
+            &mut Node,
+            &mut Transform,
+            &mut BackgroundColor,
+        ),
         Without<SectorMapNodeBorder>,
     >,
 ) {
@@ -192,8 +209,19 @@ pub(super) fn projected_link_dash(
     dash_count: u8,
 ) -> (Node, Transform) {
     let dash_count = dash_count.max(1);
-    let start = Vec2::new(start[0], start[1]) * zoom + Vec2::new(MAP_CENTER_X, MAP_CENTER_Y) + offset;
-    let end = Vec2::new(end[0], end[1]) * zoom + Vec2::new(MAP_CENTER_X, MAP_CENTER_Y) + offset;
+    let node_size_scale = zoom.clamp(0.8, 1.35);
+    let node_center_offset = Vec2::new(
+        MAP_NODE_WIDTH * node_size_scale * 0.5,
+        MAP_NODE_HEIGHT * node_size_scale * 0.5,
+    );
+    let start = Vec2::new(start[0], start[1]) * zoom
+        + Vec2::new(MAP_CENTER_X, MAP_CENTER_Y)
+        + offset
+        + node_center_offset;
+    let end = Vec2::new(end[0], end[1]) * zoom
+        + Vec2::new(MAP_CENTER_X, MAP_CENTER_Y)
+        + offset
+        + node_center_offset;
     let delta = end - start;
     let direction = if delta.length_squared() > 0.0 {
         delta.normalize()

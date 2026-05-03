@@ -4,12 +4,13 @@ use crate::{
     balance::BalanceConfig,
     gameplay::{
         components::{
+            AirlockCommandState,
             CurrentStation,
             DestroyedModule,
             HeldInteraction,
             Integrity,
-            ManipulatorModule,
             ManipulatorCommandState,
+            ManipulatorModule,
             MissionState,
             ModuleRuntimeState,
             NearbyInteraction,
@@ -27,7 +28,6 @@ use crate::{
             StorageCommandState,
             StorageModule,
             TurretCommandState,
-            AirlockCommandState,
         },
         helpers::{
             Fx,
@@ -85,11 +85,11 @@ pub(crate) fn update_inspection_and_alerts_text(
 ) {
     let (station, nearby, held, player_fields) = player_query.into_inner();
     let (automation_state, mission_state, atmosphere_state) = ship_query.into_inner();
-    let current_module = module_query
-        .iter()
-        .find(|(_, runtime_module, _, _, _, _, _, _, _, _, _, _, _, _, _)| {
+    let current_module = module_query.iter().find(
+        |(_, runtime_module, _, _, _, _, _, _, _, _, _, _, _, _, _)| {
             runtime_module.module_id == station.module_id
-        });
+        },
+    );
 
     for mut text in &mut inspection_query {
         **text = inspection_text(current_module, nearby, held, automation_state, &balance);
@@ -149,8 +149,7 @@ pub(crate) fn inspection_text(
         _turret,
         _airlock,
         destroyed,
-    )) =
-        current_module
+    )) = current_module
     else {
         return "Module: unavailable".to_string();
     };
@@ -249,23 +248,26 @@ pub(crate) fn inspection_text(
 }
 
 pub(crate) fn collect_alert_issues(
-    module_query: &Query<(
-        Entity,
-        &RuntimeShipModule,
-        &Integrity,
-        &ModuleRuntimeState,
-        Option<&RuntimeArchComputer>,
-        Option<&StorageModule>,
-        Option<&StorageCommandState>,
-        Option<&ManipulatorModule>,
-        Option<&ManipulatorCommandState>,
-        Option<&ProcessorModule>,
-        Option<&ProcessorCommandState>,
-        Option<&ReactorCommandState>,
-        Option<&TurretCommandState>,
-        Option<&AirlockCommandState>,
-        Option<&DestroyedModule>,
-    ), With<RuntimeShipModule>>,
+    module_query: &Query<
+        (
+            Entity,
+            &RuntimeShipModule,
+            &Integrity,
+            &ModuleRuntimeState,
+            Option<&RuntimeArchComputer>,
+            Option<&StorageModule>,
+            Option<&StorageCommandState>,
+            Option<&ManipulatorModule>,
+            Option<&ManipulatorCommandState>,
+            Option<&ProcessorModule>,
+            Option<&ProcessorCommandState>,
+            Option<&ReactorCommandState>,
+            Option<&TurretCommandState>,
+            Option<&AirlockCommandState>,
+            Option<&DestroyedModule>,
+        ),
+        With<RuntimeShipModule>,
+    >,
     balance: &BalanceConfig,
 ) -> Vec<(i32, String)> {
     module_query

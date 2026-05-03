@@ -1,5 +1,4 @@
-use super::*;
-use super::super::alerts;
+use super::{super::alerts, *};
 
 pub(crate) fn toggle_gameplay_info_panel(
     keys: Res<ButtonInput<KeyCode>>,
@@ -121,10 +120,7 @@ pub(crate) struct GameplayHudUiQueries<'w, 's> {
             Query<
                 'w,
                 's,
-                (
-                    &'static ChildOf,
-                    &'static mut Node,
-                ),
+                (&'static ChildOf, &'static mut Node),
                 With<GameplayStationReadoutBarTrack>,
             >,
             Query<
@@ -147,6 +143,7 @@ pub(crate) struct GameplayHudUiQueries<'w, 's> {
                 ),
                 With<GameplayStationReadoutLight>,
             >,
+            Query<'w, 's, &'static mut BackgroundColor, With<GameplayBlackoutOverlay>>,
         ),
     >,
 }
@@ -173,12 +170,15 @@ pub(crate) fn update_gameplay_status_text(
     >,
     player_query: Single<
         (
+            &PlayerIdentity,
             &CurrentStation,
             &NearbyInteraction,
             &HeldInteraction,
             &PlayerFieldState,
             &PlayerMotionState,
             &CarriedResource,
+            &EquippedSuit,
+            &PlayerConditionState,
             &ShipboardControlState,
         ),
         With<ObservedLocalPlayerMarker>,
@@ -203,14 +203,27 @@ pub(crate) fn update_gameplay_status_text(
         atmosphere_state,
         _ship_controls,
     ) = ship_query.into_inner();
-    let (current_station, nearby_interaction, held_interaction, player_fields, player_motion, carried_resource, control_mode) =
-        player_query.into_inner();
+    let (
+        player_identity,
+        current_station,
+        nearby_interaction,
+        held_interaction,
+        player_fields,
+        player_motion,
+        carried_resource,
+        equipped_suit,
+        player_condition,
+        control_mode,
+    ) = player_query.into_inner();
 
-    let frame_label = summary::reference_frame_label(player_motion, &status_world.ship_identity_query);
+    let frame_label =
+        summary::reference_frame_label(player_motion, &status_world.ship_identity_query);
     let focused_station_context = control_mode
         .focused_entity
         .and_then(|entity| status_world.module_parent_query.get(entity).ok())
-        .map(|parent| summary::ship_affiliation_label(parent.get(), &status_world.ship_identity_query))
+        .map(|parent| {
+            summary::ship_affiliation_label(parent.get(), &status_world.ship_identity_query)
+        })
         .unwrap_or("Unattached");
 
     let (current_integrity, max_integrity, active_modules, degraded_modules, disabled_modules) =
@@ -223,6 +236,7 @@ pub(crate) fn update_gameplay_status_text(
         status_world.projectile_query.iter().len(),
     );
     let compact = summary::build_compact_status(
+        player_identity,
         player_motion,
         ship_position,
         linear_velocity,
@@ -237,7 +251,9 @@ pub(crate) fn update_gameplay_status_text(
         degraded_modules,
         disabled_modules,
         atmosphere_state,
+        equipped_suit,
         carried_resource,
+        player_condition,
         mission_state,
         progression.scrap,
         &arch_summary,
@@ -248,17 +264,16 @@ pub(crate) fn update_gameplay_status_text(
         "{}\nF1 ship  |  F2 focus  |  F3 alerts  |  F4 station",
         summary::controls_help_text(control_mode.mode)
     );
-    let (panel_title, panel_body, _, _) =
-        station_panel::station_panel_content(
-            control_mode,
-            mission_state,
-            weapon_state,
-            player_fields,
-            player_motion,
-            &status_world.module_query,
-            focused_station_context,
-            &arch_summary,
-        );
+    let (panel_title, panel_body, _, _) = station_panel::station_panel_content(
+        control_mode,
+        mission_state,
+        weapon_state,
+        player_fields,
+        player_motion,
+        &status_world.module_query,
+        focused_station_context,
+        &arch_summary,
+    );
     let station_display = station_panel::station_panel_display(
         control_mode,
         mission_state,
@@ -268,12 +283,11 @@ pub(crate) fn update_gameplay_status_text(
         focused_station_context,
         &arch_summary,
     );
-    let current_module = status_world
-        .module_query
-        .iter()
-        .find(|(_, runtime_module, _, _, _, _, _, _, _, _, _, _, _, _, _)| {
+    let current_module = status_world.module_query.iter().find(
+        |(_, runtime_module, _, _, _, _, _, _, _, _, _, _, _, _, _)| {
             runtime_module.module_id == current_station.module_id
-        });
+        },
+    );
     let mut issues = alerts::collect_alert_issues(&status_world.module_query, &balance);
     issues.sort_by_key(|issue| std::cmp::Reverse(issue.0));
     issues.truncate(3);
@@ -306,8 +320,15 @@ pub(crate) fn update_gameplay_status_text(
         ShipControlMode::Interior | ShipControlMode::Cockpit | ShipControlMode::Turret
     );
 
-    for (mut text, top_banner_marker, compact_marker, controls_marker, panel_title_marker, panel_body_marker, station_title_marker) in
-        &mut hud_ui.text_queries.p0()
+    for (
+        mut text,
+        top_banner_marker,
+        compact_marker,
+        controls_marker,
+        panel_title_marker,
+        panel_body_marker,
+        station_title_marker,
+    ) in &mut hud_ui.text_queries.p0()
     {
         if top_banner_marker.is_some() {
             **text = top_banner.clone();
@@ -350,6 +371,9 @@ pub(crate) fn update_gameplay_status_text(
     let electrical_pct = (player_fields.local_electrical / Fx::from_num(12) * Fx::from_num(100))
         .clamp(Fx::from_num(0), Fx::from_num(100))
         .to_num::<f32>();
+    let blackout_alpha = player_condition
+        .blackout
+        .clamp(Fx::from_num(0), Fx::from_num(1));
 
     for (bar, mut node) in &mut hud_ui.node_queries.p0() {
         let pct = match bar.kind {
@@ -487,9 +511,8 @@ pub(crate) fn update_gameplay_status_text(
             if let Ok((parent, mut node, mut color)) = hud_ui.node_queries.p6().get_mut(child)
                 && parent.get() == row_entity
             {
-                if let station_panel::StationReadoutVisual::Light {
-                    color: light_color,
-                } = readout.visual
+                if let station_panel::StationReadoutVisual::Light { color: light_color } =
+                    readout.visual
                 {
                     node.display = Display::Flex;
                     *color = BackgroundColor(light_color);
@@ -498,5 +521,9 @@ pub(crate) fn update_gameplay_status_text(
                 }
             }
         }
+    }
+
+    for mut color in &mut hud_ui.node_queries.p7() {
+        *color = BackgroundColor(Color::srgba(0.0, 0.0, 0.0, blackout_alpha.to_num::<f32>()));
     }
 }

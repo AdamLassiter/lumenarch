@@ -87,6 +87,7 @@ pub(super) fn spawn_runtime_module(
             is_disabled: false,
             was_disabled_last_frame: false,
             needs_attention: false,
+            extracted: false,
             last_interaction_age: Fx::from_num(0),
         },
         module_field_emitter(module.kind, balance),
@@ -130,6 +131,7 @@ pub(super) fn spawn_runtime_module(
                         }
                         inventory
                     },
+                    damaged_components: Vec::new(),
                     accepts_fuel: module.variant == ModuleVariant::FuelTank,
                     accepts_ammunition: module.variant == ModuleVariant::AmmoRack,
                     accepts_general: module.variant == ModuleVariant::GeneralCargo,
@@ -143,6 +145,7 @@ pub(super) fn spawn_runtime_module(
                 StorageModule {
                     capacity: spec.storage_capacity,
                     inventory: ResourceInventory::default(),
+                    damaged_components: Vec::new(),
                     accepts_fuel: false,
                     accepts_ammunition: false,
                     accepts_general: true,

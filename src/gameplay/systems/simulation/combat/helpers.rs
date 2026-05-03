@@ -15,7 +15,9 @@ pub(super) fn spawn_hostile_salvage(
             scrap_value: salvage_reward,
         },
         crate::gameplay::components::LooseCargo {
-            kind: crate::gameplay::components::ResourceKind::RawSalvage,
+            kind: crate::gameplay::components::CarriedItemKind::Resource(
+                crate::gameplay::components::ResourceKind::RawSalvage,
+            ),
             amount: salvage_reward,
         },
         crate::gameplay::components::SalvageWreck,

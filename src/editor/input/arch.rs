@@ -1,17 +1,32 @@
 use bevy::prelude::*;
 
 use crate::{
-    netcode,
     HOVERED_BUTTON,
     PRESSED_BUTTON,
+    netcode,
     ship::{
         ModuleKind,
         arch::{ArchInstruction, ArchProgram, ArchProgramTemplate, ArchRegister, ArchValueRef},
-        lumen::{LumenAspect, LumenInstruction, LumenOp, LumenProgram, LumenProgramTemplate, LumenTarget},
+        lumen::{
+            LumenAspect,
+            LumenInstruction,
+            LumenOp,
+            LumenProgram,
+            LumenProgramTemplate,
+            LumenTarget,
+        },
     },
     state::{
-        ArchEditorButton, ArchEditorButtonAction, ArchEditorState, ComputerProgramButton, EditorShip,
-        ProgramButtonAction, ProgrammingLanguageMode,
+        ArchEditorButton,
+        ArchEditorButtonAction,
+        ArchEditorState,
+        ComputerProgramButton,
+        EditorMode,
+        EditorSessionState,
+        EditorShip,
+        EnemyEditorState,
+        ProgramButtonAction,
+        ProgrammingLanguageMode,
     },
 };
 
@@ -22,8 +37,10 @@ pub(crate) fn computer_program_button_system(
     >,
     mut arch_editor_state: ResMut<ArchEditorState>,
     mut editor_ship: ResMut<EditorShip>,
+    editor_session: Res<EditorSessionState>,
     status: Res<netcode::SessionStatus>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
 ) {
     if !netcode::is_host_authority(&status) {
         return;
@@ -73,7 +90,11 @@ pub(crate) fn computer_program_button_system(
                         lumen_program.enabled = !lumen_program.enabled;
                     }
                 }
-                rollback_state.editor_ship = editor_ship.ship.clone();
+                if editor_session.mode == EditorMode::Player {
+                    rollback_state.editor_ship = editor_ship.ship.clone();
+                } else {
+                    enemy_editor_state.dirty = true;
+                }
             }
             Interaction::Hovered => {
                 *background = BackgroundColor(HOVERED_BUTTON);
@@ -90,8 +111,10 @@ pub(crate) fn arch_editor_button_system(
     >,
     mut arch_editor_state: ResMut<ArchEditorState>,
     mut editor_ship: ResMut<EditorShip>,
+    editor_session: Res<EditorSessionState>,
     status: Res<netcode::SessionStatus>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
 ) {
     if !netcode::is_host_authority(&status) {
         return;
@@ -101,7 +124,11 @@ pub(crate) fn arch_editor_button_system(
             Interaction::Pressed => {
                 *background = BackgroundColor(PRESSED_BUTTON);
                 apply_arch_editor_action(&mut arch_editor_state, &mut editor_ship, button.action);
-                rollback_state.editor_ship = editor_ship.ship.clone();
+                if editor_session.mode == EditorMode::Player {
+                    rollback_state.editor_ship = editor_ship.ship.clone();
+                } else {
+                    enemy_editor_state.dirty = true;
+                }
             }
             Interaction::Hovered => {
                 *background = BackgroundColor(HOVERED_BUTTON);
@@ -250,7 +277,9 @@ fn apply_arch_editor_action(
                 return;
             };
             let insert_at = (line + 1).min(program.instructions.len());
-            program.instructions.insert(insert_at, default_lumen_instruction());
+            program
+                .instructions
+                .insert(insert_at, default_lumen_instruction());
             arch_editor_state.selected_language = ProgrammingLanguageMode::Lumen;
             arch_editor_state.selected_module_id = Some(module_id);
             arch_editor_state.selected_line = insert_at;
@@ -333,7 +362,10 @@ fn module_program_mut(editor_ship: &mut EditorShip, module_id: u64) -> Option<&m
         })
 }
 
-fn module_lumen_program_mut(editor_ship: &mut EditorShip, module_id: u64) -> Option<&mut LumenProgram> {
+fn module_lumen_program_mut(
+    editor_ship: &mut EditorShip,
+    module_id: u64,
+) -> Option<&mut LumenProgram> {
     editor_ship
         .ship
         .modules
@@ -485,11 +517,30 @@ impl EditableInstruction {
         *instruction = match force_kind {
             EditableOpcode::Nop => ArchInstruction::Nop,
             EditableOpcode::Mov => ArchInstruction::Mov { dst, src: a },
-            EditableOpcode::Add => ArchInstruction::Add { dst, lhs: a, rhs: b },
-            EditableOpcode::Sub => ArchInstruction::Sub { dst, lhs: a, rhs: b },
-            EditableOpcode::Gt => ArchInstruction::Gt { dst, lhs: a, rhs: b },
-            EditableOpcode::Lt => ArchInstruction::Lt { dst, lhs: a, rhs: b },
-            EditableOpcode::Jnz => ArchInstruction::Jnz { cond: a, target: jump },
+            EditableOpcode::Add => ArchInstruction::Add {
+                dst,
+                lhs: a,
+                rhs: b,
+            },
+            EditableOpcode::Sub => ArchInstruction::Sub {
+                dst,
+                lhs: a,
+                rhs: b,
+            },
+            EditableOpcode::Gt => ArchInstruction::Gt {
+                dst,
+                lhs: a,
+                rhs: b,
+            },
+            EditableOpcode::Lt => ArchInstruction::Lt {
+                dst,
+                lhs: a,
+                rhs: b,
+            },
+            EditableOpcode::Jnz => ArchInstruction::Jnz {
+                cond: a,
+                target: jump,
+            },
             EditableOpcode::Jmp => ArchInstruction::Jmp { target: jump },
         };
     }

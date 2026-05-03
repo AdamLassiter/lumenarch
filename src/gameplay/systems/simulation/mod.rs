@@ -16,10 +16,15 @@ pub(crate) use combat::{
     fire_hostile_targets,
     fire_player_weapons,
     handle_projectile_hits,
+    handle_ship_collisions,
     integrate_hostile_ship_motion,
     sync_hostile_ship_state,
 };
-pub(crate) use fields::{sample_ship_fields, update_module_runtime_state};
+pub(crate) use fields::{
+    apply_player_environmental_effects,
+    sample_ship_fields,
+    update_module_runtime_state,
+};
 pub(crate) use logistics::{collect_salvage, run_logistics_transfers, run_processors};
 pub(crate) use mission::{
     return_after_mission_resolution,

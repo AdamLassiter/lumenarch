@@ -2,12 +2,12 @@ use bevy::{log, prelude::*};
 use bevy_ggrs::{LocalPlayers, RollbackFrameCount};
 
 use super::{
-    bootstrap::stable_hash,
     ActivePresentationPhase,
     ChecksumHistory,
     LocalPlayerHandle,
     RollbackGameState,
     RollbackPhase,
+    bootstrap::stable_hash,
 };
 use crate::state::{DemoProgression, FrontendMode, LastMissionReport, SectorState};
 
@@ -40,12 +40,16 @@ pub(crate) fn advance_rollback_state(
 }
 
 pub(crate) fn sync_presentation_from_rollback(
+    frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
     mut editor_ship: ResMut<crate::state::EditorShip>,
     mut progression: ResMut<DemoProgression>,
     mut sector: ResMut<SectorState>,
     mut last_mission_report: ResMut<LastMissionReport>,
 ) {
+    if *frontend_mode.get() == FrontendMode::DebugEnemyEditor {
+        return;
+    }
     if !rollback_state.is_changed() {
         return;
     }
@@ -67,7 +71,8 @@ pub(crate) fn sync_presentation_from_rollback(
     if stable_hash(sector.as_ref()) != stable_hash(&rollback_state.sector) {
         *sector = rollback_state.sector.clone();
     }
-    if stable_hash(last_mission_report.as_ref()) != stable_hash(&rollback_state.last_mission_report) {
+    if stable_hash(last_mission_report.as_ref()) != stable_hash(&rollback_state.last_mission_report)
+    {
         *last_mission_report = rollback_state.last_mission_report.clone();
     }
 }
@@ -108,7 +113,9 @@ pub(crate) fn sync_player_editor_mode(
         && rollback_state.phase == RollbackPhase::Editing
         && editor_session.mode != crate::state::EditorMode::Player
     {
-        log::debug!("Synchronizing editor session mode to Player for rollback-driven editing phase");
+        log::debug!(
+            "Synchronizing editor session mode to Player for rollback-driven editing phase"
+        );
         editor_session.mode = crate::state::EditorMode::Player;
     }
 }
@@ -121,9 +128,7 @@ pub(crate) fn frontend_mode_is_lobby(frontend_mode: Res<State<FrontendMode>>) ->
     *frontend_mode.get() == FrontendMode::Lobby
 }
 
-pub(crate) fn frontend_mode_is_debug_enemy_editor(
-    frontend_mode: Res<State<FrontendMode>>,
-) -> bool {
+pub(crate) fn frontend_mode_is_debug_enemy_editor(frontend_mode: Res<State<FrontendMode>>) -> bool {
     *frontend_mode.get() == FrontendMode::DebugEnemyEditor
 }
 

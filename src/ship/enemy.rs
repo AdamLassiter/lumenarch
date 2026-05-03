@@ -1,10 +1,24 @@
-use std::{fs, path::Path};
+use std::{collections::HashMap, fs, path::Path};
 
+use bevy::log;
 use serde::{Deserialize, Serialize};
 
 use super::{ModuleKind, ModuleVariant, ShipDefinition, ShipModule};
 
 pub const DEFAULT_ENEMY_SHIPS_PATH: &str = "saves/enemy_ships.json";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnemyShipEntryValidationStatus {
+    Valid,
+    RepairedInMemory,
+    Invalid,
+}
+
+#[derive(Debug, Clone)]
+pub struct ValidatedEnemyLibrary {
+    pub library: EnemyShipLibrary,
+    pub statuses: HashMap<String, EnemyShipEntryValidationStatus>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnemyShipEntry {
@@ -70,10 +84,50 @@ impl EnemyShipLibrary {
         });
         self.entries.len() - 1
     }
+
+    pub fn validate_and_repair_in_memory(
+        &mut self,
+    ) -> HashMap<String, EnemyShipEntryValidationStatus> {
+        let mut statuses = HashMap::default();
+        for entry in &mut self.entries {
+            let status = match validate_enemy_ship_entry(entry) {
+                Ok(()) => EnemyShipEntryValidationStatus::Valid,
+                Err(error) => {
+                    if let Some(seeded) = seeded_enemy_by_id(&entry.id) {
+                        *entry = seeded;
+                        log::warn!(
+                            "Enemy ship entry '{}' was invalid and has been repaired in memory from seeded defaults: {}",
+                            entry.id,
+                            error
+                        );
+                        EnemyShipEntryValidationStatus::RepairedInMemory
+                    } else {
+                        log::warn!(
+                            "Enemy ship entry '{}' is invalid and cannot be repaired automatically: {}",
+                            entry.id,
+                            error
+                        );
+                        EnemyShipEntryValidationStatus::Invalid
+                    }
+                }
+            };
+            statuses.insert(entry.id.clone(), status);
+        }
+        statuses
+    }
 }
 
 pub fn load_default_enemy_library() -> Result<Option<EnemyShipLibrary>, String> {
-    load_enemy_library_from_path(Path::new(DEFAULT_ENEMY_SHIPS_PATH))
+    load_validated_default_enemy_library().map(|library| library.map(|validated| validated.library))
+}
+
+pub fn load_validated_default_enemy_library() -> Result<Option<ValidatedEnemyLibrary>, String> {
+    load_enemy_library_from_path(Path::new(DEFAULT_ENEMY_SHIPS_PATH)).map(|library| {
+        library.map(|mut library| {
+            let statuses = library.validate_and_repair_in_memory();
+            ValidatedEnemyLibrary { library, statuses }
+        })
+    })
 }
 
 pub fn save_default_enemy_library(library: &EnemyShipLibrary) -> Result<(), String> {
@@ -98,6 +152,38 @@ fn load_enemy_library_from_path(path: &Path) -> Result<Option<EnemyShipLibrary>,
         )
     })?;
     Ok(Some(library))
+}
+
+pub fn validate_enemy_ship_entry(entry: &EnemyShipEntry) -> Result<(), String> {
+    validate_enemy_ship_definition(&entry.ship)
+}
+
+pub fn validate_enemy_ship_definition(ship: &ShipDefinition) -> Result<(), String> {
+    if ship.modules.is_empty() {
+        return Err("ship has no modules".to_string());
+    }
+    if !ship
+        .modules
+        .iter()
+        .any(|module| module.kind == ModuleKind::Core)
+    {
+        return Err("ship is missing a core".to_string());
+    }
+    if !ship
+        .modules
+        .iter()
+        .any(|module| module.kind == ModuleKind::Cockpit)
+    {
+        return Err("ship is missing a cockpit".to_string());
+    }
+    Ok(())
+}
+
+fn seeded_enemy_by_id(id: &str) -> Option<EnemyShipEntry> {
+    EnemyShipLibrary::seeded()
+        .entries
+        .into_iter()
+        .find(|entry| entry.id == id)
 }
 
 fn save_enemy_library_to_path(path: &Path, library: &EnemyShipLibrary) -> Result<(), String> {
@@ -184,5 +270,79 @@ fn scrap_brigand() -> EnemyShipEntry {
             name: "Scrap Brigand".to_string(),
             modules,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_entry(id: &str) -> EnemyShipEntry {
+        seeded_enemy_by_id(id).unwrap()
+    }
+
+    #[test]
+    fn validation_rejects_empty_ship() {
+        let mut entry = valid_entry("raider_skiff");
+        entry.ship.modules.clear();
+        assert!(validate_enemy_ship_entry(&entry).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_ship_without_core() {
+        let mut entry = valid_entry("raider_skiff");
+        entry
+            .ship
+            .modules
+            .retain(|module| module.kind != ModuleKind::Core);
+        assert!(validate_enemy_ship_entry(&entry).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_ship_without_cockpit() {
+        let mut entry = valid_entry("raider_skiff");
+        entry
+            .ship
+            .modules
+            .retain(|module| module.kind != ModuleKind::Cockpit);
+        assert!(validate_enemy_ship_entry(&entry).is_err());
+    }
+
+    #[test]
+    fn invalid_seeded_entry_is_repaired_in_memory() {
+        let mut library = EnemyShipLibrary {
+            entries: vec![EnemyShipEntry {
+                id: "raider_skiff".to_string(),
+                display_name: "Broken Raider".to_string(),
+                threat_tier: 1,
+                behavior_tag: "skirmisher".to_string(),
+                ship: ShipDefinition::empty("Broken Raider"),
+            }],
+        };
+        let statuses = library.validate_and_repair_in_memory();
+        assert_eq!(
+            statuses.get("raider_skiff"),
+            Some(&EnemyShipEntryValidationStatus::RepairedInMemory)
+        );
+        assert!(!library.entries[0].ship.modules.is_empty());
+    }
+
+    #[test]
+    fn invalid_unknown_entry_stays_invalid() {
+        let mut library = EnemyShipLibrary {
+            entries: vec![EnemyShipEntry {
+                id: "custom_unknown".to_string(),
+                display_name: "Broken Custom".to_string(),
+                threat_tier: 1,
+                behavior_tag: "aggressive".to_string(),
+                ship: ShipDefinition::empty("Broken Custom"),
+            }],
+        };
+        let statuses = library.validate_and_repair_in_memory();
+        assert_eq!(
+            statuses.get("custom_unknown"),
+            Some(&EnemyShipEntryValidationStatus::Invalid)
+        );
+        assert!(library.entries[0].ship.modules.is_empty());
     }
 }

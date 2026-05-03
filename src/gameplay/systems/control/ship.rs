@@ -1,11 +1,16 @@
 use super::*;
+use crate::gameplay::components::PlayerConditionState;
 
 pub(crate) fn update_station_command_input(
     time: Res<Time>,
     balance: Res<BalanceConfig>,
     decoded_commands: Res<netcode::DecodedPlayerCommands>,
     ship_query: Single<(&SimPosition, &SimRotation), (With<PlayerShip>, With<ShipRoot>)>,
-    player_control_query: Query<(&PlayerHandleComponent, &ShipboardControlState)>,
+    player_control_query: Query<(
+        &PlayerHandleComponent,
+        &ShipboardControlState,
+        &PlayerConditionState,
+    )>,
     ship_control_query: Single<&mut ShipControlState, (With<PlayerShip>, With<ShipRoot>)>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     mut module_query: Query<(
@@ -27,7 +32,7 @@ pub(crate) fn update_station_command_input(
     let mut mission_runtime = mission_query.into_inner();
     let previous_throttle = ship_controls.throttle_demand;
     let mut control_states: Vec<_> = player_control_query.iter().collect();
-    control_states.sort_by_key(|(handle, _)| handle.handle);
+    control_states.sort_by_key(|(handle, _, _)| handle.handle);
     let mut claimed_entities = BTreeSet::new();
 
     ship_controls.fire_pressed = false;
@@ -37,17 +42,19 @@ pub(crate) fn update_station_command_input(
         return;
     }
 
-    for (handle, control_state) in control_states {
+    for (handle, control_state, condition) in control_states {
+        if condition.control_disabled() {
+            continue;
+        }
         let command = netcode::command_for_handle(&decoded_commands, handle.handle);
         match control_state.mode {
             ShipControlMode::Interior => {}
             ShipControlMode::Cockpit => {
-                ship_controls.throttle_demand =
-                    (Fx::from_num(command.throttle_milli) / Fx::from_num(1000))
-                        .clamp(Fx::from_num(0), Fx::from_num(1));
-                ship_controls.turn_input =
-                    (Fx::from_num(command.turn_milli) / Fx::from_num(1000))
-                        .clamp(Fx::from_num(-1), Fx::from_num(1));
+                ship_controls.throttle_demand = (Fx::from_num(command.throttle_milli)
+                    / Fx::from_num(1000))
+                .clamp(Fx::from_num(0), Fx::from_num(1));
+                ship_controls.turn_input = (Fx::from_num(command.turn_milli) / Fx::from_num(1000))
+                    .clamp(Fx::from_num(-1), Fx::from_num(1));
                 if command.raw.pressed(netcode::INPUT_FIRE) {
                     ship_controls.turn_input =
                         Fx::from_num(-command.aim_x_milli) / Fx::from_num(1000);
@@ -212,7 +219,8 @@ pub(crate) fn update_station_command_input(
                         };
                     }
                     if command.raw.pressed(netcode::INPUT_SPACE_EDGE)
-                        || command.station.op == netcode::StationControlOp::LogisticsToggleManipulator
+                        || command.station.op
+                            == netcode::StationControlOp::LogisticsToggleManipulator
                     {
                         manipulator_cmd.transfer_enabled = !manipulator_cmd.transfer_enabled;
                     }
@@ -246,8 +254,7 @@ pub(crate) fn update_station_command_input(
                 }
                 if let Some(mut processor_cmd) = processor_cmd {
                     if command.raw.pressed(netcode::INPUT_SPACE_EDGE)
-                        || command.station.op
-                            == netcode::StationControlOp::LogisticsToggleProcessor
+                        || command.station.op == netcode::StationControlOp::LogisticsToggleProcessor
                     {
                         processor_cmd.enabled = !processor_cmd.enabled;
                     }

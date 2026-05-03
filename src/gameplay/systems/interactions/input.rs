@@ -8,6 +8,7 @@ use crate::{
             HeldInteraction,
             InteractWithModule,
             NearbyInteraction,
+            PlayerConditionState,
             PlayerHandleComponent,
             ShipboardPlayer,
         },
@@ -22,6 +23,7 @@ pub(crate) fn run_shipboard_interaction_input(
         (
             Entity,
             &PlayerHandleComponent,
+            &PlayerConditionState,
             &NearbyInteraction,
             &HeldInteraction,
         ),
@@ -31,8 +33,11 @@ pub(crate) fn run_shipboard_interaction_input(
     mut begin_events: MessageWriter<BeginHeldInteraction>,
 ) {
     let mut players: Vec<_> = player_query.iter().collect();
-    players.sort_by_key(|(_, handle, _, _)| handle.handle);
-    for (player, handle, nearby, held) in players {
+    players.sort_by_key(|(_, handle, _, _, _)| handle.handle);
+    for (player, handle, condition, nearby, held) in players {
+        if condition.control_disabled() {
+            continue;
+        }
         let input = session_inputs
             .as_ref()
             .and_then(|inputs| inputs.get(handle.handle))

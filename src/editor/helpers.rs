@@ -6,7 +6,10 @@ use super::super::{
     TOOLBOX_WIDTH,
     state::{EditorMode, LastMissionReport},
 };
-use crate::ship::{ModuleKind, ModuleSpec, ModuleVariant};
+use crate::{
+    ship::{ModuleKind, ModuleSpec, ModuleVariant},
+    state::DemoProgression,
+};
 
 pub(super) fn editor_status_line(
     mode: EditorMode,
@@ -17,21 +20,29 @@ pub(super) fn editor_status_line(
     selected_rotation: u8,
     module_count: usize,
     scrap_total: u32,
+    progression: &DemoProgression,
 ) -> String {
-    let selected_cost = module_kind_cost(*selected_kind, selected_variant);
-    let affordability = if scrap_total >= selected_cost {
+    let ready_count = progression.ready_count(*selected_kind, selected_variant);
+    let damaged_count = progression.damaged_count(*selected_kind, selected_variant);
+    let repair_cost = module_kind_cost(*selected_kind, selected_variant).max(1);
+    let availability = if ready_count > 0 {
         "ready"
+    } else if damaged_count > 0 {
+        "repair needed"
     } else {
-        "need more scrap"
+        "none available"
     };
 
     format!(
-        "{}\nEntry: {entry_label}\nShip: {ship_name}\nSelected Tool: {selected_kind} / {}\nRotation: {selected_rotation}\nPlaced Modules: {module_count}\nScrap: {scrap_total}\nPlacement Cost: {selected_cost} ({affordability})",
+        "{}\nEntry: {entry_label}\nShip: {ship_name}\nSelected Tool: {selected_kind} / {}\nRotation: {selected_rotation}\nPlaced Modules: {module_count}\nScrap: {scrap_total}\nAvailable: ready {} / damaged {}\nRepair Cost: {} ({availability})",
         match mode {
             EditorMode::Player => "Player Refit",
             EditorMode::Enemy => "Enemy Ship Debug Editor",
         },
         selected_variant.display_name(),
+        ready_count,
+        damaged_count,
+        repair_cost,
     )
 }
 

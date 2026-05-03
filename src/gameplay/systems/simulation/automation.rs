@@ -985,7 +985,10 @@ fn write_register(
 fn execute_lumen_program(
     program: &LumenProgram,
     snapshot: LumenSnapshot,
-) -> (crate::gameplay::components::LumenExecutionResult, PendingArchCommands) {
+) -> (
+    crate::gameplay::components::LumenExecutionResult,
+    PendingArchCommands,
+) {
     let mut commands = PendingArchCommands::default();
     let mut resolved_targets = 0u32;
     let mut effects = Vec::new();
@@ -993,11 +996,21 @@ fn execute_lumen_program(
     for instruction in &program.instructions {
         let target_count = resolve_lumen_target_count(instruction.target, snapshot);
         if target_count == 0 {
-            effects.push(format!("{} {} -> no targets", instruction.op.as_str(), instruction.target.as_str()));
+            effects.push(format!(
+                "{} {} -> no targets",
+                instruction.op.as_str(),
+                instruction.target.as_str()
+            ));
             continue;
         }
         resolved_targets += target_count;
-        apply_lumen_instruction(instruction, snapshot, target_count, &mut commands, &mut effects);
+        apply_lumen_instruction(
+            instruction,
+            snapshot,
+            target_count,
+            &mut commands,
+            &mut effects,
+        );
     }
 
     (
@@ -1031,9 +1044,9 @@ fn apply_lumen_instruction(
 ) {
     let weight = Fx::from_num(instruction.weight as i32).clamp(Fx::from_num(0), Fx::from_num(3));
     match (instruction.op, instruction.aspect) {
-        (LumenOp::Buff, LumenAspect::HeatCooling)
-        | (LumenOp::Nerf, LumenAspect::Instability) => {
-            commands.reactor_bias = (commands.reactor_bias + weight).clamp(Fx::from_num(0), Fx::from_num(3));
+        (LumenOp::Buff, LumenAspect::HeatCooling) | (LumenOp::Nerf, LumenAspect::Instability) => {
+            commands.reactor_bias =
+                (commands.reactor_bias + weight).clamp(Fx::from_num(0), Fx::from_num(3));
             effects.push(format!(
                 "{} {} {} -> cooling +{} ({} targets)",
                 instruction.op.as_str(),
@@ -1073,8 +1086,7 @@ fn apply_lumen_instruction(
                 target_count
             ));
         }
-        (LumenOp::Nerf, LumenAspect::FireControl)
-        | (LumenOp::Nerf, LumenAspect::PowerDraw) => {
+        (LumenOp::Nerf, LumenAspect::FireControl) | (LumenOp::Nerf, LumenAspect::PowerDraw) => {
             commands.turret_fire_hold = true;
             effects.push(format!(
                 "{} {} {} -> hold fire ({} targets)",
@@ -1086,7 +1098,8 @@ fn apply_lumen_instruction(
         }
         (LumenOp::Buff, LumenAspect::PowerDraw) => {
             if snapshot.low_power {
-                commands.reactor_bias = (commands.reactor_bias + Fx::from_num(1)).clamp(Fx::from_num(0), Fx::from_num(3));
+                commands.reactor_bias = (commands.reactor_bias + Fx::from_num(1))
+                    .clamp(Fx::from_num(0), Fx::from_num(3));
             }
             effects.push(format!(
                 "BUFF {} power_draw -> reserve support ({} targets)",

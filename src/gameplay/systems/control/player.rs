@@ -1,4 +1,5 @@
 use super::*;
+use crate::gameplay::components::PlayerConditionState;
 
 pub(crate) fn toggle_shipboard_control_mode(
     decoded_commands: Res<netcode::DecodedPlayerCommands>,
@@ -7,6 +8,7 @@ pub(crate) fn toggle_shipboard_control_mode(
         (
             &PlayerHandleComponent,
             &mut ShipboardControlState,
+            &PlayerConditionState,
             &CurrentStation,
         ),
         With<PlayerShipAssignment>,
@@ -19,8 +21,11 @@ pub(crate) fn toggle_shipboard_control_mode(
     }
 
     let mut players: Vec<_> = player_query.iter_mut().collect();
-    players.sort_by_key(|(handle, _, _)| handle.handle);
-    for (handle, mut control_state, current_station) in players {
+    players.sort_by_key(|(handle, _, _, _)| handle.handle);
+    for (handle, mut control_state, condition, current_station) in players {
+        if condition.control_disabled() {
+            continue;
+        }
         let command = netcode::command_for_handle(&decoded_commands, handle.handle);
         if !command.raw.pressed(netcode::INPUT_TOGGLE_STATION) {
             continue;
@@ -48,11 +53,18 @@ pub(crate) fn toggle_shipboard_control_mode(
 
 pub(crate) fn exit_focused_station(
     decoded_commands: Res<netcode::DecodedPlayerCommands>,
-    mut ship_query: Query<(&PlayerHandleComponent, &mut ShipboardControlState)>,
+    mut ship_query: Query<(
+        &PlayerHandleComponent,
+        &mut ShipboardControlState,
+        &PlayerConditionState,
+    )>,
 ) {
     let mut players: Vec<_> = ship_query.iter_mut().collect();
-    players.sort_by_key(|(handle, _)| handle.handle);
-    for (handle, mut control_state) in players {
+    players.sort_by_key(|(handle, _, _)| handle.handle);
+    for (handle, mut control_state, condition) in players {
+        if condition.control_disabled() {
+            continue;
+        }
         let command = netcode::command_for_handle(&decoded_commands, handle.handle);
         if !command.raw.pressed(netcode::INPUT_EXIT_STATION) {
             continue;
@@ -167,7 +179,9 @@ pub(crate) fn move_shipboard_player(
             &ShipboardControlState,
             &mut PlayerMotionState,
             &mut InternalPosition,
+            &EquippedSuit,
             &PlayerFieldState,
+            &PlayerConditionState,
         ),
         With<PlayerShipAssignment>,
     >,
@@ -179,8 +193,22 @@ pub(crate) fn move_shipboard_player(
 
     let dt = fx_from_time_delta(&time);
     let mut players: Vec<_> = player_query.iter_mut().collect();
-    players.sort_by_key(|(handle, _, _, _, _)| handle.handle);
-    for (handle, control_state, mut motion, mut position, player_fields) in players {
+    players.sort_by_key(|(handle, _, _, _, _, _, _)| handle.handle);
+    for (
+        handle,
+        control_state,
+        mut motion,
+        mut position,
+        equipped_suit,
+        player_fields,
+        condition,
+    ) in players
+    {
+        if condition.control_disabled() {
+            motion.local_velocity = FixedVec2::zero();
+            motion.world_velocity = FixedVec2::zero();
+            continue;
+        }
         if control_state.mode != ShipControlMode::Interior {
             helpers::anchor_player_to_focused_station(
                 &mut motion,
@@ -229,16 +257,24 @@ pub(crate) fn move_shipboard_player(
                     ship_position.value + motion.local_position.rotate(ship_rotation.radians);
                 motion.world_velocity =
                     ship_velocity.value + local_velocity.rotate(ship_rotation.radians);
+                if !local_velocity.is_near_zero() {
+                    motion.facing_radians = angle_from_vector(local_velocity);
+                }
                 position.local_position = motion.local_position;
                 position.grid_x = (motion.local_position.x / Fx::from_num(32)).to_num::<i32>();
                 position.grid_y = (-motion.local_position.y / Fx::from_num(32)).to_num::<i32>();
             }
             PlayerReferenceFrame::World => {
-                motion.world_velocity += input * Fx::from_num(PLAYER_EVA_ACCELERATION) * dt;
+                let eva_multiplier = equipped_suit.suit.eva_speed_multiplier();
+                motion.world_velocity +=
+                    input * Fx::from_num(PLAYER_EVA_ACCELERATION) * eva_multiplier * dt;
                 motion.world_velocity =
                     damp_vec2(motion.world_velocity, Fx::from_num(PLAYER_EVA_DAMPING), dt)
-                        .clamp_length(Fx::from_num(PLAYER_EVA_MAX_SPEED));
+                        .clamp_length(Fx::from_num(PLAYER_EVA_MAX_SPEED) * eva_multiplier);
                 let world_velocity = motion.world_velocity;
+                if !world_velocity.is_near_zero() {
+                    motion.facing_radians = angle_from_vector(world_velocity);
+                }
                 motion.world_position += world_velocity * dt;
                 clamp_position_to_arena(&mut motion.world_position);
             }
@@ -253,6 +289,7 @@ pub(crate) fn sync_shipboard_player_visual(
             Option<&ObservedLocalPlayerMarker>,
             &PlayerMotionState,
             &CarriedResource,
+            &EquippedSuit,
             &mut Transform,
             &mut Sprite,
             &mut Visibility,
@@ -261,7 +298,7 @@ pub(crate) fn sync_shipboard_player_visual(
     >,
 ) {
     let control_state = ship_query.into_inner();
-    for (observed, position, carried, mut transform, mut sprite, mut visibility) in
+    for (observed, position, carried, equipped_suit, mut transform, mut sprite, mut visibility) in
         &mut player_query
     {
         transform.translation = match position.frame {
@@ -272,18 +309,21 @@ pub(crate) fn sync_shipboard_player_visual(
             ),
             PlayerReferenceFrame::World => render_translation(position.world_position, 6.0),
         };
+        transform.rotation = Quat::from_rotation_z(
+            position.facing_radians.to_num::<f32>() + std::f32::consts::FRAC_PI_2,
+        );
         if observed.is_some() {
             sprite.color = match control_state.mode {
                 ShipControlMode::Interior if carried.kind.is_some() => {
                     Color::srgb(0.98, 0.88, 0.52)
                 }
-                ShipControlMode::Interior => Color::srgb(0.82, 0.96, 0.62),
+                ShipControlMode::Interior => equipped_suit.suit.color(),
                 ShipControlMode::Cockpit | ShipControlMode::Turret => {
                     Color::srgba(0.82, 0.96, 0.62, 0.20)
                 }
                 ShipControlMode::Reactor
                 | ShipControlMode::Logistics
-                | ShipControlMode::Computer => Color::srgb(0.92, 0.96, 0.68),
+                | ShipControlMode::Computer => equipped_suit.suit.color(),
             };
             *visibility = if matches!(
                 control_state.mode,
@@ -389,7 +429,13 @@ pub(crate) fn handle_player_cargo_interaction(
     local_handle: Option<Res<netcode::LocalPlayerHandle>>,
     player_ship_query: Single<(Entity, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,
     player_query: Single<
-        (&PlayerMotionState, &CurrentStation, &mut CarriedResource),
+        (
+            &PlayerMotionState,
+            &CurrentStation,
+            &mut CarriedResource,
+            &mut EquippedSuit,
+            &PlayerConditionState,
+        ),
         (With<ObservedLocalPlayerMarker>, With<PlayerShipAssignment>),
     >,
     mut loose_cargo_query: Query<(Entity, &SimPosition, &LooseCargo)>,
@@ -405,7 +451,11 @@ pub(crate) fn handle_player_cargo_interaction(
     }
 
     let (player_ship_entity, mut mission_state) = player_ship_query.into_inner();
-    let (motion, current_station, mut carried) = player_query.into_inner();
+    let (motion, current_station, mut carried, mut equipped_suit, condition) =
+        player_query.into_inner();
+    if condition.control_disabled() {
+        return;
+    }
 
     if drop_pressed {
         let Some(kind) = carried.kind else {
@@ -413,7 +463,7 @@ pub(crate) fn handle_player_cargo_interaction(
         };
         let amount = carried.amount.max(1);
         commands.spawn((
-            Sprite::from_color(helpers::cargo_color(kind), Vec2::splat(10.0)),
+            Sprite::from_color(kind.color(), Vec2::splat(10.0)),
             Transform::from_translation(render_translation(motion.world_position, 5.2)),
             SimPosition {
                 value: motion.world_position,
@@ -421,8 +471,7 @@ pub(crate) fn handle_player_cargo_interaction(
             LooseCargo { kind, amount },
             PlayingCleanup,
         ));
-        mission_state.recent_action =
-            Some(format!("Dropped {} {}", amount, helpers::resource_label(kind)));
+        mission_state.recent_action = Some(format!("Dropped {} {}", amount, kind.label()));
         mission_state.recent_action_timer = Fx::from_num(1.5);
         carried.kind = None;
         carried.amount = 0;
@@ -436,11 +485,8 @@ pub(crate) fn handle_player_cargo_interaction(
             {
                 carried.kind = Some(cargo.kind);
                 carried.amount = cargo.amount;
-                mission_state.recent_action = Some(format!(
-                    "Picked up {} {}",
-                    cargo.amount,
-                    helpers::resource_label(cargo.kind)
-                ));
+                mission_state.recent_action =
+                    Some(format!("Picked up {} {}", cargo.amount, cargo.kind.label()));
                 mission_state.recent_action_timer = Fx::from_num(1.5);
                 commands.entity(entity).despawn();
                 return;
@@ -462,17 +508,32 @@ pub(crate) fn handle_player_cargo_interaction(
                 continue;
             }
             if let Some((kind, amount)) = helpers::take_first_available(&mut storage.inventory) {
-                carried.kind = Some(kind);
+                carried.kind = Some(CarriedItemKind::Resource(kind));
                 carried.amount = amount;
                 mission_state.recent_action = Some(format!(
                     "Extracted {} {} from hostile ship",
                     amount,
-                    helpers::resource_label(kind)
+                    CarriedItemKind::Resource(kind).label()
                 ));
                 mission_state.recent_action_timer = Fx::from_num(1.5);
                 return;
             }
         }
+        return;
+    }
+
+    if let Some(CarriedItemKind::Suit(new_suit)) = carried.kind {
+        let old_suit = equipped_suit.suit;
+        equipped_suit.suit = new_suit;
+        if old_suit == PlayerSuit::Standard {
+            carried.kind = None;
+            carried.amount = 0;
+        } else {
+            carried.kind = Some(CarriedItemKind::Suit(old_suit));
+            carried.amount = 1;
+        }
+        mission_state.recent_action = Some(format!("Equipped {}", new_suit.as_str()));
+        mission_state.recent_action_timer = Fx::from_num(1.5);
         return;
     }
 
@@ -492,26 +553,68 @@ pub(crate) fn handle_player_cargo_interaction(
         if parent.get() != active_ship || runtime_module.module_id != current_station.module_id {
             continue;
         }
-        if storage.inventory.total_units() + carried.amount > storage.capacity {
+        let Some(deposit) = carried_item_deposit(kind, carried.amount) else {
+            mission_state.recent_action =
+                Some("This item cannot be stowed in ship storage".to_string());
+            mission_state.recent_action_timer = Fx::from_num(1.5);
+            return;
+        };
+        if storage.inventory.total_units() + deposit.resource_amount > storage.capacity {
             continue;
         }
-        storage.inventory.add(kind, carried.amount);
-        if kind == ResourceKind::RawSalvage {
-            mission_state.recovered_raw_salvage += carried.amount;
-            mission_state.salvage_scrap_awarded += carried.amount;
+        if let Some((component_kind, component_variant, component_amount)) = deposit.component {
+            storage.add_damaged_component(component_kind, component_variant, component_amount);
+        }
+        if let Some(resource_kind) = deposit.resource_kind {
+            storage
+                .inventory
+                .add(resource_kind, deposit.resource_amount);
+        }
+        if deposit.resource_kind == Some(ResourceKind::RawSalvage) {
+            mission_state.recovered_raw_salvage += deposit.resource_amount;
+            mission_state.salvage_scrap_awarded += deposit.resource_amount;
             mission_state.salvage_collected = true;
             mission_state.completion_reason = Some("Cargo recovered aboard".to_string());
-        } else {
-            mission_state.processed_repair_charge += carried.amount;
+        } else if deposit.resource_kind.is_some() {
+            mission_state.processed_repair_charge += deposit.resource_amount;
         }
-        mission_state.recent_action = Some(format!(
-            "Deposited {} {} aboard ship",
-            carried.amount,
-            helpers::resource_label(kind)
-        ));
+        mission_state.recent_action = Some(format!("Deposited {} aboard ship", deposit.label));
         mission_state.recent_action_timer = Fx::from_num(1.5);
         carried.kind = None;
         carried.amount = 0;
         return;
+    }
+}
+
+struct CarriedItemDeposit {
+    resource_kind: Option<ResourceKind>,
+    resource_amount: u32,
+    component: Option<(ModuleKind, crate::ship::ModuleVariant, u32)>,
+    label: String,
+}
+
+fn carried_item_deposit(kind: CarriedItemKind, amount: u32) -> Option<CarriedItemDeposit> {
+    match kind {
+        CarriedItemKind::Resource(resource_kind) => Some(CarriedItemDeposit {
+            resource_kind: Some(resource_kind),
+            resource_amount: amount,
+            component: None,
+            label: format!(
+                "{} {}",
+                amount,
+                CarriedItemKind::Resource(resource_kind).label()
+            ),
+        }),
+        CarriedItemKind::ExtractedComponent { kind, variant } => Some(CarriedItemDeposit {
+            resource_kind: None,
+            resource_amount: 0,
+            component: Some((kind, variant, amount.max(1))),
+            label: format!(
+                "damaged {} {} component",
+                variant.display_name(),
+                kind.as_str()
+            ),
+        }),
+        CarriedItemKind::Suit(_) => None,
     }
 }

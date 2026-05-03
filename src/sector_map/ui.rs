@@ -1,5 +1,13 @@
 use bevy::prelude::*;
 
+use super::layout::{
+    node_border_color,
+    node_button_color,
+    projected_link_dash,
+    projected_node,
+    sector_detail_text,
+    sector_status_text,
+};
 use crate::{
     UI_BODY_FONT_SIZE,
     UI_BUTTON_RADIUS,
@@ -7,15 +15,19 @@ use crate::{
     UI_PANEL_RADIUS,
     UI_TITLE_FONT_SIZE,
     state::{
-        BackToStationButton, LaunchEncounterButton, SectorMapCanvas, SectorMapDetailText,
-        SectorMapLinkDash, SectorMapLinkLayer, SectorMapNodeBorder, SectorMapNodeLayer,
-        SectorMapRoot, SectorMapStatusText, SectorNodeButton, SectorState,
+        BackToStationButton,
+        LaunchEncounterButton,
+        SectorMapCanvas,
+        SectorMapDetailText,
+        SectorMapLinkDash,
+        SectorMapLinkLayer,
+        SectorMapNodeBorder,
+        SectorMapNodeLayer,
+        SectorMapRoot,
+        SectorMapStatusText,
+        SectorNodeButton,
+        SectorState,
     },
-};
-
-use super::layout::{
-    node_border_color, node_button_color, projected_link_dash, projected_node, sector_detail_text,
-    sector_status_text,
 };
 
 pub(crate) fn spawn_sector_map_ui(

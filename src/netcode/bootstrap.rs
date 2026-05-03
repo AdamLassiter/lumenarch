@@ -1,26 +1,38 @@
-use std::{hash::{Hash, Hasher}, net::SocketAddr};
+use std::{
+    hash::{Hash, Hasher},
+    net::SocketAddr,
+};
 
 use bevy::{log, prelude::*};
-use bevy_ggrs::Session;
+use bevy_ggrs::{
+    Session,
+    prelude::{PlayerType, SessionBuilder},
+};
 use ggrs::{PlayerHandle, UdpNonBlockingSocket};
 use serde::Serialize;
 
 use super::{
-    lobby::{shutdown_lobby_runtime, start_lobby_runtime, LobbyControlCommand},
-    types::{
-        LumenGgrsConfig, PendingLocalMetaCommand, PendingLocalStationCommand,
-        RollbackGameState, RollbackPhase,
-        SessionBootstrapConfig, SessionConfig, SessionPhase, SessionRole, SessionStatus,
-    },
     DecodedPlayerCommands,
     LobbyRuntime,
+    lobby::{LobbyControlCommand, shutdown_lobby_runtime, start_lobby_runtime},
+    types::{
+        LumenGgrsConfig,
+        PendingLocalMetaCommand,
+        PendingLocalStationCommand,
+        RollbackGameState,
+        RollbackPhase,
+        SessionBootstrapConfig,
+        SessionConfig,
+        SessionPhase,
+        SessionRole,
+        SessionStatus,
+    },
 };
 use crate::{
     campaign::{CampaignSave, load_campaign},
     ship::storage::load_default_ship,
-    state::FrontendMode,
+    state::{FrontendMode, LocalPlayerProfile},
 };
-use bevy_ggrs::prelude::{PlayerType, SessionBuilder};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct ParsedSessionDescriptor {
@@ -32,6 +44,7 @@ pub(super) struct ParsedSessionDescriptor {
 
 pub(crate) fn begin_session_attempt(
     config: &SessionConfig,
+    local_profile: &LocalPlayerProfile,
     status: &mut SessionStatus,
     bootstrap: &mut SessionBootstrapConfig,
     lobby_runtime: &mut LobbyRuntime,
@@ -69,7 +82,7 @@ pub(crate) fn begin_session_attempt(
             bootstrap.initial_state = load_initial_rollback_state();
             status.total_players = 1;
             status.active_ship_snapshot = Some(bootstrap.initial_state.editor_ship.clone());
-            match start_lobby_runtime(&descriptor) {
+            match start_lobby_runtime(&descriptor, local_profile) {
                 Ok(runtime) => {
                     *lobby_runtime = runtime;
                     log::info!(
@@ -327,10 +340,69 @@ fn load_initial_rollback_state() -> RollbackGameState {
 
     if let Ok(Some(CampaignSave {
         progression,
-        sector,
+        mut sector,
         last_mission_report,
     })) = load_campaign()
     {
+        let previous_enemy_ship_ids = sector
+            .nodes
+            .iter()
+            .map(|node| {
+                (
+                    node.id,
+                    node.encounter.enemy_ship_ids.clone(),
+                    node.encounter.hostile_count,
+                )
+            })
+            .collect::<Vec<_>>();
+        sector.ensure_latest_layout();
+        let refreshed_enemy_ship_nodes = sector
+            .nodes
+            .iter()
+            .filter_map(|node| {
+                previous_enemy_ship_ids
+                    .iter()
+                    .find(|(id, _, _)| *id == node.id)
+                    .and_then(|(_, previous_ids, previous_hostile_count)| {
+                        if *previous_ids != node.encounter.enemy_ship_ids
+                            || *previous_hostile_count != node.encounter.hostile_count
+                        {
+                            Some((
+                                node.id,
+                                previous_ids.clone(),
+                                node.encounter.enemy_ship_ids.clone(),
+                                *previous_hostile_count,
+                                node.encounter.hostile_count,
+                            ))
+                        } else {
+                            None
+                        }
+                    })
+            })
+            .collect::<Vec<_>>();
+        if !refreshed_enemy_ship_nodes.is_empty() {
+            log::warn!(
+                "Campaign sector data differed from current sector layout; refreshed {} node(s) from sector_layout.json before session bootstrap",
+                refreshed_enemy_ship_nodes.len()
+            );
+            for (
+                node_id,
+                previous_ids,
+                refreshed_ids,
+                previous_hostile_count,
+                refreshed_hostile_count,
+            ) in &refreshed_enemy_ship_nodes
+            {
+                log::debug!(
+                    "Refreshed campaign sector node {} hostile config: enemy_ship_ids {:?} -> {:?}, hostile_count {} -> {}",
+                    node_id,
+                    previous_ids,
+                    refreshed_ids,
+                    previous_hostile_count,
+                    refreshed_hostile_count
+                );
+            }
+        }
         state.progression = progression;
         state.sector = sector;
         state.last_mission_report = last_mission_report;
@@ -352,7 +424,7 @@ fn load_initial_rollback_state() -> RollbackGameState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::netcode::{PlayerGgrsInput, INPUT_FIRE, INPUT_SPACE_EDGE, INPUT_UP};
+    use crate::netcode::{INPUT_FIRE, INPUT_SPACE_EDGE, INPUT_UP, PlayerGgrsInput};
 
     #[test]
     fn input_button_flags_round_trip() {

@@ -22,7 +22,7 @@ pub(super) fn spawn_test_arena(
     commands: &mut Commands,
     balance: &BalanceConfig,
     arena_variant: &str,
-    hostile_count: u32,
+    platform_hostile_count: u32,
     ambient_heat_pressure: i32,
     ambient_electrical_pressure: i32,
 ) {
@@ -45,7 +45,7 @@ pub(super) fn spawn_test_arena(
     spawn_hostile_platforms(
         commands,
         balance,
-        hostile_count,
+        platform_hostile_count,
         ambient_heat_pressure,
         ambient_electrical_pressure,
     );

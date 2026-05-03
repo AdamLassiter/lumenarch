@@ -1,36 +1,37 @@
 use bevy::prelude::*;
 
 use crate::{
+    UI_BODY_FONT_SIZE,
+    UI_BUTTON_RADIUS,
+    UI_HELP_FONT_SIZE,
+    UI_PANEL_RADIUS,
+    UI_TITLE_FONT_SIZE,
     gameplay::helpers::gameplay_status_line,
     ship::ShipDefinition,
     state::{
         GameplayBarFill,
         GameplayBarKind,
         GameplayBarLabel,
-        GameplayControlsText,
+        GameplayBlackoutOverlay,
         GameplayControlsPanel,
+        GameplayControlsText,
         GameplayInfoPanelRoot,
         GameplayOverviewBarsPanel,
         GameplayPanelBodyText,
         GameplayPanelTitleText,
+        GameplayStationPanel,
+        GameplayStationPanelButton,
+        GameplayStationPanelButtonLabel,
         GameplayStationReadoutBarFill,
         GameplayStationReadoutBarTrack,
         GameplayStationReadoutLabel,
         GameplayStationReadoutLight,
         GameplayStationReadoutSlot,
         GameplayStationReadoutValue,
-        GameplayStationPanel,
-        GameplayStationPanelButton,
-        GameplayStationPanelButtonLabel,
         GameplayStationTitleText,
         PlayingCleanup,
         StationPanelButtonAction,
     },
-    UI_BODY_FONT_SIZE,
-    UI_BUTTON_RADIUS,
-    UI_HELP_FONT_SIZE,
-    UI_PANEL_RADIUS,
-    UI_TITLE_FONT_SIZE,
 };
 
 pub(super) fn spawn_runtime_hud(
@@ -56,6 +57,18 @@ pub(super) fn spawn_runtime_hud(
             spawn_compact_status_panel(root, title_font.clone(), mono_font.clone());
             spawn_station_panel(root, title_font.clone(), mono_font.clone());
             spawn_controls_panel(root, title_font, mono_font);
+            root.spawn((
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Px(0.0),
+                    right: Val::Px(0.0),
+                    top: Val::Px(0.0),
+                    bottom: Val::Px(0.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+                GameplayBlackoutOverlay,
+            ));
         });
 }
 
@@ -321,34 +334,35 @@ fn spawn_station_panel(
                                     TextColor(Color::srgb(0.88, 0.92, 0.98)),
                                     GameplayStationReadoutLabel,
                                 ));
-                                header.spawn(Node {
-                                    align_items: AlignItems::Center,
-                                    column_gap: Val::Px(8.0),
-                                    ..default()
-                                })
-                                .with_children(|status| {
-                                    status.spawn((
-                                        Node {
-                                            width: Val::Px(12.0),
-                                            height: Val::Px(12.0),
-                                            border_radius: BorderRadius::all(Val::Px(999.0)),
-                                            display: Display::None,
-                                            ..default()
-                                        },
-                                        BackgroundColor(Color::srgb(0.22, 0.26, 0.30)),
-                                        GameplayStationReadoutLight,
-                                    ));
-                                    status.spawn((
-                                        Text::new("--"),
-                                        TextFont {
-                                            font: mono_font.clone(),
-                                            font_size: UI_BODY_FONT_SIZE - 1.0,
-                                            ..default()
-                                        },
-                                        TextColor(Color::srgb(0.76, 0.84, 0.92)),
-                                        GameplayStationReadoutValue,
-                                    ));
-                                });
+                                header
+                                    .spawn(Node {
+                                        align_items: AlignItems::Center,
+                                        column_gap: Val::Px(8.0),
+                                        ..default()
+                                    })
+                                    .with_children(|status| {
+                                        status.spawn((
+                                            Node {
+                                                width: Val::Px(12.0),
+                                                height: Val::Px(12.0),
+                                                border_radius: BorderRadius::all(Val::Px(999.0)),
+                                                display: Display::None,
+                                                ..default()
+                                            },
+                                            BackgroundColor(Color::srgb(0.22, 0.26, 0.30)),
+                                            GameplayStationReadoutLight,
+                                        ));
+                                        status.spawn((
+                                            Text::new("--"),
+                                            TextFont {
+                                                font: mono_font.clone(),
+                                                font_size: UI_BODY_FONT_SIZE - 1.0,
+                                                ..default()
+                                            },
+                                            TextColor(Color::srgb(0.76, 0.84, 0.92)),
+                                            GameplayStationReadoutValue,
+                                        ));
+                                    });
                             });
                             row.spawn((
                                 Node {

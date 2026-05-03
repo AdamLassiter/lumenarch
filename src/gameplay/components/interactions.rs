@@ -32,6 +32,7 @@ pub(crate) enum InteractionKind {
     Turret,
     Engine,
     Repair,
+    Extract,
 }
 
 #[derive(Component)]

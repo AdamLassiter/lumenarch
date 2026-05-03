@@ -214,7 +214,10 @@ pub(super) fn station_panel_display(
             readout_bar(
                 "Aim Error",
                 format_fx1(angle_distance(turret.desired_angle, turret.actual_angle)),
-                percent_from_fx(angle_distance(turret.desired_angle, turret.actual_angle), Fx::PI),
+                percent_from_fx(
+                    angle_distance(turret.desired_angle, turret.actual_angle),
+                    Fx::PI,
+                ),
                 Color::srgb(0.36, 0.72, 0.96),
             ),
             readout_bar(
@@ -254,7 +257,11 @@ pub(super) fn station_panel_display(
                 },
             ),
         ]
-    } else if storage.is_some() || manipulator.is_some() || processor.is_some() || airlock_state.is_some() {
+    } else if storage.is_some()
+        || manipulator.is_some()
+        || processor.is_some()
+        || airlock_state.is_some()
+    {
         logistics_readouts(
             storage,
             storage_command,
@@ -277,7 +284,11 @@ pub(super) fn station_panel_display(
         vec![
             readout_light(
                 "Online",
-                if computer.enabled { "Enabled" } else { "Disabled" },
+                if computer.enabled {
+                    "Enabled"
+                } else {
+                    "Disabled"
+                },
                 if computer.enabled {
                     Color::srgb(0.34, 0.78, 0.46)
                 } else {
@@ -529,7 +540,10 @@ fn logistics_readouts(
         readouts.push(readout_bar(
             "Cargo Fill",
             format!("{}/{}", storage.inventory.total_units(), storage.capacity),
-            percent_from_ratio(storage.inventory.total_units() as f32, storage.capacity.max(1) as f32),
+            percent_from_ratio(
+                storage.inventory.total_units() as f32,
+                storage.capacity.max(1) as f32,
+            ),
             Color::srgb(0.86, 0.74, 0.30),
         ));
         readouts.push(readout_light(
@@ -611,9 +625,7 @@ fn logistics_readouts(
             if processor.duration > Fx::from_num(0) {
                 format!(
                     "{}%",
-                    format_fx0(
-                        processor.progress / processor.duration * Fx::from_num(100)
-                    )
+                    format_fx0(processor.progress / processor.duration * Fx::from_num(100))
                 )
             } else {
                 "Idle".to_string()
@@ -624,10 +636,7 @@ fn logistics_readouts(
         readouts.push(readout_light(
             "Processor",
             if processor_command.is_none_or(|command| command.enabled) {
-                processor
-                    .blocked_reason
-                    .as_deref()
-                    .unwrap_or("Running")
+                processor.blocked_reason.as_deref().unwrap_or("Running")
             } else {
                 "Disabled"
             },

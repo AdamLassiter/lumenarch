@@ -4,19 +4,25 @@ use crate::gameplay::{
     components::{
         CurrentStation,
         DestroyedModule,
+        EquippedSuit,
+        HostileShip,
         Integrity,
+        InteractionKind,
         ModuleRuntimeState,
         NearbyInteraction,
         PlayerHandleComponent,
         PlayerMotionState,
         PlayerReferenceFrame,
+        PlayerSuit,
         RuntimeShipModule,
+        ShipRoot,
         ShipboardPlayer,
     },
     helpers::{interaction_for_module, interaction_prompt},
 };
 
 pub(crate) fn detect_nearby_interactions(
+    ship_query: Query<Option<&HostileShip>, With<ShipRoot>>,
     module_query: Query<(
         Entity,
         &RuntimeShipModule,
@@ -30,14 +36,15 @@ pub(crate) fn detect_nearby_interactions(
             &PlayerHandleComponent,
             &CurrentStation,
             &PlayerMotionState,
+            &EquippedSuit,
             &mut NearbyInteraction,
         ),
         With<ShipboardPlayer>,
     >,
 ) {
     let mut players: Vec<_> = player_query.iter_mut().collect();
-    players.sort_by_key(|(handle, _, _, _)| handle.handle);
-    for (_, station, player_motion, mut nearby) in players {
+    players.sort_by_key(|(handle, _, _, _, _)| handle.handle);
+    for (_, station, player_motion, equipped_suit, mut nearby) in players {
         nearby.target = None;
         nearby.kind = None;
         nearby.prompt = None;
@@ -50,24 +57,43 @@ pub(crate) fn detect_nearby_interactions(
             nearby.unavailable_reason = Some("EVA: no nearby station".to_string());
             continue;
         };
+        let on_hostile_ship = ship_query.get(active_ship).ok().flatten().is_some();
 
-        let Some((entity, _, _, integrity, runtime_state, destroyed)) =
-            module_query
-                .iter()
-                .find(|(_, runtime_module, parent, _, _, _)| {
-                    parent.get() == active_ship && runtime_module.module_id == station.module_id
-                })
+        let Some((entity, runtime_module, _, integrity, runtime_state, destroyed)) = module_query
+            .iter()
+            .find(|(_, runtime_module, parent, _, _, _)| {
+                parent.get() == active_ship && runtime_module.module_id == station.module_id
+            })
         else {
             nearby.unavailable_reason = Some("no reachable station".to_string());
             continue;
         };
 
-        if let Some(kind) =
+        if on_hostile_ship
+            && runtime_module.kind != crate::ship::ModuleKind::Core
+            && runtime_module.kind != crate::ship::ModuleKind::Cockpit
+            && !runtime_state.extracted
+            && (destroyed.is_some()
+                || runtime_state.is_disabled
+                || integrity.current < integrity.max)
+        {
+            if equipped_suit.suit != PlayerSuit::Welder {
+                nearby.unavailable_reason = Some("need welder suit for extraction".to_string());
+            } else {
+                nearby.target = Some(entity);
+                nearby.kind = Some(InteractionKind::Extract);
+                nearby.prompt = Some(interaction_prompt(InteractionKind::Extract).to_string());
+            }
+        } else if let Some(kind) =
             interaction_for_module(station.kind, integrity, runtime_state, destroyed.is_some())
         {
-            nearby.target = Some(entity);
-            nearby.kind = Some(kind);
-            nearby.prompt = Some(interaction_prompt(kind).to_string());
+            if kind == InteractionKind::Repair && equipped_suit.suit != PlayerSuit::Welder {
+                nearby.unavailable_reason = Some("need welder suit for repairs".to_string());
+            } else {
+                nearby.target = Some(entity);
+                nearby.kind = Some(kind);
+                nearby.prompt = Some(interaction_prompt(kind).to_string());
+            }
         } else {
             nearby.unavailable_reason = Some("station is stable".to_string());
         }

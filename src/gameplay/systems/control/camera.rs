@@ -141,14 +141,12 @@ pub(crate) fn camera_follow_player_ship(
                             ship_pos.value + runtime_module.local_position.rotate(ship_rot.radians)
                         })
                 })
-                .or_else(|| {
-                    match player_motion.frame {
-                        PlayerReferenceFrame::Ship(ship_entity) => ship_frame_query
-                            .get(ship_entity)
-                            .ok()
-                            .map(|(_, ship_position, _)| ship_position.value),
-                        PlayerReferenceFrame::World => None,
-                    }
+                .or_else(|| match player_motion.frame {
+                    PlayerReferenceFrame::Ship(ship_entity) => ship_frame_query
+                        .get(ship_entity)
+                        .ok()
+                        .map(|(_, ship_position, _)| ship_position.value),
+                    PlayerReferenceFrame::World => None,
                 })
                 .unwrap_or(player_world);
             (focus_pos, 0.0, EXTERIOR_CAMERA_SCALE)

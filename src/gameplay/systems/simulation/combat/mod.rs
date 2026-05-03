@@ -57,11 +57,13 @@ use crate::{
     state::PlayingCleanup,
 };
 
+mod collisions;
 mod helpers;
 mod hostile;
 mod player;
 mod projectiles;
 
+pub(crate) use collisions::handle_ship_collisions;
 pub(crate) use hostile::{
     aim_hostile_turrets,
     drive_hostile_ships,

@@ -13,3 +13,4 @@
 * [ ] Players should move faster while aboard a ship than in space
 * [ ] Scrap and other items need more effort - one suit per player, one carried item per player
   * [ ] Needs some design for types of suits and what items will exist
+* [ ] Some components are missing unique sprites

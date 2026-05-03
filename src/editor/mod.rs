@@ -15,6 +15,7 @@ pub(crate) use input::{
     pan_and_zoom_editor_view,
     persist_editor_ship,
     place_or_remove_tile,
+    repair_selected_component_shortcut,
     rotate_selected_tool,
     save_editor_ship_shortcut,
     toolbox_button_system,

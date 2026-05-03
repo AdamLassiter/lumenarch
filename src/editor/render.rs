@@ -12,6 +12,8 @@ use super::{
         state::{
             DemoProgression,
             EditingCleanup,
+            EditorMode,
+            EditorSessionState,
             EditorShip,
             EditorToolState,
             EditorToolboxScrollContent,
@@ -20,15 +22,10 @@ use super::{
             PreviewTile,
             ShipTileSprite,
             ToolboxButton,
+            ToolboxButtonText,
         },
     },
-    helpers::{
-        cursor_grid_position,
-        grid_to_world,
-        is_cursor_over_toolbox,
-        module_kind_cost,
-        sprite_path_for_kind,
-    },
+    helpers::{cursor_grid_position, grid_to_world, is_cursor_over_toolbox, sprite_path_for_kind},
 };
 
 pub(crate) fn spawn_preview_tile(
@@ -113,18 +110,20 @@ pub(crate) fn sync_ship_tile_entities(
 pub(crate) fn sync_toolbox_visuals(
     tool_state: Res<EditorToolState>,
     progression: Res<DemoProgression>,
+    editor_session: Res<EditorSessionState>,
     mut query: Query<(&ToolboxButton, &mut BackgroundColor)>,
+    mut text_query: Query<(&ToolboxButtonText, &mut Text)>,
 ) {
-    if !tool_state.is_changed() && !progression.is_changed() {
+    if !tool_state.is_changed() && !progression.is_changed() && !editor_session.is_changed() {
         return;
     }
 
     for (button, mut background) in &mut query {
-        let affordable = progression.scrap
-            >= module_kind_cost(
+        let affordable = editor_session.mode == EditorMode::Enemy
+            || progression.ready_count(
                 button.kind,
                 crate::ship::ModuleVariant::default_for_kind(button.kind),
-            );
+            ) > 0;
         if button.kind == tool_state.selected_kind {
             *background = BackgroundColor(if affordable {
                 SELECTED_BUTTON
@@ -138,6 +137,19 @@ pub(crate) fn sync_toolbox_visuals(
                 super::UNAFFORDABLE_BUTTON
             });
         }
+    }
+
+    for (button, mut text) in &mut text_query {
+        let variant = crate::ship::ModuleVariant::default_for_kind(button.kind);
+        **text = match editor_session.mode {
+            EditorMode::Player => format!(
+                "{}  [ready {} / damaged {}]",
+                button.kind.as_str(),
+                progression.ready_count(button.kind, variant),
+                progression.damaged_count(button.kind, variant),
+            ),
+            EditorMode::Enemy => format!("{}  [∞]", button.kind.as_str()),
+        };
     }
 }
 

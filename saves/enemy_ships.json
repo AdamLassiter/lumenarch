@@ -2,12 +2,253 @@
   "entries": [
     {
       "id": "raider_skiff",
-      "display_name": "Untitled Knot",
+      "display_name": "Raider Skiff",
       "threat_tier": 1,
       "behavior_tag": "skirmisher",
       "ship": {
-        "name": "Untitled Knot",
-        "modules": []
+        "name": "Raider Skiff",
+        "modules": [
+          {
+            "id": 1,
+            "kind": "Core",
+            "variant": "BasicCore",
+            "grid_x": 0,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 2,
+            "kind": "Cockpit",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 3,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 4,
+            "kind": "Reactor",
+            "variant": "Fission",
+            "grid_x": -2,
+            "grid_y": 1,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 5,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": 1,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 6,
+            "kind": "Battery",
+            "variant": "BatteryCell",
+            "grid_x": 1,
+            "grid_y": 1,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 7,
+            "kind": "Engine",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 8,
+            "kind": "Engine",
+            "variant": "Standard",
+            "grid_x": 1,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 9,
+            "kind": "Turret",
+            "variant": "LaserTurret",
+            "grid_x": -1,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 10,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 11,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": 2,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 12,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 13,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": -1,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 14,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 15,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": 0,
+            "grid_y": 2,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 16,
+            "kind": "HullInnerCorner",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": 1,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 17,
+            "kind": "HullInnerCorner",
+            "variant": "Standard",
+            "grid_x": 0,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 18,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": 1,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 19,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": 0,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 20,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 21,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 0,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 22,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 1,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 23,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": 0,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 24,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": 1,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          }
+        ]
       }
     },
     {
@@ -25,115 +266,949 @@
             "grid_x": 0,
             "grid_y": 0,
             "rotation_quadrants": 0,
-            "arch_program": null
+            "arch_program": null,
+            "lumen_program": null
           },
           {
             "id": 2,
-            "kind": "Cockpit",
+            "kind": "Interior",
             "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": 1,
-            "rotation_quadrants": 0,
-            "arch_program": null
+            "grid_x": -1,
+            "grid_y": -1,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
           },
           {
             "id": 3,
-            "kind": "Reactor",
-            "variant": "Fusion",
-            "grid_x": -1,
-            "grid_y": 0,
-            "rotation_quadrants": 3,
-            "arch_program": null
+            "kind": "Shield",
+            "variant": "RadialShield",
+            "grid_x": 0,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
           },
           {
             "id": 4,
-            "kind": "Battery",
-            "variant": "Capacitor",
-            "grid_x": -2,
-            "grid_y": 0,
-            "rotation_quadrants": 3,
-            "arch_program": null
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": 1,
+            "grid_y": -1,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
           },
           {
             "id": 5,
-            "kind": "Engine",
+            "kind": "Interior",
             "variant": "Standard",
-            "grid_x": 0,
-            "grid_y": -1,
-            "rotation_quadrants": 2,
-            "arch_program": null
+            "grid_x": 1,
+            "grid_y": 0,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
           },
           {
             "id": 6,
-            "kind": "Engine",
-            "variant": "Standard",
+            "kind": "Reactor",
+            "variant": "Fission",
             "grid_x": 1,
-            "grid_y": -1,
-            "rotation_quadrants": 2,
-            "arch_program": null
-          },
-          {
-            "id": 7,
-            "kind": "Turret",
-            "variant": "BallisticTurret",
-            "grid_x": 1,
-            "grid_y": 0,
+            "grid_y": 1,
             "rotation_quadrants": 1,
-            "arch_program": null
-          },
-          {
-            "id": 8,
-            "kind": "Turret",
-            "variant": "LaserTurret",
-            "grid_x": 2,
-            "grid_y": 0,
-            "rotation_quadrants": 1,
-            "arch_program": null
+            "arch_program": null,
+            "lumen_program": null
           },
           {
             "id": 9,
-            "kind": "Cargo",
-            "variant": "FuelTank",
+            "kind": "Interior",
+            "variant": "Standard",
             "grid_x": -1,
-            "grid_y": 1,
-            "rotation_quadrants": 0,
-            "arch_program": null
+            "grid_y": 0,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
           },
           {
             "id": 10,
+            "kind": "Reactor",
+            "variant": "Fission",
+            "grid_x": -1,
+            "grid_y": 1,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 15,
+            "kind": "Reactor",
+            "variant": "Fission",
+            "grid_x": 0,
+            "grid_y": 1,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 16,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": -3,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 17,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": -2,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 18,
+            "kind": "Cockpit",
+            "variant": "Standard",
+            "grid_x": 0,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 19,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": 1,
+            "grid_y": -2,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 20,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": 1,
+            "grid_y": -3,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 21,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": 0,
+            "grid_y": -3,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 23,
+            "kind": "Engine",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 24,
+            "kind": "Engine",
+            "variant": "Standard",
+            "grid_x": 1,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 25,
+            "kind": "Airlock",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": -2,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 26,
+            "kind": "Turret",
+            "variant": "LaserTurret",
+            "grid_x": -1,
+            "grid_y": -4,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 27,
+            "kind": "Turret",
+            "variant": "LaserTurret",
+            "grid_x": 1,
+            "grid_y": -4,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 28,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": 2,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 29,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": -4,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 30,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": -4,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 31,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 32,
             "kind": "Hull",
             "variant": "Standard",
             "grid_x": -2,
             "grid_y": 1,
             "rotation_quadrants": 3,
-            "arch_program": null
+            "arch_program": null,
+            "lumen_program": null
           },
           {
-            "id": 11,
+            "id": 33,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": 0,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 34,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": -1,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 35,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": -2,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 36,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": -3,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 37,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 0,
+            "grid_y": -4,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 38,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": -3,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 39,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": -1,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 40,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": 0,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 41,
             "kind": "Hull",
             "variant": "Standard",
             "grid_x": 2,
             "grid_y": 1,
             "rotation_quadrants": 1,
-            "arch_program": null
+            "arch_program": null,
+            "lumen_program": null
           },
           {
-            "id": 12,
+            "id": 42,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 0,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "enemy_3",
+      "display_name": "Enemy 3",
+      "threat_tier": 1,
+      "behavior_tag": "aggressive",
+      "ship": {
+        "name": "Enemy 3",
+        "modules": [
+          {
+            "id": 1,
+            "kind": "Shield",
+            "variant": "RadialShield",
+            "grid_x": 0,
+            "grid_y": 0,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 2,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -5,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 3,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -4,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 4,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 9,
+            "kind": "Reactor",
+            "variant": "Fission",
+            "grid_x": 3,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 10,
+            "kind": "Battery",
+            "variant": "BatteryCell",
+            "grid_x": 4,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 11,
+            "kind": "Reactor",
+            "variant": "Fission",
+            "grid_x": 5,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 13,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -5,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 14,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -4,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 15,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 21,
+            "kind": "Reactor",
+            "variant": "Fission",
+            "grid_x": 3,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 22,
+            "kind": "Battery",
+            "variant": "BatteryCell",
+            "grid_x": 4,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 23,
+            "kind": "Reactor",
+            "variant": "Fission",
+            "grid_x": 5,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 24,
+            "kind": "Battery",
+            "variant": "BatteryCell",
+            "grid_x": 5,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 25,
+            "kind": "Core",
+            "variant": "BasicCore",
+            "grid_x": 4,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 26,
+            "kind": "Battery",
+            "variant": "BatteryCell",
+            "grid_x": 3,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 27,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 28,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": 1,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 29,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 30,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 31,
+            "kind": "Cargo",
+            "variant": "GeneralCargo",
+            "grid_x": -3,
+            "grid_y": 0,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 32,
+            "kind": "Cockpit",
+            "variant": "Standard",
+            "grid_x": -4,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 33,
+            "kind": "Cargo",
+            "variant": "GeneralCargo",
+            "grid_x": -5,
+            "grid_y": 0,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 34,
+            "kind": "Engine",
+            "variant": "Standard",
+            "grid_x": -4,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 35,
+            "kind": "Engine",
+            "variant": "Standard",
+            "grid_x": 4,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 36,
+            "kind": "Airlock",
+            "variant": "Standard",
+            "grid_x": 0,
+            "grid_y": 1,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 37,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": 1,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 38,
+            "kind": "HullInnerCorner",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": 1,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 39,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 1,
+            "grid_y": 1,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 40,
+            "kind": "HullInnerCorner",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 41,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 3,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 42,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 5,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 43,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 44,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -5,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 45,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -5,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 46,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -4,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 47,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 48,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 49,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 0,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 50,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 1,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 51,
             "kind": "HullInnerCorner",
             "variant": "Standard",
             "grid_x": 2,
             "grid_y": -1,
-            "rotation_quadrants": 2,
-            "arch_program": null
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
           },
           {
-            "id": 13,
-            "kind": "Shield",
-            "variant": "DirectionalShield",
+            "id": 52,
+            "kind": "HullInnerCorner",
+            "variant": "Standard",
             "grid_x": -2,
             "grid_y": -1,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 53,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 3,
+            "grid_y": -2,
             "rotation_quadrants": 0,
-            "arch_program": null
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 54,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 4,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 55,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 5,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 56,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 6,
+            "grid_y": -1,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 57,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 6,
+            "grid_y": 0,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 58,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": 6,
+            "grid_y": 1,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 59,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -6,
+            "grid_y": -1,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 60,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -6,
+            "grid_y": 0,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 61,
+            "kind": "Hull",
+            "variant": "Standard",
+            "grid_x": -6,
+            "grid_y": 1,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 62,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 63,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": 6,
+            "grid_y": 2,
+            "rotation_quadrants": 2,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 64,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": 2,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 65,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": -6,
+            "grid_y": 2,
+            "rotation_quadrants": 3,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 66,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": -6,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 67,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": 2,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 68,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": -2,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 69,
+            "kind": "HullOuterCorner",
+            "variant": "Standard",
+            "grid_x": 6,
+            "grid_y": -2,
+            "rotation_quadrants": 1,
+            "arch_program": null,
+            "lumen_program": null
           }
         ]
       }

@@ -5,11 +5,35 @@ use serde::{Deserialize, Serialize};
 
 const DEFAULT_SECTOR_LAYOUT_PATH: &str = "saves/sector_layout.json";
 
+use crate::ship::{ModuleKind, ModuleSpec, ModuleVariant};
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct StoredComponentStack {
+    pub(crate) kind: ModuleKind,
+    pub(crate) variant: ModuleVariant,
+    pub(crate) ready: u32,
+    pub(crate) damaged: u32,
+}
+
+impl StoredComponentStack {
+    pub(crate) fn label(&self) -> String {
+        format!("{} {}", self.variant.display_name(), self.kind.as_str())
+    }
+
+    pub(crate) fn repair_cost(&self) -> u32 {
+        ModuleSpec::for_module(self.kind, self.variant)
+            .placement_cost
+            .max(1)
+    }
+}
+
 #[derive(Resource, Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct DemoProgression {
     pub(crate) scrap: u32,
     pub(crate) hull_wear: u32,
     pub(crate) jump_count: u32,
+    #[serde(default)]
+    pub(crate) stored_components: Vec<StoredComponentStack>,
 }
 
 impl Default for DemoProgression {
@@ -18,8 +42,182 @@ impl Default for DemoProgression {
             scrap: 100,
             hull_wear: 0,
             jump_count: 0,
+            stored_components: starter_component_inventory(),
         }
     }
+}
+
+impl DemoProgression {
+    pub(crate) fn ready_count(&self, kind: ModuleKind, variant: ModuleVariant) -> u32 {
+        self.stored_components
+            .iter()
+            .find(|entry| entry.kind == kind && entry.variant == variant)
+            .map_or(0, |entry| entry.ready)
+    }
+
+    pub(crate) fn damaged_count(&self, kind: ModuleKind, variant: ModuleVariant) -> u32 {
+        self.stored_components
+            .iter()
+            .find(|entry| entry.kind == kind && entry.variant == variant)
+            .map_or(0, |entry| entry.damaged)
+    }
+
+    pub(crate) fn add_ready_component(
+        &mut self,
+        kind: ModuleKind,
+        variant: ModuleVariant,
+        amount: u32,
+    ) {
+        if amount == 0 {
+            return;
+        }
+        let entry = self.component_entry_mut(kind, variant);
+        entry.ready += amount;
+    }
+
+    pub(crate) fn add_damaged_component(
+        &mut self,
+        kind: ModuleKind,
+        variant: ModuleVariant,
+        amount: u32,
+    ) {
+        if amount == 0 {
+            return;
+        }
+        let entry = self.component_entry_mut(kind, variant);
+        entry.damaged += amount;
+    }
+
+    pub(crate) fn try_consume_ready_component(
+        &mut self,
+        kind: ModuleKind,
+        variant: ModuleVariant,
+    ) -> bool {
+        let entry = self.component_entry_mut(kind, variant);
+        if entry.ready == 0 {
+            return false;
+        }
+        entry.ready -= 1;
+        true
+    }
+
+    pub(crate) fn try_repair_component(
+        &mut self,
+        kind: ModuleKind,
+        variant: ModuleVariant,
+    ) -> bool {
+        let repair_cost = ModuleSpec::for_module(kind, variant).placement_cost.max(1);
+        if self.scrap < repair_cost {
+            return false;
+        }
+        let damaged_count = self.damaged_count(kind, variant);
+        if damaged_count == 0 {
+            return false;
+        }
+        self.scrap -= repair_cost;
+        let entry = self.component_entry_mut(kind, variant);
+        entry.damaged -= 1;
+        entry.ready += 1;
+        true
+    }
+
+    pub(crate) fn damaged_components(&self) -> impl Iterator<Item = &StoredComponentStack> {
+        self.stored_components
+            .iter()
+            .filter(|entry| entry.damaged > 0)
+    }
+
+    fn component_entry_mut(
+        &mut self,
+        kind: ModuleKind,
+        variant: ModuleVariant,
+    ) -> &mut StoredComponentStack {
+        if let Some(index) = self
+            .stored_components
+            .iter()
+            .position(|entry| entry.kind == kind && entry.variant == variant)
+        {
+            return &mut self.stored_components[index];
+        }
+        self.stored_components.push(StoredComponentStack {
+            kind,
+            variant,
+            ready: 0,
+            damaged: 0,
+        });
+        self.stored_components.last_mut().unwrap()
+    }
+}
+
+fn starter_component_inventory() -> Vec<StoredComponentStack> {
+    vec![
+        StoredComponentStack {
+            kind: ModuleKind::Hull,
+            variant: ModuleVariant::Standard,
+            ready: 10,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Interior,
+            variant: ModuleVariant::Standard,
+            ready: 8,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Engine,
+            variant: ModuleVariant::Standard,
+            ready: 2,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Cargo,
+            variant: ModuleVariant::GeneralCargo,
+            ready: 2,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Battery,
+            variant: ModuleVariant::BatteryCell,
+            ready: 2,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Computer,
+            variant: ModuleVariant::Standard,
+            ready: 1,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Processor,
+            variant: ModuleVariant::FabricatorSlow,
+            ready: 1,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Airlock,
+            variant: ModuleVariant::Standard,
+            ready: 1,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Turret,
+            variant: ModuleVariant::LaserTurret,
+            ready: 1,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Shield,
+            variant: ModuleVariant::RadialShield,
+            ready: 1,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Reactor,
+            variant: ModuleVariant::Fission,
+            ready: 1,
+            damaged: 0,
+        },
+    ]
 }
 
 #[derive(Resource, Clone, Copy)]
@@ -262,8 +460,9 @@ fn load_or_create_sector_layout(seed: u64) -> Result<SectorLayoutConfig, String>
     if path.exists() {
         let encoded = fs::read_to_string(path)
             .map_err(|error| format!("failed to read sector layout {}: {error}", path.display()))?;
-        let config = serde_json::from_str(&encoded)
-            .map_err(|error| format!("failed to decode sector layout {}: {error}", path.display()))?;
+        let config = serde_json::from_str(&encoded).map_err(|error| {
+            format!("failed to decode sector layout {}: {error}", path.display())
+        })?;
         return Ok(config);
     }
 

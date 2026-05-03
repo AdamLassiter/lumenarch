@@ -214,6 +214,7 @@ pub(crate) struct ModuleRuntimeState {
     pub(crate) is_disabled: bool,
     pub(crate) was_disabled_last_frame: bool,
     pub(crate) needs_attention: bool,
+    pub(crate) extracted: bool,
     pub(crate) last_interaction_age: Fx,
 }
 

@@ -1,12 +1,19 @@
 use bevy::prelude::*;
 
 use crate::{
-    netcode,
     HOVERED_BUTTON,
     PRESSED_BUTTON,
+    netcode,
+    ship::enemy::EnemyShipEntryValidationStatus,
     state::{
-        EditorMode, EditorSessionState, EditorShip, EnemyNewButton, EnemyNextButton,
-        EnemyPrevButton, EnemyShipLibraryState,
+        EditorMode,
+        EditorSessionState,
+        EditorShip,
+        EnemyEditorState,
+        EnemyNewButton,
+        EnemyNextButton,
+        EnemyPrevButton,
+        EnemyShipLibraryState,
     },
 };
 
@@ -23,9 +30,9 @@ pub(crate) fn enemy_library_button_system(
     >,
     editor_session: Res<EditorSessionState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
     mut editor_ship: ResMut<EditorShip>,
     status: Res<netcode::SessionStatus>,
-    mut rollback_state: ResMut<netcode::RollbackGameState>,
 ) {
     if !netcode::is_host_authority(&status) {
         return;
@@ -49,13 +56,22 @@ pub(crate) fn enemy_library_button_system(
                 } else if new_entry.is_some() {
                     enemy_library_state.selected_index =
                         enemy_library_state.library.add_blank_entry();
+                    let selected_entry_id = enemy_library_state
+                        .library
+                        .selected_or_first(enemy_library_state.selected_index)
+                        .map(|entry| entry.id.clone());
+                    if let Some(entry_id) = selected_entry_id {
+                        enemy_library_state
+                            .entry_statuses
+                            .insert(entry_id, EnemyShipEntryValidationStatus::Valid);
+                    }
                 }
                 if let Some(entry) = enemy_library_state
                     .library
                     .selected_or_first(enemy_library_state.selected_index)
                 {
                     editor_ship.ship = entry.ship.clone();
-                    rollback_state.editor_ship = editor_ship.ship.clone();
+                    enemy_editor_state.dirty = false;
                 }
             }
             Interaction::Hovered => {
@@ -72,9 +88,9 @@ pub(crate) fn enemy_library_keyboard_shortcuts(
     keys: Res<ButtonInput<KeyCode>>,
     editor_session: Res<EditorSessionState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
     mut editor_ship: ResMut<EditorShip>,
     status: Res<netcode::SessionStatus>,
-    mut rollback_state: ResMut<netcode::RollbackGameState>,
 ) {
     if !netcode::is_host_authority(&status) {
         return;
@@ -97,6 +113,15 @@ pub(crate) fn enemy_library_keyboard_shortcuts(
     }
     if keys.just_pressed(KeyCode::KeyN) {
         enemy_library_state.selected_index = enemy_library_state.library.add_blank_entry();
+        let selected_entry_id = enemy_library_state
+            .library
+            .selected_or_first(enemy_library_state.selected_index)
+            .map(|entry| entry.id.clone());
+        if let Some(entry_id) = selected_entry_id {
+            enemy_library_state
+                .entry_statuses
+                .insert(entry_id, EnemyShipEntryValidationStatus::Valid);
+        }
         changed = true;
     }
 
@@ -106,6 +131,6 @@ pub(crate) fn enemy_library_keyboard_shortcuts(
             .selected_or_first(enemy_library_state.selected_index)
     {
         editor_ship.ship = entry.ship.clone();
-        rollback_state.editor_ship = editor_ship.ship.clone();
+        enemy_editor_state.dirty = false;
     }
 }

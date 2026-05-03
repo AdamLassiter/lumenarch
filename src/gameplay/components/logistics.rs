@@ -1,6 +1,8 @@
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
-use super::super::helpers::Fx;
+use super::{super::helpers::Fx, CarriedItemKind};
+use crate::ship::{ModuleKind, ModuleVariant};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ResourceKind {
@@ -58,6 +60,7 @@ impl ResourceInventory {
 pub(crate) struct StorageModule {
     pub(crate) capacity: u32,
     pub(crate) inventory: ResourceInventory,
+    pub(crate) damaged_components: Vec<StoredDamagedComponent>,
     pub(crate) accepts_fuel: bool,
     pub(crate) accepts_ammunition: bool,
     pub(crate) accepts_general: bool,
@@ -69,6 +72,39 @@ impl StorageModule {
             ResourceKind::Fuel => self.accepts_fuel,
             ResourceKind::Ammunition => self.accepts_ammunition,
             ResourceKind::RawSalvage | ResourceKind::RepairCharge => self.accepts_general,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct StoredDamagedComponent {
+    pub(crate) kind: ModuleKind,
+    pub(crate) variant: ModuleVariant,
+    pub(crate) amount: u32,
+}
+
+impl StorageModule {
+    pub(crate) fn add_damaged_component(
+        &mut self,
+        kind: ModuleKind,
+        variant: ModuleVariant,
+        amount: u32,
+    ) {
+        if amount == 0 {
+            return;
+        }
+        if let Some(entry) = self
+            .damaged_components
+            .iter_mut()
+            .find(|entry| entry.kind == kind && entry.variant == variant)
+        {
+            entry.amount += amount;
+        } else {
+            self.damaged_components.push(StoredDamagedComponent {
+                kind,
+                variant,
+                amount,
+            });
         }
     }
 }
@@ -97,6 +133,6 @@ pub(crate) struct ProcessorModule {
 
 #[derive(Component, Clone)]
 pub(crate) struct LooseCargo {
-    pub(crate) kind: ResourceKind,
+    pub(crate) kind: CarriedItemKind,
     pub(crate) amount: u32,
 }

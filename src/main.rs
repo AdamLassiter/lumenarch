@@ -27,6 +27,7 @@ use self::state::{
     EditorToolState,
     EditorUiState,
     EditorViewState,
+    EnemyEditorState,
     EnemyShipLibraryState,
     FrontendMode,
     LastMissionReport,
@@ -122,8 +123,11 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
     .insert_resource(netcode::ChecksumHistory::default())
     .insert_resource(netcode::ActivePresentationPhase::default())
     .insert_resource(state::GameplayInfoPanelMode::default())
+    .insert_resource(state::LocalPlayerProfile::default())
+    .insert_resource(state::LobbyProfileEditState::default())
     .insert_resource(EditorShip::default())
     .insert_resource(EditorSessionState::default())
+    .insert_resource(EnemyEditorState::default())
     .insert_resource(EnemyShipLibraryState::default())
     .insert_resource(DemoProgression::default())
     .insert_resource(DockedState::default())
@@ -165,6 +169,9 @@ fn register_rollback_state(app: &mut App) {
         .rollback_component_with_clone::<gameplay::components::PlayerShipAssignment>()
         .rollback_component_with_clone::<gameplay::components::PlayerMotionState>()
         .rollback_component_with_clone::<gameplay::components::CarriedResource>()
+        .rollback_component_with_clone::<gameplay::components::EquippedSuit>()
+        .rollback_component_with_clone::<gameplay::components::PlayerIdentity>()
+        .rollback_component_with_clone::<gameplay::components::PlayerConditionState>()
         .rollback_component_with_clone::<gameplay::components::CurrentStation>()
         .rollback_component_with_clone::<gameplay::components::InternalPosition>()
         .rollback_component_with_clone::<gameplay::components::ShipboardControlState>()
@@ -235,10 +242,7 @@ fn add_rollback_systems(app: &mut App) {
     app.add_systems(
         bevy_ggrs::GgrsSchedule,
         (
-            (
-                netcode::decode_player_inputs,
-                netcode::apply_host_meta_ops,
-            )
+            (netcode::decode_player_inputs, netcode::apply_host_meta_ops)
                 .chain()
                 .ambiguous_with_all(),
             (
@@ -262,6 +266,7 @@ fn add_rollback_systems(app: &mut App) {
                 .ambiguous_with_all(),
             (
                 gameplay::sample_ship_fields,
+                gameplay::apply_player_environmental_effects,
                 gameplay::update_module_runtime_state,
                 gameplay::run_arch_automation,
                 gameplay::run_logistics_transfers,
@@ -399,6 +404,7 @@ fn add_lobby_ui_fixed_systems(app: &mut App) {
             lobby::edit_host_address.run_if(in_state(FrontendMode::Lobby)),
             lobby::lobby_button_system.run_if(in_state(FrontendMode::Lobby)),
             lobby::lobby_keyboard_shortcuts.run_if(in_state(FrontendMode::Lobby)),
+            netcode::sync_lobby_profile_changes.run_if(in_state(FrontendMode::Lobby)),
             lobby::update_lobby_status_text.run_if(in_state(FrontendMode::Lobby)),
             lobby::update_host_address_text.run_if(in_state(FrontendMode::Lobby)),
         ),
@@ -439,9 +445,10 @@ fn add_player_editor_ui_fixed_systems(app: &mut App) {
             editor::computer_program_button_system.run_if(netcode::session_presents_player_editor),
             editor::arch_editor_button_system.run_if(netcode::session_presents_player_editor),
             editor::leave_editor_button_system.run_if(netcode::session_presents_player_editor),
-            editor::leave_editor_keyboard_shortcut
-                .run_if(netcode::session_presents_player_editor),
+            editor::leave_editor_keyboard_shortcut.run_if(netcode::session_presents_player_editor),
             editor::rotate_selected_tool.run_if(netcode::session_presents_player_editor),
+            editor::repair_selected_component_shortcut
+                .run_if(netcode::session_presents_player_editor),
             editor::place_or_remove_tile.run_if(netcode::session_presents_player_editor),
             editor::pan_and_zoom_editor_view.run_if(netcode::session_presents_player_editor),
             editor::save_editor_ship_shortcut.run_if(netcode::session_presents_player_editor),
@@ -468,8 +475,7 @@ fn add_debug_enemy_editor_fixed_systems(app: &mut App) {
             editor::enemy_library_keyboard_shortcuts
                 .run_if(in_state(FrontendMode::DebugEnemyEditor)),
             editor::leave_editor_button_system.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::leave_editor_keyboard_shortcut
-                .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+            editor::leave_editor_keyboard_shortcut.run_if(in_state(FrontendMode::DebugEnemyEditor)),
             editor::rotate_selected_tool.run_if(in_state(FrontendMode::DebugEnemyEditor)),
             editor::place_or_remove_tile.run_if(in_state(FrontendMode::DebugEnemyEditor)),
             editor::pan_and_zoom_editor_view.run_if(in_state(FrontendMode::DebugEnemyEditor)),
@@ -478,8 +484,7 @@ fn add_debug_enemy_editor_fixed_systems(app: &mut App) {
             editor::persist_editor_ship.run_if(in_state(FrontendMode::DebugEnemyEditor)),
             editor::sync_preview_tile.run_if(in_state(FrontendMode::DebugEnemyEditor)),
             editor::sync_ship_tile_entities.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::sync_computer_program_entries
-                .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+            editor::sync_computer_program_entries.run_if(in_state(FrontendMode::DebugEnemyEditor)),
             editor::sync_toolbox_visuals.run_if(in_state(FrontendMode::DebugEnemyEditor)),
             editor::sync_toolbox_scroll.run_if(in_state(FrontendMode::DebugEnemyEditor)),
             editor::update_editor_status_text.run_if(in_state(FrontendMode::DebugEnemyEditor)),
@@ -494,6 +499,7 @@ fn add_encounter_presentation_systems(app: &mut App) {
             gameplay::return_button_system.run_if(netcode::session_presents_encounter),
             gameplay::return_keyboard_shortcut.run_if(netcode::session_presents_encounter),
             gameplay::toggle_gameplay_info_panel.run_if(netcode::session_presents_encounter),
+            gameplay::log_runtime_hostile_scene_summary.run_if(netcode::session_presents_encounter),
             gameplay::sync_player_reference_frame_parenting
                 .run_if(netcode::session_presents_encounter),
             (
@@ -501,6 +507,7 @@ fn add_encounter_presentation_systems(app: &mut App) {
                 gameplay::sync_shipboard_player_visual,
                 gameplay::integrate_player_ship_motion,
                 gameplay::integrate_hostile_ship_motion,
+                gameplay::handle_ship_collisions,
                 gameplay::camera_follow_player_ship,
                 gameplay::draw_debug_overlay,
             )

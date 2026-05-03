@@ -4,6 +4,8 @@ use super::super::control::focus_station;
 use crate::gameplay::{
     components::{
         ArchComputerModule,
+        CarriedItemKind,
+        CarriedResource,
         CompleteHeldInteraction,
         DestroyedModule,
         Integrity,
@@ -29,6 +31,7 @@ pub(crate) fn apply_module_interactions(
     mut instant_events: MessageReader<InteractWithModule>,
     mut complete_events: MessageReader<CompleteHeldInteraction>,
     mut player_query: Query<&mut ShipboardControlState, With<ShipboardPlayer>>,
+    mut player_cargo_query: Query<&mut CarriedResource, With<ShipboardPlayer>>,
     mission_query: Single<
         &mut MissionState,
         (
@@ -69,6 +72,7 @@ pub(crate) fn apply_module_interactions(
     for event in complete_events.read() {
         apply_completed_interaction(
             event,
+            &mut player_cargo_query,
             &mut mission_state,
             &mut module_query,
             &mut logistics_query,
@@ -232,6 +236,7 @@ fn apply_instant_interaction(
 
 fn apply_completed_interaction(
     event: &CompleteHeldInteraction,
+    player_cargo_query: &mut Query<&mut CarriedResource, With<ShipboardPlayer>>,
     mission_state: &mut MissionState,
     module_query: &mut Query<(
         Entity,
@@ -253,6 +258,30 @@ fn apply_completed_interaction(
     if let Ok((_, runtime_module, mut integrity, mut runtime_state, _, _, destroyed)) =
         module_query.get_mut(event.target)
     {
+        if event.kind == InteractionKind::Extract {
+            let Ok(mut carried) = player_cargo_query.get_mut(event.player) else {
+                return;
+            };
+            if carried.kind.is_some() {
+                set_recent_action(mission_state, "Hands full - drop cargo first", 1.8);
+                return;
+            }
+            carried.kind = Some(CarriedItemKind::ExtractedComponent {
+                kind: runtime_module.kind,
+                variant: runtime_module.variant,
+            });
+            carried.amount = 1;
+            integrity.current = 0;
+            runtime_state.is_disabled = true;
+            runtime_state.needs_attention = false;
+            runtime_state.extracted = true;
+            set_recent_action(
+                mission_state,
+                &format!("Extracted {} component", runtime_module.kind.as_str()),
+                2.0,
+            );
+            return;
+        }
         if destroyed.is_some() {
             return;
         }

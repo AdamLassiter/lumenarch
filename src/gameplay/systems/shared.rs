@@ -26,6 +26,7 @@ pub(super) fn interaction_label(kind: InteractionKind) -> &'static str {
         InteractionKind::Turret => "man turret",
         InteractionKind::Engine => "reset engine",
         InteractionKind::Repair => "repair module",
+        InteractionKind::Extract => "extract component",
     }
 }
 

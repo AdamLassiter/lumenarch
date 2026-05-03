@@ -1,3 +1,4 @@
+mod collision_math;
 mod combat;
 mod fields;
 mod interactions;
@@ -5,6 +6,20 @@ mod math;
 mod ship;
 mod status;
 
+pub(crate) use collision_math::{
+    COLLISION_HEAT_FROM_DAMAGE,
+    COLLISION_MAX_EFFECTIVE_SPEED,
+    COLLISION_PUSH_STIFFNESS,
+    COLLISION_RESTITUTION,
+    COMPONENT_COLLIDER_RADIUS,
+    SHIELD_COLLIDER_RADIUS,
+    clamp_non_negative,
+    collision_damage_from_energy,
+    collision_energy_wide,
+    narrow_wide_clamped,
+    safe_sqrt_wide,
+    shield_accepts_contact,
+};
 pub(crate) use combat::{
     angle_from_vector,
     clamp_position_to_arena,

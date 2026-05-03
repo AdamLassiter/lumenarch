@@ -17,7 +17,14 @@ use super::{
         HostAddressText,
         JoinButton,
         JoinButtonText,
+        LobbyColorText,
+        LobbyCycleColorButton,
+        LobbyCycleRoleButton,
+        LobbyNameText,
+        LobbyProfileEditState,
+        LobbyRoleText,
         LobbyRoot,
+        LocalPlayerProfile,
         StatusText,
     },
 };
@@ -27,6 +34,8 @@ pub(crate) fn spawn_lobby_ui(
     asset_server: Res<AssetServer>,
     config: Res<netcode::SessionConfig>,
     status: Res<netcode::SessionStatus>,
+    local_profile: Res<LocalPlayerProfile>,
+    edit_state: Res<LobbyProfileEditState>,
 ) {
     let title_font = asset_server.load("fonts/FiraSans-Bold.ttf");
     let mono_font = asset_server.load("fonts/FiraMono-Medium.ttf");
@@ -69,7 +78,7 @@ pub(crate) fn spawn_lobby_ui(
 
                     panel.spawn((
                         Text::new(format!(
-                            "Type a session descriptor, Backspace to delete, Enter to start.\nExamples: host@{} or client1@{}>{}",
+                            "Type a session descriptor, Backspace to delete, Enter to start.\nPress N to edit your player name.\nExamples: host@{} or client1@{}>{}",
                             super::DEFAULT_HOST_ADDR,
                             super::DEFAULT_CLIENT_ADDR,
                             super::DEFAULT_HOST_ADDR
@@ -102,6 +111,113 @@ pub(crate) fn spawn_lobby_ui(
                                 },
                                 TextColor(Color::WHITE),
                                 HostAddressText,
+                            ));
+                        });
+
+                    panel.spawn((
+                        Text::new(format!(
+                            "Player Name: {}{}",
+                            local_profile.name,
+                            if edit_state.editing_name { " [editing]" } else { "" }
+                        )),
+                        TextFont {
+                            font: mono_font.clone(),
+                            font_size: 18.0,
+                            ..default()
+                        },
+                        TextColor(Color::WHITE),
+                        LobbyNameText,
+                    ));
+
+                    panel
+                        .spawn((
+                            Node {
+                                width: Val::Percent(100.0),
+                                justify_content: JustifyContent::SpaceBetween,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                        ))
+                        .with_children(|row| {
+                            row.spawn((
+                                Text::new(format!(
+                                    "Role: {} ({})",
+                                    local_profile.role.as_str(),
+                                    local_profile.starting_suit().as_str()
+                                )),
+                                TextFont {
+                                    font: mono_font.clone(),
+                                    font_size: 18.0,
+                                    ..default()
+                                },
+                                TextColor(Color::WHITE),
+                                LobbyRoleText,
+                            ));
+                            row.spawn((
+                                Button,
+                                Node {
+                                    width: Val::Px(140.0),
+                                    height: Val::Px(34.0),
+                                    justify_content: JustifyContent::Center,
+                                    align_items: AlignItems::Center,
+                                    border_radius: BorderRadius::all(Val::Px(10.0)),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgb(0.24, 0.32, 0.48)),
+                                LobbyCycleRoleButton,
+                            ))
+                            .with_child((
+                                Text::new("Cycle Role"),
+                                TextFont {
+                                    font: mono_font.clone(),
+                                    font_size: 15.0,
+                                    ..default()
+                                },
+                                TextColor(Color::WHITE),
+                            ));
+                        });
+
+                    panel
+                        .spawn((
+                            Node {
+                                width: Val::Percent(100.0),
+                                justify_content: JustifyContent::SpaceBetween,
+                                align_items: AlignItems::Center,
+                                ..default()
+                            },
+                        ))
+                        .with_children(|row| {
+                            row.spawn((
+                                Text::new(format!("Avatar Color: {}", color_label(local_profile.color_index))),
+                                TextFont {
+                                    font: mono_font.clone(),
+                                    font_size: 18.0,
+                                    ..default()
+                                },
+                                TextColor(local_profile.color()),
+                                LobbyColorText,
+                            ));
+                            row.spawn((
+                                Button,
+                                Node {
+                                    width: Val::Px(140.0),
+                                    height: Val::Px(34.0),
+                                    justify_content: JustifyContent::Center,
+                                    align_items: AlignItems::Center,
+                                    border_radius: BorderRadius::all(Val::Px(10.0)),
+                                    ..default()
+                                },
+                                BackgroundColor(Color::srgb(0.24, 0.32, 0.48)),
+                                LobbyCycleColorButton,
+                            ))
+                            .with_child((
+                                Text::new("Cycle Color"),
+                                TextFont {
+                                    font: mono_font.clone(),
+                                    font_size: 15.0,
+                                    ..default()
+                                },
+                                TextColor(Color::WHITE),
                             ));
                         });
 
@@ -171,17 +287,16 @@ pub(crate) fn spawn_lobby_ui(
 pub(crate) fn edit_host_address(
     mut keyboard_events: MessageReader<KeyboardInput>,
     mut config: ResMut<netcode::SessionConfig>,
+    mut local_profile: ResMut<LocalPlayerProfile>,
+    mut edit_state: ResMut<LobbyProfileEditState>,
     status: Res<netcode::SessionStatus>,
 ) {
-    if matches!(
+    let lobby_locked = matches!(
         status.phase,
         netcode::SessionPhase::Connecting
             | netcode::SessionPhase::Lobby
             | netcode::SessionPhase::Starting
-    ) {
-        return;
-    }
-
+    );
     if matches!(status.phase, netcode::SessionPhase::Failed(_))
         && config.session_descriptor.starts_with("host@")
     {
@@ -198,11 +313,32 @@ pub(crate) fn edit_host_address(
         }
 
         match &event.logical_key {
-            Key::Backspace => {
-                config.session_descriptor.pop();
+            Key::Character(chars) if chars.eq_ignore_ascii_case("n") => {
+                edit_state.editing_name = !edit_state.editing_name;
             }
-            Key::Character(chars) if chars.chars().all(is_host_address_character) => {
+            Key::Backspace => {
+                if edit_state.editing_name {
+                    local_profile.name.pop();
+                } else if !lobby_locked {
+                    config.session_descriptor.pop();
+                }
+            }
+            Key::Character(chars)
+                if !lobby_locked
+                    && !edit_state.editing_name
+                    && chars.chars().all(is_host_address_character) =>
+            {
                 config.session_descriptor.push_str(chars);
+            }
+            Key::Character(chars)
+                if edit_state.editing_name
+                    && chars.chars().all(|character| {
+                        character.is_ascii_alphanumeric() || matches!(character, ' ' | '_' | '-')
+                    }) =>
+            {
+                if local_profile.name.len() < 18 {
+                    local_profile.name.push_str(chars);
+                }
             }
             _ => {}
         }
@@ -230,17 +366,22 @@ pub(crate) fn lobby_button_system(
             &mut BackgroundColor,
             Option<&JoinButton>,
             Option<&DebugEnemyEditorButton>,
+            Option<&LobbyCycleRoleButton>,
+            Option<&LobbyCycleColorButton>,
         ),
         (Changed<Interaction>, With<Button>),
     >,
     config: Res<netcode::SessionConfig>,
+    mut local_profile: ResMut<LocalPlayerProfile>,
     mut status: ResMut<netcode::SessionStatus>,
     mut bootstrap: ResMut<netcode::SessionBootstrapConfig>,
     mut lobby_runtime: ResMut<netcode::LobbyRuntime>,
     mut editor_session: ResMut<EditorSessionState>,
     mut next_mode: ResMut<NextState<FrontendMode>>,
 ) {
-    for (interaction, mut background, join, debug_enemy) in &mut interaction_query {
+    for (interaction, mut background, join, debug_enemy, cycle_role, cycle_color) in
+        &mut interaction_query
+    {
         match *interaction {
             Interaction::Pressed => {
                 if join.is_some() {
@@ -261,6 +402,7 @@ pub(crate) fn lobby_button_system(
                         );
                         netcode::begin_session_attempt(
                             &config,
+                            &local_profile,
                             &mut status,
                             &mut bootstrap,
                             lobby_runtime.as_mut(),
@@ -273,6 +415,12 @@ pub(crate) fn lobby_button_system(
                     next_mode.set(FrontendMode::DebugEnemyEditor);
                     log::info!("Debug Enemy Editor button pressed");
                     log::info!("Switching to Editing mode");
+                } else if cycle_role.is_some() {
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                    local_profile.role = local_profile.role.cycle(1);
+                } else if cycle_color.is_some() {
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                    local_profile.cycle_color(1);
                 }
             }
             Interaction::Hovered => {
@@ -281,6 +429,8 @@ pub(crate) fn lobby_button_system(
             Interaction::None => {
                 *background = BackgroundColor(if join.is_some() {
                     NORMAL_BUTTON
+                } else if cycle_role.is_some() || cycle_color.is_some() {
+                    Color::srgb(0.24, 0.32, 0.48)
                 } else {
                     Color::srgb(0.46, 0.34, 0.22)
                 });
@@ -292,11 +442,17 @@ pub(crate) fn lobby_button_system(
 pub(crate) fn lobby_keyboard_shortcuts(
     keys: Res<ButtonInput<KeyCode>>,
     config: Res<netcode::SessionConfig>,
+    local_profile: Res<LocalPlayerProfile>,
+    mut edit_state: ResMut<LobbyProfileEditState>,
     mut status: ResMut<netcode::SessionStatus>,
     mut bootstrap: ResMut<netcode::SessionBootstrapConfig>,
     mut lobby_runtime: ResMut<netcode::LobbyRuntime>,
 ) {
     if keys.just_pressed(KeyCode::Enter) {
+        if edit_state.editing_name {
+            edit_state.editing_name = false;
+            return;
+        }
         if matches!(status.phase, netcode::SessionPhase::Lobby)
             && status.role == Some(netcode::SessionRole::Host)
         {
@@ -308,6 +464,7 @@ pub(crate) fn lobby_keyboard_shortcuts(
             );
             netcode::begin_session_attempt(
                 &config,
+                &local_profile,
                 &mut status,
                 &mut bootstrap,
                 lobby_runtime.as_mut(),
@@ -319,19 +476,53 @@ pub(crate) fn lobby_keyboard_shortcuts(
 pub(crate) fn update_lobby_status_text(
     status: Res<netcode::SessionStatus>,
     config: Res<netcode::SessionConfig>,
-    mut status_query: Query<&mut Text, With<StatusText>>,
-    mut join_button_query: Query<&mut Text, (With<JoinButtonText>, Without<StatusText>)>,
+    local_profile: Res<LocalPlayerProfile>,
+    edit_state: Res<LobbyProfileEditState>,
+    mut text_queries: ParamSet<(
+        Query<&mut Text, With<StatusText>>,
+        Query<&mut Text, (With<JoinButtonText>, Without<StatusText>)>,
+        Query<&mut Text, (With<LobbyNameText>, Without<StatusText>)>,
+        Query<&mut Text, (With<LobbyRoleText>, Without<StatusText>)>,
+        Query<(&mut Text, &mut TextColor), (With<LobbyColorText>, Without<StatusText>)>,
+    )>,
 ) {
-    if !status.is_changed() && !config.is_changed() {
+    if !status.is_changed()
+        && !config.is_changed()
+        && !local_profile.is_changed()
+        && !edit_state.is_changed()
+    {
         return;
     }
 
-    for mut text in &mut status_query {
+    for mut text in &mut text_queries.p0() {
         **text = lobby_status_line(&status, &config.session_descriptor);
     }
 
-    for mut text in &mut join_button_query {
+    for mut text in &mut text_queries.p1() {
         **text = join_button_label(&config.session_descriptor, &status).to_string();
+    }
+
+    for mut text in &mut text_queries.p2() {
+        **text = format!(
+            "Player Name: {}{}",
+            local_profile.name,
+            if edit_state.editing_name {
+                " [editing]"
+            } else {
+                ""
+            }
+        );
+    }
+    for mut text in &mut text_queries.p3() {
+        **text = format!(
+            "Role: {} ({})",
+            local_profile.role.as_str(),
+            local_profile.starting_suit().as_str()
+        );
+    }
+    for (mut text, mut color) in &mut text_queries.p4() {
+        **text = format!("Avatar Color: {}", color_label(local_profile.color_index));
+        color.0 = local_profile.color();
     }
 }
 
@@ -367,11 +558,43 @@ fn join_button_label(server_addr: &str, status: &netcode::SessionStatus) -> &'st
     }
 }
 
+fn color_label(index: u8) -> &'static str {
+    match index % 8 {
+        0 => "Mint",
+        1 => "Sky",
+        2 => "Sand",
+        3 => "Rose",
+        4 => "Amber",
+        5 => "Steel",
+        6 => "Lime",
+        _ => "Coral",
+    }
+}
+
 fn lobby_status_line(status: &netcode::SessionStatus, server_addr: &str) -> String {
     let lobby_count = status
         .lobby_snapshot
         .as_ref()
         .map(|snapshot| snapshot.players.len());
+    let roster = status
+        .lobby_snapshot
+        .as_ref()
+        .map(|snapshot| {
+            snapshot
+                .players
+                .iter()
+                .map(|player| {
+                    format!(
+                        "{}{} ({})",
+                        player.profile.name,
+                        if player.is_host { " [host]" } else { "" },
+                        player.profile.role.as_str()
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+        })
+        .filter(|players| !players.is_empty());
 
     match &status.phase {
         netcode::SessionPhase::Idle => {
@@ -384,11 +607,19 @@ fn lobby_status_line(status: &netcode::SessionStatus, server_addr: &str) -> Stri
             let players = lobby_count.unwrap_or(1);
             if status.role == Some(netcode::SessionRole::Host) {
                 format!(
-                    "Lobby active for {server_addr}. {players} player(s) connected. Press Start Lobby or Enter once everyone is present."
+                    "Lobby active for {server_addr}. {players} player(s) connected. Press Start Lobby or Enter once everyone is present.{}",
+                    roster
+                        .as_ref()
+                        .map(|players| format!("\nCrew: {players}"))
+                        .unwrap_or_default()
                 )
             } else {
                 format!(
-                    "Lobby active for {server_addr}. {players} player(s) connected. Waiting for host to start the match."
+                    "Lobby active for {server_addr}. {players} player(s) connected. Waiting for host to start the match.{}",
+                    roster
+                        .as_ref()
+                        .map(|players| format!("\nCrew: {players}"))
+                        .unwrap_or_default()
                 )
             }
         }

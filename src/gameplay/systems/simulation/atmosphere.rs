@@ -8,6 +8,7 @@ use crate::{
         components::{
             AirlockCommandState,
             DestroyedModule,
+            EquippedSuit,
             HostileShip,
             MissionState,
             PlayerFieldState,
@@ -161,13 +162,14 @@ pub(crate) fn update_ship_atmosphere(
 }
 
 pub(crate) fn sample_player_atmosphere(
-    balance: Res<BalanceConfig>,
+    _balance: Res<BalanceConfig>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     ship_query: Query<&ShipAtmosphereState, With<ShipRoot>>,
     mut player_query: Query<
         (
             &PlayerHandleComponent,
             &PlayerMotionState,
+            &EquippedSuit,
             &mut PlayerFieldState,
         ),
         With<ShipboardPlayer>,
@@ -175,8 +177,8 @@ pub(crate) fn sample_player_atmosphere(
 ) {
     let mut mission_state = mission_query.into_inner();
     let mut players: Vec<_> = player_query.iter_mut().collect();
-    players.sort_by_key(|(handle, _, _)| handle.handle);
-    for (_, player_motion, mut player_fields) in players {
+    players.sort_by_key(|(handle, _, _, _)| handle.handle);
+    for (_, player_motion, equipped_suit, mut player_fields) in players {
         let Some(ship_entity) = (match player_motion.frame {
             PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
             PlayerReferenceFrame::World => None,
@@ -215,9 +217,9 @@ pub(crate) fn sample_player_atmosphere(
 
         player_fields.local_oxygen = local_oxygen;
         player_fields.oxygen_warning =
-            local_oxygen <= Fx::from_num(balance.atmosphere.player_warning_threshold);
+            local_oxygen <= equipped_suit.suit.oxygen_warning_threshold();
         player_fields.oxygen_critical =
-            local_oxygen <= Fx::from_num(balance.atmosphere.player_critical_threshold);
+            local_oxygen <= equipped_suit.suit.oxygen_critical_threshold();
         mission_state.lowest_player_oxygen = mission_state.lowest_player_oxygen.min(local_oxygen);
     }
 }

@@ -2,23 +2,48 @@ use std::ops::DerefMut;
 
 use bevy::{
     input::mouse::{MouseButton, MouseWheel},
+    log,
     prelude::*,
     window::PrimaryWindow,
 };
 
-use super::super::{
-    helpers::{cursor_grid_position, is_cursor_over_editor_ui, is_cursor_over_toolbox, module_kind_cost},
+use super::super::helpers::{
+    cursor_grid_position,
+    is_cursor_over_editor_ui,
+    is_cursor_over_toolbox,
 };
 use crate::{
-    netcode,
     HOVERED_BUTTON,
     PRESSED_BUTTON,
     TOOLBOX_COMPONENTS,
-    ship::{enemy::{load_default_enemy_library, save_default_enemy_library}, storage::{load_default_ship, save_default_ship}, ModuleVariant, ShipModule},
+    netcode,
+    ship::{
+        ModuleVariant,
+        ShipModule,
+        enemy::{
+            EnemyShipEntryValidationStatus,
+            load_validated_default_enemy_library,
+            save_default_enemy_library,
+            validate_enemy_ship_definition,
+        },
+        storage::{load_default_ship, save_default_ship},
+    },
     state::{
-        DemoProgression, EditorMissionReportButton, EditorMode, EditorPanState,
-        EditorSessionState, EditorShip, EditorToolState, EditorUiState, EditorViewState,
-        EnemyShipLibraryState, FrontendMode, LeaveEditorButton, MainCamera, ToolboxButton,
+        DemoProgression,
+        EditorMissionReportButton,
+        EditorMode,
+        EditorPanState,
+        EditorSessionState,
+        EditorShip,
+        EditorToolState,
+        EditorUiState,
+        EditorViewState,
+        EnemyEditorState,
+        EnemyShipLibraryState,
+        FrontendMode,
+        LeaveEditorButton,
+        MainCamera,
+        ToolboxButton,
     },
 };
 
@@ -31,20 +56,20 @@ pub(crate) fn toolbox_button_system(
     mut tool_state: ResMut<EditorToolState>,
 ) {
     for (interaction, button, mut background) in &mut interaction_query {
-        let affordable = progression.scrap
-            >= module_kind_cost(button.kind, ModuleVariant::default_for_kind(button.kind));
+        let available =
+            progression.ready_count(button.kind, ModuleVariant::default_for_kind(button.kind)) > 0;
         match *interaction {
             Interaction::Pressed => {
                 tool_state.selected_kind = button.kind;
                 tool_state.selected_variant = ModuleVariant::default_for_kind(button.kind);
-                *background = BackgroundColor(if affordable {
+                *background = BackgroundColor(if available {
                     PRESSED_BUTTON
                 } else {
                     super::super::SELECTED_UNAFFORDABLE_BUTTON
                 });
             }
             Interaction::Hovered => {
-                *background = BackgroundColor(if affordable {
+                *background = BackgroundColor(if available {
                     HOVERED_BUTTON
                 } else {
                     super::super::UNAFFORDABLE_BUTTON
@@ -62,7 +87,6 @@ pub(crate) fn leave_editor_button_system(
     >,
     editor_session: Res<EditorSessionState>,
     status: Res<netcode::SessionStatus>,
-    mut rollback_state: ResMut<netcode::RollbackGameState>,
     mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
     mut next_mode: ResMut<NextState<FrontendMode>>,
 ) {
@@ -81,7 +105,6 @@ pub(crate) fn leave_editor_button_system(
                         });
                     }
                     EditorMode::Enemy => {
-                        rollback_state.phase = netcode::RollbackPhase::Docked;
                         next_mode.set(FrontendMode::Lobby);
                     }
                 }
@@ -100,7 +123,6 @@ pub(crate) fn leave_editor_keyboard_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     editor_session: Res<EditorSessionState>,
     status: Res<netcode::SessionStatus>,
-    mut rollback_state: ResMut<netcode::RollbackGameState>,
     mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
     mut next_mode: ResMut<NextState<FrontendMode>>,
 ) {
@@ -116,7 +138,6 @@ pub(crate) fn leave_editor_keyboard_shortcut(
                 });
             }
             EditorMode::Enemy => {
-                rollback_state.phase = netcode::RollbackPhase::Docked;
                 next_mode.set(FrontendMode::Lobby);
             }
         }
@@ -126,7 +147,11 @@ pub(crate) fn leave_editor_keyboard_shortcut(
 pub(crate) fn mission_report_button_system(
     mut interaction_query: Query<
         (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<Button>, With<EditorMissionReportButton>),
+        (
+            Changed<Interaction>,
+            With<Button>,
+            With<EditorMissionReportButton>,
+        ),
     >,
     mut editor_ui_state: ResMut<EditorUiState>,
 ) {
@@ -181,6 +206,7 @@ pub(crate) fn place_or_remove_tile(
     mut rollback_state: ResMut<netcode::RollbackGameState>,
     editor_session: Res<EditorSessionState>,
     tool_state: Res<EditorToolState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
 ) {
     if !netcode::is_host_authority(&status) {
         return;
@@ -196,40 +222,33 @@ pub(crate) fn place_or_remove_tile(
     };
 
     if buttons.just_pressed(MouseButton::Left) {
-        let selected_cost = if editor_session.mode == EditorMode::Player {
-            module_kind_cost(tool_state.selected_kind, tool_state.selected_variant)
-        } else {
-            0
-        };
+        let selected_variant = tool_state
+            .selected_variant
+            .normalize_for_kind(tool_state.selected_kind);
         if let Some(existing) = editor_ship.ship.module_at_mut(grid_x, grid_y) {
-            if existing.kind == tool_state.selected_kind
-                && existing.variant == tool_state.selected_variant
-            {
+            if existing.kind == tool_state.selected_kind && existing.variant == selected_variant {
                 existing.rotation_quadrants = tool_state.selected_rotation;
                 return;
             }
 
-            let existing_cost = if editor_session.mode == EditorMode::Player {
-                module_kind_cost(existing.kind, existing.variant)
-            } else {
-                0
-            };
-            let additional_cost = selected_cost.saturating_sub(existing_cost);
-            if progression.scrap < additional_cost {
-                return;
+            if editor_session.mode == EditorMode::Player {
+                if !progression
+                    .try_consume_ready_component(tool_state.selected_kind, selected_variant)
+                {
+                    return;
+                }
+                progression.add_ready_component(existing.kind, existing.variant, 1);
             }
-
-            progression.scrap -= additional_cost;
             existing.kind = tool_state.selected_kind;
-            existing.variant = tool_state
-                .selected_variant
-                .normalize_for_kind(tool_state.selected_kind);
+            existing.variant = selected_variant;
             existing.rotation_quadrants = tool_state.selected_rotation;
         } else {
-            if progression.scrap < selected_cost {
+            if editor_session.mode == EditorMode::Player
+                && !progression
+                    .try_consume_ready_component(tool_state.selected_kind, selected_variant)
+            {
                 return;
             }
-            progression.scrap -= selected_cost;
             let next_id = editor_ship.ship.next_module_id();
             editor_ship.ship.replace_module(ShipModule::new(
                 next_id,
@@ -239,18 +258,48 @@ pub(crate) fn place_or_remove_tile(
                 tool_state.selected_rotation,
             ));
             if let Some(module) = editor_ship.ship.module_at_mut(grid_x, grid_y) {
-                module.variant = tool_state
-                    .selected_variant
-                    .normalize_for_kind(tool_state.selected_kind);
+                module.variant = selected_variant;
             }
         }
-        rollback_state.editor_ship = editor_ship.ship.clone();
-        rollback_state.progression = progression.clone();
+        if editor_session.mode == EditorMode::Player {
+            rollback_state.editor_ship = editor_ship.ship.clone();
+            rollback_state.progression = progression.clone();
+        } else {
+            enemy_editor_state.dirty = true;
+        }
     }
 
     if buttons.just_pressed(MouseButton::Right) {
+        if let Some(existing) = editor_ship.ship.module_at(grid_x, grid_y).cloned()
+            && editor_session.mode == EditorMode::Player
+        {
+            progression.add_ready_component(existing.kind, existing.variant, 1);
+        }
         editor_ship.ship.remove_module_at(grid_x, grid_y);
-        rollback_state.editor_ship = editor_ship.ship.clone();
+        if editor_session.mode == EditorMode::Player {
+            rollback_state.progression = progression.clone();
+            rollback_state.editor_ship = editor_ship.ship.clone();
+        } else {
+            enemy_editor_state.dirty = true;
+        }
+    }
+}
+
+pub(crate) fn repair_selected_component_shortcut(
+    keys: Res<ButtonInput<KeyCode>>,
+    editor_session: Res<EditorSessionState>,
+    tool_state: Res<EditorToolState>,
+    mut progression: ResMut<DemoProgression>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
+) {
+    if editor_session.mode != EditorMode::Player || !keys.just_pressed(KeyCode::KeyR) {
+        return;
+    }
+    let variant = tool_state
+        .selected_variant
+        .normalize_for_kind(tool_state.selected_kind);
+    if progression.try_repair_component(tool_state.selected_kind, variant) {
+        rollback_state.progression = progression.clone();
     }
 }
 
@@ -258,7 +307,8 @@ pub(crate) fn save_editor_ship_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     editor_ship: Res<EditorShip>,
     editor_session: Res<EditorSessionState>,
-    enemy_library_state: Res<EnemyShipLibraryState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
+    mut enemy_library_state: ResMut<EnemyShipLibraryState>,
 ) {
     if !keys.just_pressed(KeyCode::F5) {
         return;
@@ -266,10 +316,61 @@ pub(crate) fn save_editor_ship_shortcut(
 
     let result = match editor_session.mode {
         EditorMode::Player => save_default_ship(&editor_ship.ship),
-        EditorMode::Enemy => save_default_enemy_library(&enemy_library_state.library),
+        EditorMode::Enemy => {
+            enemy_library_state.library.ensure_seeded();
+            let selected_index = enemy_library_state.selected_index;
+            let mut selected_entry_id = None;
+            if let Some(entry) = enemy_library_state
+                .library
+                .selected_or_first_mut(selected_index)
+            {
+                entry.ship = editor_ship.ship.clone();
+                entry.display_name = editor_ship.ship.name.clone();
+                selected_entry_id = Some(entry.id.clone());
+            }
+            if let Some(entry_id) = selected_entry_id {
+                let status = match validate_enemy_ship_definition(&editor_ship.ship) {
+                    Ok(()) => EnemyShipEntryValidationStatus::Valid,
+                    Err(error) => {
+                        log::warn!(
+                            "Blocked enemy library save because the selected enemy ship is invalid: {}",
+                            error
+                        );
+                        enemy_library_state
+                            .entry_statuses
+                            .insert(entry_id, EnemyShipEntryValidationStatus::Invalid);
+                        return;
+                    }
+                };
+                enemy_library_state.entry_statuses.insert(entry_id, status);
+            }
+
+            if let Some((entry_id, error)) =
+                enemy_library_state
+                    .library
+                    .entries
+                    .iter()
+                    .find_map(|entry| {
+                        validate_enemy_ship_definition(&entry.ship)
+                            .err()
+                            .map(|error| (entry.id.clone(), error))
+                    })
+            {
+                log::warn!(
+                    "Blocked enemy library save because entry '{}' is invalid: {}",
+                    entry_id,
+                    error
+                );
+                return;
+            }
+
+            save_default_enemy_library(&enemy_library_state.library)
+        }
     };
     if let Err(error) = result {
         eprintln!("editor: failed to save ship data: {error}");
+    } else if editor_session.mode == EditorMode::Enemy {
+        enemy_editor_state.dirty = false;
     }
 }
 
@@ -329,6 +430,7 @@ pub(crate) fn load_editor_ship_shortcut(
     status: Res<netcode::SessionStatus>,
     mut editor_ship: ResMut<EditorShip>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
 ) {
     if !netcode::is_host_authority(&status) {
         return;
@@ -350,9 +452,14 @@ pub(crate) fn load_editor_ship_shortcut(
                 eprintln!("editor: failed to load ship: {error}");
             }
         },
-        EditorMode::Enemy => match load_default_enemy_library() {
-            Ok(Some(library)) => {
-                enemy_library_state.library = library;
+        EditorMode::Enemy => match load_validated_default_enemy_library() {
+            Ok(Some(validated)) => {
+                log::info!(
+                    "Reloaded enemy ship library from disk with {} entries",
+                    validated.library.entries.len()
+                );
+                enemy_library_state.library = validated.library;
+                enemy_library_state.entry_statuses = validated.statuses;
                 enemy_library_state.library.ensure_seeded();
                 enemy_library_state.selected_index = enemy_library_state
                     .selected_index
@@ -362,14 +469,18 @@ pub(crate) fn load_editor_ship_shortcut(
                     .selected_or_first(enemy_library_state.selected_index)
                 {
                     editor_ship.ship = entry.ship.clone();
-                    rollback_state.editor_ship = editor_ship.ship.clone();
                 }
+                enemy_editor_state.dirty = false;
             }
             Ok(None) => {
+                enemy_library_state.entry_statuses.clear();
                 eprintln!("editor: no enemy ship library file was found to load");
+                enemy_editor_state.dirty = false;
             }
             Err(error) => {
+                enemy_library_state.entry_statuses.clear();
                 eprintln!("editor: failed to load enemy ship library: {error}");
+                enemy_editor_state.dirty = false;
             }
         },
     }
@@ -380,6 +491,7 @@ pub(crate) fn persist_editor_ship(
     editor_session: Res<EditorSessionState>,
     status: Res<netcode::SessionStatus>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
 ) {
     if !netcode::is_host_authority(&status) {
@@ -388,21 +500,33 @@ pub(crate) fn persist_editor_ship(
     if !editor_ship.is_changed() {
         return;
     }
-    rollback_state.editor_ship = editor_ship.ship.clone();
 
     let result = match editor_session.mode {
-        EditorMode::Player => save_default_ship(&editor_ship.ship),
+        EditorMode::Player => {
+            rollback_state.editor_ship = editor_ship.ship.clone();
+            save_default_ship(&editor_ship.ship)
+        }
         EditorMode::Enemy => {
             enemy_library_state.library.ensure_seeded();
             let selected_index = enemy_library_state.selected_index;
+            let mut selected_entry_id = None;
             if let Some(entry) = enemy_library_state
                 .library
                 .selected_or_first_mut(selected_index)
             {
                 entry.ship = editor_ship.ship.clone();
                 entry.display_name = editor_ship.ship.name.clone();
+                selected_entry_id = Some(entry.id.clone());
             }
-            save_default_enemy_library(&enemy_library_state.library)
+            if let Some(entry_id) = selected_entry_id {
+                let status = match validate_enemy_ship_definition(&editor_ship.ship) {
+                    Ok(()) => EnemyShipEntryValidationStatus::Valid,
+                    Err(_) => EnemyShipEntryValidationStatus::Invalid,
+                };
+                enemy_library_state.entry_statuses.insert(entry_id, status);
+            }
+            enemy_editor_state.dirty = true;
+            return;
         }
     };
 

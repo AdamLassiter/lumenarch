@@ -2,9 +2,19 @@ use bevy::prelude::*;
 
 use crate::{
     netcode,
-    ship::{enemy::load_default_enemy_library, storage::load_default_ship, ModuleKind, ShipDefinition},
+    ship::{
+        ModuleKind,
+        ShipDefinition,
+        enemy::load_validated_default_enemy_library,
+        storage::load_default_ship,
+    },
     state::{
-        ArchEditorState, EditorMode, EditorSessionState, EditorShip, EditorToolState,
+        ArchEditorState,
+        EditorMode,
+        EditorSessionState,
+        EditorShip,
+        EditorToolState,
+        EnemyEditorState,
         EnemyShipLibraryState,
     },
 };
@@ -13,6 +23,7 @@ pub(crate) fn initialize_editor_ship(
     status: Res<netcode::SessionStatus>,
     rollback_state: Res<netcode::RollbackGameState>,
     editor_session: Res<EditorSessionState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
     mut editor_ship: ResMut<EditorShip>,
     mut tool_state: ResMut<EditorToolState>,
@@ -50,16 +61,23 @@ pub(crate) fn initialize_editor_ship(
             }
         }
         EditorMode::Enemy => {
-            match load_default_enemy_library() {
-                Ok(Some(library)) => {
-                    enemy_library_state.library = library;
+            match load_validated_default_enemy_library() {
+                Ok(Some(validated)) => {
+                    bevy::log::info!(
+                        "Loaded enemy ship library with {} entries for debug enemy editor",
+                        validated.library.entries.len()
+                    );
+                    enemy_library_state.library = validated.library;
+                    enemy_library_state.entry_statuses = validated.statuses;
                 }
                 Ok(None) => {
                     enemy_library_state.library = crate::ship::enemy::EnemyShipLibrary::seeded();
+                    enemy_library_state.entry_statuses.clear();
                 }
                 Err(error) => {
                     eprintln!("editor: failed to load enemy ship library: {error}");
                     enemy_library_state.library = crate::ship::enemy::EnemyShipLibrary::seeded();
+                    enemy_library_state.entry_statuses.clear();
                 }
             }
             enemy_library_state.library.ensure_seeded();
@@ -72,6 +90,7 @@ pub(crate) fn initialize_editor_ship(
             {
                 editor_ship.ship = entry.ship.clone();
             }
+            enemy_editor_state.dirty = false;
         }
     }
 

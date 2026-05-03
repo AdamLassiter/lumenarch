@@ -66,11 +66,12 @@ pub(crate) fn interaction_prompt(kind: InteractionKind) -> &'static str {
         InteractionKind::Turret => "E: man turret",
         InteractionKind::Engine => "E: reset engine",
         InteractionKind::Repair => "Hold E: repair module",
+        InteractionKind::Extract => "Hold E: extract component",
     }
 }
 
 pub(crate) fn is_hold_interaction(kind: InteractionKind) -> bool {
-    matches!(kind, InteractionKind::Repair)
+    matches!(kind, InteractionKind::Repair | InteractionKind::Extract)
 }
 
 pub(crate) fn interaction_hold_duration(kind: InteractionKind) -> Fx {
@@ -84,6 +85,7 @@ pub(crate) fn interaction_hold_duration(kind: InteractionKind) -> Fx {
         | InteractionKind::Reactor
         | InteractionKind::Engine => Fx::from_num(0),
         InteractionKind::Repair => Fx::from_num(1.8),
+        InteractionKind::Extract => Fx::from_num(2.4),
     }
 }
 

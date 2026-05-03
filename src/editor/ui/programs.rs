@@ -2,14 +2,20 @@ use bevy::prelude::*;
 
 use crate::{
     ship::{
+        ModuleKind,
         arch::{ArchProgram, ArchProgramTemplate},
         lumen::{LumenProgram, LumenProgramTemplate},
         storage::save_default_ship,
-        ModuleKind,
     },
     state::{
-        ArchEditorButton, ArchEditorButtonAction, ArchEditorState, ComputerProgramButton,
-        ComputerProgramEntry, ComputerProgramPanel, EditorShip, ProgramButtonAction,
+        ArchEditorButton,
+        ArchEditorButtonAction,
+        ArchEditorState,
+        ComputerProgramButton,
+        ComputerProgramEntry,
+        ComputerProgramPanel,
+        EditorShip,
+        ProgramButtonAction,
         ProgrammingLanguageMode,
     },
 };
@@ -611,16 +617,36 @@ fn instruction_summary(instruction: &crate::ship::arch::ArchInstruction) -> Stri
         ArchInstruction::Nop => "NOP".to_string(),
         ArchInstruction::Mov { dst, src } => format!("MOV {} <- {}", dst.as_str(), value_ref(src)),
         ArchInstruction::Add { dst, lhs, rhs } => {
-            format!("ADD {} <- {} + {}", dst.as_str(), value_ref(lhs), value_ref(rhs))
+            format!(
+                "ADD {} <- {} + {}",
+                dst.as_str(),
+                value_ref(lhs),
+                value_ref(rhs)
+            )
         }
         ArchInstruction::Sub { dst, lhs, rhs } => {
-            format!("SUB {} <- {} - {}", dst.as_str(), value_ref(lhs), value_ref(rhs))
+            format!(
+                "SUB {} <- {} - {}",
+                dst.as_str(),
+                value_ref(lhs),
+                value_ref(rhs)
+            )
         }
         ArchInstruction::Gt { dst, lhs, rhs } => {
-            format!("GT {} <- {} > {}", dst.as_str(), value_ref(lhs), value_ref(rhs))
+            format!(
+                "GT {} <- {} > {}",
+                dst.as_str(),
+                value_ref(lhs),
+                value_ref(rhs)
+            )
         }
         ArchInstruction::Lt { dst, lhs, rhs } => {
-            format!("LT {} <- {} < {}", dst.as_str(), value_ref(lhs), value_ref(rhs))
+            format!(
+                "LT {} <- {} < {}",
+                dst.as_str(),
+                value_ref(lhs),
+                value_ref(rhs)
+            )
         }
         ArchInstruction::Jnz { cond, target } => format!("JNZ {} -> {}", value_ref(cond), target),
         ArchInstruction::Jmp { target } => format!("JMP {}", target),
