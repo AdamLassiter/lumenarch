@@ -180,8 +180,7 @@ pub(crate) fn sync_computer_program_entries(
                         );
                     });
                 entry.spawn((
-                    Text::new(format!(
-                        "{}",
+                    Text::new(
                         match arch_editor_state.selected_language {
                             ProgrammingLanguageMode::Arch => format!(
                                 "Computer #{}\nProgram: {}\nTemplate: {}\nConst A / B: {} / {}\nValidation: {}",
@@ -200,8 +199,8 @@ pub(crate) fn sync_computer_program_entries(
                                 if lumen_program.enabled { "online" } else { "disabled" },
                                 lumen_validation_summary(&lumen_program),
                             ),
-                        }
-                    )),
+                        }.to_string()
+                    ),
                     TextFont {
                         font: mono_font.clone(),
                         font_size: 14.0,

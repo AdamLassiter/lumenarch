@@ -332,20 +332,14 @@ fn build_lumen_snapshot(
         match runtime_module.kind {
             ModuleKind::Reactor => snapshot.reactor_count += 1,
             ModuleKind::Turret => snapshot.turret_count += 1,
-            ModuleKind::Cargo | ModuleKind::Airlock => {
-                if storage.is_some() {
-                    snapshot.cargo_count += 1;
-                }
+            ModuleKind::Cargo | ModuleKind::Airlock if storage.is_some() => {
+                snapshot.cargo_count += 1;
             }
-            ModuleKind::Processor => {
-                if processor.is_some() {
-                    snapshot.processor_count += 1;
-                }
+            ModuleKind::Processor if processor.is_some() => {
+                snapshot.processor_count += 1;
             }
-            ModuleKind::Computer => {
-                if computer.is_some() {
-                    snapshot.computer_count += 1;
-                }
+            ModuleKind::Computer if computer.is_some() => {
+                snapshot.computer_count += 1;
             }
             _ => {}
         }

@@ -355,38 +355,40 @@ pub(crate) fn return_after_mission_resolution(
         ("Mission Complete".to_string(), detail)
     };
 
-    let mut last_mission_report = LastMissionReport::default();
-    last_mission_report.headline = Some(headline);
-    last_mission_report.detail = Some(detail);
-    last_mission_report.scrap_awarded = mission_state.salvage_scrap_awarded;
-    last_mission_report.total_scrap = progression.scrap;
-    last_mission_report.hottest_module = mission_state
-        .hottest_module_kind
-        .map(|kind| kind.as_str().to_string());
-    last_mission_report.first_disabled_module = mission_state
-        .first_disabled_module_kind
-        .map(|kind| kind.as_str().to_string());
-    last_mission_report.repairs_performed = mission_state.repairs_performed;
-    last_mission_report.stabilizations_performed = mission_state.stabilizations_performed;
-    last_mission_report.automation_used = mission_state.automation_used;
-    last_mission_report.automation_triggers = mission_state.automation_trigger_count;
-    last_mission_report.recovered_raw_salvage = mission_state.recovered_raw_salvage;
-    last_mission_report.processed_repair_charge = mission_state.processed_repair_charge;
-    last_mission_report.consumed_repair_charge = mission_state.consumed_repair_charge;
-    last_mission_report.transfer_count = mission_state.transfer_count;
-    last_mission_report.processor_cycles = mission_state.processor_cycles;
-    last_mission_report.logistics_bottleneck = mission_state.logistics_bottleneck.clone();
-    last_mission_report.logistics_automation_used = mission_state.logistics_automation_used;
-    last_mission_report.arch_primary_program = automation_program_name(&computer_query);
-    last_mission_report.arch_invalid_executions = computer_query
-        .iter()
-        .filter(|computer| computer.last_result.halted_reason.is_some())
-        .count() as u32;
-    last_mission_report.arch_recent_writes = computer_query
-        .iter()
-        .flat_map(|computer| computer.last_result.recent_writes.clone())
-        .take(4)
-        .collect();
+    let mut last_mission_report = LastMissionReport {
+        headline: Some(headline),
+        detail: Some(detail),
+        scrap_awarded: mission_state.salvage_scrap_awarded,
+        total_scrap: progression.scrap,
+        hottest_module: mission_state
+            .hottest_module_kind
+            .map(|kind| kind.as_str().to_string()),
+        first_disabled_module: mission_state
+            .first_disabled_module_kind
+            .map(|kind| kind.as_str().to_string()),
+        repairs_performed: mission_state.repairs_performed,
+        stabilizations_performed: mission_state.stabilizations_performed,
+        automation_used: mission_state.automation_used,
+        automation_triggers: mission_state.automation_trigger_count,
+        recovered_raw_salvage: mission_state.recovered_raw_salvage,
+        processed_repair_charge: mission_state.processed_repair_charge,
+        consumed_repair_charge: mission_state.consumed_repair_charge,
+        transfer_count: mission_state.transfer_count,
+        processor_cycles: mission_state.processor_cycles,
+        logistics_bottleneck: mission_state.logistics_bottleneck.clone(),
+        logistics_automation_used: mission_state.logistics_automation_used,
+        arch_primary_program: automation_program_name(&computer_query),
+        arch_invalid_executions: computer_query
+            .iter()
+            .filter(|computer| computer.last_result.halted_reason.is_some())
+            .count() as u32,
+        arch_recent_writes: computer_query
+            .iter()
+            .flat_map(|computer| computer.last_result.recent_writes.clone())
+            .take(4)
+            .collect(),
+        ..Default::default()
+    };
     let mut hints = Vec::new();
     if mission_state.hottest_module_kind == Some(ModuleKind::Reactor) {
         hints.push("Reactor ran hottest. Consider more spacing or cooler hull nearby.".to_string());

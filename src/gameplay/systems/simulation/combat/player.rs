@@ -56,7 +56,7 @@ pub(crate) fn fire_player_weapons(
             continue;
         }
         let is_manual_turret = turret_state.fire_intent;
-        if !is_manual_turret && !(arch_commands.turret_auto_fire && !arch_commands.turret_fire_hold)
+        if (arch_commands.turret_fire_hold || !arch_commands.turret_auto_fire) && !is_manual_turret
         {
             continue;
         }

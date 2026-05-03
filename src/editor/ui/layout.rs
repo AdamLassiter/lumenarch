@@ -142,14 +142,12 @@ pub(crate) fn spawn_editor_ui(
                                         ))
                                         .with_children(|button| {
                                             button.spawn((
-                                                Text::new(format!(
-                                                    "{}",
-                                                    toolbox_label(
+                                                Text::new(toolbox_label(
                                                         kind,
                                                         editor_session.mode,
                                                         &progression,
-                                                    )
-                                                )),
+                                                    ).to_string()
+                                                ),
                                                 TextFont {
                                                     font: mono_font.clone(),
                                                     font_size: 16.0,

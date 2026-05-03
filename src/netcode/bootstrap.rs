@@ -142,7 +142,7 @@ pub(crate) fn request_lobby_session_start(
         player_count
     );
     if let Err(error) = control_tx.send(LobbyControlCommand::StartSession {
-        initial_state: bootstrap.initial_state.clone(),
+        initial_state: Box::new(bootstrap.initial_state.clone()),
         input_delay: bootstrap.input_delay,
         check_distance: bootstrap.check_distance,
     }) {

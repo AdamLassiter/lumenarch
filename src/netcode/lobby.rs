@@ -45,12 +45,12 @@ enum LobbyClientMessage {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum LobbyServerMessage {
     Snapshot(super::LobbySnapshot),
-    StartSession(LobbySessionStart),
+    StartSession(Box<LobbySessionStart>),
 }
 
 pub(crate) enum LobbyRuntimeEvent {
     Snapshot(super::LobbySnapshot),
-    StartSession(LobbySessionStart),
+    StartSession(Box<LobbySessionStart>),
     Failed(String),
 }
 
@@ -60,25 +60,16 @@ pub(crate) enum LobbyControlCommand {
         profile: LocalPlayerProfile,
     },
     StartSession {
-        initial_state: RollbackGameState,
+        initial_state: Box<RollbackGameState>,
         input_delay: usize,
         check_distance: usize,
     },
 }
 
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub(crate) struct LobbyRuntime {
     pub(crate) control_tx: Option<Sender<LobbyControlCommand>>,
     pub(crate) event_rx: Option<Mutex<Receiver<LobbyRuntimeEvent>>>,
-}
-
-impl Default for LobbyRuntime {
-    fn default() -> Self {
-        Self {
-            control_tx: None,
-            event_rx: None,
-        }
-    }
 }
 
 struct HostClientConn {
@@ -288,9 +279,9 @@ fn run_host_lobby(
                         .collect(),
                     input_delay,
                     check_distance,
-                    initial_state: initial_state.clone(),
+                    initial_state: *initial_state.clone(),
                 };
-                let _ = event_tx.send(LobbyRuntimeEvent::StartSession(host_start));
+                let _ = event_tx.send(LobbyRuntimeEvent::StartSession(Box::new(host_start)));
                 broadcast_start_session(
                     &mut clients,
                     &snapshot.players,
@@ -551,13 +542,12 @@ fn run_client_lobby(
 }
 
 fn reassign_host_client_handles(clients: &mut [HostClientConn]) {
-    let mut next_handle = 1;
-    for client in clients
-        .iter_mut()
-        .filter(|client| client.bind_addr.is_some())
-    {
+    for (next_handle, client) in (1..).zip(
+        clients
+            .iter_mut()
+            .filter(|client| client.bind_addr.is_some()),
+    ) {
         client.handle = Some(next_handle);
-        next_handle += 1;
     }
 }
 
@@ -632,13 +622,13 @@ fn broadcast_start_session(
             .filter(|(handle, _)| *handle != local_handle)
             .map(|(_, addr)| *addr)
             .collect::<Vec<_>>();
-        let message = LobbyServerMessage::StartSession(LobbySessionStart {
+        let message = LobbyServerMessage::StartSession(Box::new(LobbySessionStart {
             local_handle,
             peer_addrs,
             input_delay,
             check_distance,
             initial_state: initial_state.clone(),
-        });
+        }));
         if let Err(error) = send_json_line(&mut client.stream, &message) {
             log::warn!(
                 "Failed to send start-session message to client {:?}: {}",

@@ -334,11 +334,10 @@ pub(crate) fn edit_host_address(
                 if edit_state.editing_name
                     && chars.chars().all(|character| {
                         character.is_ascii_alphanumeric() || matches!(character, ' ' | '_' | '-')
-                    }) =>
+                    })
+                    && local_profile.name.len() < 18 =>
             {
-                if local_profile.name.len() < 18 {
-                    local_profile.name.push_str(chars);
-                }
+                local_profile.name.push_str(chars);
             }
             _ => {}
         }
