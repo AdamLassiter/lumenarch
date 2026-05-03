@@ -11,6 +11,7 @@ pub(crate) struct RuntimeShipModule {
     pub(crate) module_id: u64,
     pub(crate) kind: ModuleKind,
     pub(crate) variant: ModuleVariant,
+    pub(crate) channel: u8,
     pub(crate) grid_x: i32,
     pub(crate) grid_y: i32,
     pub(crate) rotation_quadrants: u8,

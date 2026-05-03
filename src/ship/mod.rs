@@ -69,6 +69,21 @@ impl ModuleKind {
             Self::HullOuterCorner => "hull_outer_corner",
         }
     }
+
+    pub fn supports_channel(self) -> bool {
+        matches!(
+            self,
+            Self::Cockpit
+                | Self::Computer
+                | Self::Processor
+                | Self::Reactor
+                | Self::Engine
+                | Self::Cargo
+                | Self::Airlock
+                | Self::Turret
+                | Self::Shield
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
@@ -94,28 +109,6 @@ pub enum ModuleVariant {
 }
 
 impl ModuleVariant {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Standard => "standard",
-            Self::AdvancedHelm => "advanced_helm",
-            Self::Fission => "fission",
-            Self::Fusion => "fusion",
-            Self::GeneralCargo => "general_cargo",
-            Self::FuelTank => "fuel_tank",
-            Self::AmmoRack => "ammo_rack",
-            Self::BatteryCell => "battery_cell",
-            Self::Capacitor => "capacitor",
-            Self::LaserTurret => "laser_turret",
-            Self::BallisticTurret => "ballistic_turret",
-            Self::BasicCore => "basic_core",
-            Self::ExpandedCore => "expanded_core",
-            Self::FabricatorSlow => "fabricator_slow",
-            Self::FabricatorFast => "fabricator_fast",
-            Self::RadialShield => "radial_shield",
-            Self::DirectionalShield => "directional_shield",
-        }
-    }
-
     pub fn display_name(self) -> &'static str {
         match self {
             Self::Standard => "Standard",
@@ -184,6 +177,117 @@ impl ModuleVariant {
         let next = ((index as i32 + direction).rem_euclid(variants.len() as i32)) as usize;
         variants[next]
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum StoredResourceKind {
+    #[default]
+    RawSalvage,
+    RepairCharge,
+    Fuel,
+    Ammunition,
+}
+
+impl StoredResourceKind {
+    pub fn next(self) -> Self {
+        match self {
+            Self::RawSalvage => Self::RepairCharge,
+            Self::RepairCharge => Self::Fuel,
+            Self::Fuel => Self::Ammunition,
+            Self::Ammunition => Self::RawSalvage,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::RawSalvage => "Raw Salvage",
+            Self::RepairCharge => "Repair Charge",
+            Self::Fuel => "Fuel",
+            Self::Ammunition => "Ammunition",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum StoredProcessorRecipe {
+    #[default]
+    RepairCharge,
+    Ammunition,
+    Fuel,
+}
+
+impl StoredProcessorRecipe {
+    pub fn next(self) -> Self {
+        match self {
+            Self::RepairCharge => Self::Ammunition,
+            Self::Ammunition => Self::Fuel,
+            Self::Fuel => Self::RepairCharge,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::RepairCharge => "Repair Charge",
+            Self::Ammunition => "Ammunition",
+            Self::Fuel => "Fuel",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModuleDefaultState {
+    #[serde(default = "default_reaction_rate_milli")]
+    pub reaction_rate_milli: u16,
+    #[serde(default = "default_turbine_load_milli")]
+    pub turbine_load_milli: u16,
+    #[serde(default = "default_true")]
+    pub storage_allow_intake: bool,
+    #[serde(default)]
+    pub airlock_open: bool,
+    #[serde(default)]
+    pub manipulator_manual_mode: bool,
+    #[serde(default)]
+    pub manipulator_transfer_enabled: bool,
+    #[serde(default)]
+    pub manipulator_resource_kind: StoredResourceKind,
+    #[serde(default)]
+    pub processor_recipe: StoredProcessorRecipe,
+    #[serde(default = "default_true")]
+    pub processor_enabled: bool,
+    #[serde(default = "default_true")]
+    pub computer_enabled: bool,
+    #[serde(default)]
+    pub turret_fire_intent: bool,
+}
+
+impl Default for ModuleDefaultState {
+    fn default() -> Self {
+        Self {
+            reaction_rate_milli: default_reaction_rate_milli(),
+            turbine_load_milli: default_turbine_load_milli(),
+            storage_allow_intake: true,
+            airlock_open: false,
+            manipulator_manual_mode: false,
+            manipulator_transfer_enabled: false,
+            manipulator_resource_kind: StoredResourceKind::RawSalvage,
+            processor_recipe: StoredProcessorRecipe::RepairCharge,
+            processor_enabled: true,
+            computer_enabled: true,
+            turret_fire_intent: false,
+        }
+    }
+}
+
+const fn default_reaction_rate_milli() -> u16 {
+    350
+}
+
+const fn default_turbine_load_milli() -> u16 {
+    300
+}
+
+const fn default_true() -> bool {
+    true
 }
 
 impl fmt::Display for ModuleKind {
@@ -580,6 +684,10 @@ pub struct ShipModule {
     pub grid_y: i32,
     pub rotation_quadrants: u8,
     #[serde(default)]
+    pub channel: u8,
+    #[serde(default)]
+    pub defaults: ModuleDefaultState,
+    #[serde(default)]
     pub arch_program: Option<ArchProgram>,
     #[serde(default)]
     pub lumen_program: Option<LumenProgram>,
@@ -600,6 +708,8 @@ impl ShipModule {
             grid_x,
             grid_y,
             rotation_quadrants: rotation_quadrants % 4,
+            channel: 0,
+            defaults: ModuleDefaultState::default(),
             arch_program: (kind == ModuleKind::Computer)
                 .then(|| ArchProgram::from_template(ArchProgramTemplate::BalancedOps)),
             lumen_program: (kind == ModuleKind::Computer)
@@ -627,6 +737,19 @@ impl ShipModule {
         } else {
             format!("{family} / {}", self.variant.display_name())
         }
+    }
+
+    pub fn effective_channel(&self) -> u8 {
+        if self.kind.supports_channel() {
+            self.channel % 10
+        } else {
+            0
+        }
+    }
+
+    pub fn clamped_defaults(&mut self) {
+        self.defaults.reaction_rate_milli = self.defaults.reaction_rate_milli.min(1000);
+        self.defaults.turbine_load_milli = self.defaults.turbine_load_milli.min(1000);
     }
 }
 
@@ -705,6 +828,18 @@ impl ShipDefinition {
     pub fn normalize_variants(&mut self) {
         for module in &mut self.modules {
             module.variant = module.variant.normalize_for_kind(module.kind);
+            module.channel = module.effective_channel();
+            module.clamped_defaults();
+            if let Some(program) = &mut module.arch_program
+                && program.source_text.trim().is_empty()
+            {
+                program.refresh_source_text();
+            }
+            if let Some(program) = &mut module.lumen_program
+                && program.source_text.trim().is_empty()
+            {
+                program.refresh_source_text();
+            }
         }
     }
 

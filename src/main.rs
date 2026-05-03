@@ -1,4 +1,6 @@
 mod ship;
+#[cfg(test)]
+mod sim_tests;
 
 mod balance;
 pub(crate) mod campaign;
@@ -139,6 +141,7 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
     .insert_resource(EditorToolState::default())
     .insert_resource(EditorUiState::default())
     .insert_resource(ArchEditorState::default())
+    .insert_resource(state::ProgramTextEditorState::default())
     .insert_resource(EditorPanState::default())
     .insert_resource(EditorViewState::default())
     .insert_resource(SectorMapPanState::default())
@@ -146,19 +149,30 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
 }
 
 fn add_core_plugins(app: &mut App, mode: AppRuntimeMode) {
-    let default_plugins = DefaultPlugins
-        .set(ImagePlugin::default_nearest())
-        .set(WindowPlugin {
-            primary_window: mode.is_interactive().then_some(Window {
-                title: "LUMEN//ARCH".to_string(),
-                resolution: (1280, 720).into(),
-                ..default()
-            }),
-            ..default()
-        });
+    if mode.is_interactive() {
+        app.add_plugins(
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "LUMEN//ARCH".to_string(),
+                        resolution: (1280, 720).into(),
+                        ..default()
+                    }),
+                    ..default()
+                }),
+        );
+    } else {
+        app.add_plugins(MinimalPlugins)
+            .add_plugins(bevy::asset::AssetPlugin::default())
+            .add_plugins(ImagePlugin::default_nearest())
+            .add_plugins(bevy::state::app::StatesPlugin)
+            .add_plugins(bevy::transform::TransformPlugin);
+        app.init_asset::<bevy::image::Image>()
+            .init_asset::<bevy::text::Font>();
+    }
 
-    app.add_plugins(default_plugins)
-        .add_plugins(GgrsPlugin::<LumenGgrsConfig>::default());
+    app.add_plugins(GgrsPlugin::<LumenGgrsConfig>::default());
 }
 
 fn register_rollback_state(app: &mut App) {
@@ -441,27 +455,36 @@ fn add_player_editor_ui_fixed_systems(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (
-            editor::draw_grid_overlay.run_if(netcode::session_presents_player_editor),
-            editor::toolbox_button_system.run_if(netcode::session_presents_player_editor),
-            editor::mission_report_button_system.run_if(netcode::session_presents_player_editor),
-            editor::computer_program_button_system.run_if(netcode::session_presents_player_editor),
-            editor::arch_editor_button_system.run_if(netcode::session_presents_player_editor),
-            editor::leave_editor_button_system.run_if(netcode::session_presents_player_editor),
-            editor::leave_editor_keyboard_shortcut.run_if(netcode::session_presents_player_editor),
-            editor::rotate_selected_tool.run_if(netcode::session_presents_player_editor),
-            editor::repair_selected_component_shortcut
+            (
+                editor::draw_grid_overlay,
+                editor::toolbox_button_system,
+                editor::mission_report_button_system,
+                editor::sync_program_text_editor_state,
+                editor::focus_program_text_editor_on_click,
+                editor::edit_program_text_editor,
+                editor::program_editor_action_button_system,
+                editor::editor_station_panel_button_system,
+                editor::leave_editor_button_system,
+                editor::leave_editor_keyboard_shortcut,
+                editor::toggle_editor_module_overlay_shortcuts,
+                editor::rotate_selected_tool,
+            )
                 .run_if(netcode::session_presents_player_editor),
-            editor::place_or_remove_tile.run_if(netcode::session_presents_player_editor),
-            editor::pan_and_zoom_editor_view.run_if(netcode::session_presents_player_editor),
-            editor::save_editor_ship_shortcut.run_if(netcode::session_presents_player_editor),
-            editor::load_editor_ship_shortcut.run_if(netcode::session_presents_player_editor),
-            editor::persist_editor_ship.run_if(netcode::session_presents_player_editor),
-            editor::sync_preview_tile.run_if(netcode::session_presents_player_editor),
-            editor::sync_ship_tile_entities.run_if(netcode::session_presents_player_editor),
-            editor::sync_computer_program_entries.run_if(netcode::session_presents_player_editor),
-            editor::sync_toolbox_visuals.run_if(netcode::session_presents_player_editor),
-            editor::sync_toolbox_scroll.run_if(netcode::session_presents_player_editor),
-            editor::update_editor_status_text.run_if(netcode::session_presents_player_editor),
+            (
+                editor::repair_selected_component_shortcut,
+                editor::place_or_remove_tile,
+                editor::pan_and_zoom_editor_view,
+                editor::save_editor_ship_shortcut,
+                editor::load_editor_ship_shortcut,
+                editor::persist_editor_ship,
+                editor::sync_preview_tile,
+                editor::sync_ship_tile_entities,
+                editor::update_editor_module_overlay,
+                editor::sync_toolbox_visuals,
+                editor::sync_toolbox_scroll,
+                editor::update_editor_status_text,
+            )
+                .run_if(netcode::session_presents_player_editor),
         ),
     );
 }
@@ -470,26 +493,37 @@ fn add_debug_enemy_editor_fixed_systems(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (
-            editor::draw_grid_overlay.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::toolbox_button_system.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::mission_report_button_system.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::enemy_library_button_system.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::enemy_library_keyboard_shortcuts
+            (
+                editor::draw_grid_overlay,
+                editor::toolbox_button_system,
+                editor::mission_report_button_system,
+                editor::enemy_library_button_system,
+                editor::enemy_library_keyboard_shortcuts,
+                editor::sync_program_text_editor_state,
+                editor::focus_program_text_editor_on_click,
+                editor::edit_program_text_editor,
+                editor::program_editor_action_button_system,
+                editor::editor_station_panel_button_system,
+                editor::leave_editor_button_system,
+                editor::leave_editor_keyboard_shortcut,
+                editor::toggle_editor_module_overlay_shortcuts,
+            )
                 .run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::leave_editor_button_system.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::leave_editor_keyboard_shortcut.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::rotate_selected_tool.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::place_or_remove_tile.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::pan_and_zoom_editor_view.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::save_editor_ship_shortcut.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::load_editor_ship_shortcut.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::persist_editor_ship.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::sync_preview_tile.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::sync_ship_tile_entities.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::sync_computer_program_entries.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::sync_toolbox_visuals.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::sync_toolbox_scroll.run_if(in_state(FrontendMode::DebugEnemyEditor)),
-            editor::update_editor_status_text.run_if(in_state(FrontendMode::DebugEnemyEditor)),
+            (
+                editor::rotate_selected_tool,
+                editor::place_or_remove_tile,
+                editor::pan_and_zoom_editor_view,
+                editor::save_editor_ship_shortcut,
+                editor::load_editor_ship_shortcut,
+                editor::persist_editor_ship,
+                editor::sync_preview_tile,
+                editor::sync_ship_tile_entities,
+                editor::update_editor_module_overlay,
+                editor::sync_toolbox_visuals,
+                editor::sync_toolbox_scroll,
+                editor::update_editor_status_text,
+            )
+                .run_if(in_state(FrontendMode::DebugEnemyEditor)),
         ),
     );
 }

@@ -13,7 +13,8 @@
     "passive_draw_per_module": 0.08,
     "engine_draw_per_engine": 2.5,
     "weapon_draw_per_turret": 2.0,
-    "reactor_output_floor_per_reactor": 0.8
+    "reactor_output_floor_per_reactor": 0.8,
+    "throttle_activation_threshold": 0.05
   },
   "reactor": {
     "warmup_threshold": 3.0,
@@ -57,6 +58,24 @@
     "disabled_electrical_threshold": 14.0,
     "player_heat_warning_threshold": 8.0,
     "player_electrical_warning_threshold": 7.0,
+    "player_heat_buildup_rate": 0.12,
+    "player_heat_decay_rate": 1.4,
+    "player_heat_damage_threshold": 2.5,
+    "player_heat_damage_rate": 0.22,
+    "player_heat_buildup_cap": 12.0,
+    "player_electrical_buildup_rate": 0.32,
+    "player_electrical_decay_rate": 2.0,
+    "player_electrical_stun_threshold": 3.0,
+    "player_electrical_stun_duration": 2.8,
+    "player_electrical_stun_damage": 2,
+    "player_oxygen_blackout_zero_rate": 0.4,
+    "player_oxygen_blackout_critical_rate": 0.18,
+    "player_oxygen_blackout_warning_rate": 0.08,
+    "player_oxygen_blackout_recovery_rate": 0.22,
+    "player_oxygen_blackout_damage_threshold": 0.98,
+    "player_oxygen_blackout_damage_rate": 0.18,
+    "player_zero_oxygen_threshold": 0.2,
+    "player_death_stun_duration": 4.0,
     "emitter_reactor_heat": 1.0,
     "emitter_reactor_electrical": 0.5,
     "emitter_reactor_grounding": 0.2,
@@ -85,11 +104,15 @@
     "equalization_rate": 2.2,
     "leak_rate_per_edge": 2.6,
     "destroyed_leak_multiplier": 1.8,
+    "minimum_breach_leak_multiplier": 0.45,
+    "breach_leak_sqrt_divisor": 2.0,
     "player_warning_threshold": 5.0,
     "player_critical_threshold": 2.2,
     "low_oxygen_speed_multiplier": 0.72,
     "critical_oxygen_speed_multiplier": 0.48,
-    "hostile_decompression_threshold": 2.0
+    "hostile_decompression_threshold": 2.0,
+    "decompression_pull_acceleration": 90.0,
+    "decompression_pull_falloff_per_tile": 0.6
   },
   "combat": {
     "camera_follow_lerp_rate": 8.0,
@@ -106,7 +129,17 @@
     "hostile_projectile_damage": 3,
     "hostile_projectile_heat_damage": 1.2,
     "hostile_projectile_electrical_damage": 0.8,
-    "salvage_pickup_radius": 42.0
+    "salvage_pickup_radius": 42.0,
+    "collision_push_stiffness": 0.92,
+    "collision_restitution": 0.22,
+    "collision_heat_from_damage": 0.12,
+    "collision_max_effective_mass": 512.0,
+    "collision_max_effective_speed": 320.0,
+    "collision_damage_energy_divisor": 3600.0,
+    "collision_damage_energy_threshold": 1260.0,
+    "component_collider_radius": 14.08,
+    "shield_collider_radius": 24.32,
+    "turret_manual_aim_speed": 1.8
   },
   "hostile_ai": {
     "brawler_preferred_range": 120.0,
@@ -127,5 +160,47 @@
     "manipulator_transfer_duration": 0.75,
     "manipulator_range_tiles": 2.5,
     "processor_duration": 2.2
+  },
+  "player": {
+    "interior_camera_scale": 0.58,
+    "exterior_camera_scale": 1.0,
+    "walk_acceleration": 260.0,
+    "walk_max_speed": 120.0,
+    "walk_damping": 8.0,
+    "eva_acceleration": 180.0,
+    "eva_max_speed": 140.0,
+    "eva_damping": 1.6,
+    "interact_radius": 28.0,
+    "cargo_pickup_radius": 20.0,
+    "collision_radius": 7.0,
+    "standard_heat_multiplier": 1.0,
+    "radiation_heat_multiplier": 0.55,
+    "welder_heat_multiplier": 0.8,
+    "eva_heat_multiplier": 0.9,
+    "standard_electrical_multiplier": 1.0,
+    "radiation_electrical_multiplier": 0.6,
+    "welder_electrical_multiplier": 0.85,
+    "eva_electrical_multiplier": 0.95,
+    "standard_oxygen_warning_threshold": 6.0,
+    "radiation_oxygen_warning_threshold": 4.0,
+    "welder_oxygen_warning_threshold": 5.0,
+    "eva_oxygen_warning_threshold": 2.0,
+    "standard_oxygen_critical_threshold": 3.0,
+    "radiation_oxygen_critical_threshold": 2.0,
+    "welder_oxygen_critical_threshold": 2.0,
+    "eva_oxygen_critical_threshold": 1.0,
+    "standard_eva_speed_multiplier": 1.0,
+    "radiation_eva_speed_multiplier": 0.95,
+    "welder_eva_speed_multiplier": 0.85,
+    "eva_eva_speed_multiplier": 1.65
+  },
+  "interaction": {
+    "repair_hold_duration": 1.8,
+    "extract_hold_duration": 2.4
+  },
+  "mission": {
+    "return_delay_seconds": 2.5,
+    "hull_wear_heat_threshold": 10.0,
+    "low_oxygen_hint_threshold": 3.0
   }
 }

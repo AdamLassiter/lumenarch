@@ -8,6 +8,6 @@ pub(crate) use layout::{
     editor_ui_missing,
     editor_ui_present,
     spawn_editor_ui,
+    update_editor_module_overlay,
     update_editor_status_text,
 };
-pub(crate) use programs::sync_computer_program_entries;

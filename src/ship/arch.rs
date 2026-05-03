@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArchParseDiagnostic {
+    pub line: usize,
+    pub message: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ArchRegister {
     Gp0,
@@ -312,16 +318,19 @@ pub struct ArchProgram {
     pub template: ArchProgramTemplate,
     pub name: String,
     pub constants: [i32; 2],
+    #[serde(default)]
+    pub source_text: String,
     pub instructions: Vec<ArchInstruction>,
 }
 
 impl ArchProgram {
     pub fn from_template(template: ArchProgramTemplate) -> Self {
-        match template {
+        let mut program = match template {
             ArchProgramTemplate::ReactorGuard => Self {
                 template,
                 name: template.as_str().to_string(),
                 constants: [9, 7],
+                source_text: String::new(),
                 instructions: vec![
                     ArchInstruction::Mov {
                         dst: ArchRegister::CmdReactorBias,
@@ -356,6 +365,7 @@ impl ArchProgram {
                 template,
                 name: template.as_str().to_string(),
                 constants: [2, 1],
+                source_text: String::new(),
                 instructions: vec![
                     ArchInstruction::Mov {
                         dst: ArchRegister::CmdLogisticsEnable,
@@ -404,6 +414,7 @@ impl ArchProgram {
                 template,
                 name: template.as_str().to_string(),
                 constants: [1, 2],
+                source_text: String::new(),
                 instructions: vec![
                     ArchInstruction::Mov {
                         dst: ArchRegister::CmdTurretAssist,
@@ -462,6 +473,7 @@ impl ArchProgram {
                 template,
                 name: template.as_str().to_string(),
                 constants: [8, 2],
+                source_text: String::new(),
                 instructions: vec![
                     ArchInstruction::Mov {
                         dst: ArchRegister::CmdReactorBias,
@@ -535,6 +547,324 @@ impl ArchProgram {
                     },
                 ],
             },
+        };
+        program.refresh_source_text();
+        program
+    }
+
+    pub fn refresh_source_text(&mut self) {
+        self.source_text = arch_program_to_source(&self.instructions);
+    }
+
+    pub fn compile_source_text(
+        &mut self,
+        source_text: &str,
+    ) -> Result<(), Vec<ArchParseDiagnostic>> {
+        let instructions = parse_arch_program(source_text)?;
+        self.instructions = instructions;
+        self.source_text = source_text.to_string();
+        Ok(())
+    }
+
+    pub fn validate_source_text(
+        source_text: &str,
+    ) -> Result<Vec<ArchInstruction>, Vec<ArchParseDiagnostic>> {
+        parse_arch_program(source_text)
+    }
+}
+
+pub fn arch_program_to_source(instructions: &[ArchInstruction]) -> String {
+    instructions
+        .iter()
+        .map(instruction_to_source)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub fn parse_arch_program(
+    source_text: &str,
+) -> Result<Vec<ArchInstruction>, Vec<ArchParseDiagnostic>> {
+    let mut instructions = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for (line_index, raw_line) in source_text.lines().enumerate() {
+        let line_number = line_index + 1;
+        let line = raw_line.split('#').next().unwrap_or("").trim();
+        if line.is_empty() {
+            continue;
         }
+
+        let tokens: Vec<_> = line.split_whitespace().collect();
+        let opcode = tokens[0].to_ascii_uppercase();
+        let parsed = match opcode.as_str() {
+            "NOP" => parse_nop(tokens.len(), line_number),
+            "MOV" => parse_binary_dst(tokens.as_slice(), line_number, |dst, src| {
+                ArchInstruction::Mov { dst, src }
+            }),
+            "ADD" => parse_ternary_dst(tokens.as_slice(), line_number, |dst, lhs, rhs| {
+                ArchInstruction::Add { dst, lhs, rhs }
+            }),
+            "SUB" => parse_ternary_dst(tokens.as_slice(), line_number, |dst, lhs, rhs| {
+                ArchInstruction::Sub { dst, lhs, rhs }
+            }),
+            "GT" => parse_ternary_dst(tokens.as_slice(), line_number, |dst, lhs, rhs| {
+                ArchInstruction::Gt { dst, lhs, rhs }
+            }),
+            "LT" => parse_ternary_dst(tokens.as_slice(), line_number, |dst, lhs, rhs| {
+                ArchInstruction::Lt { dst, lhs, rhs }
+            }),
+            "JNZ" => parse_jump_conditional(tokens.as_slice(), line_number, |cond, target| {
+                ArchInstruction::Jnz { cond, target }
+            }),
+            "JMP" => parse_jump(tokens.as_slice(), line_number, |target| {
+                ArchInstruction::Jmp { target }
+            }),
+            other => Err(ArchParseDiagnostic {
+                line: line_number,
+                message: format!("unknown ARCH opcode '{other}'"),
+            }),
+        };
+
+        match parsed {
+            Ok(instruction) => instructions.push(instruction),
+            Err(diagnostic) => diagnostics.push(diagnostic),
+        }
+    }
+
+    for (index, instruction) in instructions.iter().enumerate() {
+        if let Some(target) = jump_target(instruction)
+            && target >= instructions.len()
+        {
+            diagnostics.push(ArchParseDiagnostic {
+                line: index + 1,
+                message: format!("jump target {target} is past end of program"),
+            });
+        }
+        if let Some(dst) = instruction_destination(instruction)
+            && !dst.is_writable()
+        {
+            diagnostics.push(ArchParseDiagnostic {
+                line: index + 1,
+                message: format!("destination register '{}' is read-only", dst.as_str()),
+            });
+        }
+    }
+
+    if diagnostics.is_empty() {
+        Ok(instructions)
+    } else {
+        Err(diagnostics)
+    }
+}
+
+fn parse_nop(token_count: usize, line: usize) -> Result<ArchInstruction, ArchParseDiagnostic> {
+    if token_count == 1 {
+        Ok(ArchInstruction::Nop)
+    } else {
+        Err(ArchParseDiagnostic {
+            line,
+            message: "NOP takes no arguments".to_string(),
+        })
+    }
+}
+
+fn parse_binary_dst(
+    tokens: &[&str],
+    line: usize,
+    build: impl FnOnce(ArchRegister, ArchValueRef) -> ArchInstruction,
+) -> Result<ArchInstruction, ArchParseDiagnostic> {
+    if tokens.len() != 3 {
+        return Err(ArchParseDiagnostic {
+            line,
+            message: format!("{} expects 2 arguments", tokens[0]),
+        });
+    }
+    let dst = parse_arch_register(tokens[1], line)?;
+    let src = parse_arch_value(tokens[2], line)?;
+    Ok(build(dst, src))
+}
+
+fn parse_ternary_dst(
+    tokens: &[&str],
+    line: usize,
+    build: impl FnOnce(ArchRegister, ArchValueRef, ArchValueRef) -> ArchInstruction,
+) -> Result<ArchInstruction, ArchParseDiagnostic> {
+    if tokens.len() != 4 {
+        return Err(ArchParseDiagnostic {
+            line,
+            message: format!("{} expects 3 arguments", tokens[0]),
+        });
+    }
+    let dst = parse_arch_register(tokens[1], line)?;
+    let lhs = parse_arch_value(tokens[2], line)?;
+    let rhs = parse_arch_value(tokens[3], line)?;
+    Ok(build(dst, lhs, rhs))
+}
+
+fn parse_jump_conditional(
+    tokens: &[&str],
+    line: usize,
+    build: impl FnOnce(ArchValueRef, usize) -> ArchInstruction,
+) -> Result<ArchInstruction, ArchParseDiagnostic> {
+    if tokens.len() != 3 {
+        return Err(ArchParseDiagnostic {
+            line,
+            message: format!("{} expects 2 arguments", tokens[0]),
+        });
+    }
+    let cond = parse_arch_value(tokens[1], line)?;
+    let target = parse_jump_target(tokens[2], line)?;
+    Ok(build(cond, target))
+}
+
+fn parse_jump(
+    tokens: &[&str],
+    line: usize,
+    build: impl FnOnce(usize) -> ArchInstruction,
+) -> Result<ArchInstruction, ArchParseDiagnostic> {
+    if tokens.len() != 2 {
+        return Err(ArchParseDiagnostic {
+            line,
+            message: format!("{} expects 1 argument", tokens[0]),
+        });
+    }
+    let target = parse_jump_target(tokens[1], line)?;
+    Ok(build(target))
+}
+
+fn parse_arch_register(token: &str, line: usize) -> Result<ArchRegister, ArchParseDiagnostic> {
+    let token = token.to_ascii_uppercase();
+    match token.as_str() {
+        "GP0" | "GP00" => Ok(ArchRegister::Gp0),
+        "GP1" | "GP01" => Ok(ArchRegister::Gp1),
+        "GP2" | "GP02" => Ok(ArchRegister::Gp2),
+        "GP3" | "GP03" => Ok(ArchRegister::Gp3),
+        "VPR" => Ok(ArchRegister::ShipPowerReserve),
+        "VHT" => Ok(ArchRegister::ShipAverageHeat),
+        "VTHR" => Ok(ArchRegister::MissionThreat),
+        "RRH0" | "RRH1" | "RRH2" | "RRH3" | "RRH4" | "RRH5" | "RRH6" | "RRH7" | "RRH8" | "RRH9" => {
+            Ok(ArchRegister::ReactorHeat)
+        }
+        "RRS0" | "RRS1" | "RRS2" | "RRS3" | "RRS4" | "RRS5" | "RRS6" | "RRS7" | "RRS8" | "RRS9" => {
+            Ok(ArchRegister::ReactorInstability)
+        }
+        "LSR0" => Ok(ArchRegister::StorageRawSalvage),
+        "LSR1" => Ok(ArchRegister::StorageRepairCharge),
+        "LPR0" => Ok(ArchRegister::ProcessorRawSalvage),
+        "LPR1" => Ok(ArchRegister::ProcessorRepairCharge),
+        "WTR0" | "WTR1" | "WTR2" | "WTR3" | "WTR4" | "WTR5" | "WTR6" | "WTR7" | "WTR8" | "WTR9" => {
+            Ok(ArchRegister::TurretReady)
+        }
+        "WTC0" | "WTC1" | "WTC2" | "WTC3" | "WTC4" | "WTC5" | "WTC6" | "WTC7" | "WTC8" | "WTC9" => {
+            Ok(ArchRegister::TurretCooldown)
+        }
+        "RRC0" | "RRC1" | "RRC2" | "RRC3" | "RRC4" | "RRC5" | "RRC6" | "RRC7" | "RRC8" | "RRC9" => {
+            Ok(ArchRegister::CmdReactorBias)
+        }
+        "LMC0" => Ok(ArchRegister::CmdLogisticsEnable),
+        "LMP0" => Ok(ArchRegister::CmdLogisticsPreference),
+        "WTA0" | "WTA1" | "WTA2" | "WTA3" | "WTA4" | "WTA5" | "WTA6" | "WTA7" | "WTA8" | "WTA9" => {
+            Ok(ArchRegister::CmdTurretAssist)
+        }
+        "WTF0" | "WTF1" | "WTF2" | "WTF3" | "WTF4" | "WTF5" | "WTF6" | "WTF7" | "WTF8" | "WTF9" => {
+            Ok(ArchRegister::CmdTurretAutoFire)
+        }
+        _ => Err(ArchParseDiagnostic {
+            line,
+            message: format!("unknown ARCH register '{token}'"),
+        }),
+    }
+}
+
+fn parse_arch_value(token: &str, line: usize) -> Result<ArchValueRef, ArchParseDiagnostic> {
+    if let Ok(register) = parse_arch_register(token, line) {
+        return Ok(ArchValueRef::Register(register));
+    }
+    let token = token.trim_start_matches('#');
+    token
+        .parse::<i32>()
+        .map(ArchValueRef::Immediate)
+        .map_err(|_| ArchParseDiagnostic {
+            line,
+            message: format!("invalid ARCH operand '{token}'"),
+        })
+}
+
+fn parse_jump_target(token: &str, line: usize) -> Result<usize, ArchParseDiagnostic> {
+    let token = token.trim_start_matches(':').trim_start_matches('L');
+    token.parse::<usize>().map_err(|_| ArchParseDiagnostic {
+        line,
+        message: format!("invalid jump target '{token}'"),
+    })
+}
+
+fn jump_target(instruction: &ArchInstruction) -> Option<usize> {
+    match instruction {
+        ArchInstruction::Jmp { target } | ArchInstruction::Jnz { target, .. } => Some(*target),
+        _ => None,
+    }
+}
+
+fn instruction_destination(instruction: &ArchInstruction) -> Option<ArchRegister> {
+    match instruction {
+        ArchInstruction::Mov { dst, .. }
+        | ArchInstruction::Add { dst, .. }
+        | ArchInstruction::Sub { dst, .. }
+        | ArchInstruction::Gt { dst, .. }
+        | ArchInstruction::Lt { dst, .. } => Some(*dst),
+        _ => None,
+    }
+}
+
+fn instruction_to_source(instruction: &ArchInstruction) -> String {
+    match instruction {
+        ArchInstruction::Nop => "NOP".to_string(),
+        ArchInstruction::Mov { dst, src } => {
+            format!("MOV {} {}", dst.as_str(), value_to_source(src))
+        }
+        ArchInstruction::Add { dst, lhs, rhs } => {
+            format!(
+                "ADD {} {} {}",
+                dst.as_str(),
+                value_to_source(lhs),
+                value_to_source(rhs)
+            )
+        }
+        ArchInstruction::Sub { dst, lhs, rhs } => {
+            format!(
+                "SUB {} {} {}",
+                dst.as_str(),
+                value_to_source(lhs),
+                value_to_source(rhs)
+            )
+        }
+        ArchInstruction::Gt { dst, lhs, rhs } => {
+            format!(
+                "GT {} {} {}",
+                dst.as_str(),
+                value_to_source(lhs),
+                value_to_source(rhs)
+            )
+        }
+        ArchInstruction::Lt { dst, lhs, rhs } => {
+            format!(
+                "LT {} {} {}",
+                dst.as_str(),
+                value_to_source(lhs),
+                value_to_source(rhs)
+            )
+        }
+        ArchInstruction::Jnz { cond, target } => {
+            format!("JNZ {} {}", value_to_source(cond), target)
+        }
+        ArchInstruction::Jmp { target } => format!("JMP {}", target),
+        other => format!("# Unsupported structured op: {other:?}"),
+    }
+}
+
+fn value_to_source(value: &ArchValueRef) -> String {
+    match value {
+        ArchValueRef::Register(register) => register.as_str().to_string(),
+        ArchValueRef::Immediate(value) => value.to_string(),
     }
 }

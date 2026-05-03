@@ -1,3 +1,4 @@
+mod atmosphere;
 mod collision_math;
 mod combat;
 mod fields;
@@ -6,13 +7,13 @@ mod math;
 mod ship;
 mod status;
 
+pub(crate) use atmosphere::{
+    breach_leak_multiplier,
+    decompression_signature,
+    recompute_decompression_vectors,
+    sampled_decompression_pull,
+};
 pub(crate) use collision_math::{
-    COLLISION_HEAT_FROM_DAMAGE,
-    COLLISION_MAX_EFFECTIVE_SPEED,
-    COLLISION_PUSH_STIFFNESS,
-    COLLISION_RESTITUTION,
-    COMPONENT_COLLIDER_RADIUS,
-    SHIELD_COLLIDER_RADIUS,
     clamp_non_negative,
     collision_damage_from_energy,
     collision_energy_wide,
@@ -44,6 +45,7 @@ pub(crate) use interactions::{
     interaction_hold_duration,
     interaction_prompt,
     is_hold_interaction,
+    module_needs_repair,
     resource_kind_label,
     sprite_path_for_kind,
 };

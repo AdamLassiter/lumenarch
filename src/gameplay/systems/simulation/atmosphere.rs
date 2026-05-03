@@ -21,7 +21,13 @@ use crate::{
             ShipRoot,
             ShipboardPlayer,
         },
-        helpers::{Fx, fx_from_time_delta},
+        helpers::{
+            Fx,
+            breach_leak_multiplier,
+            decompression_signature,
+            fx_from_time_delta,
+            recompute_decompression_vectors,
+        },
     },
 };
 
@@ -67,6 +73,8 @@ pub(crate) fn update_ship_atmosphere(
             atmosphere_state.average_oxygen = Fx::from_num(0);
             atmosphere_state.minimum_oxygen = Fx::from_num(0);
             atmosphere_state.venting_tiles = 0;
+            atmosphere_state.decompression_signature = 0;
+            atmosphere_state.decompression_vectors.clear();
             continue;
         }
 
@@ -105,6 +113,8 @@ pub(crate) fn update_ship_atmosphere(
         }
 
         let mut venting_tiles = 0u32;
+        let mut vent_edges_per_tile = vec![0u8; atmosphere_state.tiles.len()];
+        let mut total_open_edges = 0u32;
         let leak_rate = Fx::from_num(balance.atmosphere.leak_rate_per_edge);
         let destroyed_multiplier = Fx::from_num(balance.atmosphere.destroyed_leak_multiplier);
         let max_oxygen = Fx::from_num(balance.atmosphere.max_tile_oxygen);
@@ -123,12 +133,29 @@ pub(crate) fn update_ship_atmosphere(
             };
             if vent_edges > 0 {
                 venting_tiles += 1;
+                vent_edges_per_tile[index] = vent_edges as u8;
+                total_open_edges += vent_edges;
+            }
+        }
+
+        let breach_leak_scale = breach_leak_multiplier(total_open_edges, &balance);
+        for (index, tile) in atmosphere_state.tiles.iter().enumerate() {
+            let vent_edges = vent_edges_per_tile[index];
+            if vent_edges > 0 {
+                let (destroyed, _) = module_state
+                    .get(&tile.module_id)
+                    .copied()
+                    .unwrap_or((false, false));
                 let multiplier = if destroyed {
                     destroyed_multiplier
                 } else {
                     Fx::from_num(1)
                 };
-                let leak = leak_rate * Fx::from_num(vent_edges as i32) * multiplier * dt;
+                let leak = leak_rate
+                    * Fx::from_num(vent_edges as i32)
+                    * breach_leak_scale
+                    * multiplier
+                    * dt;
                 next_levels[index] = (next_levels[index] - leak).max(Fx::from_num(0));
             }
             next_levels[index] = next_levels[index].clamp(Fx::from_num(0), max_oxygen);
@@ -147,6 +174,18 @@ pub(crate) fn update_ship_atmosphere(
         atmosphere_state.minimum_oxygen = oxygen_min;
         atmosphere_state.venting_tiles = venting_tiles;
 
+        let signature = decompression_signature(&vent_edges_per_tile);
+        if signature != atmosphere_state.decompression_signature
+            || atmosphere_state.decompression_vectors.len() != atmosphere_state.tiles.len()
+        {
+            atmosphere_state.decompression_signature = signature;
+            atmosphere_state.decompression_vectors = recompute_decompression_vectors(
+                &atmosphere_state.tiles,
+                &vent_edges_per_tile,
+                &balance,
+            );
+        }
+
         if player_ship.is_some() && venting_tiles > 0 {
             mission_state.player_ship_breached = true;
         }
@@ -162,7 +201,7 @@ pub(crate) fn update_ship_atmosphere(
 }
 
 pub(crate) fn sample_player_atmosphere(
-    _balance: Res<BalanceConfig>,
+    balance: Res<BalanceConfig>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     ship_query: Query<&ShipAtmosphereState, With<ShipRoot>>,
     mut player_query: Query<
@@ -217,9 +256,11 @@ pub(crate) fn sample_player_atmosphere(
 
         player_fields.local_oxygen = local_oxygen;
         player_fields.oxygen_warning =
-            local_oxygen <= equipped_suit.suit.oxygen_warning_threshold();
-        player_fields.oxygen_critical =
-            local_oxygen <= equipped_suit.suit.oxygen_critical_threshold();
+            local_oxygen <= equipped_suit.suit.oxygen_warning_threshold(&balance.player);
+        player_fields.oxygen_critical = local_oxygen
+            <= equipped_suit
+                .suit
+                .oxygen_critical_threshold(&balance.player);
         mission_state.lowest_player_oxygen = mission_state.lowest_player_oxygen.min(local_oxygen);
     }
 }

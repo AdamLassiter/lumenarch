@@ -1,8 +1,8 @@
 use super::*;
 
-pub(super) type SimVec = crate::gameplay::helpers::FixedVec2;
+pub(crate) type SimVec = crate::gameplay::helpers::FixedVec2;
 
-pub(super) fn spawn_hostile_salvage(
+pub(crate) fn spawn_hostile_salvage(
     commands: &mut Commands,
     position: SimVec,
     salvage_reward: u32,
@@ -25,7 +25,7 @@ pub(super) fn spawn_hostile_salvage(
     ));
 }
 
-pub(super) fn consume_ship_resource(
+pub(crate) fn consume_ship_resource(
     storage_query: &mut Query<(&ChildOf, &mut StorageModule)>,
     children: &Children,
     resource_kind: crate::gameplay::components::ResourceKind,
@@ -45,7 +45,7 @@ pub(super) fn consume_ship_resource(
     false
 }
 
-pub(super) fn absorb_hostile_shield_hit(
+pub(crate) fn absorb_hostile_shield_hit(
     root_entity: Entity,
     ship_rotation: Fx,
     projectile: &Projectile,
@@ -65,7 +65,7 @@ pub(super) fn absorb_hostile_shield_hit(
     false
 }
 
-pub(super) fn absorb_player_shield_hit(
+pub(crate) fn absorb_player_shield_hit(
     ship_rotation: Fx,
     projectile: &Projectile,
     shield_query: &mut Query<

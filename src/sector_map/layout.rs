@@ -15,10 +15,10 @@ use crate::{
     },
 };
 
-pub(super) const MAP_CENTER_X: f32 = 360.0;
-pub(super) const MAP_CENTER_Y: f32 = 230.0;
-pub(super) const MAP_NODE_WIDTH: f32 = 170.0;
-pub(super) const MAP_NODE_HEIGHT: f32 = 52.0;
+pub(crate) const MAP_CENTER_X: f32 = 360.0;
+pub(crate) const MAP_CENTER_Y: f32 = 230.0;
+pub(crate) const MAP_NODE_WIDTH: f32 = 170.0;
+pub(crate) const MAP_NODE_HEIGHT: f32 = 52.0;
 
 pub(crate) fn sync_sector_map_layout(
     sector_state: Res<SectorState>,
@@ -107,7 +107,7 @@ pub(crate) fn update_sector_map_text(
     }
 }
 
-pub(super) fn sector_status_text(sector_state: &SectorState) -> String {
+pub(crate) fn sector_status_text(sector_state: &SectorState) -> String {
     let current = sector_state
         .current_node()
         .map(|node| node.label.as_str())
@@ -124,7 +124,7 @@ pub(super) fn sector_status_text(sector_state: &SectorState) -> String {
     )
 }
 
-pub(super) fn sector_detail_text(sector_state: &SectorState) -> String {
+pub(crate) fn sector_detail_text(sector_state: &SectorState) -> String {
     let Some(node) = sector_state.selected_node() else {
         return "Select a reachable node to inspect its encounter profile.".to_string();
     };
@@ -144,7 +144,7 @@ pub(super) fn sector_detail_text(sector_state: &SectorState) -> String {
     )
 }
 
-pub(super) fn node_button_color(
+pub(crate) fn node_button_color(
     kind: SectorNodeKind,
     status: SectorNodeStatus,
     reachable: bool,
@@ -174,7 +174,7 @@ pub(super) fn node_button_color(
     }
 }
 
-pub(super) fn node_border_color(is_current: bool, reachable: bool) -> Color {
+pub(crate) fn node_border_color(is_current: bool, reachable: bool) -> Color {
     if is_current {
         Color::srgb(0.98, 0.88, 0.42)
     } else if reachable {
@@ -184,7 +184,7 @@ pub(super) fn node_border_color(is_current: bool, reachable: bool) -> Color {
     }
 }
 
-pub(super) fn projected_node(position: [f32; 2], zoom: f32, offset: Vec2) -> Node {
+pub(crate) fn projected_node(position: [f32; 2], zoom: f32, offset: Vec2) -> Node {
     Node {
         position_type: PositionType::Absolute,
         left: Val::Px(position[0] * zoom + MAP_CENTER_X + offset.x),
@@ -200,7 +200,7 @@ pub(super) fn projected_node(position: [f32; 2], zoom: f32, offset: Vec2) -> Nod
     }
 }
 
-pub(super) fn projected_link_dash(
+pub(crate) fn projected_link_dash(
     start: [f32; 2],
     end: [f32; 2],
     zoom: f32,

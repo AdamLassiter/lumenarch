@@ -15,7 +15,7 @@ use crate::{
     state::PlayingCleanup,
 };
 
-pub(super) fn spawn_salvage_wreck(commands: &mut Commands, salvage_value: u32) {
+pub(crate) fn spawn_salvage_wreck(commands: &mut Commands, salvage_value: u32) {
     if salvage_value == 0 {
         return;
     }

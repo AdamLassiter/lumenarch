@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn wrap_angle_f32(angle: f32) -> f32 {
+pub(crate) fn wrap_angle_f32(angle: f32) -> f32 {
     let mut angle = angle;
     while angle <= -std::f32::consts::PI {
         angle += std::f32::consts::TAU;
@@ -11,11 +11,11 @@ pub(super) fn wrap_angle_f32(angle: f32) -> f32 {
     angle
 }
 
-pub(super) fn fixed_square(value: Fx) -> crate::gameplay::helpers::WideFx {
+pub(crate) fn fixed_square(value: Fx) -> crate::gameplay::helpers::WideFx {
     crate::gameplay::helpers::widen(value) * crate::gameplay::helpers::widen(value)
 }
 
-pub(super) fn nearby_logistics_target_ids(
+pub(crate) fn nearby_logistics_target_ids(
     focused_module_id: u64,
     candidate_query: &Query<&RuntimeShipModule>,
 ) -> Vec<u64> {
@@ -31,7 +31,7 @@ pub(super) fn nearby_logistics_target_ids(
         .collect()
 }
 
-pub(super) fn take_first_available(
+pub(crate) fn take_first_available(
     inventory: &mut crate::gameplay::components::ResourceInventory,
 ) -> Option<(ResourceKind, u32)> {
     if inventory.raw_salvage > 0 {
@@ -51,7 +51,7 @@ pub(super) fn take_first_available(
     }
 }
 
-pub(super) fn resource_label(kind: ResourceKind) -> &'static str {
+pub(crate) fn resource_label(kind: ResourceKind) -> &'static str {
     match kind {
         ResourceKind::RawSalvage => "raw salvage",
         ResourceKind::RepairCharge => "repair charge",
@@ -60,7 +60,7 @@ pub(super) fn resource_label(kind: ResourceKind) -> &'static str {
     }
 }
 
-pub(super) fn cargo_color(kind: ResourceKind) -> Color {
+pub(crate) fn cargo_color(kind: ResourceKind) -> Color {
     match kind {
         ResourceKind::RawSalvage => Color::srgb(0.90, 0.78, 0.34),
         ResourceKind::RepairCharge => Color::srgb(0.38, 0.88, 0.98),
@@ -69,7 +69,7 @@ pub(super) fn cargo_color(kind: ResourceKind) -> Color {
     }
 }
 
-pub(super) fn anchor_player_to_focused_station(
+pub(crate) fn anchor_player_to_focused_station(
     motion: &mut PlayerMotionState,
     position: &mut InternalPosition,
     control_state: &ShipboardControlState,
@@ -118,14 +118,14 @@ pub(super) fn anchor_player_to_focused_station(
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct ShipCollisionTile {
-    pub(super) center: FixedVec2,
-    pub(super) exterior_edges: u8,
-    pub(super) solid: bool,
-    pub(super) opening: bool,
+pub(crate) struct ShipCollisionTile {
+    pub(crate) center: FixedVec2,
+    pub(crate) exterior_edges: u8,
+    pub(crate) solid: bool,
+    pub(crate) opening: bool,
 }
 
-pub(super) fn ship_collision_tiles(
+pub(crate) fn ship_collision_tiles(
     ship_entity: Entity,
     atmosphere_state: &ShipAtmosphereState,
     module_query: &Query<
@@ -172,27 +172,34 @@ pub(super) fn ship_collision_tiles(
         .collect()
 }
 
-pub(super) fn resolve_ship_local_motion(
+pub(crate) fn resolve_ship_local_motion(
     start: FixedVec2,
     desired: FixedVec2,
     collision_tiles: &[ShipCollisionTile],
+    collision_radius: Fx,
 ) -> FixedVec2 {
     let mut resolved = start;
     let try_x = FixedVec2::new(desired.x, resolved.y);
-    if !movement_blocked(resolved, try_x, collision_tiles) {
+    if !movement_blocked(resolved, try_x, collision_tiles, collision_radius) {
         resolved.x = desired.x;
     }
     let try_y = FixedVec2::new(resolved.x, desired.y);
-    if !movement_blocked(resolved, try_y, collision_tiles) {
+    if !movement_blocked(resolved, try_y, collision_tiles, collision_radius) {
         resolved.y = desired.y;
     }
     resolved
 }
 
-fn movement_blocked(from: FixedVec2, to: FixedVec2, collision_tiles: &[ShipCollisionTile]) -> bool {
-    if collision_tiles.iter().any(|tile| {
-        tile.solid && point_overlaps_tile(to, tile.center, Fx::from_num(PLAYER_COLLISION_RADIUS))
-    }) {
+fn movement_blocked(
+    from: FixedVec2,
+    to: FixedVec2,
+    collision_tiles: &[ShipCollisionTile],
+    collision_radius: Fx,
+) -> bool {
+    if collision_tiles
+        .iter()
+        .any(|tile| tile.solid && point_overlaps_tile(to, tile.center, collision_radius))
+    {
         return true;
     }
 

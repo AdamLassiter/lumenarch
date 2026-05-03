@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy_ggrs::PlayerInputs;
 
 use crate::{
+    balance::BalanceConfig,
     gameplay::{
         components::{
             BeginHeldInteraction,
@@ -18,6 +19,7 @@ use crate::{
 };
 
 pub(crate) fn run_shipboard_interaction_input(
+    balance: Res<BalanceConfig>,
     session_inputs: Option<Res<PlayerInputs<LumenGgrsConfig>>>,
     player_query: Query<
         (
@@ -53,7 +55,7 @@ pub(crate) fn run_shipboard_interaction_input(
                     player,
                     target,
                     kind,
-                    required: interaction_hold_duration(kind),
+                    required: interaction_hold_duration(kind, &balance),
                 });
             }
         } else if input.pressed(netcode::INPUT_INTERACT) {

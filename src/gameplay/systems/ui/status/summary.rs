@@ -1,24 +1,24 @@
 use super::*;
 
-pub(super) struct ArchSummary {
-    pub(super) program_name: String,
-    pub(super) exec_summary: String,
-    pub(super) invalid_count: u32,
-    pub(super) recent_writes: String,
+pub(crate) struct ArchSummary {
+    pub(crate) program_name: String,
+    pub(crate) exec_summary: String,
+    pub(crate) invalid_count: u32,
+    pub(crate) recent_writes: String,
 }
 
 #[derive(Clone, Copy, Default)]
-pub(super) struct StationFlags {
-    pub(super) storage: bool,
-    pub(super) manipulator: bool,
-    pub(super) processor: bool,
-    pub(super) airlock: bool,
-    pub(super) computer: bool,
-    pub(super) reactor: bool,
-    pub(super) turret: bool,
+pub(crate) struct StationFlags {
+    pub(crate) storage: bool,
+    pub(crate) manipulator: bool,
+    pub(crate) processor: bool,
+    pub(crate) airlock: bool,
+    pub(crate) computer: bool,
+    pub(crate) reactor: bool,
+    pub(crate) turret: bool,
 }
 
-pub(super) fn build_top_banner(
+pub(crate) fn build_top_banner(
     mission_state: &MissionState,
     weapon_state: &ShipWeaponState,
     hostile_count: usize,
@@ -39,7 +39,7 @@ pub(super) fn build_top_banner(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn build_compact_status(
+pub(crate) fn build_compact_status(
     player_identity: &PlayerIdentity,
     player_motion: &PlayerMotionState,
     ship_position: &SimPosition,
@@ -146,7 +146,7 @@ pub(super) fn build_compact_status(
     )
 }
 
-pub(super) fn summarize_modules(
+pub(crate) fn summarize_modules(
     children: &Children,
     module_query: &Query<
         (
@@ -204,7 +204,7 @@ pub(super) fn summarize_modules(
     )
 }
 
-pub(super) fn summarize_arch(
+pub(crate) fn summarize_arch(
     children: &Children,
     module_query: &Query<
         (
@@ -277,7 +277,7 @@ pub(super) fn summarize_arch(
     }
 }
 
-pub(super) fn controls_help_text(mode: ShipControlMode) -> String {
+pub(crate) fn controls_help_text(mode: ShipControlMode) -> String {
     match mode {
         ShipControlMode::Interior => {
             "Walk / EVA\nWASD move or thrust\nE enter station / work\nF pick up, equip suit, or deposit\nG drop carried item\nQ or Esc leave station\nF3 diagnostics  |  Tab station hub".to_string()
@@ -300,7 +300,7 @@ pub(super) fn controls_help_text(mode: ShipControlMode) -> String {
     }
 }
 
-pub(super) fn reference_frame_label(
+pub(crate) fn reference_frame_label(
     player_motion: &PlayerMotionState,
     ship_identity_query: &Query<
         (Entity, Option<&PlayerShip>, Option<&HostileShip>),
@@ -318,7 +318,7 @@ pub(super) fn reference_frame_label(
     }
 }
 
-pub(super) fn ship_affiliation_label(
+pub(crate) fn ship_affiliation_label(
     ship_entity: Entity,
     ship_identity_query: &Query<
         (Entity, Option<&PlayerShip>, Option<&HostileShip>),
@@ -339,7 +339,7 @@ pub(super) fn ship_affiliation_label(
         .unwrap_or("Unknown Ship")
 }
 
-pub(super) fn nearby_logistics_target_ids(
+pub(crate) fn nearby_logistics_target_ids(
     focused_module_id: u64,
     candidate_query: &Query<&RuntimeShipModule>,
 ) -> Vec<u64> {
@@ -357,7 +357,7 @@ pub(super) fn nearby_logistics_target_ids(
         .collect()
 }
 
-pub(super) fn percent(value: f32, max: f32) -> f32 {
+pub(crate) fn percent(value: f32, max: f32) -> f32 {
     if max <= 0.0 {
         0.0
     } else {

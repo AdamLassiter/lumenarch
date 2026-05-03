@@ -35,11 +35,11 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct ParsedSessionDescriptor {
-    pub(super) role: SessionRole,
-    pub(super) local_bind_addr: SocketAddr,
-    pub(super) peer_addrs: Vec<SocketAddr>,
-    pub(super) local_handle: PlayerHandle,
+pub(crate) struct ParsedSessionDescriptor {
+    pub(crate) role: SessionRole,
+    pub(crate) local_bind_addr: SocketAddr,
+    pub(crate) peer_addrs: Vec<SocketAddr>,
+    pub(crate) local_handle: PlayerHandle,
 }
 
 pub(crate) fn begin_session_attempt(
@@ -331,7 +331,7 @@ fn parse_session_descriptor(value: &str) -> Result<ParsedSessionDescriptor, Stri
     })
 }
 
-fn load_initial_rollback_state() -> RollbackGameState {
+pub(crate) fn load_initial_rollback_state() -> RollbackGameState {
     let mut state = RollbackGameState::default();
 
     if let Ok(Some(saved_ship)) = load_default_ship() {

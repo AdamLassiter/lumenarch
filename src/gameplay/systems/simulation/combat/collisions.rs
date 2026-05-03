@@ -61,6 +61,7 @@ struct ShieldCollisionDamage {
 
 pub(crate) fn handle_ship_collisions(
     mut commands: Commands,
+    balance: Res<BalanceConfig>,
     mut ship_queries: ParamSet<(
         Query<
             (
@@ -114,6 +115,7 @@ pub(crate) fn handle_ship_collisions(
                     rotation.radians,
                     player_ship.is_some(),
                     hostile_ai,
+                    &balance,
                     &module_read_query,
                 )
             },
@@ -164,16 +166,22 @@ pub(crate) fn handle_ship_collisions(
                     };
                     let closing_speed = clamp_non_negative(
                         (-dot(relative_velocity, normal)).max(Fx::from_num(0)),
-                        COLLISION_MAX_EFFECTIVE_SPEED,
+                        Fx::from_num(balance.combat.collision_max_effective_speed),
                     );
-                    let collision_energy =
-                        collision_energy_wide(ship_a.mass, ship_b.mass, closing_speed);
+                    let collision_energy = collision_energy_wide(
+                        ship_a.mass,
+                        ship_b.mass,
+                        closing_speed,
+                        Fx::from_num(balance.combat.collision_max_effective_mass),
+                        Fx::from_num(balance.combat.collision_max_effective_speed),
+                    );
 
                     apply_overlap_separation(
                         ship_a,
                         ship_b,
                         normal,
                         overlap,
+                        &balance,
                         &mut ship_adjustments,
                     );
                     apply_collision_impulse(
@@ -181,10 +189,15 @@ pub(crate) fn handle_ship_collisions(
                         ship_b,
                         normal,
                         closing_speed,
+                        &balance,
                         &mut ship_adjustments,
                     );
 
-                    let damage = collision_damage_from_energy(collision_energy);
+                    let damage = collision_damage_from_energy(
+                        collision_energy,
+                        WideFx::from_num(balance.combat.collision_damage_energy_threshold),
+                        WideFx::from_num(balance.combat.collision_damage_energy_divisor),
+                    );
                     if damage <= 0 {
                         continue;
                     }
@@ -259,7 +272,7 @@ pub(crate) fn handle_ship_collisions(
             integrity.current = (integrity.current - damage.damage).max(0);
             runtime_state.current_heat +=
                 narrow_wide_clamped(safe_sqrt_wide(damage.highest_impact_energy))
-                    * COLLISION_HEAT_FROM_DAMAGE;
+                    * Fx::from_num(balance.combat.collision_heat_from_damage);
             runtime_state.needs_attention = true;
 
             if integrity.current > 0 || destroyed.is_some() {
@@ -276,7 +289,7 @@ pub(crate) fn handle_ship_collisions(
                     mission_state.completion_reason = None;
                     mission_state
                         .return_delay_remaining
-                        .get_or_insert(Fx::from_num(2.5));
+                        .get_or_insert(Fx::from_num(balance.mission.return_delay_seconds));
                 }
                 Some(CollisionShipKind::Hostile { salvage_reward })
                     if runtime_module.kind == ModuleKind::Core =>
@@ -302,6 +315,7 @@ fn build_ship_snapshot(
     rotation: Fx,
     is_player: bool,
     hostile_ai: Option<&HostileShipAi>,
+    balance: &BalanceConfig,
     module_query: &Query<
         (
             &RuntimeShipModule,
@@ -313,8 +327,10 @@ fn build_ship_snapshot(
         With<RuntimeShipModule>,
     >,
 ) -> ShipCollisionSnapshot {
+    let component_collider_radius = Fx::from_num(balance.combat.component_collider_radius);
+    let shield_collider_radius = Fx::from_num(balance.combat.shield_collider_radius);
     let mut colliders = Vec::new();
-    let mut broad_radius = COMPONENT_COLLIDER_RADIUS;
+    let mut broad_radius = component_collider_radius;
     let mut live_module_count = 0usize;
 
     for child in children.iter() {
@@ -333,7 +349,7 @@ fn build_ship_snapshot(
             && let Some(shield_state) = shield_state
             && shield_state.strength > Fx::from_num(0)
         {
-            let radius = SHIELD_COLLIDER_RADIUS;
+            let radius = shield_collider_radius;
             broad_radius = broad_radius.max((world_position - position).length() + radius);
             colliders.push(ShipCollider {
                 entity: child,
@@ -350,7 +366,7 @@ fn build_ship_snapshot(
             continue;
         }
 
-        let radius = COMPONENT_COLLIDER_RADIUS;
+        let radius = component_collider_radius;
         broad_radius = broad_radius.max((world_position - position).length() + radius);
         colliders.push(ShipCollider {
             entity: child,
@@ -430,12 +446,13 @@ fn apply_overlap_separation(
     ship_b: &ShipCollisionSnapshot,
     normal: FixedVec2,
     overlap: Fx,
+    balance: &BalanceConfig,
     ship_adjustments: &mut BTreeMap<Entity, ShipCollisionAdjustment>,
 ) {
     let inv_mass_a = Fx::from_num(1) / ship_a.mass.max(Fx::from_num(1));
     let inv_mass_b = Fx::from_num(1) / ship_b.mass.max(Fx::from_num(1));
     let inv_mass_sum = (inv_mass_a + inv_mass_b).max(Fx::from_num(0.001));
-    let correction = normal * overlap * COLLISION_PUSH_STIFFNESS;
+    let correction = normal * overlap * Fx::from_num(balance.combat.collision_push_stiffness);
     let share_a = inv_mass_a / inv_mass_sum;
     let share_b = inv_mass_b / inv_mass_sum;
 
@@ -454,6 +471,7 @@ fn apply_collision_impulse(
     ship_b: &ShipCollisionSnapshot,
     normal: FixedVec2,
     closing_speed: Fx,
+    balance: &BalanceConfig,
     ship_adjustments: &mut BTreeMap<Entity, ShipCollisionAdjustment>,
 ) {
     if closing_speed <= Fx::from_num(0) {
@@ -467,8 +485,9 @@ fn apply_collision_impulse(
         return;
     }
 
-    let impulse =
-        normal * (closing_speed * (Fx::from_num(1) + COLLISION_RESTITUTION) / inv_mass_sum);
+    let impulse = normal
+        * (closing_speed * (Fx::from_num(1) + Fx::from_num(balance.combat.collision_restitution))
+            / inv_mass_sum);
     ship_adjustments
         .entry(ship_a.entity)
         .or_default()

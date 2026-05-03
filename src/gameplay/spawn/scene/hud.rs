@@ -34,7 +34,7 @@ use crate::{
     },
 };
 
-pub(super) fn spawn_runtime_hud(
+pub(crate) fn spawn_runtime_hud(
     commands: &mut Commands,
     asset_server: &AssetServer,
     ship: &ShipDefinition,

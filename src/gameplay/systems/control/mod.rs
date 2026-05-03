@@ -10,6 +10,7 @@ use super::super::{
         AngularVelocity,
         CarriedItemKind,
         CarriedResource,
+        CrewNameBackdrop,
         CrewNameLabel,
         CurrentStation,
         DestroyedModule,
@@ -100,15 +101,3 @@ pub(crate) use ship::{
     integrate_player_ship_motion,
     update_station_command_input,
 };
-
-const INTERIOR_CAMERA_SCALE: f32 = 0.58;
-const EXTERIOR_CAMERA_SCALE: f32 = 1.0;
-const PLAYER_WALK_ACCELERATION: f32 = 260.0;
-const PLAYER_WALK_MAX_SPEED: f32 = 120.0;
-const PLAYER_WALK_DAMPING: f32 = 8.0;
-const PLAYER_EVA_ACCELERATION: f32 = 180.0;
-const PLAYER_EVA_MAX_SPEED: f32 = 140.0;
-const PLAYER_EVA_DAMPING: f32 = 1.6;
-const PLAYER_INTERACT_RADIUS: f32 = 28.0;
-const PLAYER_CARGO_PICKUP_RADIUS: f32 = 20.0;
-const PLAYER_COLLISION_RADIUS: f32 = 7.0;

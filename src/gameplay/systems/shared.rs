@@ -1,7 +1,7 @@
 use super::super::components::{InteractionKind, ModuleCondition};
 use crate::ship::ModuleKind;
 
-pub(super) fn module_display_name(kind: ModuleKind) -> String {
+pub(crate) fn module_display_name(kind: ModuleKind) -> String {
     sentence_case(kind.as_str())
 }
 
@@ -15,7 +15,7 @@ fn sentence_case(s: &str) -> String {
     }
 }
 
-pub(super) fn interaction_label(kind: InteractionKind) -> &'static str {
+pub(crate) fn interaction_label(kind: InteractionKind) -> &'static str {
     match kind {
         InteractionKind::Cockpit => "enter cockpit station",
         InteractionKind::Computer => "open computer console",
@@ -30,7 +30,7 @@ pub(super) fn interaction_label(kind: InteractionKind) -> &'static str {
     }
 }
 
-pub(super) fn condition_severity(condition: ModuleCondition) -> i32 {
+pub(crate) fn condition_severity(condition: ModuleCondition) -> i32 {
     match condition {
         ModuleCondition::Healthy => 0,
         ModuleCondition::Degraded => 1,

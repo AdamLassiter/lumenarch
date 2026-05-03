@@ -50,7 +50,7 @@ pub(crate) fn sector_node_button_system(
         (Changed<Interaction>, With<Button>),
     >,
     status: Res<netcode::SessionStatus>,
-    sector_state: Res<SectorState>,
+    mut sector_state: ResMut<SectorState>,
     mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
 ) {
     if !netcode::is_host_authority(&status) {
@@ -65,6 +65,7 @@ pub(crate) fn sector_node_button_system(
         match *interaction {
             Interaction::Pressed => {
                 if reachable && !matches!(node.kind, SectorNodeKind::HubStation) {
+                    sector_state.selected_node_id = Some(button.node_id);
                     log::debug!(
                         "Sector map queued SelectSectorNode meta command for node {}",
                         button.node_id
@@ -116,7 +117,11 @@ pub(crate) fn sector_navigation_button_system(
             Interaction::Pressed => {
                 if launch.is_some() {
                     *background = BackgroundColor(Color::srgb(0.12, 0.40, 0.24));
-                    if let Some(node_id) = sector_state.selected_node_id
+                    let queued_selection = pending_meta.0.as_ref().and_then(|command| {
+                        matches!(command.op, netcode::RollbackMetaOp::SelectSectorNode)
+                            .then_some(command.arg0.max(0) as u32)
+                    });
+                    if let Some(node_id) = queued_selection.or(sector_state.selected_node_id)
                         && sector_state.is_reachable(node_id)
                         && sector_state
                             .node(node_id)

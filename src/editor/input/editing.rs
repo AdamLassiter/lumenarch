@@ -29,6 +29,7 @@ use crate::{
         storage::{load_default_ship, save_default_ship},
     },
     state::{
+        ArchEditorState,
         DemoProgression,
         EditorMissionReportButton,
         EditorMode,
@@ -41,8 +42,10 @@ use crate::{
         EnemyEditorState,
         EnemyShipLibraryState,
         FrontendMode,
+        GameplayStationPanelButton,
         LeaveEditorButton,
         MainCamera,
+        ProgrammingLanguageMode,
         ToolboxButton,
     },
 };
@@ -175,11 +178,7 @@ pub(crate) fn rotate_selected_tool(
     keys: Res<ButtonInput<KeyCode>>,
     mut tool_state: ResMut<EditorToolState>,
 ) {
-    if keys.just_pressed(KeyCode::KeyQ) {
-        tool_state.selected_rotation = (tool_state.selected_rotation + 3) % 4;
-    }
-
-    if keys.just_pressed(KeyCode::KeyE) {
+    if keys.just_pressed(KeyCode::KeyR) {
         tool_state.selected_rotation = (tool_state.selected_rotation + 1) % 4;
     }
 
@@ -194,6 +193,14 @@ pub(crate) fn rotate_selected_tool(
             .selected_variant
             .cycle_for_kind(tool_state.selected_kind, 1);
     }
+
+    if keys.just_pressed(KeyCode::KeyC) {
+        tool_state.selected_channel = tool_state.selected_channel.wrapping_add(9) % 10;
+    }
+
+    if keys.just_pressed(KeyCode::KeyV) {
+        tool_state.selected_channel = (tool_state.selected_channel + 1) % 10;
+    }
 }
 
 pub(crate) fn place_or_remove_tile(
@@ -206,6 +213,7 @@ pub(crate) fn place_or_remove_tile(
     mut rollback_state: ResMut<netcode::RollbackGameState>,
     editor_session: Res<EditorSessionState>,
     tool_state: Res<EditorToolState>,
+    mut arch_editor_state: ResMut<ArchEditorState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
 ) {
     if !netcode::is_host_authority(&status) {
@@ -215,6 +223,22 @@ pub(crate) fn place_or_remove_tile(
 
     if is_cursor_over_editor_ui(window) {
         return;
+    }
+
+    if arch_editor_state.panel_open {
+        let width = window.width();
+        let height = window.height();
+        let over_module_panel = if let Some(cursor) = window.cursor_position() {
+            cursor.x >= width * 0.2
+                && cursor.x <= width * 0.8
+                && cursor.y >= 160.0
+                && cursor.y <= height - 40.0
+        } else {
+            false
+        };
+        if over_module_panel {
+            return;
+        }
     }
 
     let Some((grid_x, grid_y)) = cursor_grid_position(window, *camera_query) else {
@@ -228,6 +252,7 @@ pub(crate) fn place_or_remove_tile(
         if let Some(existing) = editor_ship.ship.module_at_mut(grid_x, grid_y) {
             if existing.kind == tool_state.selected_kind && existing.variant == selected_variant {
                 existing.rotation_quadrants = tool_state.selected_rotation;
+                existing.channel = tool_state.selected_channel;
                 return;
             }
 
@@ -242,6 +267,7 @@ pub(crate) fn place_or_remove_tile(
             existing.kind = tool_state.selected_kind;
             existing.variant = selected_variant;
             existing.rotation_quadrants = tool_state.selected_rotation;
+            existing.channel = tool_state.selected_channel;
         } else {
             if editor_session.mode == EditorMode::Player
                 && !progression
@@ -259,6 +285,7 @@ pub(crate) fn place_or_remove_tile(
             ));
             if let Some(module) = editor_ship.ship.module_at_mut(grid_x, grid_y) {
                 module.variant = selected_variant;
+                module.channel = tool_state.selected_channel;
             }
         }
         if editor_session.mode == EditorMode::Player {
@@ -285,6 +312,165 @@ pub(crate) fn place_or_remove_tile(
     }
 }
 
+pub(crate) fn toggle_editor_module_overlay_shortcuts(
+    keys: Res<ButtonInput<KeyCode>>,
+    window: Single<&Window, With<PrimaryWindow>>,
+    camera_query: Single<(&Camera, &GlobalTransform)>,
+    editor_ship: Res<EditorShip>,
+    mut tool_state: ResMut<EditorToolState>,
+    mut arch_editor_state: ResMut<ArchEditorState>,
+) {
+    if keys.just_pressed(KeyCode::KeyQ) {
+        arch_editor_state.panel_open = false;
+        return;
+    }
+
+    if !keys.just_pressed(KeyCode::KeyE) {
+        return;
+    }
+
+    let window = window.into_inner();
+    let Some((grid_x, grid_y)) = cursor_grid_position(window, *camera_query) else {
+        return;
+    };
+    let Some(module) = editor_ship.ship.module_at(grid_x, grid_y) else {
+        return;
+    };
+    arch_editor_state.selected_module_id = Some(module.id);
+    arch_editor_state.panel_open = true;
+    tool_state.selected_kind = module.kind;
+    tool_state.selected_variant = module.variant;
+    tool_state.selected_rotation = module.rotation_quadrants;
+    tool_state.selected_channel = module.effective_channel();
+}
+
+pub(crate) fn editor_station_panel_button_system(
+    mut interaction_query: Query<
+        (
+            &Interaction,
+            &GameplayStationPanelButton,
+            &mut BackgroundColor,
+        ),
+        (Changed<Interaction>, With<Button>),
+    >,
+    mut editor_ship: ResMut<EditorShip>,
+    arch_editor_state: Res<ArchEditorState>,
+    editor_session: Res<EditorSessionState>,
+    status: Res<netcode::SessionStatus>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
+) {
+    if !arch_editor_state.panel_open || !netcode::is_host_authority(&status) {
+        return;
+    }
+    let Some(module_id) = arch_editor_state.selected_module_id else {
+        return;
+    };
+    let mut changed = false;
+    for (interaction, button, mut background) in &mut interaction_query {
+        match *interaction {
+            Interaction::Pressed => {
+                *background = BackgroundColor(PRESSED_BUTTON);
+                let Some(module) = editor_ship
+                    .ship
+                    .modules
+                    .iter_mut()
+                    .find(|module| module.id == module_id)
+                else {
+                    continue;
+                };
+                match button.action {
+                    crate::state::StationPanelButtonAction::HelmThrottle { .. }
+                    | crate::state::StationPanelButtonAction::HelmTurn { .. } => {}
+                    crate::state::StationPanelButtonAction::TurretAdjustAim { .. } => {}
+                    crate::state::StationPanelButtonAction::TurretFireToggle => {
+                        module.defaults.turret_fire_intent = !module.defaults.turret_fire_intent;
+                    }
+                    crate::state::StationPanelButtonAction::ReactorAdjustRate { delta } => {
+                        let current = module.defaults.reaction_rate_milli as i32;
+                        module.defaults.reaction_rate_milli =
+                            (current + (delta * 1000.0) as i32).clamp(0, 1000) as u16;
+                    }
+                    crate::state::StationPanelButtonAction::ReactorAdjustTurbine { delta } => {
+                        let current = module.defaults.turbine_load_milli as i32;
+                        module.defaults.turbine_load_milli =
+                            (current + (delta * 1000.0) as i32).clamp(0, 1000) as u16;
+                    }
+                    crate::state::StationPanelButtonAction::LogisticsToggleStorageIntake => {
+                        module.defaults.storage_allow_intake =
+                            !module.defaults.storage_allow_intake;
+                    }
+                    crate::state::StationPanelButtonAction::LogisticsToggleAirlock => {
+                        module.defaults.airlock_open = !module.defaults.airlock_open;
+                    }
+                    crate::state::StationPanelButtonAction::LogisticsToggleManipulator => {
+                        module.defaults.manipulator_transfer_enabled =
+                            !module.defaults.manipulator_transfer_enabled;
+                    }
+                    crate::state::StationPanelButtonAction::LogisticsCycleManipulatorTarget {
+                        ..
+                    } => {
+                        module.defaults.manipulator_manual_mode =
+                            !module.defaults.manipulator_manual_mode;
+                    }
+                    crate::state::StationPanelButtonAction::LogisticsCycleResource => {
+                        module.defaults.manipulator_resource_kind =
+                            module.defaults.manipulator_resource_kind.next();
+                    }
+                    crate::state::StationPanelButtonAction::LogisticsToggleProcessor => {
+                        if module.kind == crate::ship::ModuleKind::Processor {
+                            module.defaults.processor_enabled = !module.defaults.processor_enabled;
+                        } else {
+                            module.defaults.processor_recipe =
+                                module.defaults.processor_recipe.next();
+                        }
+                    }
+                    crate::state::StationPanelButtonAction::ComputerToggleEnabled => {
+                        module.defaults.computer_enabled = !module.defaults.computer_enabled;
+                    }
+                    crate::state::StationPanelButtonAction::ComputerCycleTemplate => {
+                        match arch_editor_state.selected_language {
+                            ProgrammingLanguageMode::Arch => {
+                                let program = module.arch_program.get_or_insert_with(|| {
+                                    crate::ship::arch::ArchProgram::from_template(
+                                        crate::ship::arch::ArchProgramTemplate::BalancedOps,
+                                    )
+                                });
+                                *program = crate::ship::arch::ArchProgram::from_template(
+                                    program.template.next(),
+                                );
+                            }
+                            ProgrammingLanguageMode::Lumen => {
+                                let program = module.lumen_program.get_or_insert_with(|| {
+                                    crate::ship::lumen::LumenProgram::from_template(
+                                    crate::ship::lumen::LumenProgramTemplate::BalancedSupervision,
+                                )
+                                });
+                                *program = crate::ship::lumen::LumenProgram::from_template(
+                                    program.template.next(),
+                                );
+                            }
+                        }
+                    }
+                }
+                changed = true;
+            }
+            Interaction::Hovered => {
+                *background = BackgroundColor(HOVERED_BUTTON);
+            }
+            Interaction::None => {}
+        }
+    }
+
+    if changed {
+        if editor_session.mode == EditorMode::Player {
+            rollback_state.editor_ship = editor_ship.ship.clone();
+        } else {
+            enemy_editor_state.dirty = true;
+        }
+    }
+}
+
 pub(crate) fn repair_selected_component_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     editor_session: Res<EditorSessionState>,
@@ -292,7 +478,7 @@ pub(crate) fn repair_selected_component_shortcut(
     mut progression: ResMut<DemoProgression>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
 ) {
-    if editor_session.mode != EditorMode::Player || !keys.just_pressed(KeyCode::KeyR) {
+    if editor_session.mode != EditorMode::Player || !keys.just_pressed(KeyCode::KeyT) {
         return;
     }
     let variant = tool_state

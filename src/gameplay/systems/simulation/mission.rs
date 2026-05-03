@@ -64,6 +64,7 @@ pub(crate) fn update_mission_telemetry(
 }
 
 pub(crate) fn update_mission_state(
+    balance: Res<BalanceConfig>,
     hostile_query: Query<Entity, With<HostileTarget>>,
     processor_query: Query<&ProcessorModule>,
     salvage_query: Query<Entity, With<SalvageWreck>>,
@@ -75,7 +76,7 @@ pub(crate) fn update_mission_state(
         mission_state.completed = false;
         mission_state
             .return_delay_remaining
-            .get_or_insert(Fx::from_num(2.5));
+            .get_or_insert(Fx::from_num(balance.mission.return_delay_seconds));
         return;
     }
 
@@ -99,7 +100,7 @@ pub(crate) fn update_mission_state(
         if mission_state.completed {
             mission_state
                 .return_delay_remaining
-                .get_or_insert(Fx::from_num(2.5));
+                .get_or_insert(Fx::from_num(balance.mission.return_delay_seconds));
         } else {
             mission_state.return_delay_remaining = None;
         }
@@ -244,11 +245,12 @@ pub(crate) fn sync_runtime_ship_state(
         mission_state.completed = false;
         mission_state
             .return_delay_remaining
-            .get_or_insert(Fx::from_num(2.5));
+            .get_or_insert(Fx::from_num(balance.mission.return_delay_seconds));
     }
 }
 
 pub(crate) fn return_after_mission_resolution(
+    balance: Res<BalanceConfig>,
     time: Res<Time>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
@@ -309,7 +311,7 @@ pub(crate) fn return_after_mission_resolution(
         3
     } else if mission_state.first_disabled_module_kind.is_some() {
         2
-    } else if mission_state.highest_heat >= Fx::from_num(10) {
+    } else if mission_state.highest_heat >= Fx::from_num(balance.mission.hull_wear_heat_threshold) {
         1
     } else {
         0
@@ -426,7 +428,8 @@ pub(crate) fn return_after_mission_resolution(
                 .to_string(),
         );
     }
-    if mission_state.lowest_player_oxygen <= Fx::from_num(3) {
+    if mission_state.lowest_player_oxygen <= Fx::from_num(balance.mission.low_oxygen_hint_threshold)
+    {
         hints.push(
             "Player oxygen dipped critically low. Compartments or seal control may need improvement."
                 .to_string(),

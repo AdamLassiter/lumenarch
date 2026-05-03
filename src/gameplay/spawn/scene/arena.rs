@@ -18,7 +18,7 @@ use crate::{
     state::PlayingCleanup,
 };
 
-pub(super) fn spawn_test_arena(
+pub(crate) fn spawn_test_arena(
     commands: &mut Commands,
     balance: &BalanceConfig,
     arena_variant: &str,

@@ -3,6 +3,3 @@
 
 # Ignore hidden files and directories
 .*
-
-# Ignore the assets directory
-/assets

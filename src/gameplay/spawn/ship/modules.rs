@@ -40,10 +40,17 @@ use crate::{
             sprite_path_for_kind,
         },
     },
-    ship::{ModuleKind, ModuleSpec, ModuleVariant, ShipModule},
+    ship::{
+        ModuleKind,
+        ModuleSpec,
+        ModuleVariant,
+        ShipModule,
+        StoredProcessorRecipe,
+        StoredResourceKind,
+    },
 };
 
-pub(super) fn spawn_runtime_module(
+pub(crate) fn spawn_runtime_module(
     commands: &mut Commands,
     asset_server: &AssetServer,
     module: &ShipModule,
@@ -70,6 +77,7 @@ pub(super) fn spawn_runtime_module(
             module_id: module.id,
             kind: module.kind,
             variant: module.variant,
+            channel: module.effective_channel(),
             grid_x: module.grid_x,
             grid_y: module.grid_y,
             rotation_quadrants: module.rotation_quadrants,
@@ -105,8 +113,10 @@ pub(super) fn spawn_runtime_module(
                 PowerProducer { output: 10 },
                 ReactorCommandState {
                     variant: module.variant,
-                    reaction_rate: Fx::from_num(balance.reactor.starting_reaction_rate),
-                    turbine_load: Fx::from_num(balance.reactor.starting_turbine_load),
+                    reaction_rate: Fx::from_num(module.defaults.reaction_rate_milli)
+                        / Fx::from_num(1000),
+                    turbine_load: Fx::from_num(module.defaults.turbine_load_milli)
+                        / Fx::from_num(1000),
                     confinement: Fx::from_num(0.5),
                     power_output: Fx::from_num(balance.reactor.starting_power_output),
                     fuel_remaining: Fx::from_num(balance.reactor.starting_fuel * 0.35),
@@ -136,12 +146,16 @@ pub(super) fn spawn_runtime_module(
                     accepts_ammunition: module.variant == ModuleVariant::AmmoRack,
                     accepts_general: module.variant == ModuleVariant::GeneralCargo,
                 },
-                StorageCommandState { allow_intake: true },
+                StorageCommandState {
+                    allow_intake: module.defaults.storage_allow_intake,
+                },
             ));
         }
         ModuleKind::Airlock => {
             entity.insert((
-                AirlockCommandState { open: false },
+                AirlockCommandState {
+                    open: module.defaults.airlock_open,
+                },
                 StorageModule {
                     capacity: spec.storage_capacity,
                     inventory: ResourceInventory::default(),
@@ -150,7 +164,9 @@ pub(super) fn spawn_runtime_module(
                     accepts_ammunition: false,
                     accepts_general: true,
                 },
-                StorageCommandState { allow_intake: true },
+                StorageCommandState {
+                    allow_intake: module.defaults.storage_allow_intake,
+                },
                 ManipulatorModule {
                     transfer_progress: Fx::from_num(0),
                     transfer_duration: Fx::from_num(
@@ -163,11 +179,22 @@ pub(super) fn spawn_runtime_module(
                     blocked_reason: None,
                 },
                 ManipulatorCommandState {
-                    manual_mode: false,
-                    transfer_enabled: false,
+                    manual_mode: module.defaults.manipulator_manual_mode,
+                    transfer_enabled: module.defaults.manipulator_transfer_enabled,
                     source_module_id: Some(module.id),
                     target_module_id: None,
-                    resource_kind: crate::gameplay::components::ResourceKind::RawSalvage,
+                    resource_kind: match module.defaults.manipulator_resource_kind {
+                        StoredResourceKind::RawSalvage => {
+                            crate::gameplay::components::ResourceKind::RawSalvage
+                        }
+                        StoredResourceKind::RepairCharge => {
+                            crate::gameplay::components::ResourceKind::RepairCharge
+                        }
+                        StoredResourceKind::Fuel => crate::gameplay::components::ResourceKind::Fuel,
+                        StoredResourceKind::Ammunition => {
+                            crate::gameplay::components::ResourceKind::Ammunition
+                        }
+                    },
                 },
             ));
         }
@@ -183,7 +210,7 @@ pub(super) fn spawn_runtime_module(
             entity.insert((
                 ArchComputerModule,
                 RuntimeArchComputer {
-                    enabled: true,
+                    enabled: module.defaults.computer_enabled,
                     instruction_budget: 24,
                     program: module.arch_program.clone().unwrap_or_else(|| {
                         crate::ship::arch::ArchProgram::from_template(
@@ -215,8 +242,12 @@ pub(super) fn spawn_runtime_module(
                     output_amount: 1,
                 },
                 ProcessorCommandState {
-                    selected_recipe: ProcessorRecipe::RepairCharge,
-                    enabled: true,
+                    selected_recipe: match module.defaults.processor_recipe {
+                        StoredProcessorRecipe::RepairCharge => ProcessorRecipe::RepairCharge,
+                        StoredProcessorRecipe::Ammunition => ProcessorRecipe::Ammunition,
+                        StoredProcessorRecipe::Fuel => ProcessorRecipe::Fuel,
+                    },
+                    enabled: module.defaults.processor_enabled,
                 },
             ));
         }
@@ -243,7 +274,7 @@ pub(super) fn spawn_runtime_module(
                     TurretCommandState {
                         desired_angle: Fx::from_num(0),
                         actual_angle: Fx::from_num(0),
-                        fire_intent: false,
+                        fire_intent: module.defaults.turret_fire_intent,
                     },
                 ))
                 .with_children(|parent| {

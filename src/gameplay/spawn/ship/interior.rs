@@ -9,7 +9,7 @@ use crate::{
     ship::ShipDefinition,
 };
 
-pub(super) fn build_interior_nodes(
+pub(crate) fn build_interior_nodes(
     ship: &ShipDefinition,
     center_x_fixed: Fx,
     center_y_fixed: Fx,
@@ -26,7 +26,7 @@ pub(super) fn build_interior_nodes(
         .collect()
 }
 
-pub(super) fn build_atmosphere_tiles(
+pub(crate) fn build_atmosphere_tiles(
     ship: &ShipDefinition,
     center_x_fixed: Fx,
     center_y_fixed: Fx,

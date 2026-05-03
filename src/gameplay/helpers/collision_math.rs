@@ -1,14 +1,5 @@
 use super::{FixedVec2, Fx, WideFx, widen, wrap_radians};
 
-pub(crate) const COLLISION_PUSH_STIFFNESS: Fx = Fx::from_bits(60293);
-pub(crate) const COLLISION_RESTITUTION: Fx = Fx::from_bits(14418);
-pub(crate) const COLLISION_HEAT_FROM_DAMAGE: Fx = Fx::from_bits(7864);
-pub(crate) const COLLISION_MAX_EFFECTIVE_MASS: Fx = Fx::from_bits(512 << 16);
-pub(crate) const COLLISION_MAX_EFFECTIVE_SPEED: Fx = Fx::from_bits(320 << 16);
-pub(crate) const COLLISION_DAMAGE_ENERGY_DIVISOR: WideFx = WideFx::from_bits(3600i64 << 16);
-pub(crate) const COLLISION_DAMAGE_ENERGY_THRESHOLD: WideFx = WideFx::from_bits(1260i64 << 16);
-pub(crate) const COMPONENT_COLLIDER_RADIUS: Fx = Fx::from_bits(922_747);
-pub(crate) const SHIELD_COLLIDER_RADIUS: Fx = Fx::from_bits(1_593_836);
 pub(crate) const FX_QUARTER_MAX_BITS: i32 = i32::MAX / 4;
 
 pub(crate) fn clamp_signed(value: Fx, max_abs: Fx) -> Fx {
@@ -21,36 +12,43 @@ pub(crate) fn clamp_non_negative(value: Fx, max_value: Fx) -> Fx {
     value.clamp(Fx::from_num(0), max_value)
 }
 
-pub(crate) fn reduced_mass_wide(mass_a: Fx, mass_b: Fx) -> WideFx {
+pub(crate) fn reduced_mass_wide(mass_a: Fx, mass_b: Fx, max_effective_mass: Fx) -> WideFx {
     let mass_a = widen(clamp_non_negative(
         mass_a.max(Fx::from_num(1)),
-        COLLISION_MAX_EFFECTIVE_MASS,
+        max_effective_mass,
     ));
     let mass_b = widen(clamp_non_negative(
         mass_b.max(Fx::from_num(1)),
-        COLLISION_MAX_EFFECTIVE_MASS,
+        max_effective_mass,
     ));
     debug_assert!(mass_a > WideFx::from_num(0));
     debug_assert!(mass_b > WideFx::from_num(0));
     (mass_a * mass_b) / (mass_a + mass_b).max(WideFx::from_num(1))
 }
 
-pub(crate) fn collision_energy_wide(mass_a: Fx, mass_b: Fx, closing_speed: Fx) -> WideFx {
-    let reduced_mass = reduced_mass_wide(mass_a, mass_b);
-    let clamped_speed = widen(clamp_non_negative(
-        closing_speed,
-        COLLISION_MAX_EFFECTIVE_SPEED,
-    ));
+pub(crate) fn collision_energy_wide(
+    mass_a: Fx,
+    mass_b: Fx,
+    closing_speed: Fx,
+    max_effective_mass: Fx,
+    max_effective_speed: Fx,
+) -> WideFx {
+    let reduced_mass = reduced_mass_wide(mass_a, mass_b, max_effective_mass);
+    let clamped_speed = widen(clamp_non_negative(closing_speed, max_effective_speed));
     debug_assert!(clamped_speed >= WideFx::from_num(0));
     (reduced_mass * clamped_speed * clamped_speed) / WideFx::from_num(2)
 }
 
-pub(crate) fn collision_damage_from_energy(collision_energy: WideFx) -> i32 {
+pub(crate) fn collision_damage_from_energy(
+    collision_energy: WideFx,
+    damage_threshold: WideFx,
+    damage_divisor: WideFx,
+) -> i32 {
     let energy = collision_energy.max(WideFx::from_num(0));
-    if energy < COLLISION_DAMAGE_ENERGY_THRESHOLD {
+    if energy < damage_threshold {
         return 0;
     }
-    let steps = energy / COLLISION_DAMAGE_ENERGY_DIVISOR;
+    let steps = energy / damage_divisor.max(WideFx::from_num(1));
     let whole = steps.to_num::<i32>();
     if steps > WideFx::from_num(whole) {
         (whole + 1).max(1)

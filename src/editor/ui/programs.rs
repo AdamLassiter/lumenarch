@@ -16,6 +16,13 @@ use crate::{
         ComputerProgramPanel,
         EditorShip,
         ProgramButtonAction,
+        ProgramEditorAction,
+        ProgramEditorActionButton,
+        ProgramEditorDiagnosticsText,
+        ProgramEditorDraftText,
+        ProgramEditorStatusText,
+        ProgramEditorTextBox,
+        ProgramTextEditorState,
         ProgrammingLanguageMode,
     },
 };
@@ -24,11 +31,15 @@ pub(crate) fn sync_computer_program_entries(
     mut commands: Commands,
     editor_ship: Res<EditorShip>,
     arch_editor_state: Res<ArchEditorState>,
+    program_editor_state: Res<ProgramTextEditorState>,
     asset_server: Res<AssetServer>,
     panel_query: Single<Entity, With<ComputerProgramPanel>>,
     existing_query: Query<Entity, With<ComputerProgramEntry>>,
 ) {
-    if !editor_ship.is_changed() && !arch_editor_state.is_changed() {
+    if !editor_ship.is_changed()
+        && !arch_editor_state.is_changed()
+        && !program_editor_state.is_changed()
+    {
         return;
     }
 
@@ -129,6 +140,21 @@ pub(crate) fn sync_computer_program_entries(
             .lumen_program
             .clone()
             .unwrap_or_else(|| LumenProgram::from_template(LumenProgramTemplate::BalancedSupervision));
+        let draft_text = if program_editor_state.module_id == Some(selected_module.id)
+            && program_editor_state.language == arch_editor_state.selected_language
+        {
+            program_editor_state.draft_text.clone()
+        } else {
+            match arch_editor_state.selected_language {
+                ProgrammingLanguageMode::Arch => program.source_text.clone(),
+                ProgrammingLanguageMode::Lumen => lumen_program.source_text.clone(),
+            }
+        };
+        let diagnostics_text = if program_editor_state.diagnostics.is_empty() {
+            "No parse diagnostics".to_string()
+        } else {
+            program_editor_state.diagnostics.join("\n")
+        };
 
         panel
             .spawn((
@@ -183,19 +209,19 @@ pub(crate) fn sync_computer_program_entries(
                     Text::new(
                         match arch_editor_state.selected_language {
                             ProgrammingLanguageMode::Arch => format!(
-                                "Computer #{}\nProgram: {}\nTemplate: {}\nConst A / B: {} / {}\nValidation: {}",
+                                "Computer #{}\nProgram: {}\nTemplate: {}\nChannel: {}\nValidation: {}",
                                 selected_module.id,
                                 program.name,
                                 program.template.as_str(),
-                                program.constants[0],
-                                program.constants[1],
+                                selected_module.effective_channel(),
                                 program_validation_summary(&program),
                             ),
                             ProgrammingLanguageMode::Lumen => format!(
-                                "Computer #{}\nProgram: {}\nTemplate: {}\nState: {}\nValidation: {}",
+                                "Computer #{}\nProgram: {}\nTemplate: {}\nChannel: {}\nState: {}\nValidation: {}",
                                 selected_module.id,
                                 lumen_program.name,
                                 lumen_program.template.as_str(),
+                                selected_module.effective_channel(),
                                 if lumen_program.enabled { "online" } else { "disabled" },
                                 lumen_validation_summary(&lumen_program),
                             ),
@@ -226,26 +252,6 @@ pub(crate) fn sync_computer_program_entries(
                                     selected_module.id,
                                     ProgramButtonAction::CycleArchTemplate,
                                 );
-                                for (label, index, delta) in [
-                                    ("Const A +1", 0, 1),
-                                    ("Const A -1", 0, -1),
-                                    ("Const B +1", 1, 1),
-                                    ("Const B -1", 1, -1),
-                                ] {
-                                    spawn_program_button(
-                                        buttons,
-                                        &mono_font,
-                                        label,
-                                        selected_module.id,
-                                        ProgramButtonAction::AdjustArchConstant { index, delta },
-                                    );
-                                }
-                                spawn_arch_editor_button(
-                                    buttons,
-                                    &mono_font,
-                                    "Add Line",
-                                    ArchEditorButtonAction::AddLine(selected_module.id),
-                                );
                             }
                             ProgrammingLanguageMode::Lumen => {
                                 spawn_program_button(
@@ -266,263 +272,127 @@ pub(crate) fn sync_computer_program_entries(
                                     selected_module.id,
                                     ProgramButtonAction::ToggleLumenEnabled,
                                 );
-                                spawn_arch_editor_button(
-                                    buttons,
-                                    &mono_font,
-                                    "Add Directive",
-                                    ArchEditorButtonAction::AddLumenLine(selected_module.id),
-                                );
                             }
+                        }
+                        for (label, action) in [
+                            ("Check", ProgramEditorAction::Check),
+                            ("Apply", ProgramEditorAction::Apply),
+                            ("Revert", ProgramEditorAction::Revert),
+                        ] {
+                            buttons
+                                .spawn((
+                                    Button,
+                                    Node {
+                                        height: Val::Px(32.0),
+                                        padding: UiRect::horizontal(Val::Px(10.0)),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        border_radius: BorderRadius::all(Val::Px(8.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(crate::NORMAL_BUTTON),
+                                    ProgramEditorActionButton { action },
+                                    ComputerProgramEntry,
+                                ))
+                                .with_children(|button| {
+                                    button.spawn((
+                                        Text::new(label),
+                                        TextFont {
+                                            font: mono_font.clone(),
+                                            font_size: 13.0,
+                                            ..default()
+                                        },
+                                        TextColor(Color::WHITE),
+                                    ));
+                                });
                         }
                     });
 
-                let line_count = match arch_editor_state.selected_language {
-                    ProgrammingLanguageMode::Arch => program.instructions.len(),
-                    ProgrammingLanguageMode::Lumen => lumen_program.instructions.len(),
-                };
-                for line_index in 0..line_count {
-                    let selected = arch_editor_state.selected_line == line_index;
-                    let title = match arch_editor_state.selected_language {
-                        ProgrammingLanguageMode::Arch => format!(
-                            "L{:02}  {}",
-                            line_index,
-                            instruction_summary(&program.instructions[line_index])
-                        ),
-                        ProgrammingLanguageMode::Lumen => format!(
-                            "L{:02}  {}",
-                            line_index,
-                            lumen_instruction_summary(&lumen_program.instructions[line_index])
-                        ),
-                    };
-                    entry
-                        .spawn((
-                            Node {
-                                width: Val::Percent(100.0),
-                                padding: UiRect::all(Val::Px(10.0)),
-                                flex_direction: FlexDirection::Column,
-                                row_gap: Val::Px(6.0),
-                                border_radius: BorderRadius::all(Val::Px(8.0)),
+                entry.spawn((
+                    Text::new(match arch_editor_state.selected_language {
+                        ProgrammingLanguageMode::Arch => {
+                            "ARCH Source\nClick to focus. Enter newline. Ctrl-A/C/X/V supported."
+                        }
+                        ProgrammingLanguageMode::Lumen => {
+                            "LUMEN Source\nClick to focus. Enter newline. Ctrl-A/C/X/V supported."
+                        }
+                    }),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: 12.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.76, 0.80, 0.86)),
+                    ComputerProgramEntry,
+                ));
+
+                entry
+                    .spawn((
+                        Button,
+                        Node {
+                            width: Val::Percent(100.0),
+                            min_height: Val::Px(220.0),
+                            padding: UiRect::all(Val::Px(10.0)),
+                            border_radius: BorderRadius::all(Val::Px(8.0)),
+                            ..default()
+                        },
+                        BackgroundColor(if program_editor_state.focused {
+                            Color::srgba(0.18, 0.24, 0.34, 0.98)
+                        } else {
+                            Color::srgba(0.12, 0.16, 0.24, 0.94)
+                        }),
+                        ProgramEditorTextBox,
+                        ComputerProgramEntry,
+                    ))
+                    .with_children(|textbox| {
+                        textbox.spawn((
+                            Text::new(format_program_draft_text(
+                                &draft_text,
+                                &program_editor_state,
+                                selected_module.id,
+                                arch_editor_state.selected_language,
+                            )),
+                            TextFont {
+                                font: mono_font.clone(),
+                                font_size: 13.0,
                                 ..default()
                             },
-                            BackgroundColor(if selected {
-                                Color::srgba(0.22, 0.28, 0.37, 0.98)
-                            } else {
-                                Color::srgba(0.15, 0.18, 0.24, 0.92)
-                            }),
-                        ))
-                        .with_children(|line| {
-                            line.spawn((
-                                Text::new(title),
-                                TextFont {
-                                    font: mono_font.clone(),
-                                    font_size: 13.0,
-                                    ..default()
-                                },
-                                TextColor(Color::WHITE),
-                            ));
-                            line.spawn(Node {
-                                width: Val::Percent(100.0),
-                                flex_wrap: FlexWrap::Wrap,
-                                column_gap: Val::Px(6.0),
-                                row_gap: Val::Px(6.0),
-                                ..default()
-                            })
-                            .with_children(|buttons| {
-                                let actions = match arch_editor_state.selected_language {
-                                    ProgrammingLanguageMode::Arch => vec![
-                                        (
-                                            if selected { "Selected" } else { "Select" },
-                                            ArchEditorButtonAction::SelectLine {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Opcode",
-                                            ArchEditorButtonAction::CycleOpcode {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Dst",
-                                            ArchEditorButtonAction::CycleDst {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Src A",
-                                            ArchEditorButtonAction::CycleSrcA {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Src B",
-                                            ArchEditorButtonAction::CycleSrcB {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Imm A +",
-                                            ArchEditorButtonAction::AdjustImmediateA {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                                delta: 1,
-                                            },
-                                        ),
-                                        (
-                                            "Imm A -",
-                                            ArchEditorButtonAction::AdjustImmediateA {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                                delta: -1,
-                                            },
-                                        ),
-                                        (
-                                            "Imm B +",
-                                            ArchEditorButtonAction::AdjustImmediateB {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                                delta: 1,
-                                            },
-                                        ),
-                                        (
-                                            "Imm B -",
-                                            ArchEditorButtonAction::AdjustImmediateB {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                                delta: -1,
-                                            },
-                                        ),
-                                        (
-                                            "Jump +",
-                                            ArchEditorButtonAction::AdjustJump {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                                delta: 1,
-                                            },
-                                        ),
-                                        (
-                                            "Jump -",
-                                            ArchEditorButtonAction::AdjustJump {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                                delta: -1,
-                                            },
-                                        ),
-                                        (
-                                            "Insert",
-                                            ArchEditorButtonAction::InsertLineAfter {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Up",
-                                            ArchEditorButtonAction::MoveLineUp {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Down",
-                                            ArchEditorButtonAction::MoveLineDown {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Remove",
-                                            ArchEditorButtonAction::RemoveLine {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                    ],
-                                    ProgrammingLanguageMode::Lumen => vec![
-                                        (
-                                            if selected { "Selected" } else { "Select" },
-                                            ArchEditorButtonAction::SelectLumenLine {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "BUFF/NERF",
-                                            ArchEditorButtonAction::CycleLumenOp {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Target",
-                                            ArchEditorButtonAction::CycleLumenTarget {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Aspect",
-                                            ArchEditorButtonAction::CycleLumenAspect {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Weight +",
-                                            ArchEditorButtonAction::AdjustLumenWeight {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                                delta: 1,
-                                            },
-                                        ),
-                                        (
-                                            "Weight -",
-                                            ArchEditorButtonAction::AdjustLumenWeight {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                                delta: -1,
-                                            },
-                                        ),
-                                        (
-                                            "Insert",
-                                            ArchEditorButtonAction::InsertLumenLineAfter {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Up",
-                                            ArchEditorButtonAction::MoveLumenLineUp {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Down",
-                                            ArchEditorButtonAction::MoveLumenLineDown {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                        (
-                                            "Remove",
-                                            ArchEditorButtonAction::RemoveLumenLine {
-                                                module_id: selected_module.id,
-                                                line: line_index,
-                                            },
-                                        ),
-                                    ],
-                                };
-                                for (label, action) in actions {
-                                    spawn_arch_editor_button(buttons, &mono_font, label, action);
-                                }
-                            });
-                        });
-                }
+                            TextColor(Color::WHITE),
+                            ProgramEditorDraftText,
+                        ));
+                    });
+
+                entry.spawn((
+                    Text::new(if program_editor_state.status_line.is_empty() {
+                        "Draft idle".to_string()
+                    } else {
+                        program_editor_state.status_line.clone()
+                    }),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: 13.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.92, 0.84, 0.62)),
+                    ProgramEditorStatusText,
+                    ComputerProgramEntry,
+                ));
+
+                entry.spawn((
+                    Text::new(format!("Diagnostics\n{diagnostics_text}")),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: 12.0,
+                        ..default()
+                    },
+                    TextColor(if program_editor_state.diagnostics.is_empty() {
+                        Color::srgb(0.76, 0.80, 0.86)
+                    } else {
+                        Color::srgb(0.96, 0.58, 0.46)
+                    }),
+                    ProgramEditorDiagnosticsText,
+                    ComputerProgramEntry,
+                ));
             });
     });
 }
@@ -734,6 +604,46 @@ fn instruction_jump_target(instruction: &crate::ship::arch::ArchInstruction) -> 
         | ArchInstruction::Jnz { target, .. } => Some(*target),
         _ => None,
     }
+}
+
+fn format_program_draft_text(
+    draft_text: &str,
+    program_editor_state: &ProgramTextEditorState,
+    module_id: u64,
+    language: ProgrammingLanguageMode,
+) -> String {
+    if program_editor_state.module_id != Some(module_id)
+        || program_editor_state.language != language
+        || !program_editor_state.focused
+    {
+        return draft_text.to_string();
+    }
+
+    let mut display = if program_editor_state.select_all {
+        format!("[{draft_text}]")
+    } else {
+        draft_text.to_string()
+    };
+    let cursor_index = program_editor_state
+        .cursor_index
+        .min(draft_text.chars().count());
+    let insert_at = char_to_byte_index(
+        &display,
+        if program_editor_state.select_all {
+            display.chars().count()
+        } else {
+            cursor_index
+        },
+    );
+    display.insert(insert_at, '|');
+    display
+}
+
+fn char_to_byte_index(text: &str, char_index: usize) -> usize {
+    text.char_indices()
+        .nth(char_index)
+        .map(|(index, _)| index)
+        .unwrap_or(text.len())
 }
 
 #[allow(dead_code)]

@@ -88,6 +88,7 @@ pub(crate) struct EditorToolState {
     pub(crate) selected_kind: ModuleKind,
     pub(crate) selected_variant: ModuleVariant,
     pub(crate) selected_rotation: u8,
+    pub(crate) selected_channel: u8,
 }
 
 impl Default for EditorToolState {
@@ -96,6 +97,7 @@ impl Default for EditorToolState {
             selected_kind: ModuleKind::Hull,
             selected_variant: ModuleVariant::default_for_kind(ModuleKind::Hull),
             selected_rotation: 0,
+            selected_channel: 0,
         }
     }
 }
@@ -105,6 +107,20 @@ pub(crate) struct ArchEditorState {
     pub(crate) selected_module_id: Option<u64>,
     pub(crate) selected_line: usize,
     pub(crate) selected_language: ProgrammingLanguageMode,
+    pub(crate) panel_open: bool,
+}
+
+#[derive(Resource, Clone, Default)]
+pub(crate) struct ProgramTextEditorState {
+    pub(crate) module_id: Option<u64>,
+    pub(crate) language: ProgrammingLanguageMode,
+    pub(crate) draft_text: String,
+    pub(crate) cursor_index: usize,
+    pub(crate) select_all: bool,
+    pub(crate) focused: bool,
+    pub(crate) dirty: bool,
+    pub(crate) diagnostics: Vec<String>,
+    pub(crate) status_line: String,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -274,6 +290,33 @@ pub(crate) struct ComputerProgramButton {
     pub(crate) module_id: u64,
     pub(crate) action: ProgramButtonAction,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ProgramEditorAction {
+    SwitchArch,
+    SwitchLumen,
+    Check,
+    Apply,
+    Revert,
+    Focus,
+}
+
+#[derive(Component)]
+pub(crate) struct ProgramEditorActionButton {
+    pub(crate) action: ProgramEditorAction,
+}
+
+#[derive(Component)]
+pub(crate) struct ProgramEditorTextBox;
+
+#[derive(Component)]
+pub(crate) struct ProgramEditorDraftText;
+
+#[derive(Component)]
+pub(crate) struct ProgramEditorStatusText;
+
+#[derive(Component)]
+pub(crate) struct ProgramEditorDiagnosticsText;
 
 #[derive(Component)]
 pub(crate) struct ArchEditorButton {

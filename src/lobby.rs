@@ -94,14 +94,12 @@ pub(crate) fn spawn_lobby_ui(
                     ));
 
                     panel
-                        .spawn((
-                            Node {
-                                width: Val::Percent(100.0),
-                                flex_direction: FlexDirection::Column,
-                                row_gap: Val::Px(8.0),
-                                ..default()
-                            },
-                        ))
+                        .spawn((Node {
+                            width: Val::Percent(100.0),
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(8.0),
+                            ..default()
+                        },))
                         .with_children(|field| {
                             field.spawn((
                                 Text::new("Session"),
@@ -121,14 +119,12 @@ pub(crate) fn spawn_lobby_ui(
                         });
 
                     panel
-                        .spawn((
-                            Node {
-                                width: Val::Percent(100.0),
-                                flex_direction: FlexDirection::Column,
-                                row_gap: Val::Px(8.0),
-                                ..default()
-                            },
-                        ))
+                        .spawn((Node {
+                            width: Val::Percent(100.0),
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(8.0),
+                            ..default()
+                        },))
                         .with_children(|field| {
                             field.spawn((
                                 Text::new("Player Name"),
@@ -148,14 +144,12 @@ pub(crate) fn spawn_lobby_ui(
                         });
 
                     panel
-                        .spawn((
-                            Node {
-                                width: Val::Percent(100.0),
-                                justify_content: JustifyContent::SpaceBetween,
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                        ))
+                        .spawn((Node {
+                            width: Val::Percent(100.0),
+                            justify_content: JustifyContent::SpaceBetween,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },))
                         .with_children(|row| {
                             row.spawn((
                                 Text::new(format!(
@@ -196,17 +190,18 @@ pub(crate) fn spawn_lobby_ui(
                         });
 
                     panel
-                        .spawn((
-                            Node {
-                                width: Val::Percent(100.0),
-                                justify_content: JustifyContent::SpaceBetween,
-                                align_items: AlignItems::Center,
-                                ..default()
-                            },
-                        ))
+                        .spawn((Node {
+                            width: Val::Percent(100.0),
+                            justify_content: JustifyContent::SpaceBetween,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },))
                         .with_children(|row| {
                             row.spawn((
-                                Text::new(format!("Avatar Color: {}", color_label(local_profile.color_index))),
+                                Text::new(format!(
+                                    "Avatar Color: {}",
+                                    color_label(local_profile.color_index)
+                                )),
                                 TextFont {
                                     font: mono_font.clone(),
                                     font_size: 18.0,
@@ -356,13 +351,16 @@ pub(crate) fn edit_lobby_textboxes(
 
         match &event.logical_key {
             Key::ArrowLeft => move_cursor_left(&mut focused_textbox),
-            Key::ArrowRight => move_cursor_right(field, &config, &local_profile, &mut focused_textbox),
+            Key::ArrowRight => {
+                move_cursor_right(field, &config, &local_profile, &mut focused_textbox)
+            }
             Key::Home => {
                 focused_textbox.cursor_index = 0;
                 focused_textbox.select_all = false;
             }
             Key::End => {
-                focused_textbox.cursor_index = field_value(field, &config, &local_profile).chars().count();
+                focused_textbox.cursor_index =
+                    field_value(field, &config, &local_profile).chars().count();
                 focused_textbox.select_all = false;
             }
             Key::Backspace => backspace_textbox(
@@ -380,34 +378,45 @@ pub(crate) fn edit_lobby_textboxes(
                 lobby_locked,
             ),
             Key::Character(chars) if ctrl_pressed && chars.eq_ignore_ascii_case("a") => {
-                focused_textbox.cursor_index = field_value(field, &config, &local_profile).chars().count();
+                focused_textbox.cursor_index =
+                    field_value(field, &config, &local_profile).chars().count();
                 focused_textbox.select_all = true;
             }
-            Key::Character(chars) if ctrl_pressed && chars.eq_ignore_ascii_case("c") => {
-                if focused_textbox.select_all {
-                    clipboard.contents = field_value(field, &config, &local_profile).to_string();
-                }
+            Key::Character(chars)
+                if ctrl_pressed
+                    && chars.eq_ignore_ascii_case("c")
+                    && focused_textbox.select_all =>
+            {
+                clipboard.contents = field_value(field, &config, &local_profile).to_string();
             }
-            Key::Character(chars) if ctrl_pressed && chars.eq_ignore_ascii_case("x") => {
-                if focused_textbox.select_all && field_is_editable(field, lobby_locked) {
-                    clipboard.contents = field_value(field, &config, &local_profile).to_string();
-                    clear_field(field, &mut config, &mut local_profile);
-                    focused_textbox.cursor_index = 0;
-                    focused_textbox.select_all = false;
-                }
+            Key::Character(chars)
+                if ctrl_pressed
+                    && chars.eq_ignore_ascii_case("x")
+                    && focused_textbox.select_all
+                    && field_is_editable(field, lobby_locked) =>
+            {
+                clipboard.contents = field_value(field, &config, &local_profile).to_string();
+                clear_field(field, &mut config, &mut local_profile);
+                focused_textbox.cursor_index = 0;
+                focused_textbox.select_all = false;
             }
-            Key::Character(chars) if ctrl_pressed && chars.eq_ignore_ascii_case("v") => {
-                if field_is_editable(field, lobby_locked) && !clipboard.contents.is_empty() {
-                    insert_text(
-                        field,
-                        &mut config,
-                        &mut local_profile,
-                        &mut focused_textbox,
-                        &clipboard.contents.clone(),
-                    );
-                }
+            Key::Character(chars)
+                if ctrl_pressed
+                    && chars.eq_ignore_ascii_case("v")
+                    && field_is_editable(field, lobby_locked)
+                    && !clipboard.contents.is_empty() =>
+            {
+                insert_text(
+                    field,
+                    &mut config,
+                    &mut local_profile,
+                    &mut focused_textbox,
+                    &clipboard.contents.clone(),
+                );
             }
-            Key::Character(chars) if !ctrl_pressed && field_accepts_input(field, lobby_locked, chars) => {
+            Key::Character(chars)
+                if !ctrl_pressed && field_accepts_input(field, lobby_locked, chars) =>
+            {
                 insert_text(
                     field,
                     &mut config,
@@ -652,7 +661,11 @@ fn spawn_textbox(
         });
 }
 
-fn format_textbox_value(value: &str, field: TextBoxField, focused_textbox: &FocusedTextBox) -> String {
+fn format_textbox_value(
+    value: &str,
+    field: TextBoxField,
+    focused_textbox: &FocusedTextBox,
+) -> String {
     if focused_textbox.field != Some(field) {
         return value.to_string();
     }
@@ -663,7 +676,14 @@ fn format_textbox_value(value: &str, field: TextBoxField, focused_textbox: &Focu
         value.to_string()
     };
     let cursor_index = focused_textbox.cursor_index.min(value.chars().count());
-    let insert_at = char_to_byte_index(&display, if focused_textbox.select_all { display.chars().count() } else { cursor_index });
+    let insert_at = char_to_byte_index(
+        &display,
+        if focused_textbox.select_all {
+            display.chars().count()
+        } else {
+            cursor_index
+        },
+    );
     display.insert(insert_at, '|');
     display
 }

@@ -69,13 +69,17 @@ pub(crate) fn detect_nearby_interactions(
             continue;
         };
 
+        let needs_repair = crate::gameplay::helpers::module_needs_repair(
+            integrity,
+            runtime_state,
+            destroyed.is_some(),
+        );
+
         if on_hostile_ship
             && runtime_module.kind != crate::ship::ModuleKind::Core
             && runtime_module.kind != crate::ship::ModuleKind::Cockpit
             && !runtime_state.extracted
-            && (destroyed.is_some()
-                || runtime_state.is_disabled
-                || integrity.current < integrity.max)
+            && needs_repair
         {
             if equipped_suit.suit != PlayerSuit::Welder {
                 nearby.unavailable_reason = Some("need welder suit for extraction".to_string());
@@ -83,6 +87,14 @@ pub(crate) fn detect_nearby_interactions(
                 nearby.target = Some(entity);
                 nearby.kind = Some(InteractionKind::Extract);
                 nearby.prompt = Some(interaction_prompt(InteractionKind::Extract).to_string());
+            }
+        } else if needs_repair {
+            if equipped_suit.suit != PlayerSuit::Welder {
+                nearby.unavailable_reason = Some("need welder suit for repairs".to_string());
+            } else {
+                nearby.target = Some(entity);
+                nearby.kind = Some(InteractionKind::Repair);
+                nearby.prompt = Some(interaction_prompt(InteractionKind::Repair).to_string());
             }
         } else if let Some(kind) =
             interaction_for_module(station.kind, integrity, runtime_state, destroyed.is_some())

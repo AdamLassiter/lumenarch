@@ -15,6 +15,7 @@ use crate::{
             AngularVelocity,
             CarriedItemKind,
             CarriedResource,
+            CrewNameBackdrop,
             CrewNameLabel,
             CurrentStation,
             EquippedSuit,
@@ -429,6 +430,22 @@ pub(crate) fn spawn_runtime_ship(
                 entity_commands.insert(ObservedLocalPlayerMarker);
             }
             let entity = entity_commands.id();
+            let name_width = (player_profile.name.chars().count() as f32 * 6.5).clamp(28.0, 120.0);
+            commands.spawn((
+                Sprite::from_color(
+                    Color::srgba(0.03, 0.05, 0.08, 0.70),
+                    Vec2::new(name_width, 14.0),
+                ),
+                Transform::from_xyz(
+                    spawn_node.local_position.x.to_num::<f32>(),
+                    spawn_node.local_position.y.to_num::<f32>() + 15.0,
+                    19.5,
+                ),
+                CrewNameBackdrop {
+                    player_entity: entity,
+                },
+                PlayingCleanup,
+            ));
             commands.spawn((
                 Text2d::new(player_profile.name.clone()),
                 TextFont {
@@ -440,7 +457,7 @@ pub(crate) fn spawn_runtime_ship(
                 Transform::from_xyz(
                     spawn_node.local_position.x.to_num::<f32>(),
                     spawn_node.local_position.y.to_num::<f32>() + 15.0,
-                    6.2,
+                    20.0,
                 ),
                 CrewNameLabel {
                     player_entity: entity,
@@ -496,6 +513,8 @@ pub(crate) fn spawn_runtime_ship(
             minimum_oxygen: Fx::from_num(balance.atmosphere.initial_tile_oxygen),
             venting_tiles: 0,
             decompression_reported: false,
+            decompression_signature: 0,
+            decompression_vectors: Vec::new(),
         },
     ));
     commands.entity(root_entity).add_children(&child_entities);
@@ -663,6 +682,8 @@ pub(crate) fn spawn_hostile_ship(
                 minimum_oxygen: Fx::from_num(balance.atmosphere.initial_tile_oxygen),
                 venting_tiles: 0,
                 decompression_reported: false,
+                decompression_signature: 0,
+                decompression_vectors: Vec::new(),
             },
         ))
         .add_children(&child_entities);

@@ -4,23 +4,23 @@ use super::*;
 use crate::gameplay::helpers::wrap_radians;
 
 #[derive(Clone)]
-pub(super) struct StationPanelReadout {
-    pub(super) label: String,
-    pub(super) value: String,
-    pub(super) visual: StationReadoutVisual,
+pub(crate) struct StationPanelReadout {
+    pub(crate) label: String,
+    pub(crate) value: String,
+    pub(crate) visual: StationReadoutVisual,
 }
 
 #[derive(Clone, Copy)]
-pub(super) enum StationReadoutVisual {
+pub(crate) enum StationReadoutVisual {
     Bar { percent: f32, color: Color },
     Light { color: Color },
 }
 
-pub(super) struct StationPanelDisplay {
-    pub(super) title: String,
-    pub(super) active_station_kind: Option<crate::ship::ModuleKind>,
-    pub(super) flags: summary::StationFlags,
-    pub(super) readouts: Vec<StationPanelReadout>,
+pub(crate) struct StationPanelDisplay {
+    pub(crate) title: String,
+    pub(crate) active_station_kind: Option<crate::ship::ModuleKind>,
+    pub(crate) flags: summary::StationFlags,
+    pub(crate) readouts: Vec<StationPanelReadout>,
 }
 
 impl StationPanelDisplay {
@@ -69,7 +69,7 @@ pub(crate) fn station_panel_button_system(
     }
 }
 
-pub(super) fn station_panel_display(
+pub(crate) fn station_panel_display(
     control_mode: &ShipboardControlState,
     mission_state: &MissionState,
     weapon_state: &ShipWeaponState,
@@ -132,7 +132,15 @@ pub(super) fn station_panel_display(
         turret: turret.is_some(),
     };
 
-    let title = format!("{} Console", module_display_name(runtime_module.kind));
+    let title = if runtime_module.kind.supports_channel() {
+        format!(
+            "{} Console  [CH{}]",
+            module_display_name(runtime_module.kind),
+            runtime_module.channel
+        )
+    } else {
+        format!("{} Console", module_display_name(runtime_module.kind))
+    };
 
     if destroyed.is_some() {
         return StationPanelDisplay {
@@ -141,19 +149,19 @@ pub(super) fn station_panel_display(
             flags,
             readouts: vec![
                 readout_bar(
-                    "Integrity",
+                    register_readout_label(runtime_module, "MII", "Integrity"),
                     format!("{} / {}", integrity.current, integrity.max),
                     percent_from_ratio(integrity.current as f32, integrity.max.max(1) as f32),
                     Color::srgb(0.80, 0.34, 0.34),
                 ),
                 readout_bar(
-                    "Heat",
+                    register_readout_label(runtime_module, "MPH", "Heat"),
                     format_fx1(runtime_state.current_heat),
                     percent_from_fx(runtime_state.current_heat, Fx::from_num(16)),
                     Color::srgb(0.96, 0.50, 0.24),
                 ),
                 readout_bar(
-                    "Electrical",
+                    register_readout_label(runtime_module, "MPE", "Electrical"),
                     format_fx1(runtime_state.electrical_instability),
                     percent_from_fx(runtime_state.electrical_instability, Fx::from_num(12)),
                     Color::srgb(0.74, 0.56, 0.98),
@@ -166,31 +174,31 @@ pub(super) fn station_panel_display(
     let readouts = if let Some(reactor) = reactor {
         vec![
             readout_bar(
-                "Reaction",
+                register_readout_label(runtime_module, "RRF", "Reaction"),
                 format!("{}%", format_fx0(reactor.reaction_rate * Fx::from_num(100))),
                 percent_from_fx(reactor.reaction_rate, Fx::from_num(1)),
                 Color::srgb(0.94, 0.42, 0.24),
             ),
             readout_bar(
-                "Turbine",
+                register_readout_label(runtime_module, "RRT", "Turbine"),
                 format!("{}%", format_fx0(reactor.turbine_load * Fx::from_num(100))),
                 percent_from_fx(reactor.turbine_load, Fx::from_num(1)),
                 Color::srgb(0.34, 0.74, 0.94),
             ),
             readout_bar(
-                "Confinement",
+                register_readout_label(runtime_module, "RRS", "Confinement"),
                 format!("{}%", format_fx0(reactor.confinement * Fx::from_num(100))),
                 percent_from_fx(reactor.confinement, Fx::from_num(1)),
                 Color::srgb(0.70, 0.48, 0.94),
             ),
             readout_bar(
-                "Output",
+                register_readout_label(runtime_module, "RRP", "Output"),
                 format_fx1(reactor.power_output),
                 percent_from_fx(reactor.power_output, Fx::from_num(20)),
                 Color::srgb(0.86, 0.74, 0.30),
             ),
             readout_bar(
-                "Fuel",
+                register_readout_label(runtime_module, "RRE", "Fuel"),
                 format_fx0(reactor.fuel_remaining),
                 percent_from_fx(reactor.fuel_remaining, Fx::from_num(100)),
                 Color::srgb(0.42, 0.86, 0.62),
@@ -212,7 +220,7 @@ pub(super) fn station_panel_display(
     } else if let Some(turret) = turret {
         vec![
             readout_bar(
-                "Aim Error",
+                register_readout_label(runtime_module, "WTA", "Aim Error"),
                 format_fx1(angle_distance(turret.desired_angle, turret.actual_angle)),
                 percent_from_fx(
                     angle_distance(turret.desired_angle, turret.actual_angle),
@@ -221,19 +229,19 @@ pub(super) fn station_panel_display(
                 Color::srgb(0.36, 0.72, 0.96),
             ),
             readout_bar(
-                "Desired Arc",
+                register_readout_label(runtime_module, "WTR", "Desired Arc"),
                 format_fx1(turret.desired_angle),
                 percent_from_wrapped_angle(turret.desired_angle),
                 Color::srgb(0.64, 0.60, 0.96),
             ),
             readout_bar(
-                "Cooldown",
+                register_readout_label(runtime_module, "WTC", "Cooldown"),
                 format_fx2(weapon_state.cooldown_remaining),
                 percent_from_fx(weapon_state.cooldown_remaining, Fx::from_num(3)),
                 Color::srgb(0.96, 0.56, 0.24),
             ),
             readout_bar(
-                "Heat",
+                register_readout_label(runtime_module, "WTH", "Heat"),
                 format_fx1(runtime_state.current_heat),
                 percent_from_fx(runtime_state.current_heat, Fx::from_num(16)),
                 Color::srgb(0.96, 0.50, 0.24),
@@ -283,7 +291,7 @@ pub(super) fn station_panel_display(
         };
         vec![
             readout_light(
-                "Online",
+                register_readout_label(runtime_module, "CCA", "Online"),
                 if computer.enabled {
                     "Enabled"
                 } else {
@@ -296,7 +304,7 @@ pub(super) fn station_panel_display(
                 },
             ),
             readout_bar(
-                "Exec Budget",
+                register_readout_label(runtime_module, "CCB", "Exec Budget"),
                 format!(
                     "{}/{}",
                     computer.last_result.executed, computer.last_result.budget
@@ -305,12 +313,12 @@ pub(super) fn station_panel_display(
                 Color::srgb(0.36, 0.72, 0.96),
             ),
             readout_light(
-                "Writes",
+                register_readout_label(runtime_module, "CCW", "Writes"),
                 arch_summary.recent_writes.as_str(),
                 Color::srgb(0.90, 0.64, 0.20),
             ),
             readout_light(
-                "LUMEN",
+                register_readout_label(runtime_module, "CLT", "LUMEN"),
                 if computer.lumen_program.enabled {
                     computer
                         .last_lumen_result
@@ -328,7 +336,7 @@ pub(super) fn station_panel_display(
                 },
             ),
             readout_light(
-                "Halt State",
+                register_readout_label(runtime_module, "CCH", "Halt State"),
                 computer
                     .last_result
                     .halted_reason
@@ -341,27 +349,37 @@ pub(super) fn station_panel_display(
                 },
             ),
             readout_light(
-                "Program",
+                register_readout_label(runtime_module, "CCP", "Program"),
                 computer.program.name.as_str(),
                 Color::srgb(0.52, 0.76, 0.96),
+            ),
+            readout_light(
+                "ARCH Source",
+                first_program_line(&computer.program.source_text),
+                Color::srgb(0.72, 0.82, 0.96),
+            ),
+            readout_light(
+                "LUMEN Source",
+                first_program_line(&computer.lumen_program.source_text),
+                Color::srgb(0.62, 0.90, 0.80),
             ),
         ]
     } else {
         vec![
             readout_bar(
-                "Integrity",
+                register_readout_label(runtime_module, "MII", "Integrity"),
                 format!("{} / {}", integrity.current, integrity.max),
                 percent_from_ratio(integrity.current as f32, integrity.max.max(1) as f32),
                 Color::srgb(0.80, 0.34, 0.34),
             ),
             readout_bar(
-                "Heat",
+                register_readout_label(runtime_module, "MPH", "Heat"),
                 format_fx1(runtime_state.current_heat),
                 percent_from_fx(runtime_state.current_heat, Fx::from_num(16)),
                 Color::srgb(0.96, 0.50, 0.24),
             ),
             readout_bar(
-                "Electrical",
+                register_readout_label(runtime_module, "MPE", "Electrical"),
                 format_fx1(runtime_state.electrical_instability),
                 percent_from_fx(runtime_state.electrical_instability, Fx::from_num(12)),
                 Color::srgb(0.74, 0.56, 0.98),
@@ -688,6 +706,25 @@ fn readout_light(
     }
 }
 
+fn register_readout_label(
+    runtime_module: &RuntimeShipModule,
+    register: &str,
+    label: &str,
+) -> String {
+    if runtime_module.kind.supports_channel() {
+        format!("{register}{}  {label}", runtime_module.channel)
+    } else {
+        format!("{register}  {label}")
+    }
+}
+
+fn first_program_line(source_text: &str) -> &str {
+    source_text
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or("no source")
+}
+
 fn percent_from_ratio(current: f32, max: f32) -> f32 {
     if max <= 0.0 {
         0.0
@@ -716,7 +753,7 @@ fn angle_distance(a: Fx, b: Fx) -> Fx {
     wrap_radians(a - b).abs()
 }
 
-pub(super) fn station_panel_content(
+pub(crate) fn station_panel_content(
     control_mode: &ShipboardControlState,
     mission_state: &MissionState,
     weapon_state: &ShipWeaponState,
@@ -921,7 +958,7 @@ pub(super) fn station_panel_content(
     (title, body, Some(runtime_module.kind), flags)
 }
 
-pub(super) fn station_action_visible(
+pub(crate) fn station_action_visible(
     action: StationPanelButtonAction,
     mode: ShipControlMode,
     active_station_kind: Option<crate::ship::ModuleKind>,
@@ -961,7 +998,7 @@ pub(super) fn station_action_visible(
     }
 }
 
-pub(super) fn station_button_label(
+pub(crate) fn station_button_label(
     action: StationPanelButtonAction,
     mode: ShipControlMode,
     flags: summary::StationFlags,

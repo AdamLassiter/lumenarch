@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LumenParseDiagnostic {
+    pub line: usize,
+    pub message: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LumenProgramTemplate {
     ThermalGuard,
@@ -149,16 +155,19 @@ pub struct LumenProgram {
     pub template: LumenProgramTemplate,
     pub name: String,
     pub enabled: bool,
+    #[serde(default)]
+    pub source_text: String,
     pub instructions: Vec<LumenInstruction>,
 }
 
 impl LumenProgram {
     pub fn from_template(template: LumenProgramTemplate) -> Self {
-        match template {
+        let mut program = match template {
             LumenProgramTemplate::ThermalGuard => Self {
                 template,
                 name: template.as_str().to_string(),
                 enabled: true,
+                source_text: String::new(),
                 instructions: vec![
                     LumenInstruction {
                         op: LumenOp::Buff,
@@ -178,6 +187,7 @@ impl LumenProgram {
                 template,
                 name: template.as_str().to_string(),
                 enabled: true,
+                source_text: String::new(),
                 instructions: vec![
                     LumenInstruction {
                         op: LumenOp::Buff,
@@ -197,6 +207,7 @@ impl LumenProgram {
                 template,
                 name: template.as_str().to_string(),
                 enabled: true,
+                source_text: String::new(),
                 instructions: vec![
                     LumenInstruction {
                         op: LumenOp::Buff,
@@ -216,6 +227,7 @@ impl LumenProgram {
                 template,
                 name: template.as_str().to_string(),
                 enabled: true,
+                source_text: String::new(),
                 instructions: vec![
                     LumenInstruction {
                         op: LumenOp::Buff,
@@ -237,6 +249,135 @@ impl LumenProgram {
                     },
                 ],
             },
+        };
+        program.refresh_source_text();
+        program
+    }
+
+    pub fn refresh_source_text(&mut self) {
+        self.source_text = lumen_program_to_source(&self.instructions);
+    }
+
+    pub fn compile_source_text(
+        &mut self,
+        source_text: &str,
+    ) -> Result<(), Vec<LumenParseDiagnostic>> {
+        let instructions = parse_lumen_program(source_text)?;
+        self.instructions = instructions;
+        self.source_text = source_text.to_string();
+        Ok(())
+    }
+
+    pub fn validate_source_text(
+        source_text: &str,
+    ) -> Result<Vec<LumenInstruction>, Vec<LumenParseDiagnostic>> {
+        parse_lumen_program(source_text)
+    }
+}
+
+pub fn lumen_program_to_source(instructions: &[LumenInstruction]) -> String {
+    instructions
+        .iter()
+        .map(LumenInstruction::syntax)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub fn parse_lumen_program(
+    source_text: &str,
+) -> Result<Vec<LumenInstruction>, Vec<LumenParseDiagnostic>> {
+    let mut instructions = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for (line_index, raw_line) in source_text.lines().enumerate() {
+        let line_number = line_index + 1;
+        let line = raw_line.split('#').next().unwrap_or("").trim();
+        if line.is_empty() {
+            continue;
         }
+
+        let tokens: Vec<_> = line.split_whitespace().collect();
+        if tokens.len() != 4 {
+            diagnostics.push(LumenParseDiagnostic {
+                line: line_number,
+                message: "LUMEN directives must be 'BUFF|NERF target aspect weight'".to_string(),
+            });
+            continue;
+        }
+
+        let op = match tokens[0].to_ascii_uppercase().as_str() {
+            "BUFF" => LumenOp::Buff,
+            "NERF" => LumenOp::Nerf,
+            other => {
+                diagnostics.push(LumenParseDiagnostic {
+                    line: line_number,
+                    message: format!("unknown LUMEN opcode '{other}'"),
+                });
+                continue;
+            }
+        };
+        let target = match parse_lumen_target(tokens[1]) {
+            Some(target) => target,
+            None => {
+                diagnostics.push(LumenParseDiagnostic {
+                    line: line_number,
+                    message: format!("unknown LUMEN target '{}'", tokens[1]),
+                });
+                continue;
+            }
+        };
+        let aspect = match parse_lumen_aspect(tokens[2]) {
+            Some(aspect) => aspect,
+            None => {
+                diagnostics.push(LumenParseDiagnostic {
+                    line: line_number,
+                    message: format!("unknown LUMEN aspect '{}'", tokens[2]),
+                });
+                continue;
+            }
+        };
+        let weight_token = tokens[3].trim_start_matches('w').trim_start_matches('W');
+        let Ok(weight) = weight_token.parse::<u8>() else {
+            diagnostics.push(LumenParseDiagnostic {
+                line: line_number,
+                message: format!("invalid LUMEN weight '{}'", tokens[3]),
+            });
+            continue;
+        };
+        instructions.push(LumenInstruction {
+            op,
+            target,
+            aspect,
+            weight: weight.min(9),
+        });
+    }
+
+    if diagnostics.is_empty() {
+        Ok(instructions)
+    } else {
+        Err(diagnostics)
+    }
+}
+
+fn parse_lumen_target(token: &str) -> Option<LumenTarget> {
+    match token.to_ascii_lowercase().as_str() {
+        "reactors" => Some(LumenTarget::Reactors),
+        "turrets" => Some(LumenTarget::Turrets),
+        "cargo" => Some(LumenTarget::Cargo),
+        "processors" => Some(LumenTarget::Processors),
+        "computers" => Some(LumenTarget::Computers),
+        "hot_modules" => Some(LumenTarget::HotModules),
+        _ => None,
+    }
+}
+
+fn parse_lumen_aspect(token: &str) -> Option<LumenAspect> {
+    match token.to_ascii_lowercase().as_str() {
+        "heat_cooling" => Some(LumenAspect::HeatCooling),
+        "instability" => Some(LumenAspect::Instability),
+        "throughput" => Some(LumenAspect::Throughput),
+        "fire_control" => Some(LumenAspect::FireControl),
+        "power_draw" => Some(LumenAspect::PowerDraw),
+        _ => None,
     }
 }

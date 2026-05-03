@@ -9,7 +9,7 @@ use super::{
     super::helpers::{FixedVec2, Fx},
     logistics::ResourceKind,
 };
-use crate::{ship::ModuleKind, state::PlayerRole};
+use crate::{balance::PlayerBalanceConfig, ship::ModuleKind, state::PlayerRole};
 
 #[derive(Component)]
 pub(crate) struct PlayerShip;
@@ -48,6 +48,11 @@ pub(crate) struct ShipInertiaField {
 
 #[derive(Component, Clone, Copy)]
 pub(crate) struct CrewNameLabel {
+    pub(crate) player_entity: Entity,
+}
+
+#[derive(Component, Clone, Copy)]
+pub(crate) struct CrewNameBackdrop {
     pub(crate) player_entity: Entity,
 }
 
@@ -96,48 +101,48 @@ impl PlayerSuit {
         }
     }
 
-    pub(crate) fn heat_multiplier(self) -> Fx {
+    pub(crate) fn heat_multiplier(self, balance: &PlayerBalanceConfig) -> Fx {
         match self {
-            Self::Standard => Fx::from_num(1.0),
-            Self::Radiation => Fx::from_num(0.55),
-            Self::Welder => Fx::from_num(0.8),
-            Self::Eva => Fx::from_num(0.9),
+            Self::Standard => Fx::from_num(balance.standard_heat_multiplier),
+            Self::Radiation => Fx::from_num(balance.radiation_heat_multiplier),
+            Self::Welder => Fx::from_num(balance.welder_heat_multiplier),
+            Self::Eva => Fx::from_num(balance.eva_heat_multiplier),
         }
     }
 
-    pub(crate) fn electrical_multiplier(self) -> Fx {
+    pub(crate) fn electrical_multiplier(self, balance: &PlayerBalanceConfig) -> Fx {
         match self {
-            Self::Standard => Fx::from_num(1.0),
-            Self::Radiation => Fx::from_num(0.6),
-            Self::Welder => Fx::from_num(0.85),
-            Self::Eva => Fx::from_num(0.95),
+            Self::Standard => Fx::from_num(balance.standard_electrical_multiplier),
+            Self::Radiation => Fx::from_num(balance.radiation_electrical_multiplier),
+            Self::Welder => Fx::from_num(balance.welder_electrical_multiplier),
+            Self::Eva => Fx::from_num(balance.eva_electrical_multiplier),
         }
     }
 
-    pub(crate) fn oxygen_warning_threshold(self) -> Fx {
+    pub(crate) fn oxygen_warning_threshold(self, balance: &PlayerBalanceConfig) -> Fx {
         match self {
-            Self::Standard => Fx::from_num(6),
-            Self::Radiation => Fx::from_num(4),
-            Self::Welder => Fx::from_num(5),
-            Self::Eva => Fx::from_num(2),
+            Self::Standard => Fx::from_num(balance.standard_oxygen_warning_threshold),
+            Self::Radiation => Fx::from_num(balance.radiation_oxygen_warning_threshold),
+            Self::Welder => Fx::from_num(balance.welder_oxygen_warning_threshold),
+            Self::Eva => Fx::from_num(balance.eva_oxygen_warning_threshold),
         }
     }
 
-    pub(crate) fn oxygen_critical_threshold(self) -> Fx {
+    pub(crate) fn oxygen_critical_threshold(self, balance: &PlayerBalanceConfig) -> Fx {
         match self {
-            Self::Standard => Fx::from_num(3),
-            Self::Radiation => Fx::from_num(2),
-            Self::Welder => Fx::from_num(2),
-            Self::Eva => Fx::from_num(1),
+            Self::Standard => Fx::from_num(balance.standard_oxygen_critical_threshold),
+            Self::Radiation => Fx::from_num(balance.radiation_oxygen_critical_threshold),
+            Self::Welder => Fx::from_num(balance.welder_oxygen_critical_threshold),
+            Self::Eva => Fx::from_num(balance.eva_oxygen_critical_threshold),
         }
     }
 
-    pub(crate) fn eva_speed_multiplier(self) -> Fx {
+    pub(crate) fn eva_speed_multiplier(self, balance: &PlayerBalanceConfig) -> Fx {
         match self {
-            Self::Standard => Fx::from_num(1.0),
-            Self::Radiation => Fx::from_num(0.95),
-            Self::Welder => Fx::from_num(0.85),
-            Self::Eva => Fx::from_num(1.65),
+            Self::Standard => Fx::from_num(balance.standard_eva_speed_multiplier),
+            Self::Radiation => Fx::from_num(balance.radiation_eva_speed_multiplier),
+            Self::Welder => Fx::from_num(balance.welder_eva_speed_multiplier),
+            Self::Eva => Fx::from_num(balance.eva_eva_speed_multiplier),
         }
     }
 
@@ -251,6 +256,8 @@ pub(crate) struct ShipAtmosphereState {
     pub(crate) minimum_oxygen: Fx,
     pub(crate) venting_tiles: u32,
     pub(crate) decompression_reported: bool,
+    pub(crate) decompression_signature: u64,
+    pub(crate) decompression_vectors: Vec<FixedVec2>,
 }
 
 #[derive(Component, Clone)]

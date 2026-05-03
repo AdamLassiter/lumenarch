@@ -11,13 +11,14 @@ use crate::{
     state::DemoProgression,
 };
 
-pub(super) fn editor_status_line(
+pub(crate) fn editor_status_line(
     mode: EditorMode,
     entry_label: &str,
     ship_name: &str,
     selected_kind: &ModuleKind,
     selected_variant: ModuleVariant,
     selected_rotation: u8,
+    selected_channel: u8,
     module_count: usize,
     scrap_total: u32,
     progression: &DemoProgression,
@@ -34,19 +35,20 @@ pub(super) fn editor_status_line(
     };
 
     format!(
-        "{}\nEntry: {entry_label}\nShip: {ship_name}\nSelected Tool: {selected_kind} / {}\nRotation: {selected_rotation}\nPlaced Modules: {module_count}\nScrap: {scrap_total}\nAvailable: ready {} / damaged {}\nRepair Cost: {} ({availability})",
+        "{}\nEntry: {entry_label}\nShip: {ship_name}\nSelected Tool: {selected_kind} / {}\nRotation: {selected_rotation}\nChannel: {}\nPlaced Modules: {module_count}\nScrap: {scrap_total}\nAvailable: ready {} / damaged {}\nRepair Cost: {} ({availability})",
         match mode {
             EditorMode::Player => "Player Refit",
             EditorMode::Enemy => "Enemy Ship Debug Editor",
         },
         selected_variant.display_name(),
+        selected_channel,
         ready_count,
         damaged_count,
         repair_cost,
     )
 }
 
-pub(super) fn editor_mission_report_text(last_mission_report: &LastMissionReport) -> String {
+pub(crate) fn editor_mission_report_text(last_mission_report: &LastMissionReport) -> String {
     match (&last_mission_report.headline, &last_mission_report.detail) {
         (Some(headline), Some(detail)) => format!(
             "Last Mission: {headline}\n{detail}\nScrap Awarded: {}\nTotal Scrap: {}\nHottest Module: {}\nFirst Disabled: {}\nRepairs / Stabilizations: {} / {}\nAutomation Used: {}\nARCH Program: {}\nARCH Invalid / Recent Writes: {} / {}\nRecovered Raw: {}\nProcessed / Used Charges: {} / {}\nTransfers / Processor Cycles: {} / {}\nLogistics Bottleneck: {}{}",
@@ -103,11 +105,11 @@ pub(super) fn editor_mission_report_text(last_mission_report: &LastMissionReport
     }
 }
 
-pub(super) fn module_kind_cost(kind: ModuleKind, variant: ModuleVariant) -> u32 {
+pub(crate) fn module_kind_cost(kind: ModuleKind, variant: ModuleVariant) -> u32 {
     ModuleSpec::for_module(kind, variant).placement_cost
 }
 
-pub(super) fn cursor_grid_position(
+pub(crate) fn cursor_grid_position(
     window: &Window,
     (camera, camera_transform): (&Camera, &GlobalTransform),
 ) -> Option<(i32, i32)> {
@@ -119,18 +121,18 @@ pub(super) fn cursor_grid_position(
     ))
 }
 
-pub(super) fn grid_to_world(grid_x: i32, grid_y: i32, z: f32) -> Vec3 {
+pub(crate) fn grid_to_world(grid_x: i32, grid_y: i32, z: f32) -> Vec3 {
     Vec3::new(grid_x as f32 * TILE_SIZE, -(grid_y as f32) * TILE_SIZE, z)
 }
 
-pub(super) fn is_cursor_over_toolbox(window: &Window) -> bool {
+pub(crate) fn is_cursor_over_toolbox(window: &Window) -> bool {
     let Some(cursor) = window.cursor_position() else {
         return false;
     };
     cursor.x <= TOOLBOX_WIDTH
 }
 
-pub(super) fn is_cursor_over_editor_ui(window: &Window) -> bool {
+pub(crate) fn is_cursor_over_editor_ui(window: &Window) -> bool {
     let Some(cursor) = window.cursor_position() else {
         return false;
     };
@@ -151,7 +153,7 @@ pub(super) fn is_cursor_over_editor_ui(window: &Window) -> bool {
     over_arch_panel || over_status_panel || over_controls_panel
 }
 
-pub(super) fn sprite_path_for_kind(kind: &ModuleKind, variant: ModuleVariant) -> String {
+pub(crate) fn sprite_path_for_kind(kind: &ModuleKind, variant: ModuleVariant) -> String {
     let _ = variant;
     let asset_name = match kind {
         ModuleKind::Shield => "battery",

@@ -100,8 +100,9 @@ pub(crate) fn update_station_command_input(
                         angle_from_vector(aim) - Fx::FRAC_PI_2 - ship_rotation.radians,
                     );
                 }
-                turret_state.desired_angle +=
-                    dt * Fx::from_num(command.turn_milli) / Fx::from_num(1000) * Fx::from_num(1.8);
+                turret_state.desired_angle += dt * Fx::from_num(command.turn_milli)
+                    / Fx::from_num(1000)
+                    * Fx::from_num(balance.combat.turret_manual_aim_speed);
                 if command.station.op == netcode::StationControlOp::TurretAdjustAim {
                     turret_state.desired_angle +=
                         Fx::from_num(command.station.arg0) / Fx::from_num(1000);
@@ -306,6 +307,7 @@ pub(crate) fn update_station_command_input(
 }
 
 pub(crate) fn apply_player_ship_controls(
+    balance: Res<BalanceConfig>,
     time: Res<Time>,
     player_ship_query: Single<
         (
@@ -348,8 +350,10 @@ pub(crate) fn apply_player_ship_controls(
         control_state.throttle_demand = Fx::from_num(0);
     }
 
-    control_state.thrust_active =
-        throttle_demand > Fx::from_num(0.05) && !mission_state.failed && !mission_state.completed;
+    control_state.thrust_active = throttle_demand
+        > Fx::from_num(balance.ship.throttle_activation_threshold)
+        && !mission_state.failed
+        && !mission_state.completed;
     control_state.turn_input = turn_input;
     weapon_state.cooldown_remaining = (weapon_state.cooldown_remaining - dt).max(Fx::from_num(0));
 

@@ -1,5 +1,6 @@
 use super::Fx;
 use crate::{
+    balance::BalanceConfig,
     gameplay::components::{Integrity, InteractionKind, ModuleRuntimeState, ResourceKind},
     ship::{ModuleKind, ModuleVariant},
 };
@@ -55,6 +56,17 @@ pub(crate) fn interaction_for_module(
     None
 }
 
+pub(crate) fn module_needs_repair(
+    integrity: &Integrity,
+    runtime_state: &ModuleRuntimeState,
+    destroyed: bool,
+) -> bool {
+    !destroyed
+        && (integrity.current < integrity.max
+            || runtime_state.needs_attention
+            || runtime_state.is_disabled)
+}
+
 pub(crate) fn interaction_prompt(kind: InteractionKind) -> &'static str {
     match kind {
         InteractionKind::Cockpit => "E: enter cockpit station",
@@ -74,7 +86,7 @@ pub(crate) fn is_hold_interaction(kind: InteractionKind) -> bool {
     matches!(kind, InteractionKind::Repair | InteractionKind::Extract)
 }
 
-pub(crate) fn interaction_hold_duration(kind: InteractionKind) -> Fx {
+pub(crate) fn interaction_hold_duration(kind: InteractionKind, balance: &BalanceConfig) -> Fx {
     match kind {
         InteractionKind::Cockpit
         | InteractionKind::Computer
@@ -84,8 +96,8 @@ pub(crate) fn interaction_hold_duration(kind: InteractionKind) -> Fx {
         | InteractionKind::Turret
         | InteractionKind::Reactor
         | InteractionKind::Engine => Fx::from_num(0),
-        InteractionKind::Repair => Fx::from_num(1.8),
-        InteractionKind::Extract => Fx::from_num(2.4),
+        InteractionKind::Repair => Fx::from_num(balance.interaction.repair_hold_duration),
+        InteractionKind::Extract => Fx::from_num(balance.interaction.extract_hold_duration),
     }
 }
 

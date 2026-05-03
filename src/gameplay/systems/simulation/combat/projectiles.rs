@@ -247,7 +247,9 @@ pub(crate) fn handle_projectile_hits(
                                 mission_state.completion_reason = None;
                                 mission_state
                                     .return_delay_remaining
-                                    .get_or_insert(Fx::from_num(2.5));
+                                    .get_or_insert(Fx::from_num(
+                                        balance.mission.return_delay_seconds,
+                                    ));
                             }
                         }
                     }

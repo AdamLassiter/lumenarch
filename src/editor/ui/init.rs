@@ -16,6 +16,7 @@ use crate::{
         EditorToolState,
         EnemyEditorState,
         EnemyShipLibraryState,
+        ProgramTextEditorState,
     },
 };
 
@@ -28,6 +29,7 @@ pub(crate) fn initialize_editor_ship(
     mut editor_ship: ResMut<EditorShip>,
     mut tool_state: ResMut<EditorToolState>,
     mut arch_editor_state: ResMut<ArchEditorState>,
+    mut program_editor_state: ResMut<ProgramTextEditorState>,
 ) {
     match editor_session.mode {
         EditorMode::Player => {
@@ -97,6 +99,7 @@ pub(crate) fn initialize_editor_ship(
     tool_state.selected_kind = ModuleKind::Hull;
     tool_state.selected_variant = crate::ship::ModuleVariant::default_for_kind(ModuleKind::Hull);
     tool_state.selected_rotation = 0;
+    tool_state.selected_channel = 0;
     arch_editor_state.selected_module_id = editor_ship
         .ship
         .modules
@@ -104,4 +107,13 @@ pub(crate) fn initialize_editor_ship(
         .find(|module| module.kind == ModuleKind::Computer)
         .map(|module| module.id);
     arch_editor_state.selected_line = 0;
+    arch_editor_state.panel_open = false;
+    program_editor_state.module_id = None;
+    program_editor_state.draft_text.clear();
+    program_editor_state.cursor_index = 0;
+    program_editor_state.select_all = false;
+    program_editor_state.focused = false;
+    program_editor_state.dirty = false;
+    program_editor_state.diagnostics.clear();
+    program_editor_state.status_line.clear();
 }

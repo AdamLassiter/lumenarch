@@ -166,11 +166,11 @@ pub(crate) fn sample_ship_fields(
 
         player_fields.local_heat = ((heat + mission_state.ambient_heat_pressure)
             .max(Fx::from_num(0))
-            * equipped_suit.suit.heat_multiplier())
+            * equipped_suit.suit.heat_multiplier(&balance.player))
         .max(Fx::from_num(0));
         player_fields.local_electrical = ((electrical + mission_state.ambient_electrical_pressure)
             .max(Fx::from_num(0))
-            * equipped_suit.suit.electrical_multiplier())
+            * equipped_suit.suit.electrical_multiplier(&balance.player))
         .max(Fx::from_num(0));
         player_fields.heat_danger =
             player_fields.local_heat >= Fx::from_num(balance.fields.player_heat_warning_threshold);
@@ -380,16 +380,19 @@ pub(crate) fn apply_player_environmental_effects(
         .max(Fx::from_num(0));
         if excess_heat > Fx::from_num(0) {
             condition.heat_buildup = (condition.heat_buildup
-                + excess_heat * Fx::from_num(0.12) * dt)
-                .min(Fx::from_num(12));
+                + excess_heat * Fx::from_num(balance.fields.player_heat_buildup_rate) * dt)
+                .min(Fx::from_num(balance.fields.player_heat_buildup_cap));
         } else {
-            condition.heat_buildup =
-                (condition.heat_buildup - Fx::from_num(1.4) * dt).max(Fx::from_num(0));
+            condition.heat_buildup = (condition.heat_buildup
+                - Fx::from_num(balance.fields.player_heat_decay_rate) * dt)
+                .max(Fx::from_num(0));
         }
 
-        if condition.heat_buildup > Fx::from_num(2.5) {
-            let heat_damage_step =
-                (condition.heat_buildup - Fx::from_num(2.5)) * Fx::from_num(0.22) * dt;
+        if condition.heat_buildup > Fx::from_num(balance.fields.player_heat_damage_threshold) {
+            let heat_damage_step = (condition.heat_buildup
+                - Fx::from_num(balance.fields.player_heat_damage_threshold))
+                * Fx::from_num(balance.fields.player_heat_damage_rate)
+                * dt;
             condition.heat_damage_progress += heat_damage_step;
             while condition.heat_damage_progress >= Fx::from_num(1) {
                 condition.heat_damage_progress -= Fx::from_num(1);
@@ -406,37 +409,49 @@ pub(crate) fn apply_player_environmental_effects(
             - Fx::from_num(balance.fields.player_electrical_warning_threshold))
         .max(Fx::from_num(0));
         if excess_electrical > Fx::from_num(0) {
-            condition.electrical_buildup += excess_electrical * Fx::from_num(0.32) * dt;
+            condition.electrical_buildup += excess_electrical
+                * Fx::from_num(balance.fields.player_electrical_buildup_rate)
+                * dt;
         } else {
-            condition.electrical_buildup =
-                (condition.electrical_buildup - Fx::from_num(2.0) * dt).max(Fx::from_num(0));
+            condition.electrical_buildup = (condition.electrical_buildup
+                - Fx::from_num(balance.fields.player_electrical_decay_rate) * dt)
+                .max(Fx::from_num(0));
         }
-        if condition.electrical_buildup >= Fx::from_num(3.0)
+        if condition.electrical_buildup
+            >= Fx::from_num(balance.fields.player_electrical_stun_threshold)
             && condition.stun_remaining <= Fx::from_num(0)
         {
-            condition.health = (condition.health - 2).max(0);
-            condition.stun_remaining = Fx::from_num(2.8);
+            condition.health =
+                (condition.health - balance.fields.player_electrical_stun_damage).max(0);
+            condition.stun_remaining = Fx::from_num(balance.fields.player_electrical_stun_duration);
             condition.electrical_buildup = Fx::from_num(0);
             mission_state.recent_action = Some("Crew stunned by electrical discharge".to_string());
             mission_state.recent_action_timer = Fx::from_num(1.8);
         }
 
-        if field_state.local_oxygen <= Fx::from_num(0.2) {
-            condition.blackout =
-                (condition.blackout + Fx::from_num(0.40) * dt).min(Fx::from_num(1));
+        if field_state.local_oxygen <= Fx::from_num(balance.fields.player_zero_oxygen_threshold) {
+            condition.blackout = (condition.blackout
+                + Fx::from_num(balance.fields.player_oxygen_blackout_zero_rate) * dt)
+                .min(Fx::from_num(1));
         } else if field_state.oxygen_critical {
-            condition.blackout =
-                (condition.blackout + Fx::from_num(0.18) * dt).min(Fx::from_num(1));
+            condition.blackout = (condition.blackout
+                + Fx::from_num(balance.fields.player_oxygen_blackout_critical_rate) * dt)
+                .min(Fx::from_num(1));
         } else if field_state.oxygen_warning {
-            condition.blackout =
-                (condition.blackout + Fx::from_num(0.08) * dt).min(Fx::from_num(1));
+            condition.blackout = (condition.blackout
+                + Fx::from_num(balance.fields.player_oxygen_blackout_warning_rate) * dt)
+                .min(Fx::from_num(1));
         } else {
-            condition.blackout =
-                (condition.blackout - Fx::from_num(0.22) * dt).max(Fx::from_num(0));
+            condition.blackout = (condition.blackout
+                - Fx::from_num(balance.fields.player_oxygen_blackout_recovery_rate) * dt)
+                .max(Fx::from_num(0));
         }
 
-        if condition.blackout >= Fx::from_num(0.98) {
-            condition.blackout_damage_progress += Fx::from_num(0.18) * dt;
+        if condition.blackout
+            >= Fx::from_num(balance.fields.player_oxygen_blackout_damage_threshold)
+        {
+            condition.blackout_damage_progress +=
+                Fx::from_num(balance.fields.player_oxygen_blackout_damage_rate) * dt;
             while condition.blackout_damage_progress >= Fx::from_num(1) {
                 condition.blackout_damage_progress -= Fx::from_num(1);
                 condition.health = (condition.health - 1).max(0);
@@ -450,7 +465,9 @@ pub(crate) fn apply_player_environmental_effects(
         }
 
         if condition.health <= 0 {
-            condition.stun_remaining = condition.stun_remaining.max(Fx::from_num(4.0));
+            condition.stun_remaining = condition
+                .stun_remaining
+                .max(Fx::from_num(balance.fields.player_death_stun_duration));
             condition.blackout = Fx::from_num(1);
         }
     }
