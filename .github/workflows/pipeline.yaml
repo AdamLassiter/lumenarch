@@ -26,6 +26,8 @@ jobs:
   release-build:
     name: Release build (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    env:
+      RUSTFLAGS: -A warnings
     strategy:
       matrix:
         include:
