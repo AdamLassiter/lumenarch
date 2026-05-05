@@ -7,7 +7,7 @@ use bevy::{log, prelude::*};
 use hud::spawn_runtime_hud;
 use salvage::spawn_salvage_wreck;
 
-use super::ship::{spawn_hostile_ship, spawn_runtime_ship};
+use super::ship::{default_hostile_identity, spawn_hostile_ship, spawn_runtime_ship};
 use crate::{
     balance::BalanceConfig,
     gameplay::{
@@ -17,6 +17,7 @@ use crate::{
     netcode,
     ship::enemy::EnemyShipEntryValidationStatus,
     state::{DemoProgression, EditorShip, EnemyShipLibraryState, SectorNodeKind, SectorState},
+    stations::StationCatalogResource,
 };
 
 pub(crate) fn spawn_runtime_scene(
@@ -25,6 +26,7 @@ pub(crate) fn spawn_runtime_scene(
     editor_ship: Res<EditorShip>,
     progression: Res<DemoProgression>,
     enemy_library_state: Res<EnemyShipLibraryState>,
+    station_catalog: Res<StationCatalogResource>,
     sector_state: Res<SectorState>,
     session_status: Res<netcode::SessionStatus>,
     local_handle: Res<netcode::LocalPlayerHandle>,
@@ -81,6 +83,49 @@ pub(crate) fn spawn_runtime_scene(
         active_node.encounter.ambient_electrical_pressure,
     );
     spawn_salvage_wreck(&mut commands, active_node.encounter.salvage_value);
+    let active_contract = progression
+        .active_contract_id
+        .as_ref()
+        .and_then(|contract_id| station_catalog.0.contract(contract_id));
+    let mission_briefing = active_contract
+        .as_ref()
+        .map(|(_, contract)| contract.briefing.clone());
+    let contract_title = active_contract
+        .as_ref()
+        .map(|(_, contract)| contract.title.clone());
+    let opposition_identity = active_node
+        .encounter
+        .enemy_ship_ids
+        .first()
+        .and_then(|enemy_id| enemy_library_state.library.find_by_id(enemy_id))
+        .map(|entry| {
+            if entry.is_crewed {
+                format!(
+                    "{} | {} | {}",
+                    entry.faction_id.as_str(),
+                    entry.captain_name.as_deref().unwrap_or("Unknown Captain"),
+                    entry
+                        .ship_name
+                        .as_deref()
+                        .unwrap_or(entry.display_name.as_str())
+                )
+            } else {
+                format!(
+                    "{} | {}",
+                    entry.faction_id.as_str(),
+                    entry
+                        .ship_name
+                        .as_deref()
+                        .unwrap_or(entry.display_name.as_str())
+                )
+            }
+        });
+    let opposition_comms = active_node
+        .encounter
+        .enemy_ship_ids
+        .first()
+        .and_then(|enemy_id| enemy_library_state.library.find_by_id(enemy_id))
+        .and_then(|entry| entry.comms_intro.clone());
     spawn_runtime_ship(
         &mut commands,
         &asset_server,
@@ -98,6 +143,11 @@ pub(crate) fn spawn_runtime_scene(
         active_node.encounter.ambient_heat_pressure,
         active_node.encounter.ambient_electrical_pressure,
         progression.hull_wear,
+        progression.active_contract_id.clone(),
+        contract_title,
+        mission_briefing,
+        opposition_identity,
+        opposition_comms,
     );
 
     let spawn_points = [
@@ -164,6 +214,40 @@ pub(crate) fn spawn_runtime_scene(
             Fx::from_num(balance.hostile_ai.default_aggression),
             balance.hostile_ai.salvage_reward_base
                 + u32::from(entry.threat_tier) * balance.hostile_ai.salvage_reward_per_threat,
+            Some(if entry.is_crewed {
+                crate::gameplay::components::ShipEncounterIdentity {
+                    faction_id: entry.faction_id,
+                    ship_name: entry
+                        .ship_name
+                        .clone()
+                        .unwrap_or_else(|| entry.display_name.clone()),
+                    captain: crate::gameplay::components::CaptainProfile {
+                        name: entry
+                            .captain_name
+                            .clone()
+                            .unwrap_or_else(|| "Unknown Captain".to_string()),
+                        title: "Commanding".to_string(),
+                    },
+                    comms: crate::gameplay::components::EncounterCommsScript {
+                        intro: entry
+                            .comms_intro
+                            .clone()
+                            .unwrap_or_else(|| "Hostile comms burst detected.".to_string()),
+                        outro: entry
+                            .comms_outro
+                            .clone()
+                            .unwrap_or_else(|| "Hostile signal lost.".to_string()),
+                    },
+                    crewed: true,
+                }
+            } else {
+                default_hostile_identity(
+                    entry
+                        .ship_name
+                        .as_deref()
+                        .unwrap_or(entry.display_name.as_str()),
+                )
+            }),
         );
     }
 

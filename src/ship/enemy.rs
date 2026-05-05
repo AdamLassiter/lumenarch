@@ -4,6 +4,7 @@ use bevy::log;
 use serde::{Deserialize, Serialize};
 
 use super::{ModuleKind, ModuleVariant, ShipDefinition, ShipModule};
+use crate::stations::FactionId;
 
 pub const DEFAULT_ENEMY_SHIPS_PATH: &str = "saves/enemy_ships.json";
 
@@ -26,6 +27,18 @@ pub struct EnemyShipEntry {
     pub display_name: String,
     pub threat_tier: u8,
     pub behavior_tag: String,
+    #[serde(default = "default_enemy_faction")]
+    pub faction_id: FactionId,
+    #[serde(default)]
+    pub ship_name: Option<String>,
+    #[serde(default)]
+    pub captain_name: Option<String>,
+    #[serde(default)]
+    pub comms_intro: Option<String>,
+    #[serde(default)]
+    pub comms_outro: Option<String>,
+    #[serde(default)]
+    pub is_crewed: bool,
     pub ship: ShipDefinition,
 }
 
@@ -71,6 +84,17 @@ impl EnemyShipLibrary {
             display_name: format!("Enemy {next_index}"),
             threat_tier: 1,
             behavior_tag: "aggressive".to_string(),
+            faction_id: FactionId::RogueContinuants,
+            ship_name: Some(format!("Enemy {next_index}")),
+            captain_name: Some("Unassigned Captain".to_string()),
+            comms_intro: Some(
+                "You are entering a live claim. Turn off your lamps and drift away.".to_string(),
+            ),
+            comms_outro: Some(
+                "This route is spoken for. Remember that the next time you cut into our wrecks."
+                    .to_string(),
+            ),
+            is_crewed: true,
             ship: ShipDefinition {
                 name: format!("Enemy {next_index}"),
                 modules: vec![
@@ -186,6 +210,10 @@ fn seeded_enemy_by_id(id: &str) -> Option<EnemyShipEntry> {
         .find(|entry| entry.id == id)
 }
 
+fn default_enemy_faction() -> FactionId {
+    FactionId::RogueContinuants
+}
+
 fn save_enemy_library_to_path(path: &Path, library: &EnemyShipLibrary) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|error| {
@@ -231,6 +259,16 @@ fn raider_skiff() -> EnemyShipEntry {
         display_name: "Raider Skiff".to_string(),
         threat_tier: 1,
         behavior_tag: "skirmisher".to_string(),
+        faction_id: FactionId::RogueContinuants,
+        ship_name: Some("Cutter Ashfall".to_string()),
+        captain_name: Some("Captain Ilex Marr".to_string()),
+        comms_intro: Some(
+            "Cutter Ashfall to unknown crew: this lane is under private recovery. Break away or be broken.".to_string(),
+        ),
+        comms_outro: Some(
+            "You got your warning. Needle Rest keeps sending crews into other people's futures.".to_string(),
+        ),
+        is_crewed: true,
         ship: ShipDefinition {
             name: "Raider Skiff".to_string(),
             modules,
@@ -266,6 +304,16 @@ fn scrap_brigand() -> EnemyShipEntry {
         display_name: "Scrap Brigand".to_string(),
         threat_tier: 3,
         behavior_tag: "brawler".to_string(),
+        faction_id: FactionId::RogueContinuants,
+        ship_name: Some("Saint-of-Cinders".to_string()),
+        captain_name: Some("Cell Lead Orin Vey".to_string()),
+        comms_intro: Some(
+            "Saint-of-Cinders hails: leave your cargo and your route marks, and we might let the station keep your names.".to_string(),
+        ),
+        comms_outro: Some(
+            "Needle Rest doesn't own this corridor. People like us survived the Quiet by learning that first.".to_string(),
+        ),
+        is_crewed: true,
         ship: ShipDefinition {
             name: "Scrap Brigand".to_string(),
             modules,
@@ -316,6 +364,12 @@ mod tests {
                 display_name: "Broken Raider".to_string(),
                 threat_tier: 1,
                 behavior_tag: "skirmisher".to_string(),
+                faction_id: FactionId::RogueContinuants,
+                ship_name: Some("Broken Raider".to_string()),
+                captain_name: Some("Captain Placeholder".to_string()),
+                comms_intro: None,
+                comms_outro: None,
+                is_crewed: true,
                 ship: ShipDefinition::empty("Broken Raider"),
             }],
         };
@@ -335,6 +389,12 @@ mod tests {
                 display_name: "Broken Custom".to_string(),
                 threat_tier: 1,
                 behavior_tag: "aggressive".to_string(),
+                faction_id: FactionId::RogueContinuants,
+                ship_name: Some("Broken Custom".to_string()),
+                captain_name: Some("Captain Placeholder".to_string()),
+                comms_intro: None,
+                comms_outro: None,
+                is_crewed: true,
                 ship: ShipDefinition::empty("Broken Custom"),
             }],
         };

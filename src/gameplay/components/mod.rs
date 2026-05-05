@@ -6,11 +6,13 @@ mod ship;
 mod simulation;
 
 pub(crate) use actors::{
+    CaptainProfile,
     CarriedItemKind,
     CarriedResource,
     CrewNameBackdrop,
     CrewNameLabel,
     CurrentStation,
+    EncounterCommsScript,
     EquippedSuit,
     HostileShip,
     HostileShipAi,
@@ -28,6 +30,7 @@ pub(crate) use actors::{
     ShipAtmosphereState,
     ShipAtmosphereTile,
     ShipControlMode,
+    ShipEncounterIdentity,
     ShipInertiaField,
     ShipInteriorMap,
     ShipInteriorNode,

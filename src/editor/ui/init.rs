@@ -11,8 +11,11 @@ use crate::{
     state::{
         ArchEditorState,
         EditorMode,
+        EditorPointerState,
+        EditorSelectionState,
         EditorSessionState,
         EditorShip,
+        EditorToolMode,
         EditorToolState,
         EnemyEditorState,
         EnemyShipLibraryState,
@@ -28,6 +31,8 @@ pub(crate) fn initialize_editor_ship(
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
     mut editor_ship: ResMut<EditorShip>,
     mut tool_state: ResMut<EditorToolState>,
+    mut selection_state: ResMut<EditorSelectionState>,
+    mut pointer_state: ResMut<EditorPointerState>,
     mut arch_editor_state: ResMut<ArchEditorState>,
     mut program_editor_state: ResMut<ProgramTextEditorState>,
 ) {
@@ -96,10 +101,16 @@ pub(crate) fn initialize_editor_ship(
         }
     }
 
+    tool_state.tool_mode = EditorToolMode::Build;
     tool_state.selected_kind = ModuleKind::Hull;
     tool_state.selected_variant = crate::ship::ModuleVariant::default_for_kind(ModuleKind::Hull);
     tool_state.selected_rotation = 0;
     tool_state.selected_channel = 0;
+    selection_state.selected_module_ids.clear();
+    selection_state.clipboard.clear();
+    selection_state.marquee_origin = None;
+    selection_state.marquee_current = None;
+    pointer_state.last_build_cell = None;
     arch_editor_state.selected_module_id = editor_ship
         .ship
         .modules

@@ -14,3 +14,6 @@
 * [ ] Scrap and other items need more effort - one suit per player, one carried item per player
   * [ ] Needs some design for types of suits and what items will exist
 * [ ] Some components are missing unique sprites
+* [ ] Sometimes, navigating to a sector takes you to the wrong sector (probably always a previously-selected selector - i.e. select A, select B, travel -> arrive at sector A - even allowing reasonable time between clicking between sectors, so more of a state issue than a race condition)
+* [ ] Atmospheric decompression pulls players towards the top-left corner of the ship node that is leaking oxygen, rather than the void of space outside of the ship
+* [ ] Ship preview while docked still appears in random positions

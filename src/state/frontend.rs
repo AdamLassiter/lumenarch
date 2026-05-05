@@ -19,12 +19,40 @@ pub(crate) struct DebugOverlayState {
 #[derive(Resource, Clone, Serialize, Deserialize)]
 pub(crate) struct DockedState {
     pub(crate) station_title: String,
+    pub(crate) selected_surface: DockedSurface,
+    pub(crate) selected_contract_index: usize,
+    pub(crate) selected_contact_index: usize,
+    pub(crate) selected_lore_index: usize,
 }
 
 impl Default for DockedState {
     fn default() -> Self {
         Self {
             station_title: "Needle Rest".to_string(),
+            selected_surface: DockedSurface::Shipyard,
+            selected_contract_index: 0,
+            selected_contact_index: 0,
+            selected_lore_index: 0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum DockedSurface {
+    #[default]
+    Shipyard,
+    Quartermaster,
+    Contracts,
+    Archives,
+}
+
+impl DockedSurface {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Shipyard => "Shipyard",
+            Self::Quartermaster => "Quartermaster",
+            Self::Contracts => "Contract Board",
+            Self::Archives => "Archives",
         }
     }
 }
@@ -176,6 +204,35 @@ pub(crate) struct OpenSectorMapButton;
 pub(crate) struct RepairShipButton;
 
 #[derive(Component)]
+pub(crate) struct DockedSurfaceButton {
+    pub(crate) surface: DockedSurface,
+}
+
+#[derive(Component)]
+pub(crate) struct DockedContractPrevButton;
+
+#[derive(Component)]
+pub(crate) struct DockedContractNextButton;
+
+#[derive(Component)]
+pub(crate) struct DockedAcceptContractButton;
+
+#[derive(Component)]
+pub(crate) struct DockedLaunchContractButton;
+
+#[derive(Component)]
+pub(crate) struct DockedContactPrevButton;
+
+#[derive(Component)]
+pub(crate) struct DockedContactNextButton;
+
+#[derive(Component)]
+pub(crate) struct DockedLorePrevButton;
+
+#[derive(Component)]
+pub(crate) struct DockedLoreNextButton;
+
+#[derive(Component)]
 pub(crate) struct StatusText;
 
 #[derive(Component)]
@@ -192,3 +249,9 @@ pub(crate) struct LobbyCycleColorButton;
 
 #[derive(Component)]
 pub(crate) struct DockedStatusText;
+
+#[derive(Component)]
+pub(crate) struct DockedContentText;
+
+#[derive(Component)]
+pub(crate) struct DockedHelpText;

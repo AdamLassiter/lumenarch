@@ -530,7 +530,7 @@ pub(crate) fn handle_player_cargo_interaction(
         };
         let amount = carried.amount.max(1);
         commands.spawn((
-            Sprite::from_color(kind.color(), Vec2::splat(10.0)),
+            Sprite::from_color(kind.color(), Vec2::splat(16.0)),
             Transform::from_translation(render_translation(motion.world_position, 5.2)),
             SimPosition {
                 value: motion.world_position,

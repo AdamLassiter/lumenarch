@@ -13,19 +13,27 @@ use super::{
             DemoProgression,
             EditingCleanup,
             EditorMode,
+            EditorSelectionState,
             EditorSessionState,
             EditorShip,
+            EditorToolModeButton,
             EditorToolState,
             EditorToolboxScrollContent,
             EditorUiState,
             MainCamera,
             PreviewTile,
             ShipTileSprite,
-            ToolboxButton,
-            ToolboxButtonText,
+            ToolboxVariantButton,
+            ToolboxVariantButtonText,
         },
     },
-    helpers::{cursor_grid_position, grid_to_world, is_cursor_over_toolbox, sprite_path_for_kind},
+    helpers::{
+        cursor_grid_position,
+        grid_to_world,
+        is_cursor_over_toolbox,
+        sprite_path_for_kind,
+        variant_inventory_label,
+    },
 };
 
 pub(crate) fn spawn_preview_tile(
@@ -58,7 +66,8 @@ pub(crate) fn sync_preview_tile(
     let (mut sprite, mut transform, mut visibility) = preview_query.into_inner();
     let window = window.into_inner();
 
-    if is_cursor_over_toolbox(window) {
+    if tool_state.tool_mode != crate::state::EditorToolMode::Build || is_cursor_over_toolbox(window)
+    {
         *visibility = Visibility::Hidden;
         return;
     }
@@ -111,8 +120,12 @@ pub(crate) fn sync_toolbox_visuals(
     tool_state: Res<EditorToolState>,
     progression: Res<DemoProgression>,
     editor_session: Res<EditorSessionState>,
-    mut query: Query<(&ToolboxButton, &mut BackgroundColor)>,
-    mut text_query: Query<(&ToolboxButtonText, &mut Text)>,
+    mut query: Query<(&ToolboxVariantButton, &mut BackgroundColor), Without<EditorToolModeButton>>,
+    mut text_query: Query<(&ToolboxVariantButtonText, &mut Text)>,
+    mut mode_query: Query<
+        (&EditorToolModeButton, &mut BackgroundColor),
+        Without<ToolboxVariantButton>,
+    >,
 ) {
     if !tool_state.is_changed() && !progression.is_changed() && !editor_session.is_changed() {
         return;
@@ -120,11 +133,10 @@ pub(crate) fn sync_toolbox_visuals(
 
     for (button, mut background) in &mut query {
         let affordable = editor_session.mode == EditorMode::Enemy
-            || progression.ready_count(
-                button.kind,
-                crate::ship::ModuleVariant::default_for_kind(button.kind),
-            ) > 0;
-        if button.kind == tool_state.selected_kind {
+            || progression.ready_count(button.kind, button.variant) > 0
+            || progression.damaged_count(button.kind, button.variant) > 0;
+        if button.kind == tool_state.selected_kind && button.variant == tool_state.selected_variant
+        {
             *background = BackgroundColor(if affordable {
                 SELECTED_BUTTON
             } else {
@@ -140,16 +152,24 @@ pub(crate) fn sync_toolbox_visuals(
     }
 
     for (button, mut text) in &mut text_query {
-        let variant = crate::ship::ModuleVariant::default_for_kind(button.kind);
-        **text = match editor_session.mode {
-            EditorMode::Player => format!(
-                "{}  [ready {} / damaged {}]",
-                button.kind.as_str(),
-                progression.ready_count(button.kind, variant),
-                progression.damaged_count(button.kind, variant),
+        **text = format!(
+            "{}\n{}",
+            button.variant.display_name(),
+            variant_inventory_label(
+                editor_session.mode,
+                &progression,
+                button.kind,
+                button.variant
             ),
-            EditorMode::Enemy => format!("{}  [∞]", button.kind.as_str()),
-        };
+        );
+    }
+
+    for (button, mut background) in &mut mode_query {
+        *background = BackgroundColor(if button.mode == tool_state.tool_mode {
+            SELECTED_BUTTON
+        } else {
+            NORMAL_BUTTON
+        });
     }
 }
 
@@ -204,5 +224,39 @@ pub(crate) fn draw_grid_overlay(
             Vec2::new(max_world_x, y),
             GRID_COLOR,
         );
+    }
+}
+
+pub(crate) fn draw_editor_selection_overlay(
+    editor_ship: Res<EditorShip>,
+    selection_state: Res<EditorSelectionState>,
+    mut gizmos: Gizmos,
+) {
+    for module in &editor_ship.ship.modules {
+        if !selection_state.selected_module_ids.contains(&module.id) {
+            continue;
+        }
+        let center = Vec2::new(
+            module.grid_x as f32 * TILE_SIZE,
+            -(module.grid_y as f32) * TILE_SIZE,
+        );
+        gizmos.rect_2d(
+            center,
+            Vec2::splat(TILE_SIZE + 6.0),
+            Color::srgb(0.95, 0.74, 0.28),
+        );
+    }
+
+    if let (Some(origin), Some(current)) = (
+        selection_state.marquee_origin,
+        selection_state.marquee_current,
+    ) {
+        let min_x = origin.0.min(current.0) as f32 * TILE_SIZE - HALF_TILE_SIZE;
+        let max_x = origin.0.max(current.0) as f32 * TILE_SIZE + HALF_TILE_SIZE;
+        let min_y = -(origin.1.max(current.1) as f32 * TILE_SIZE) - HALF_TILE_SIZE;
+        let max_y = -(origin.1.min(current.1) as f32 * TILE_SIZE) + HALF_TILE_SIZE;
+        let center = Vec2::new((min_x + max_x) * 0.5, (min_y + max_y) * 0.5);
+        let size = Vec2::new(max_x - min_x, max_y - min_y);
+        gizmos.rect_2d(center, size, Color::srgba(0.62, 0.82, 1.0, 0.9));
     }
 }

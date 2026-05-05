@@ -257,6 +257,40 @@ Definition of done:
 Keep the expanded part set understandable in refit and operation.
 
 ### Tasks
+- [x] Diagnose and fix variant availability in the player ship editor.
+  Diagnosis:
+  the current player editor toolbox and placement flow only reason about `ModuleVariant::default_for_kind(kind)`.
+  `toolbox_button_system`, `sync_toolbox_visuals`, `toolbox_label`, and the initial availability checks all ask progression only for the default variant of a module kind, so upgraded variants like `Fusion`, `BallisticTurret`, `Capacitor`, `ExpandedCore`, `DirectionalShield`, and other better-components variants never appear as independently available stock.
+  The inventory model already supports `(ModuleKind, ModuleVariant)` pairs in `DemoProgression`, but the editor UI is still kind-centric rather than variant-centric.
+- [x] Update the assets/tiles/README.md for new sprites that are expected for upgraded components.
+- [x] Refactor the player editor toolbox to present variant-aware entries instead of a single button per `ModuleKind`.
+  - [x] Refactor the player ship editor to have a number of top-level tools - select and build for now.
+  - [x] Within the build mode, show sprites with tooltips, instead of just buttons for component names, with multiple components per row, with components grouped by type - hulls, reactors, turrets, shields, etc. - with components disabled if none are available in inventory.
+  - [x] Within the select mode, show a summary of components currently selected, defaulting to all components currently on the ship when there is no selection.
+- [x] Make variant selection inventory-aware, including ready/damaged counts per variant.
+- [x] Keep enemy editor on unlimited availability across all variants.
+- [x] Improve component placement UX:
+  - add a dedicated `Select` tool and a `Place/Delete` tool
+  - allow drag placement in `Place/Delete`
+  - allow drag deletion in `Place/Delete`
+  - add marquee selection in `Select`
+  - allow moving selected placed components as a group
+  - allow copying selected groups
+  - allow deleting selected groups
+- [x] Fix rotation behavior so it advances cleanly clockwise instead of occasionally picking up unintended orientation state from replacement/update paths.
+- [x] Add an `Auto Hull` action that wraps exposed ship edges using hull edges, inner corners, and outer corners where missing.
+- [x] Update editor help text and status text to explain:
+  - tool mode
+  - current variant
+  - selection contents
+  - auto-hull behavior
+- [x] Keep the overlay/console workflow working cleanly with the new selection and placement modes.
+
+Definition of done:
+
+* better component variants are genuinely visible and placeable in player refit
+* the editor supports both quick painting and structured group editing
+* rotation and hull cleanup feel deliberate rather than fiddly
 
 - [x] Update the editor toolbox/panels for variant families.
 - [x] Add clear naming and grouping for variants.
@@ -297,11 +331,11 @@ Make the broader component ecosystem playable rather than merely implemented.
 
 ### Tasks
 
-- [ ] Tune variant costs, throughput, and combat value.
-- [ ] Tune ammunition and fuel burden.
-- [ ] Tune shield power and control burden.
-- [ ] Tune batteries/capacitors and reactor families together.
-- [ ] Verify the expanded component set remains deterministic and readable.
+- [x] Tune variant costs, throughput, and combat value.
+- [x] Tune ammunition and fuel burden.
+- [x] Tune shield power and control burden.
+- [x] Tune batteries/capacitors and reactor families together.
+- [x] Verify the expanded component set remains deterministic and readable.
 
 Definition of done:
 

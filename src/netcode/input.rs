@@ -33,11 +33,12 @@ use super::{
     RollbackPhase,
     StationControlOp,
 };
+use crate::stations::{self, StationCatalogResource};
 
 pub(crate) fn read_local_inputs(
     mut commands: Commands,
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mouse_buttons: Res<ButtonInput<MouseButton>>,
+    keyboard_input: Option<Res<ButtonInput<KeyCode>>>,
+    mouse_buttons: Option<Res<ButtonInput<MouseButton>>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
     mut pending_meta: ResMut<PendingLocalMetaCommand>,
     mut pending_station: ResMut<PendingLocalStationCommand>,
@@ -46,9 +47,13 @@ pub(crate) fn read_local_inputs(
     let mut inputs = HashMap::default();
     let pending_meta_command = pending_meta.0.take();
     let pending_station_command = pending_station.0.take();
+    let empty_keys = ButtonInput::<KeyCode>::default();
+    let empty_mouse = ButtonInput::<MouseButton>::default();
+    let keyboard_input = keyboard_input.as_deref().unwrap_or(&empty_keys);
+    let mouse_buttons = mouse_buttons.as_deref().unwrap_or(&empty_mouse);
     let input = input_from_hardware(
-        &keyboard_input,
-        &mouse_buttons,
+        keyboard_input,
+        mouse_buttons,
         window_query.iter().next(),
         pending_station_command,
         pending_meta_command,
@@ -159,6 +164,7 @@ pub(crate) fn rollback_phase_is_encounter(rollback_state: Res<RollbackGameState>
 pub(crate) fn apply_host_meta_ops(
     decoded: Res<DecodedPlayerCommands>,
     mut rollback_state: ResMut<RollbackGameState>,
+    stations: Res<StationCatalogResource>,
 ) {
     let Some(command) = decoded.by_handle.get(&0) else {
         log::trace!("No input from host player handle 0, skipping meta ops");
@@ -245,6 +251,90 @@ pub(crate) fn apply_host_meta_ops(
         RollbackMetaOp::LeaveEditor => {
             log::info!("Applying host meta op: LeaveEditor");
             rollback_state.phase = RollbackPhase::Docked;
+        }
+        RollbackMetaOp::AcceptContract => {
+            let Some(station_id) = stations::current_station_id(&rollback_state.sector) else {
+                log::debug!("Ignoring AcceptContract because no current station is active");
+                return;
+            };
+            let contract_index = command.meta.arg0.max(0) as usize;
+            let Some((station, contract)) =
+                stations.0.contract_by_index(station_id, contract_index)
+            else {
+                log::debug!(
+                    "Ignoring AcceptContract because contract index {} is invalid for station {}",
+                    contract_index,
+                    station_id
+                );
+                return;
+            };
+            rollback_state.progression.active_contract_id = Some(contract.id.clone());
+            rollback_state
+                .progression
+                .unlock_station(station.id.clone());
+            rollback_state
+                .progression
+                .unlock_contact(contract.contact_id.clone());
+            rollback_state.sector.selected_node_id = Some(contract.target_node_id);
+            rollback_state.last_mission_report.headline =
+                Some(format!("Contract Accepted: {}", contract.title));
+            rollback_state.last_mission_report.detail =
+                Some(format!("{}\n{}", contract.briefing, contract.launch_blurb));
+            log::info!(
+                "Applying host meta op: AcceptContract('{}' -> node {})",
+                contract.id,
+                contract.target_node_id
+            );
+        }
+        RollbackMetaOp::LaunchContract => {
+            let Some(active_contract_id) = rollback_state.progression.active_contract_id.clone()
+            else {
+                log::debug!("Ignoring LaunchContract because there is no active contract");
+                return;
+            };
+            let Some((station, contract)) = stations.0.contract(&active_contract_id) else {
+                log::warn!(
+                    "Active contract '{}' could not be resolved in station catalog",
+                    active_contract_id
+                );
+                rollback_state.progression.active_contract_id = None;
+                return;
+            };
+            let node_id = contract.target_node_id;
+            if rollback_state.sector.is_reachable(node_id)
+                && rollback_state
+                    .sector
+                    .node(node_id)
+                    .map(|node| !matches!(node.kind, crate::state::SectorNodeKind::HubStation))
+                    .unwrap_or(false)
+            {
+                rollback_state
+                    .progression
+                    .unlock_station(station.id.clone());
+                rollback_state
+                    .progression
+                    .unlock_contact(contract.contact_id.clone());
+                rollback_state.sector.selected_node_id = Some(node_id);
+                rollback_state.sector.active_encounter_node_id = Some(node_id);
+                rollback_state.progression.jump_count += 1;
+                rollback_state.phase = RollbackPhase::Encounter;
+                rollback_state.scene_generation += 1;
+                rollback_state.last_mission_report.headline =
+                    Some(format!("Launch: {}", contract.title));
+                rollback_state.last_mission_report.detail = Some(contract.launch_blurb.clone());
+                log::info!(
+                    "Applying host meta op: LaunchContract('{}') -> node {} / scene_generation={}",
+                    contract.id,
+                    node_id,
+                    rollback_state.scene_generation
+                );
+            } else {
+                log::debug!(
+                    "Ignoring LaunchContract('{}') because node {} is not reachable/launchable",
+                    contract.id,
+                    node_id
+                );
+            }
         }
     }
 }

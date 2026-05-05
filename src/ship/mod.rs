@@ -616,61 +616,99 @@ impl ModuleSpec {
             ModuleVariant::AdvancedHelm => {
                 spec.placement_cost = 6;
                 spec.integrity = 12;
-                spec.helm_multiplier = 1.3;
+                spec.helm_multiplier = 1.25;
             }
             ModuleVariant::Fusion => {
-                spec.placement_cost = 7;
+                spec.placement_cost = 8;
                 spec.integrity = 16;
-                spec.reactor_output_multiplier = 1.6;
-                spec.fuel_demand_multiplier = 1.4;
-                spec.reactor_heat_multiplier = 1.35;
+                spec.reactor_output_multiplier = 1.45;
+                spec.fuel_demand_multiplier = 1.75;
+                spec.reactor_heat_multiplier = 1.55;
             }
             ModuleVariant::FuelTank => {
-                spec.placement_cost = 3;
-                spec.storage_capacity = 10;
+                spec.placement_cost = 4;
+                spec.storage_capacity = 14;
             }
             ModuleVariant::AmmoRack => {
-                spec.placement_cost = 3;
-                spec.storage_capacity = 8;
+                spec.placement_cost = 4;
+                spec.storage_capacity = 6;
             }
             ModuleVariant::Capacitor => {
-                spec.placement_cost = 3;
-                spec.integrity = 6;
-                spec.battery_capacity_multiplier = 0.45;
-                spec.battery_flow_multiplier = 3.0;
+                spec.placement_cost = 4;
+                spec.integrity = 5;
+                spec.battery_capacity_multiplier = 0.35;
+                spec.battery_flow_multiplier = 4.0;
             }
             ModuleVariant::BallisticTurret => {
-                spec.placement_cost = 6;
-                spec.projectile_damage = 7;
-                spec.projectile_speed_multiplier = 0.8;
-                spec.weapon_cooldown_multiplier = 1.7;
-                spec.ammo_per_shot = 1;
+                spec.placement_cost = 7;
+                spec.projectile_damage = 8;
+                spec.projectile_speed_multiplier = 0.78;
+                spec.weapon_cooldown_multiplier = 1.9;
+                spec.ammo_per_shot = 2;
             }
             ModuleVariant::ExpandedCore => {
-                spec.placement_cost = 9;
+                spec.placement_cost = 10;
                 spec.integrity = 26;
-                spec.core_capacity_modules = 48;
-                spec.inertia_multiplier = 1.35;
+                spec.core_capacity_modules = 44;
+                spec.inertia_multiplier = 1.25;
             }
             ModuleVariant::FabricatorFast => {
-                spec.placement_cost = 6;
-                spec.processor_speed_multiplier = 1.75;
+                spec.placement_cost = 7;
+                spec.processor_speed_multiplier = 1.55;
             }
             ModuleVariant::RadialShield => {
-                spec.shield_capacity = 12.0;
+                spec.placement_cost = 5;
+                spec.shield_capacity = 10.5;
                 spec.shield_arc_degrees = 360.0;
-                spec.shield_regen = 1.1;
+                spec.shield_regen = 1.0;
             }
             ModuleVariant::DirectionalShield => {
-                spec.placement_cost = 7;
-                spec.shield_capacity = 18.0;
-                spec.shield_arc_degrees = 120.0;
-                spec.shield_regen = 0.9;
+                spec.placement_cost = 8;
+                spec.shield_capacity = 20.0;
+                spec.shield_arc_degrees = 110.0;
+                spec.shield_regen = 0.75;
             }
             _ => {}
         }
 
         spec
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ModuleKind, ModuleSpec, ModuleVariant};
+
+    #[test]
+    fn upgraded_variants_keep_clear_tradeoffs() {
+        let basic_core = ModuleSpec::for_module(ModuleKind::Core, ModuleVariant::BasicCore);
+        let expanded_core = ModuleSpec::for_module(ModuleKind::Core, ModuleVariant::ExpandedCore);
+        assert!(expanded_core.core_capacity_modules > basic_core.core_capacity_modules);
+        assert!(expanded_core.placement_cost > basic_core.placement_cost);
+
+        let fission = ModuleSpec::for_module(ModuleKind::Reactor, ModuleVariant::Fission);
+        let fusion = ModuleSpec::for_module(ModuleKind::Reactor, ModuleVariant::Fusion);
+        assert!(fusion.reactor_output_multiplier > fission.reactor_output_multiplier);
+        assert!(fusion.fuel_demand_multiplier > fission.fuel_demand_multiplier);
+        assert!(fusion.reactor_heat_multiplier > fission.reactor_heat_multiplier);
+
+        let battery = ModuleSpec::for_module(ModuleKind::Battery, ModuleVariant::BatteryCell);
+        let capacitor = ModuleSpec::for_module(ModuleKind::Battery, ModuleVariant::Capacitor);
+        assert!(capacitor.battery_capacity_multiplier < battery.battery_capacity_multiplier);
+        assert!(capacitor.battery_flow_multiplier > battery.battery_flow_multiplier);
+
+        let laser = ModuleSpec::for_module(ModuleKind::Turret, ModuleVariant::LaserTurret);
+        let ballistic = ModuleSpec::for_module(ModuleKind::Turret, ModuleVariant::BallisticTurret);
+        assert!(ballistic.projectile_damage > laser.projectile_damage);
+        assert!(ballistic.ammo_per_shot > laser.ammo_per_shot);
+        assert!(ballistic.weapon_cooldown_multiplier > laser.weapon_cooldown_multiplier);
+
+        let radial = ModuleSpec::for_module(ModuleKind::Shield, ModuleVariant::RadialShield);
+        let directional =
+            ModuleSpec::for_module(ModuleKind::Shield, ModuleVariant::DirectionalShield);
+        assert!(directional.shield_capacity > radial.shield_capacity);
+        assert!(directional.shield_arc_degrees < radial.shield_arc_degrees);
+        assert!(directional.shield_regen < radial.shield_regen);
     }
 }
 

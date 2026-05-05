@@ -34,6 +34,16 @@ pub(crate) struct DemoProgression {
     pub(crate) jump_count: u32,
     #[serde(default)]
     pub(crate) stored_components: Vec<StoredComponentStack>,
+    #[serde(default)]
+    pub(crate) known_station_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) unlocked_contact_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) unlocked_lore_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) completed_contract_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) active_contract_id: Option<String>,
 }
 
 impl Default for DemoProgression {
@@ -43,11 +53,91 @@ impl Default for DemoProgression {
             hull_wear: 0,
             jump_count: 0,
             stored_components: starter_component_inventory(),
+            known_station_ids: vec!["needle_rest".to_string()],
+            unlocked_contact_ids: vec![
+                "ivra_quell".to_string(),
+                "sable_ren".to_string(),
+                "peregrine_cho".to_string(),
+            ],
+            unlocked_lore_ids: vec![
+                "needle_rest_foundation".to_string(),
+                "null_swarms_brief".to_string(),
+            ],
+            completed_contract_ids: Vec::new(),
+            active_contract_id: None,
         }
     }
 }
 
 impl DemoProgression {
+    pub(crate) fn knows_station(&self, station_id: &str) -> bool {
+        self.known_station_ids
+            .iter()
+            .any(|known| known == station_id)
+    }
+
+    pub(crate) fn contact_unlocked(&self, contact_id: &str) -> bool {
+        self.unlocked_contact_ids
+            .iter()
+            .any(|unlocked| unlocked == contact_id)
+    }
+
+    pub(crate) fn lore_unlocked(&self, lore_id: &str) -> bool {
+        self.unlocked_lore_ids
+            .iter()
+            .any(|unlocked| unlocked == lore_id)
+    }
+
+    pub(crate) fn contract_completed(&self, contract_id: &str) -> bool {
+        self.completed_contract_ids
+            .iter()
+            .any(|completed| completed == contract_id)
+    }
+
+    pub(crate) fn unlock_station(&mut self, station_id: impl Into<String>) {
+        let station_id = station_id.into();
+        if !self
+            .known_station_ids
+            .iter()
+            .any(|known| known == &station_id)
+        {
+            self.known_station_ids.push(station_id);
+        }
+    }
+
+    pub(crate) fn unlock_contact(&mut self, contact_id: impl Into<String>) {
+        let contact_id = contact_id.into();
+        if !self
+            .unlocked_contact_ids
+            .iter()
+            .any(|unlocked| unlocked == &contact_id)
+        {
+            self.unlocked_contact_ids.push(contact_id);
+        }
+    }
+
+    pub(crate) fn unlock_lore(&mut self, lore_id: impl Into<String>) {
+        let lore_id = lore_id.into();
+        if !self
+            .unlocked_lore_ids
+            .iter()
+            .any(|unlocked| unlocked == &lore_id)
+        {
+            self.unlocked_lore_ids.push(lore_id);
+        }
+    }
+
+    pub(crate) fn complete_contract(&mut self, contract_id: impl Into<String>) {
+        let contract_id = contract_id.into();
+        if !self
+            .completed_contract_ids
+            .iter()
+            .any(|completed| completed == &contract_id)
+        {
+            self.completed_contract_ids.push(contract_id);
+        }
+    }
+
     pub(crate) fn ready_count(&self, kind: ModuleKind, variant: ModuleVariant) -> u32 {
         self.stored_components
             .iter()
@@ -336,6 +426,8 @@ pub(crate) struct SectorNode {
     pub(crate) id: u32,
     pub(crate) label: String,
     pub(crate) kind: SectorNodeKind,
+    #[serde(default)]
+    pub(crate) station_id: Option<String>,
     pub(crate) risk_tier: u8,
     pub(crate) reward_hint: String,
     pub(crate) neighbors: Vec<u32>,
@@ -492,6 +584,7 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                 id: 0,
                 label: "Needle Rest".to_string(),
                 kind: SectorNodeKind::HubStation,
+                station_id: Some("needle_rest".to_string()),
                 risk_tier: 0,
                 reward_hint: "Safe dock, refit, relaunch".to_string(),
                 neighbors: vec![1, 2, 3, 6],
@@ -511,6 +604,7 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                 id: 1,
                 label: "Latchline Debris".to_string(),
                 kind: SectorNodeKind::SalvageField,
+                station_id: None,
                 risk_tier: 1,
                 reward_hint: "Low threat, strong salvage".to_string(),
                 neighbors: vec![0, 4],
@@ -530,6 +624,7 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                 id: 6,
                 label: "Calibration Ring".to_string(),
                 kind: SectorNodeKind::TestRange,
+                station_id: None,
                 risk_tier: 0,
                 reward_hint: "No hostiles, no salvage, pure ship testing".to_string(),
                 neighbors: vec![0],
@@ -549,6 +644,7 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                 id: 2,
                 label: "Gravehook Nest".to_string(),
                 kind: SectorNodeKind::HostileHold,
+                station_id: None,
                 risk_tier: 3,
                 reward_hint: "Heavy guns, middling haul".to_string(),
                 neighbors: vec![0, 4, 5],
@@ -568,6 +664,7 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                 id: 3,
                 label: "Blueglass Hush".to_string(),
                 kind: SectorNodeKind::UnstableDerelict,
+                station_id: None,
                 risk_tier: 2,
                 reward_hint: "System stress, moderate reward".to_string(),
                 neighbors: vec![0, 5],
@@ -587,6 +684,7 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                 id: 4,
                 label: "Forked Cache".to_string(),
                 kind: SectorNodeKind::SalvageField,
+                station_id: None,
                 risk_tier: 2,
                 reward_hint: "Branch route, better payout".to_string(),
                 neighbors: vec![1, 2],
@@ -606,6 +704,7 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                 id: 5,
                 label: "Static Wake".to_string(),
                 kind: SectorNodeKind::UnstableDerelict,
+                station_id: None,
                 risk_tier: 4,
                 reward_hint: "Brutal branch, rich recovery".to_string(),
                 neighbors: vec![2, 3],

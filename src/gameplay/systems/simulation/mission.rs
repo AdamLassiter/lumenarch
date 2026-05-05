@@ -34,6 +34,7 @@ use crate::{
     netcode,
     ship::ModuleKind,
     state::{LastMissionReport, SectorNodeStatus, StoredComponentStack, TravelOutcome},
+    stations::StationCatalogResource,
 };
 
 pub(crate) fn update_mission_telemetry(
@@ -254,6 +255,7 @@ pub(crate) fn return_after_mission_resolution(
     time: Res<Time>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
+    stations: Res<StationCatalogResource>,
     inventory_query: Query<(
         &RuntimeShipModule,
         Option<&StorageModule>,
@@ -318,18 +320,8 @@ pub(crate) fn return_after_mission_resolution(
     };
     progression.hull_wear = progression.hull_wear.saturating_add(hull_wear_delta);
 
-    let (headline, detail) = if mission_state.failed {
-        (
-            "Mission Failed".to_string(),
-            mission_state
-                .failure_reason
-                .clone()
-                .unwrap_or_else(|| "The ship was lost.".to_string()),
-        )
-    } else {
-        let atmosphere_suffix = if mission_state.hostile_decompression_events > 0
-            || mission_state.player_ship_breached
-        {
+    let atmosphere_suffix =
+        if mission_state.hostile_decompression_events > 0 || mission_state.player_ship_breached {
             format!(
                 " Atmosphere: hostile ships vented {}, own breaches {}, lowest player oxygen {}.",
                 mission_state.hostile_decompression_events,
@@ -343,24 +335,78 @@ pub(crate) fn return_after_mission_resolution(
         } else {
             String::new()
         };
-        let detail = if mission_state.salvage_collected {
-            format!(
-                "Recovered {} raw salvage and returned {} repair charge worth {} scrap.{}",
-                mission_state.recovered_raw_salvage,
-                repair_charge_returned,
-                mission_state.salvage_scrap_awarded,
-                atmosphere_suffix
-            )
-        } else {
-            format!("Encounter cleared, but no salvage was recovered.{atmosphere_suffix}")
-        };
-        ("Mission Complete".to_string(), detail)
+
+    let contract_resolution = mission_state
+        .active_contract_id
+        .as_ref()
+        .and_then(|contract_id| stations.0.contract(contract_id))
+        .map(|(_, contract)| contract);
+    let contract_bonus = contract_resolution.map_or(0, |contract| contract.reward_bonus_scrap);
+    if contract_bonus > 0 && !mission_state.failed {
+        progression.scrap += contract_bonus;
+    }
+
+    let base_detail = if mission_state.failed {
+        mission_state
+            .failure_reason
+            .clone()
+            .unwrap_or_else(|| "The ship was lost.".to_string())
+    } else if mission_state.salvage_collected {
+        format!(
+            "Recovered {} raw salvage and returned {} repair charge worth {} scrap (+{} contract bonus).{}",
+            mission_state.recovered_raw_salvage,
+            repair_charge_returned,
+            mission_state.salvage_scrap_awarded,
+            contract_bonus,
+            atmosphere_suffix
+        )
+    } else {
+        format!(
+            "Encounter cleared, but no salvage was recovered. Contract bonus {} scrap.{}",
+            contract_bonus, atmosphere_suffix
+        )
     };
+
+    let (headline, detail) = if let Some(contract) = contract_resolution {
+        let contract_text = if mission_state.failed {
+            &contract.failure_debrief
+        } else {
+            &contract.success_debrief
+        };
+        let opposition = mission_state
+            .opposition_summary
+            .as_ref()
+            .map(|summary| format!("\nOpposition: {summary}"))
+            .unwrap_or_default();
+        (
+            if mission_state.failed {
+                format!("Contract Failed: {}", contract.title)
+            } else {
+                format!("Contract Complete: {}", contract.title)
+            },
+            format!("{contract_text}\n\n{base_detail}{opposition}"),
+        )
+    } else if mission_state.failed {
+        ("Mission Failed".to_string(), base_detail)
+    } else {
+        ("Mission Complete".to_string(), base_detail)
+    };
+
+    if let Some(contract) = contract_resolution {
+        progression.unlock_contact(contract.contact_id.clone());
+        for lore_id in &contract.lore_unlock_ids {
+            progression.unlock_lore(lore_id.clone());
+        }
+        if !mission_state.failed {
+            progression.complete_contract(contract.id.clone());
+        }
+    }
+    progression.active_contract_id = None;
 
     let mut last_mission_report = LastMissionReport {
         headline: Some(headline),
         detail: Some(detail),
-        scrap_awarded: mission_state.salvage_scrap_awarded,
+        scrap_awarded: mission_state.salvage_scrap_awarded + contract_bonus,
         total_scrap: progression.scrap,
         hottest_module: mission_state
             .hottest_module_kind
@@ -443,7 +489,7 @@ pub(crate) fn return_after_mission_resolution(
         node_id: mission_state.node_id,
         success: !mission_state.failed,
         failed: mission_state.failed,
-        scrap_awarded: mission_state.salvage_scrap_awarded,
+        scrap_awarded: mission_state.salvage_scrap_awarded + contract_bonus,
         hull_wear_delta,
         exhausted: !mission_state.failed,
     };

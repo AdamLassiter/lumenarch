@@ -13,11 +13,13 @@ use crate::{
         RUNTIME_SHIP_ORIGIN,
         components::{
             AngularVelocity,
+            CaptainProfile,
             CarriedItemKind,
             CarriedResource,
             CrewNameBackdrop,
             CrewNameLabel,
             CurrentStation,
+            EncounterCommsScript,
             EquippedSuit,
             HeldInteraction,
             HostileShip,
@@ -43,6 +45,7 @@ use crate::{
             ShipAutomationState,
             ShipControlMode,
             ShipControlState,
+            ShipEncounterIdentity,
             ShipInertiaField,
             ShipInteriorMap,
             ShipInteriorNode,
@@ -68,6 +71,7 @@ use crate::{
     netcode,
     ship::{ModuleKind, ModuleSpec, ShipDefinition},
     state::PlayingCleanup,
+    stations::FactionId,
 };
 
 #[derive(Default)]
@@ -158,6 +162,11 @@ pub(crate) fn spawn_runtime_ship(
     ambient_heat_pressure: i32,
     ambient_electrical_pressure: i32,
     wear_penalty: u32,
+    active_contract_id: Option<String>,
+    contract_title: Option<String>,
+    mission_briefing: Option<String>,
+    opposition_summary: Option<String>,
+    opposition_comms: Option<String>,
 ) {
     let totals = accumulate_ship_variant_totals(ship);
     let movement_model = ship_movement_model_with_variant_totals(ship, &totals, balance);
@@ -304,6 +313,11 @@ pub(crate) fn spawn_runtime_ship(
                 hostile_decompression_events: 0,
                 player_ship_breached: false,
                 airlocks_cycled: 0,
+                active_contract_id,
+                contract_title,
+                mission_briefing,
+                opposition_summary,
+                opposition_comms,
             },
         ))
         .id();
@@ -532,6 +546,7 @@ pub(crate) fn spawn_hostile_ship(
     preferred_range: Fx,
     aggression: Fx,
     salvage_reward: u32,
+    encounter_identity: Option<ShipEncounterIdentity>,
 ) {
     log::debug!(
         "Constructing hostile ship '{}' with {} modules at ({:.1}, {:.1})",
@@ -651,6 +666,10 @@ pub(crate) fn spawn_hostile_ship(
         ))
         .id();
 
+    if let Some(encounter_identity) = encounter_identity {
+        commands.entity(root_entity).insert(encounter_identity);
+    }
+
     let child_entities: Vec<_> = ship
         .modules
         .iter()
@@ -689,6 +708,22 @@ pub(crate) fn spawn_hostile_ship(
         .add_children(&child_entities);
 }
 
+pub(crate) fn default_hostile_identity(ship_name: &str) -> ShipEncounterIdentity {
+    ShipEncounterIdentity {
+        faction_id: FactionId::NullSwarms,
+        ship_name: ship_name.to_string(),
+        captain: CaptainProfile {
+            name: "Unresolved Pattern".to_string(),
+            title: "Null Cluster".to_string(),
+        },
+        comms: EncounterCommsScript {
+            intro: "Automated hostile contact acquired.".to_string(),
+            outro: "Signal collapse recorded.".to_string(),
+        },
+        crewed: false,
+    }
+}
+
 fn ship_movement_model_with_variant_totals(
     ship: &ShipDefinition,
     totals: &ShipVariantTotals,
@@ -718,9 +753,9 @@ fn actor_sprite_for_profile(
     if Path::new("assets").join(sprite_path).exists() {
         let mut sprite = Sprite::from_image(asset_server.load(sprite_path));
         sprite.color = profile.color();
-        sprite.custom_size = Some(Vec2::splat(16.0));
+        sprite.custom_size = Some(Vec2::splat(32.0));
         sprite
     } else {
-        Sprite::from_color(profile.color(), Vec2::splat(12.0))
+        Sprite::from_color(profile.color(), Vec2::splat(24.0))
     }
 }

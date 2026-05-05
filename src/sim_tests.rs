@@ -1,9 +1,6 @@
 use std::time::{Duration, Instant};
 
-use bevy::{
-    ecs::system::RunSystemOnce,
-    prelude::*,
-};
+use bevy::{ecs::system::RunSystemOnce, prelude::*};
 use bevy_ggrs::{
     Session,
     prelude::{PlayerType, SessionBuilder},
@@ -20,6 +17,7 @@ use crate::{
         self,
         DecodedPlayerCommand,
         DecodedPlayerCommands,
+        INPUT_TOGGLE_STATION,
         LobbyPlayerInfo,
         LobbySnapshot,
         PendingMetaCommand,
@@ -28,7 +26,6 @@ use crate::{
         SessionPhase,
         SessionRole,
         SessionStatus,
-        INPUT_TOGGLE_STATION,
     },
     state::FrontendMode,
 };
@@ -108,7 +105,9 @@ fn headless_host_lobby_editor_sector_and_cockpit_flow() {
     );
     wait_until(
         &mut app,
-        |app| app.world().resource::<netcode::RollbackGameState>().phase == RollbackPhase::Encounter,
+        |app| {
+            app.world().resource::<netcode::RollbackGameState>().phase == RollbackPhase::Encounter
+        },
         "encounter phase entered",
     );
 
@@ -140,11 +139,16 @@ fn begin_headless_host_lobby(app: &mut App) {
         .parse()
         .expect("default host addr should parse");
     let session_config = app.world().resource::<netcode::SessionConfig>().clone();
-    let local_profile = app.world().resource::<crate::state::LocalPlayerProfile>().clone();
+    let local_profile = app
+        .world()
+        .resource::<crate::state::LocalPlayerProfile>()
+        .clone();
     let initial_state = netcode::load_initial_rollback_state();
 
     {
-        let mut bootstrap = app.world_mut().resource_mut::<netcode::SessionBootstrapConfig>();
+        let mut bootstrap = app
+            .world_mut()
+            .resource_mut::<netcode::SessionBootstrapConfig>();
         bootstrap.pending_start = false;
         bootstrap.role = SessionRole::Host;
         bootstrap.local_bind_addr = host_addr;
@@ -204,8 +208,12 @@ fn start_headless_host_session(app: &mut App) {
         status.active_ship_snapshot = Some(bootstrap.initial_state.editor_ship.clone());
     }
     *app.world_mut().resource_mut::<netcode::RollbackGameState>() = bootstrap.initial_state;
-    app.world_mut().resource_mut::<netcode::LocalPlayerHandle>().0 = Some(0);
-    app.world_mut().resource_mut::<netcode::ObservedLocalPlayer>().handle = Some(0);
+    app.world_mut()
+        .resource_mut::<netcode::LocalPlayerHandle>()
+        .0 = Some(0);
+    app.world_mut()
+        .resource_mut::<netcode::ObservedLocalPlayer>()
+        .handle = Some(0);
     app.world_mut()
         .resource_mut::<netcode::PendingLocalMetaCommand>()
         .0 = None;

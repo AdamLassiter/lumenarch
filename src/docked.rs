@@ -6,6 +6,7 @@ use super::{
     HOVERED_BUTTON,
     NORMAL_BUTTON,
     PRESSED_BUTTON,
+    SELECTED_BUTTON,
     TILE_SIZE,
     TOOLBOX_WIDTH,
     UI_BODY_FONT_SIZE,
@@ -19,9 +20,21 @@ use super::{
     state::{
         CampaignLoadState,
         DemoProgression,
+        DockedAcceptContractButton,
+        DockedContactNextButton,
+        DockedContactPrevButton,
+        DockedContentText,
+        DockedContractNextButton,
+        DockedContractPrevButton,
+        DockedHelpText,
+        DockedLaunchContractButton,
+        DockedLoreNextButton,
+        DockedLorePrevButton,
         DockedRoot,
         DockedState,
         DockedStatusText,
+        DockedSurface,
+        DockedSurfaceButton,
         EditorMode,
         EditorSessionState,
         EditorShip,
@@ -33,6 +46,7 @@ use super::{
         RepairShipButton,
         SectorState,
     },
+    stations::{self, StationCatalogResource},
 };
 use crate::ship::{
     ShipDefinition,
@@ -49,9 +63,74 @@ struct DockedPreviewTile;
 #[derive(Component)]
 pub(crate) struct DockedPreviewSignature(u128);
 
+#[derive(Component, Clone, Copy)]
+pub(crate) struct DockedActionVisibility {
+    shipyard: bool,
+    quartermaster: bool,
+    contracts: bool,
+    archives: bool,
+}
+
+impl DockedActionVisibility {
+    const fn always() -> Self {
+        Self {
+            shipyard: true,
+            quartermaster: true,
+            contracts: true,
+            archives: true,
+        }
+    }
+
+    const fn shipyard() -> Self {
+        Self {
+            shipyard: true,
+            quartermaster: false,
+            contracts: false,
+            archives: false,
+        }
+    }
+
+    const fn shipyard_and_quartermaster() -> Self {
+        Self {
+            shipyard: true,
+            quartermaster: true,
+            contracts: false,
+            archives: false,
+        }
+    }
+
+    const fn contracts() -> Self {
+        Self {
+            shipyard: false,
+            quartermaster: false,
+            contracts: true,
+            archives: false,
+        }
+    }
+
+    const fn archives() -> Self {
+        Self {
+            shipyard: false,
+            quartermaster: false,
+            contracts: false,
+            archives: true,
+        }
+    }
+
+    fn visible_on(self, surface: DockedSurface) -> bool {
+        match surface {
+            DockedSurface::Shipyard => self.shipyard,
+            DockedSurface::Quartermaster => self.quartermaster,
+            DockedSurface::Contracts => self.contracts,
+            DockedSurface::Archives => self.archives,
+        }
+    }
+}
+
 pub(crate) fn initialize_campaign_state(
     status: Res<netcode::SessionStatus>,
     rollback_state: Res<netcode::RollbackGameState>,
+    stations: Res<StationCatalogResource>,
     mut campaign_load_state: ResMut<CampaignLoadState>,
     mut progression: ResMut<DemoProgression>,
     mut sector_state: ResMut<SectorState>,
@@ -164,8 +243,23 @@ pub(crate) fn initialize_campaign_state(
         }
     }
 
+    if let Some(station_id) = stations::current_station_id(&sector_state) {
+        progression.unlock_station(station_id.to_string());
+        if let Some(station) = stations.0.station(station_id) {
+            if docked_state.station_title != station.name {
+                docked_state.station_title = station.name.clone();
+            }
+            for contact in &station.contacts {
+                progression.unlock_contact(contact.id.clone());
+            }
+            return;
+        }
+    }
+
     if let Some(current_node) = sector_state.current_node() {
-        docked_state.station_title = current_node.label.clone();
+        if docked_state.station_title != current_node.label {
+            docked_state.station_title = current_node.label.clone();
+        }
     }
 }
 
@@ -203,6 +297,8 @@ pub(crate) fn spawn_docked_ui(
     editor_ship: Res<EditorShip>,
     status: Res<netcode::SessionStatus>,
     local_profile: Res<LocalPlayerProfile>,
+    sector_state: Res<SectorState>,
+    stations: Res<StationCatalogResource>,
 ) {
     let title_font = asset_server.load("fonts/FiraSans-Bold.ttf");
     let mono_font = asset_server.load("fonts/FiraMono-Medium.ttf");
@@ -269,27 +365,61 @@ pub(crate) fn spawn_docked_ui(
 
                 spawn_action_button(
                     panel,
-                    "Refit Ship",
-                    NORMAL_BUTTON,
-                    RefitButton,
+                    "Shipyard",
+                    docked_surface_color(docked_state.selected_surface, DockedSurface::Shipyard),
+                    DockedSurfaceButton {
+                        surface: DockedSurface::Shipyard,
+                    },
                     &title_font,
+                    DockedActionVisibility::always(),
+                    docked_state.selected_surface,
                 );
                 spawn_action_button(
                     panel,
-                    "Open Sector Map",
-                    Color::srgb(0.18, 0.50, 0.30),
-                    OpenSectorMapButton,
+                    "Quartermaster",
+                    docked_surface_color(
+                        docked_state.selected_surface,
+                        DockedSurface::Quartermaster,
+                    ),
+                    DockedSurfaceButton {
+                        surface: DockedSurface::Quartermaster,
+                    },
                     &title_font,
+                    DockedActionVisibility::always(),
+                    docked_state.selected_surface,
                 );
                 spawn_action_button(
                     panel,
-                    "Repair Ship",
-                    Color::srgb(0.45, 0.34, 0.16),
-                    RepairShipButton,
+                    "Contracts",
+                    docked_surface_color(docked_state.selected_surface, DockedSurface::Contracts),
+                    DockedSurfaceButton {
+                        surface: DockedSurface::Contracts,
+                    },
                     &title_font,
+                    DockedActionVisibility::always(),
+                    docked_state.selected_surface,
+                );
+                spawn_action_button(
+                    panel,
+                    "Archives",
+                    docked_surface_color(docked_state.selected_surface, DockedSurface::Archives),
+                    DockedSurfaceButton {
+                        surface: DockedSurface::Archives,
+                    },
+                    &title_font,
+                    DockedActionVisibility::always(),
+                    docked_state.selected_surface,
                 );
             });
 
+            let station = stations::current_station(&stations.0, &sector_state);
+            let content_text = docked_content_text(
+                station,
+                &docked_state,
+                &progression,
+                &last_mission_report,
+                &sector_state,
+            );
             root.spawn((
                 Node {
                     position_type: PositionType::Absolute,
@@ -297,6 +427,8 @@ pub(crate) fn spawn_docked_ui(
                     top: Val::Px(48.0),
                     width: Val::Px(520.0),
                     padding: UiRect::all(Val::Px(16.0)),
+                    row_gap: Val::Px(12.0),
+                    flex_direction: FlexDirection::Column,
                     border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
                     ..default()
                 },
@@ -304,16 +436,85 @@ pub(crate) fn spawn_docked_ui(
             ))
             .with_children(|panel| {
                 panel.spawn((
-                    Text::new(
-                        "Station Services\nRefit: adjust the ship layout and saved ARCH programs.\nSector Map: choose the next node on the local route graph.\nRepair Ship: spend scrap to clear persistent hull wear before the next jump.",
-                    ),
+                    Text::new(content_text),
                     TextFont {
-                        font: mono_font,
+                        font: mono_font.clone(),
                         font_size: UI_BODY_FONT_SIZE,
                         ..default()
                     },
                     TextColor(Color::srgb(0.82, 0.86, 0.92)),
+                    DockedContentText,
                 ));
+
+                spawn_action_button(
+                    panel,
+                    "Refit Ship",
+                    NORMAL_BUTTON,
+                    RefitButton,
+                    &title_font,
+                    DockedActionVisibility::shipyard(),
+                    docked_state.selected_surface,
+                );
+                spawn_action_button(
+                    panel,
+                    "Repair Ship",
+                    Color::srgb(0.45, 0.34, 0.16),
+                    RepairShipButton,
+                    &title_font,
+                    DockedActionVisibility::shipyard_and_quartermaster(),
+                    docked_state.selected_surface,
+                );
+                spawn_action_button(
+                    panel,
+                    "Open Sector Map",
+                    Color::srgb(0.18, 0.50, 0.30),
+                    OpenSectorMapButton,
+                    &title_font,
+                    DockedActionVisibility::shipyard(),
+                    docked_state.selected_surface,
+                );
+                spawn_dual_action_row(
+                    panel,
+                    ("Previous Contract", DockedContractPrevButton),
+                    ("Next Contract", DockedContractNextButton),
+                    &title_font,
+                    DockedActionVisibility::contracts(),
+                    docked_state.selected_surface,
+                );
+                spawn_action_button(
+                    panel,
+                    "Accept Contract",
+                    Color::srgb(0.28, 0.46, 0.74),
+                    DockedAcceptContractButton,
+                    &title_font,
+                    DockedActionVisibility::contracts(),
+                    docked_state.selected_surface,
+                );
+                spawn_action_button(
+                    panel,
+                    "Launch Contract",
+                    Color::srgb(0.18, 0.50, 0.30),
+                    DockedLaunchContractButton,
+                    &title_font,
+                    DockedActionVisibility::contracts(),
+                    docked_state.selected_surface,
+                );
+                spawn_dual_action_row(
+                    panel,
+                    ("Previous Contact", DockedContactPrevButton),
+                    ("Next Contact", DockedContactNextButton),
+                    &title_font,
+                    DockedActionVisibility::archives(),
+                    docked_state.selected_surface,
+                );
+                spawn_dual_action_row(
+                    panel,
+                    ("Previous Lore", DockedLorePrevButton),
+                    ("Next Lore", DockedLoreNextButton),
+                    &title_font,
+                    DockedActionVisibility::archives(),
+                    docked_state.selected_surface,
+                );
             });
 
             root.spawn((
@@ -330,15 +531,14 @@ pub(crate) fn spawn_docked_ui(
             ))
             .with_children(|panel| {
                 panel.spawn((
-                    Text::new(
-                        "Dock Controls\nEnter or click to choose a station action\nRefit: open ship editor\nSector Map: choose next route\nRepair: spend scrap to clear hull wear",
-                    ),
+                    Text::new(docked_help_text(docked_state.selected_surface)),
                     TextFont {
                         font: asset_server.load("fonts/FiraMono-Medium.ttf"),
                         font_size: UI_HELP_FONT_SIZE,
                         ..default()
                     },
                     TextColor(Color::srgb(0.82, 0.86, 0.92)),
+                    DockedHelpText,
                 ));
             });
         });
@@ -366,13 +566,17 @@ pub(crate) fn sync_docked_ship_preview(
     let ship = editor_ship.ship.clone();
     let ship_signature = docked_preview_signature(&ship);
 
-    if let Some((_, existing_signature)) = existing_query.iter().next()
-        && existing_signature.0 == ship_signature
-    {
+    let existing = existing_query.iter().collect::<Vec<_>>();
+    let matching_count = existing
+        .iter()
+        .filter(|(_, signature)| signature.0 == ship_signature)
+        .count();
+
+    if matching_count == 1 && existing.len() == 1 {
         return;
     }
 
-    for (entity, _) in &existing_query {
+    for (entity, _) in existing {
         commands.entity(entity).despawn();
     }
 
@@ -406,23 +610,108 @@ pub(crate) fn docked_button_system(
         (
             &Interaction,
             &mut BackgroundColor,
+            Option<&DockedSurfaceButton>,
             Option<&RefitButton>,
             Option<&OpenSectorMapButton>,
             Option<&RepairShipButton>,
+            Option<&DockedContractPrevButton>,
+            Option<&DockedContractNextButton>,
+            Option<&DockedAcceptContractButton>,
+            Option<&DockedLaunchContractButton>,
+            Option<&DockedContactPrevButton>,
+            Option<&DockedContactNextButton>,
+            Option<&DockedLorePrevButton>,
+            Option<&DockedLoreNextButton>,
         ),
         (Changed<Interaction>, With<Button>),
     >,
     status: Res<netcode::SessionStatus>,
     mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
     mut editor_session: ResMut<EditorSessionState>,
+    mut docked_state: ResMut<DockedState>,
+    progression: Res<DemoProgression>,
+    sector_state: Res<SectorState>,
+    stations: Res<StationCatalogResource>,
 ) {
-    if !netcode::is_host_authority(&status) {
-        return;
-    }
-    for (interaction, mut background, refit, open_map, repair) in &mut interaction_query {
+    for (
+        interaction,
+        mut background,
+        surface,
+        refit,
+        open_map,
+        repair,
+        contract_prev,
+        contract_next,
+        accept_contract,
+        launch_contract,
+        contact_prev,
+        contact_next,
+        lore_prev,
+        lore_next,
+    ) in &mut interaction_query
+    {
         match *interaction {
             Interaction::Pressed => {
-                if refit.is_some() {
+                if let Some(surface) = surface {
+                    docked_state.selected_surface = surface.surface;
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                } else if contract_prev.is_some() {
+                    if let Some(station) = stations::current_station(&stations.0, &sector_state)
+                        && !station.contracts.is_empty()
+                    {
+                        let len = station.contracts.len();
+                        docked_state.selected_contract_index =
+                            (docked_state.selected_contract_index + len - 1) % len;
+                    }
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                } else if contract_next.is_some() {
+                    if let Some(station) = stations::current_station(&stations.0, &sector_state)
+                        && !station.contracts.is_empty()
+                    {
+                        let len = station.contracts.len();
+                        docked_state.selected_contract_index =
+                            (docked_state.selected_contract_index + 1) % len;
+                    }
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                } else if contact_prev.is_some() {
+                    if let Some(station) = stations::current_station(&stations.0, &sector_state)
+                        && !station.contacts.is_empty()
+                    {
+                        let len = station.contacts.len();
+                        docked_state.selected_contact_index =
+                            (docked_state.selected_contact_index + len - 1) % len;
+                    }
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                } else if contact_next.is_some() {
+                    if let Some(station) = stations::current_station(&stations.0, &sector_state)
+                        && !station.contacts.is_empty()
+                    {
+                        let len = station.contacts.len();
+                        docked_state.selected_contact_index =
+                            (docked_state.selected_contact_index + 1) % len;
+                    }
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                } else if lore_prev.is_some() {
+                    if let Some(station) = stations::current_station(&stations.0, &sector_state)
+                        && !station.lore_entries.is_empty()
+                    {
+                        let len = station.lore_entries.len();
+                        docked_state.selected_lore_index =
+                            (docked_state.selected_lore_index + len - 1) % len;
+                    }
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                } else if lore_next.is_some() {
+                    if let Some(station) = stations::current_station(&stations.0, &sector_state)
+                        && !station.lore_entries.is_empty()
+                    {
+                        let len = station.lore_entries.len();
+                        docked_state.selected_lore_index =
+                            (docked_state.selected_lore_index + 1) % len;
+                    }
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                } else if !netcode::is_host_authority(&status) {
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                } else if refit.is_some() {
                     *background = BackgroundColor(PRESSED_BUTTON);
                     editor_session.mode = EditorMode::Player;
                     log::debug!("Docked UI queued OpenEditor meta command");
@@ -444,18 +733,56 @@ pub(crate) fn docked_button_system(
                         op: netcode::RollbackMetaOp::RepairShip,
                         ..Default::default()
                     });
+                } else if accept_contract.is_some() {
+                    if let Some(station_id) = stations::current_station_id(&sector_state)
+                        && stations
+                            .0
+                            .contract_by_index(station_id, docked_state.selected_contract_index)
+                            .is_some()
+                    {
+                        log::debug!(
+                            "Docked UI queued AcceptContract meta command for station {}, contract index {}",
+                            station_id,
+                            docked_state.selected_contract_index
+                        );
+                        pending_meta.0 = Some(netcode::PendingMetaCommand {
+                            op: netcode::RollbackMetaOp::AcceptContract,
+                            arg0: docked_state.selected_contract_index as i16,
+                            ..Default::default()
+                        });
+                    }
+                } else if launch_contract.is_some() {
+                    if progression.active_contract_id.is_some() {
+                        log::debug!("Docked UI queued LaunchContract meta command");
+                        pending_meta.0 = Some(netcode::PendingMetaCommand {
+                            op: netcode::RollbackMetaOp::LaunchContract,
+                            ..Default::default()
+                        });
+                    }
                 }
             }
             Interaction::Hovered => {
                 *background = BackgroundColor(HOVERED_BUTTON);
             }
             Interaction::None => {
-                *background = BackgroundColor(if refit.is_some() {
+                *background = BackgroundColor(if let Some(surface) = surface {
+                    docked_surface_color(docked_state.selected_surface, surface.surface)
+                } else if refit.is_some() {
                     NORMAL_BUTTON
                 } else if open_map.is_some() {
                     Color::srgb(0.18, 0.50, 0.30)
                 } else {
-                    Color::srgb(0.45, 0.34, 0.16)
+                    button_default_color(
+                        repair.is_some(),
+                        contract_prev.is_some()
+                            || contract_next.is_some()
+                            || contact_prev.is_some()
+                            || contact_next.is_some()
+                            || lore_prev.is_some()
+                            || lore_next.is_some(),
+                        accept_contract.is_some(),
+                        launch_contract.is_some(),
+                    )
                 });
             }
         }
@@ -490,17 +817,137 @@ pub(crate) fn update_docked_status_text(
     }
 }
 
+pub(crate) fn update_docked_surface_ui(
+    docked_state: Res<DockedState>,
+    progression: Res<DemoProgression>,
+    last_mission_report: Res<LastMissionReport>,
+    sector_state: Res<SectorState>,
+    stations: Res<StationCatalogResource>,
+    mut content_query: Query<&mut Text, (With<DockedContentText>, Without<DockedHelpText>)>,
+    mut help_query: Query<&mut Text, (With<DockedHelpText>, Without<DockedContentText>)>,
+    mut surface_buttons: Query<(&DockedSurfaceButton, &mut BackgroundColor)>,
+    mut action_buttons: Query<
+        (
+            Option<&RefitButton>,
+            Option<&OpenSectorMapButton>,
+            Option<&RepairShipButton>,
+            Option<&DockedContractPrevButton>,
+            Option<&DockedContractNextButton>,
+            Option<&DockedAcceptContractButton>,
+            Option<&DockedLaunchContractButton>,
+            Option<&DockedContactPrevButton>,
+            Option<&DockedContactNextButton>,
+            Option<&DockedLorePrevButton>,
+            Option<&DockedLoreNextButton>,
+            Option<&DockedActionVisibility>,
+            &mut Node,
+            &mut BackgroundColor,
+        ),
+        (With<Button>, Without<DockedSurfaceButton>),
+    >,
+    mut action_rows: Query<(&DockedActionVisibility, &mut Node), Without<Button>>,
+) {
+    if !docked_state.is_changed()
+        && !progression.is_changed()
+        && !last_mission_report.is_changed()
+        && !sector_state.is_changed()
+    {
+        return;
+    }
+
+    let station = stations::current_station(&stations.0, &sector_state);
+    let content_text = docked_content_text(
+        station,
+        &docked_state,
+        &progression,
+        &last_mission_report,
+        &sector_state,
+    );
+    for mut text in &mut content_query {
+        **text = content_text.clone();
+    }
+    let help_text = docked_help_text(docked_state.selected_surface);
+    for mut text in &mut help_query {
+        **text = help_text.clone();
+    }
+
+    for (button, mut background) in &mut surface_buttons {
+        *background = BackgroundColor(docked_surface_color(
+            docked_state.selected_surface,
+            button.surface,
+        ));
+    }
+
+    for (
+        refit,
+        open_map,
+        repair,
+        contract_prev,
+        contract_next,
+        accept_contract,
+        launch_contract,
+        contact_prev,
+        contact_next,
+        lore_prev,
+        lore_next,
+        visibility,
+        mut node,
+        mut background,
+    ) in &mut action_buttons
+    {
+        if let Some(visibility) = visibility {
+            node.display = if visibility.visible_on(docked_state.selected_surface) {
+                Display::Flex
+            } else {
+                Display::None
+            };
+        }
+        *background = BackgroundColor(if refit.is_some() {
+            NORMAL_BUTTON
+        } else if open_map.is_some() || launch_contract.is_some() {
+            Color::srgb(0.18, 0.50, 0.30)
+        } else {
+            button_default_color(
+                repair.is_some(),
+                contract_prev.is_some()
+                    || contract_next.is_some()
+                    || contact_prev.is_some()
+                    || contact_next.is_some()
+                    || lore_prev.is_some()
+                    || lore_next.is_some(),
+                accept_contract.is_some(),
+                launch_contract.is_some(),
+            )
+        });
+    }
+
+    for (visibility, mut node) in &mut action_rows {
+        node.display = if visibility.visible_on(docked_state.selected_surface) {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+}
+
 fn spawn_action_button<T: Bundle + 'static>(
     parent: &mut ChildSpawnerCommands,
     label: &str,
     color: Color,
     marker: T,
     font: &Handle<Font>,
+    visibility: DockedActionVisibility,
+    selected_surface: DockedSurface,
 ) {
     parent
         .spawn((
             Button,
             Node {
+                display: if visibility.visible_on(selected_surface) {
+                    Display::Flex
+                } else {
+                    Display::None
+                },
                 width: Val::Percent(100.0),
                 height: Val::Px(48.0),
                 justify_content: JustifyContent::Center,
@@ -509,6 +956,7 @@ fn spawn_action_button<T: Bundle + 'static>(
                 ..default()
             },
             BackgroundColor(color),
+            visibility,
             marker,
         ))
         .with_child((
@@ -516,6 +964,65 @@ fn spawn_action_button<T: Bundle + 'static>(
             TextFont {
                 font: font.clone(),
                 font_size: UI_TITLE_FONT_SIZE - 2.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+}
+
+fn spawn_dual_action_row<L: Bundle + 'static, R: Bundle + 'static>(
+    parent: &mut ChildSpawnerCommands,
+    left: (&str, L),
+    right: (&str, R),
+    font: &Handle<Font>,
+    visibility: DockedActionVisibility,
+    selected_surface: DockedSurface,
+) {
+    parent
+        .spawn((
+            Node {
+                display: if visibility.visible_on(selected_surface) {
+                    Display::Flex
+                } else {
+                    Display::None
+                },
+                width: Val::Percent(100.0),
+                column_gap: Val::Px(10.0),
+                ..default()
+            },
+            visibility,
+        ))
+        .with_children(|row| {
+            spawn_half_width_action_button(row, left.0, left.1, font);
+            spawn_half_width_action_button(row, right.0, right.1, font);
+        });
+}
+
+fn spawn_half_width_action_button<T: Bundle + 'static>(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    marker: T,
+    font: &Handle<Font>,
+) {
+    parent
+        .spawn((
+            Button,
+            Node {
+                width: Val::Percent(50.0),
+                height: Val::Px(42.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.22, 0.30, 0.44)),
+            marker,
+        ))
+        .with_child((
+            Text::new(label),
+            TextFont {
+                font: font.clone(),
+                font_size: UI_BODY_FONT_SIZE,
                 ..default()
             },
             TextColor(Color::WHITE),
@@ -558,6 +1065,179 @@ fn docked_status_text(
         editor_ship.ship.modules.len(),
         mission
     )
+}
+
+fn docked_surface_color(selected: DockedSurface, surface: DockedSurface) -> Color {
+    if selected == surface {
+        SELECTED_BUTTON
+    } else {
+        Color::srgb(0.18, 0.24, 0.34)
+    }
+}
+
+fn button_default_color(
+    is_repair: bool,
+    is_cycle: bool,
+    is_accept: bool,
+    is_launch: bool,
+) -> Color {
+    if is_repair {
+        Color::srgb(0.45, 0.34, 0.16)
+    } else if is_cycle {
+        Color::srgb(0.22, 0.30, 0.44)
+    } else if is_accept {
+        Color::srgb(0.28, 0.46, 0.74)
+    } else if is_launch {
+        Color::srgb(0.18, 0.50, 0.30)
+    } else {
+        NORMAL_BUTTON
+    }
+}
+
+fn docked_help_text(surface: DockedSurface) -> String {
+    match surface {
+        DockedSurface::Shipyard => "Dock Controls\nClick a hub surface to move around the station UI\nRefit: open shipyard refit\nRepair: spend scrap to clear hull wear\nSector Map: inspect the local route graph".to_string(),
+        DockedSurface::Quartermaster => "Quartermaster Controls\nReview scrap, damaged components, and service availability\nRepair Ship spends scrap immediately when available".to_string(),
+        DockedSurface::Contracts => "Contract Board Controls\nPrevious/Next: browse offers\nAccept: make the selected contract active\nLaunch: depart on the active contract".to_string(),
+        DockedSurface::Archives => "Archives Controls\nBrowse station contacts and recovered lore entries\nViewing lore is local; progression unlocks are shared when earned".to_string(),
+    }
+}
+
+fn docked_content_text(
+    station: Option<&stations::StationDefinition>,
+    docked_state: &DockedState,
+    progression: &DemoProgression,
+    last_mission_report: &LastMissionReport,
+    sector_state: &SectorState,
+) -> String {
+    let Some(station) = station else {
+        return "No station record available for this dock.".to_string();
+    };
+
+    match docked_state.selected_surface {
+        DockedSurface::Shipyard => {
+            let repair_cost = progression.hull_wear.saturating_mul(2);
+            format!(
+                "{}\nFaction: {}\n\n{}\n\nServices: {}\n\nHull wear repair cost: {} scrap\nCurrent route node: {}\nLast report: {}",
+                station.name,
+                station.faction.as_str(),
+                station.flavor,
+                station
+                    .services
+                    .iter()
+                    .map(|service| service.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                repair_cost,
+                sector_state
+                    .current_node()
+                    .map(|node| node.label.as_str())
+                    .unwrap_or("unknown"),
+                last_mission_report
+                    .headline
+                    .clone()
+                    .unwrap_or_else(|| "No mission report yet".to_string()),
+            )
+        }
+        DockedSurface::Quartermaster => {
+            let damaged = progression
+                .damaged_components()
+                .map(|entry| {
+                    format!(
+                        "{} x{} (repair {} scrap)",
+                        entry.label(),
+                        entry.damaged,
+                        entry.repair_cost()
+                    )
+                })
+                .collect::<Vec<_>>();
+            format!(
+                "Quartermaster Ledger\n\nScrap on hand: {}\nStored component stacks: {}\nDamaged inventory:\n{}\n\nQuartermaster note\n'Scrap is no good until it becomes pressure, wiring, or time.'",
+                progression.scrap,
+                progression.stored_components.len(),
+                if damaged.is_empty() {
+                    "  none".to_string()
+                } else {
+                    damaged
+                        .into_iter()
+                        .map(|line| format!("  {line}"))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                },
+            )
+        }
+        DockedSurface::Contracts => {
+            let contract = station
+                .contracts
+                .get(docked_state.selected_contract_index % station.contracts.len().max(1));
+            let active = progression
+                .active_contract_id
+                .as_ref()
+                .map_or("none".to_string(), |id| id.clone());
+            if let Some(contract) = contract {
+                let contact_name = station
+                    .contacts
+                    .iter()
+                    .find(|contact| contact.id == contract.contact_id)
+                    .map(|contact| contact.name.as_str())
+                    .unwrap_or("Unknown Contact");
+                let status =
+                    if progression.active_contract_id.as_deref() == Some(contract.id.as_str()) {
+                        "ACTIVE"
+                    } else if progression.contract_completed(&contract.id) {
+                        "COMPLETED"
+                    } else {
+                        "AVAILABLE"
+                    };
+                format!(
+                    "Contract Board\n\nOffer: {} [{}]\nContact: {}\nTarget Node: {}\nType: {}\nReward Bonus: {} scrap\nStatus: {}\n\nBriefing\n{}\n\nLaunch Note\n{}\n\nCurrent active contract: {}",
+                    contract.title,
+                    contract.id,
+                    contact_name,
+                    contract.target_node_id,
+                    contract.kind.as_str(),
+                    contract.reward_bonus_scrap,
+                    status,
+                    contract.briefing,
+                    contract.launch_blurb,
+                    active,
+                )
+            } else {
+                "No contracts are currently posted.".to_string()
+            }
+        }
+        DockedSurface::Archives => {
+            let contact = station
+                .contacts
+                .get(docked_state.selected_contact_index % station.contacts.len().max(1));
+            let lore = station
+                .lore_entries
+                .get(docked_state.selected_lore_index % station.lore_entries.len().max(1));
+            let contact_block = contact.map_or_else(
+                || "No contact selected.".to_string(),
+                |contact| {
+                    format!(
+                        "Contact\n{} // {}\n{}\n\n'{}'",
+                        contact.name, contact.role, contact.bio, contact.brief
+                    )
+                },
+            );
+            let lore_block = lore.map_or_else(
+                || "No lore entry selected.".to_string(),
+                |entry| {
+                    if progression.lore_unlocked(&entry.id) {
+                        format!("Lore\n{}\n{}", entry.title, entry.body)
+                    } else {
+                        format!(
+                            "Lore\n{}\nEntry locked. Recover more field intel or complete station work to unlock it.",
+                            entry.title
+                        )
+                    }
+                },
+            );
+            format!("{contact_block}\n\n{lore_block}")
+        }
+    }
 }
 
 fn spawn_docked_ship_preview(

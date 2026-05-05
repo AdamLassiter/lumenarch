@@ -44,3 +44,21 @@ Current tile set and intended purpose:
   Concave hull corner used where interior space cuts into the hull line. Default art should clearly read as an inward corner.
 * `assets/tiles/hull_outer_corner.png`
   Convex hull corner used where two exterior hull edges meet. Default art should clearly read as an outward corner.
+
+Variant sprite expectations:
+
+* The runtime currently falls back to family sprites such as `reactor.png` and `battery.png` for upgraded variants.
+* Better-components variants should eventually receive dedicated art with the same `32x32` contract when available.
+* Expected upgraded sprite names:
+  * `assets/tiles/core_expanded.png`
+  * `assets/tiles/cockpit_advanced_helm.png`
+  * `assets/tiles/reactor_fission.png`
+  * `assets/tiles/reactor_fusion.png`
+  * `assets/tiles/cargo_fuel_tank.png`
+  * `assets/tiles/cargo_ammo_rack.png`
+  * `assets/tiles/battery_capacitor.png`
+  * `assets/tiles/processor_fabricator_fast.png`
+  * `assets/tiles/turret_laser.png`
+  * `assets/tiles/turret_ballistic.png`
+  * `assets/tiles/shield_radial.png`
+  * `assets/tiles/shield_directional.png`

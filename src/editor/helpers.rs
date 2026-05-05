@@ -7,12 +7,13 @@ use super::super::{
     state::{EditorMode, LastMissionReport},
 };
 use crate::{
-    ship::{ModuleKind, ModuleSpec, ModuleVariant},
-    state::DemoProgression,
+    ship::{ModuleKind, ModuleSpec, ModuleVariant, ShipDefinition},
+    state::{DemoProgression, EditorSelectionState, EditorToolMode},
 };
 
 pub(crate) fn editor_status_line(
     mode: EditorMode,
+    tool_mode: EditorToolMode,
     entry_label: &str,
     ship_name: &str,
     selected_kind: &ModuleKind,
@@ -22,6 +23,8 @@ pub(crate) fn editor_status_line(
     module_count: usize,
     scrap_total: u32,
     progression: &DemoProgression,
+    editor_ship: &ShipDefinition,
+    selection_state: &EditorSelectionState,
 ) -> String {
     let ready_count = progression.ready_count(*selected_kind, selected_variant);
     let damaged_count = progression.damaged_count(*selected_kind, selected_variant);
@@ -35,13 +38,18 @@ pub(crate) fn editor_status_line(
     };
 
     format!(
-        "{}\nEntry: {entry_label}\nShip: {ship_name}\nSelected Tool: {selected_kind} / {}\nRotation: {selected_rotation}\nChannel: {}\nPlaced Modules: {module_count}\nScrap: {scrap_total}\nAvailable: ready {} / damaged {}\nRepair Cost: {} ({availability})",
+        "{}\nEntry: {entry_label}\nShip: {ship_name}\nMode: {}\nBuild Variant: {selected_kind} / {}\nRotation: {selected_rotation}\nChannel: {}\nPlaced Modules: {module_count}\nSelection: {}\nScrap: {scrap_total}\nAvailable: ready {} / damaged {}\nRepair Cost: {} ({availability})",
         match mode {
             EditorMode::Player => "Player Refit",
             EditorMode::Enemy => "Enemy Ship Debug Editor",
         },
+        match tool_mode {
+            EditorToolMode::Build => "Build",
+            EditorToolMode::Select => "Select",
+        },
         selected_variant.display_name(),
         selected_channel,
+        selection_summary(editor_ship, selection_state),
         ready_count,
         damaged_count,
         repair_cost,
@@ -107,6 +115,77 @@ pub(crate) fn editor_mission_report_text(last_mission_report: &LastMissionReport
 
 pub(crate) fn module_kind_cost(kind: ModuleKind, variant: ModuleVariant) -> u32 {
     ModuleSpec::for_module(kind, variant).placement_cost
+}
+
+pub(crate) fn selection_summary(
+    editor_ship: &ShipDefinition,
+    selection_state: &EditorSelectionState,
+) -> String {
+    let mut names = editor_ship
+        .modules
+        .iter()
+        .filter(|module| {
+            selection_state.selected_module_ids.is_empty()
+                || selection_state.selected_module_ids.contains(&module.id)
+        })
+        .map(|module| module.display_name())
+        .collect::<Vec<_>>();
+    if names.is_empty() {
+        return "none".to_string();
+    }
+    names.sort();
+    if names.len() <= 3 {
+        return names.join(", ");
+    }
+    format!("{}, {} more", names[..3].join(", "), names.len() - 3)
+}
+
+pub(crate) fn variant_inventory_label(
+    mode: EditorMode,
+    progression: &DemoProgression,
+    kind: ModuleKind,
+    variant: ModuleVariant,
+) -> String {
+    match mode {
+        EditorMode::Player => format!(
+            "ready {} / damaged {}",
+            progression.ready_count(kind, variant),
+            progression.damaged_count(kind, variant),
+        ),
+        EditorMode::Enemy => "ready inf / damaged inf".to_string(),
+    }
+}
+
+pub(crate) fn variant_tooltip_text(
+    mode: EditorMode,
+    progression: &DemoProgression,
+    kind: ModuleKind,
+    variant: ModuleVariant,
+) -> String {
+    let spec = ModuleSpec::for_module(kind, variant);
+    format!(
+        "{}\n{}\nCost {}  Integrity {}\nInventory: {}",
+        variant.display_name(),
+        module_family_label(kind),
+        spec.placement_cost,
+        spec.integrity,
+        variant_inventory_label(mode, progression, kind, variant),
+    )
+}
+
+pub(crate) fn module_family_label(kind: ModuleKind) -> &'static str {
+    match kind {
+        ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner => {
+            "Hull and structure"
+        }
+        ModuleKind::Interior => "Interior and walkways",
+        ModuleKind::Core => "Core systems",
+        ModuleKind::Cockpit | ModuleKind::Computer => "Control and compute",
+        ModuleKind::Processor | ModuleKind::Cargo | ModuleKind::Airlock => "Logistics and utility",
+        ModuleKind::Reactor | ModuleKind::Battery => "Power systems",
+        ModuleKind::Engine => "Propulsion",
+        ModuleKind::Turret | ModuleKind::Shield => "Combat systems",
+    }
 }
 
 pub(crate) fn cursor_grid_position(

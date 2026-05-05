@@ -9,7 +9,12 @@ use super::{
     super::helpers::{FixedVec2, Fx},
     logistics::ResourceKind,
 };
-use crate::{balance::PlayerBalanceConfig, ship::ModuleKind, state::PlayerRole};
+use crate::{
+    balance::PlayerBalanceConfig,
+    ship::ModuleKind,
+    state::PlayerRole,
+    stations::FactionId,
+};
 
 #[derive(Component)]
 pub(crate) struct PlayerShip;
@@ -25,6 +30,27 @@ pub(crate) struct HostileShipAi {
     pub(crate) preferred_range: Fx,
     pub(crate) aggression: Fx,
     pub(crate) salvage_reward: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct CaptainProfile {
+    pub(crate) name: String,
+    pub(crate) title: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct EncounterCommsScript {
+    pub(crate) intro: String,
+    pub(crate) outro: String,
+}
+
+#[derive(Component, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct ShipEncounterIdentity {
+    pub(crate) faction_id: FactionId,
+    pub(crate) ship_name: String,
+    pub(crate) captain: CaptainProfile,
+    pub(crate) comms: EncounterCommsScript,
+    pub(crate) crewed: bool,
 }
 
 #[derive(Component)]

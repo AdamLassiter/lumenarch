@@ -141,4 +141,9 @@ pub(crate) struct MissionState {
     pub(crate) hostile_decompression_events: u32,
     pub(crate) player_ship_breached: bool,
     pub(crate) airlocks_cycled: u32,
+    pub(crate) active_contract_id: Option<String>,
+    pub(crate) contract_title: Option<String>,
+    pub(crate) mission_briefing: Option<String>,
+    pub(crate) opposition_summary: Option<String>,
+    pub(crate) opposition_comms: Option<String>,
 }

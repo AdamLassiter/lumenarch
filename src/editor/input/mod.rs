@@ -22,6 +22,8 @@ pub(crate) use editing::{
     repair_selected_component_shortcut,
     rotate_selected_tool,
     save_editor_ship_shortcut,
+    selection_action_button_system,
+    selection_shortcuts,
     toggle_editor_module_overlay_shortcuts,
     toolbox_button_system,
 };

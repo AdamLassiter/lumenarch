@@ -2,8 +2,13 @@
   "progression": {
     "scrap": 31,
     "hull_wear": 0,
-    "jump_count": 161,
-    "stored_components": []
+    "jump_count": 171,
+    "stored_components": [],
+    "known_station_ids": [],
+    "unlocked_contact_ids": [],
+    "unlocked_lore_ids": [],
+    "completed_contract_ids": [],
+    "active_contract_id": null
   },
   "sector": {
     "seed": 66790,
@@ -15,6 +20,7 @@
         "id": 0,
         "label": "Needle Rest",
         "kind": "HubStation",
+        "station_id": null,
         "risk_tier": 0,
         "reward_hint": "Safe dock, refit, relaunch",
         "neighbors": [
@@ -42,6 +48,7 @@
         "id": 1,
         "label": "Latchline Debris",
         "kind": "SalvageField",
+        "station_id": null,
         "risk_tier": 1,
         "reward_hint": "Low threat, strong salvage",
         "neighbors": [
@@ -69,6 +76,7 @@
         "id": 6,
         "label": "Calibration Ring",
         "kind": "TestRange",
+        "station_id": null,
         "risk_tier": 0,
         "reward_hint": "No hostiles, no salvage, pure ship testing",
         "neighbors": [
@@ -93,6 +101,7 @@
         "id": 2,
         "label": "Gravehook Nest",
         "kind": "HostileHold",
+        "station_id": null,
         "risk_tier": 3,
         "reward_hint": "Heavy guns, middling haul",
         "neighbors": [
@@ -121,6 +130,7 @@
         "id": 3,
         "label": "Blueglass Hush",
         "kind": "UnstableDerelict",
+        "station_id": null,
         "risk_tier": 2,
         "reward_hint": "System stress, moderate reward",
         "neighbors": [
@@ -149,6 +159,7 @@
         "id": 4,
         "label": "Forked Cache",
         "kind": "SalvageField",
+        "station_id": null,
         "risk_tier": 2,
         "reward_hint": "Branch route, better payout",
         "neighbors": [
@@ -177,6 +188,7 @@
         "id": 5,
         "label": "Static Wake",
         "kind": "UnstableDerelict",
+        "station_id": null,
         "risk_tier": 4,
         "reward_hint": "Brutal branch, rich recovery",
         "neighbors": [

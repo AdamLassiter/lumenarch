@@ -11,6 +11,7 @@ mod lobby;
 mod netcode;
 mod sector_map;
 pub(crate) mod state;
+mod stations;
 
 use std::{env, time::Duration};
 
@@ -24,6 +25,8 @@ use self::state::{
     DemoProgression,
     DockedState,
     EditorPanState,
+    EditorPointerState,
+    EditorSelectionState,
     EditorSessionState,
     EditorShip,
     EditorToolState,
@@ -110,6 +113,8 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
     )))
     .insert_resource(RollbackFrameRate(TICK_FPS as usize))
     .insert_resource(ClearColor(Color::srgb(0.04, 0.05, 0.08)))
+    .insert_resource(ButtonInput::<KeyCode>::default())
+    .insert_resource(ButtonInput::<MouseButton>::default())
     .insert_resource(balance_config)
     .insert_resource(netcode::SessionConfig::default())
     .insert_resource(netcode::SessionStatus::default())
@@ -138,7 +143,10 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
     .insert_resource(CampaignLoadState::default())
     .insert_resource(DebugOverlayState::default())
     .insert_resource(LastMissionReport::default())
+    .insert_resource(stations::StationCatalogResource::load_or_default())
     .insert_resource(EditorToolState::default())
+    .insert_resource(EditorSelectionState::default())
+    .insert_resource(EditorPointerState::default())
     .insert_resource(EditorUiState::default())
     .insert_resource(ArchEditorState::default())
     .insert_resource(state::ProgramTextEditorState::default())
@@ -356,6 +364,7 @@ fn add_session_bootstrap_systems(app: &mut App, mode: AppRuntimeMode) {
 }
 
 fn add_ui_systems(app: &mut App) {
+    add_editor_keyboard_update_systems(app);
     add_session_ui_update_systems(app);
     add_lobby_ui_fixed_systems(app);
     add_docked_ui_fixed_systems(app);
@@ -363,6 +372,40 @@ fn add_ui_systems(app: &mut App) {
     add_player_editor_ui_fixed_systems(app);
     add_debug_enemy_editor_fixed_systems(app);
     add_encounter_presentation_systems(app);
+}
+
+fn add_editor_keyboard_update_systems(app: &mut App) {
+    app.add_systems(
+        Update,
+        (
+            (
+                editor::leave_editor_keyboard_shortcut,
+                editor::toggle_editor_module_overlay_shortcuts,
+                editor::rotate_selected_tool,
+            )
+                .run_if(netcode::session_presents_player_editor),
+            (
+                editor::repair_selected_component_shortcut,
+                editor::selection_shortcuts,
+                editor::save_editor_ship_shortcut,
+                editor::load_editor_ship_shortcut,
+            )
+                .run_if(netcode::session_presents_player_editor),
+            (
+                editor::enemy_library_keyboard_shortcuts,
+                editor::leave_editor_keyboard_shortcut,
+                editor::toggle_editor_module_overlay_shortcuts,
+                editor::rotate_selected_tool,
+            )
+                .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+            (
+                editor::selection_shortcuts,
+                editor::save_editor_ship_shortcut,
+                editor::load_editor_ship_shortcut,
+            )
+                .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+        ),
+    );
 }
 
 fn add_session_ui_update_systems(app: &mut App) {
@@ -433,6 +476,7 @@ fn add_docked_ui_fixed_systems(app: &mut App) {
         (
             docked::docked_button_system.run_if(netcode::session_presents_docked),
             docked::update_docked_status_text.run_if(netcode::session_presents_docked),
+            docked::update_docked_surface_ui.run_if(netcode::session_presents_docked),
         ),
     );
 }
@@ -457,7 +501,9 @@ fn add_player_editor_ui_fixed_systems(app: &mut App) {
         (
             (
                 editor::draw_grid_overlay,
+                editor::draw_editor_selection_overlay,
                 editor::toolbox_button_system,
+                editor::selection_action_button_system,
                 editor::mission_report_button_system,
                 editor::sync_program_text_editor_state,
                 editor::focus_program_text_editor_on_click,
@@ -465,17 +511,11 @@ fn add_player_editor_ui_fixed_systems(app: &mut App) {
                 editor::program_editor_action_button_system,
                 editor::editor_station_panel_button_system,
                 editor::leave_editor_button_system,
-                editor::leave_editor_keyboard_shortcut,
-                editor::toggle_editor_module_overlay_shortcuts,
-                editor::rotate_selected_tool,
             )
                 .run_if(netcode::session_presents_player_editor),
             (
-                editor::repair_selected_component_shortcut,
                 editor::place_or_remove_tile,
                 editor::pan_and_zoom_editor_view,
-                editor::save_editor_ship_shortcut,
-                editor::load_editor_ship_shortcut,
                 editor::persist_editor_ship,
                 editor::sync_preview_tile,
                 editor::sync_ship_tile_entities,
@@ -495,26 +535,22 @@ fn add_debug_enemy_editor_fixed_systems(app: &mut App) {
         (
             (
                 editor::draw_grid_overlay,
+                editor::draw_editor_selection_overlay,
                 editor::toolbox_button_system,
+                editor::selection_action_button_system,
                 editor::mission_report_button_system,
                 editor::enemy_library_button_system,
-                editor::enemy_library_keyboard_shortcuts,
                 editor::sync_program_text_editor_state,
                 editor::focus_program_text_editor_on_click,
                 editor::edit_program_text_editor,
                 editor::program_editor_action_button_system,
                 editor::editor_station_panel_button_system,
                 editor::leave_editor_button_system,
-                editor::leave_editor_keyboard_shortcut,
-                editor::toggle_editor_module_overlay_shortcuts,
             )
                 .run_if(in_state(FrontendMode::DebugEnemyEditor)),
             (
-                editor::rotate_selected_tool,
                 editor::place_or_remove_tile,
                 editor::pan_and_zoom_editor_view,
-                editor::save_editor_ship_shortcut,
-                editor::load_editor_ship_shortcut,
                 editor::persist_editor_ship,
                 editor::sync_preview_tile,
                 editor::sync_ship_tile_entities,

@@ -1,8 +1,13 @@
 use bevy::{ecs::relationship::Relationship, prelude::*};
 
-use super::super::helpers::{editor_mission_report_text, editor_status_line};
+use super::super::helpers::{
+    editor_mission_report_text,
+    editor_status_line,
+    selection_summary,
+    variant_inventory_label,
+    variant_tooltip_text,
+};
 use crate::{
-    TOOLBOX_COMPONENTS,
     TOOLBOX_WIDTH,
     UI_BODY_FONT_SIZE,
     UI_BUTTON_RADIUS,
@@ -12,17 +17,29 @@ use crate::{
     state::{
         DemoProgression,
         EditingCleanup,
+        EditorAutoHullButton,
+        EditorBuildSection,
+        EditorCopySelectionButton,
+        EditorDeleteSelectionButton,
         EditorMissionReportButton,
         EditorMissionReportButtonText,
         EditorMissionReportText,
         EditorMode,
+        EditorPasteSelectionButton,
         EditorRoot,
+        EditorSelectSection,
+        EditorSelectionState,
+        EditorSelectionSummaryText,
         EditorSessionState,
         EditorShip,
         EditorStatusText,
+        EditorToolMode,
+        EditorToolModeButton,
+        EditorToolModeButtonText,
         EditorToolState,
         EditorToolboxScrollContent,
         EditorToolboxScrollViewport,
+        EditorToolboxTooltipText,
         EditorUiState,
         EnemyEditorState,
         EnemyNewButton,
@@ -48,8 +65,8 @@ use crate::{
         ProgramEditorStatusText,
         ProgramEditorTextBox,
         StationPanelButtonAction,
-        ToolboxButton,
-        ToolboxButtonText,
+        ToolboxVariantButton,
+        ToolboxVariantButtonText,
     },
 };
 
@@ -68,6 +85,8 @@ pub(crate) fn spawn_editor_ui(
     enemy_editor_state: Res<EnemyEditorState>,
     enemy_library_state: Res<EnemyShipLibraryState>,
     editor_ship: Res<EditorShip>,
+    tool_state: Res<EditorToolState>,
+    selection_state: Res<EditorSelectionState>,
     progression: Res<DemoProgression>,
     last_mission_report: Res<LastMissionReport>,
     editor_ui_state: Res<EditorUiState>,
@@ -116,10 +135,33 @@ pub(crate) fn spawn_editor_ui(
                 ));
 
                 toolbox
+                    .spawn(Node {
+                        width: Val::Percent(100.0),
+                        column_gap: Val::Px(8.0),
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        spawn_tool_mode_button(
+                            row,
+                            "Build",
+                            EditorToolMode::Build,
+                            tool_state.tool_mode,
+                            &mono_font,
+                        );
+                        spawn_tool_mode_button(
+                            row,
+                            "Select",
+                            EditorToolMode::Select,
+                            tool_state.tool_mode,
+                            &mono_font,
+                        );
+                    });
+
+                toolbox
                     .spawn((
                         Node {
                             width: Val::Percent(100.0),
-                            height: Val::Px(430.0),
+                            height: Val::Px(470.0),
                             overflow: Overflow::clip_y(),
                             position_type: PositionType::Relative,
                             ..default()
@@ -141,40 +183,101 @@ pub(crate) fn spawn_editor_ui(
                                 EditorToolboxScrollContent,
                             ))
                             .with_children(|content| {
-                                for kind in TOOLBOX_COMPONENTS {
-                                    content
-                                        .spawn((
-                                            Button,
-                                            Node {
-                                                width: Val::Percent(100.0),
-                                                height: Val::Px(38.0),
-                                                justify_content: JustifyContent::SpaceBetween,
-                                                align_items: AlignItems::Center,
-                                                padding: UiRect::horizontal(Val::Px(10.0)),
-                                                border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
-                                                ..default()
+                                content
+                                    .spawn((
+                                        Node {
+                                            display: if tool_state.tool_mode == EditorToolMode::Build {
+                                                Display::Flex
+                                            } else {
+                                                Display::None
                                             },
-                                            BackgroundColor(crate::NORMAL_BUTTON),
-                                            ToolboxButton { kind },
-                                        ))
-                                        .with_children(|button| {
-                                            button.spawn((
-                                                Text::new(toolbox_label(
-                                                        kind,
-                                                        editor_session.mode,
-                                                        &progression,
-                                                    ).to_string()
-                                                ),
+                                            flex_direction: FlexDirection::Column,
+                                            row_gap: Val::Px(14.0),
+                                            ..default()
+                                        },
+                                        EditorBuildSection,
+                                    ))
+                                    .with_children(|build| {
+                                        for (title, entries) in toolbox_groups() {
+                                            build.spawn((
+                                                Text::new(title),
                                                 TextFont {
                                                     font: mono_font.clone(),
-                                                    font_size: 16.0,
+                                                    font_size: 15.0,
                                                     ..default()
                                                 },
-                                                TextColor(Color::WHITE),
-                                                ToolboxButtonText { kind },
+                                                TextColor(Color::srgb(0.74, 0.80, 0.88)),
                                             ));
-                                        });
-                                }
+                                            spawn_variant_button_grid(
+                                                build,
+                                                &asset_server,
+                                                &mono_font,
+                                                editor_session.mode,
+                                                &progression,
+                                                tool_state.selected_kind,
+                                                tool_state.selected_variant,
+                                                entries,
+                                            );
+                                        }
+                                    });
+
+                                content
+                                    .spawn((
+                                        Node {
+                                            display: if tool_state.tool_mode == EditorToolMode::Select {
+                                                Display::Flex
+                                            } else {
+                                                Display::None
+                                            },
+                                            flex_direction: FlexDirection::Column,
+                                            row_gap: Val::Px(10.0),
+                                            ..default()
+                                        },
+                                        EditorSelectSection,
+                                    ))
+                                    .with_children(|select| {
+                                        select.spawn((
+                                            Text::new(format!(
+                                                "Selection\n{}",
+                                                selection_summary(&editor_ship.ship, &selection_state)
+                                            )),
+                                            TextFont {
+                                                font: mono_font.clone(),
+                                                font_size: UI_BODY_FONT_SIZE,
+                                                ..default()
+                                            },
+                                            TextColor(Color::srgb(0.90, 0.93, 0.98)),
+                                            EditorSelectionSummaryText,
+                                        ));
+                                        spawn_select_action_button(
+                                            select,
+                                            "Auto Hull",
+                                            Color::srgb(0.46, 0.36, 0.18),
+                                            EditorAutoHullButton,
+                                            &mono_font,
+                                        );
+                                        spawn_select_action_button(
+                                            select,
+                                            "Copy Selection",
+                                            Color::srgb(0.26, 0.42, 0.62),
+                                            EditorCopySelectionButton,
+                                            &mono_font,
+                                        );
+                                        spawn_select_action_button(
+                                            select,
+                                            "Paste Clipboard",
+                                            Color::srgb(0.22, 0.52, 0.34),
+                                            EditorPasteSelectionButton,
+                                            &mono_font,
+                                        );
+                                        spawn_select_action_button(
+                                            select,
+                                            "Delete Selection",
+                                            Color::srgb(0.58, 0.26, 0.18),
+                                            EditorDeleteSelectionButton,
+                                            &mono_font,
+                                        );
+                                    });
 
                                 if editor_session.mode == EditorMode::Enemy {
                                     if let Some(entry) = enemy_library_state
@@ -231,6 +334,30 @@ pub(crate) fn spawn_editor_ui(
                             });
                     });
 
+                toolbox.spawn((
+                    Text::new(if editor_ui_state.toolbox_tooltip.title.is_empty() {
+                        variant_tooltip_text(
+                            editor_session.mode,
+                            &progression,
+                            tool_state.selected_kind,
+                            tool_state.selected_variant,
+                        )
+                    } else {
+                        format!(
+                            "{}\n{}",
+                            editor_ui_state.toolbox_tooltip.title,
+                            editor_ui_state.toolbox_tooltip.detail
+                        )
+                    }),
+                    TextFont {
+                        font: mono_font.clone(),
+                        font_size: 13.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.74, 0.80, 0.88)),
+                    EditorToolboxTooltipText,
+                ));
+
                 toolbox
                     .spawn((
                         Button,
@@ -274,20 +401,23 @@ pub(crate) fn spawn_editor_ui(
                 hud.spawn((
                         Text::new(editor_status_line(
                             editor_session.mode,
+                            tool_state.tool_mode,
                             &enemy_entry_label(
                                 &editor_session,
                                 &enemy_editor_state,
                                 &enemy_library_state,
                             ),
                             &editor_ship.ship.name,
-                        &TOOLBOX_COMPONENTS[0],
-                        crate::ship::ModuleVariant::default_for_kind(TOOLBOX_COMPONENTS[0]),
-                        0,
-                        0,
-                        editor_ship.ship.modules.len(),
-                        progression.scrap,
-                        &progression,
-                    )),
+                            &tool_state.selected_kind,
+                            tool_state.selected_variant,
+                            tool_state.selected_rotation,
+                            tool_state.selected_channel,
+                            editor_ship.ship.modules.len(),
+                            progression.scrap,
+                            &progression,
+                            &editor_ship.ship,
+                            &selection_state,
+                        )),
                     TextFont {
                         font: mono_font.clone(),
                         font_size: UI_BODY_FONT_SIZE,
@@ -639,8 +769,8 @@ pub(crate) fn spawn_editor_ui(
                 panel.spawn((
                     Text::new(
                         match editor_session.mode {
-                            EditorMode::Player => "Refit Controls\nLeft click: place or replace\nRight click: erase\nE: inspect hovered component\nQ: close component console\nR: rotate clockwise\nT: repair one damaged selected part\nC / V: channel - / +\nScroll over toolbox: browse parts\nScroll over grid: zoom\nMiddle drag: pan view\nF5 save ship  |  F9 reload ship\nTab: return to station",
-                            EditorMode::Enemy => "Enemy Editor Controls\nUnlimited component supply\nLeft click: place or replace\nRight click: erase\nE: inspect hovered component\nQ: close component console\nR: rotate clockwise\nC / V: channel - / +\nScroll over toolbox: browse parts\nScroll over grid: zoom\nMiddle drag: pan view\nF5 save library  |  F9 reload library\n[ / ] cycle entry  |  N new enemy\nTab: return to menu",
+                            EditorMode::Player => "Refit Controls\nBuild mode: left drag place, right drag erase\nSelect mode: drag marquee, arrows move group, Ctrl+C / Ctrl+V copy and paste, Delete removes, H runs Auto Hull\nE: inspect hovered component\nQ: close component console\nR: rotate build variant clockwise\nZ / X: previous / next variant\nT: repair one damaged selected build variant\nC / V: channel - / + in build mode\nScroll over toolbox: browse parts\nScroll over grid: zoom\nMiddle drag: pan view\nF5 save ship  |  F9 reload ship\nTab: return to station",
+                            EditorMode::Enemy => "Enemy Editor Controls\nUnlimited component supply across all variants\nBuild mode: left drag place, right drag erase\nSelect mode: drag marquee, arrows move group, Ctrl+C / Ctrl+V copy and paste, Delete removes, H runs Auto Hull\nE: inspect hovered component\nQ: close component console\nR: rotate build variant clockwise\nZ / X: previous / next variant\nC / V: channel - / + in build mode\nScroll over toolbox: browse parts\nScroll over grid: zoom\nMiddle drag: pan view\nF5 save library  |  F9 reload library\n[ / ] cycle entry  |  N new enemy\nTab: return to menu",
                         },
                     ),
                     TextFont {
@@ -654,11 +784,295 @@ pub(crate) fn spawn_editor_ui(
         });
 }
 
+const TOOLBOX_GROUP_STRUCTURE: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
+    (
+        crate::ship::ModuleKind::Hull,
+        crate::ship::ModuleVariant::Standard,
+    ),
+    (
+        crate::ship::ModuleKind::HullInnerCorner,
+        crate::ship::ModuleVariant::Standard,
+    ),
+    (
+        crate::ship::ModuleKind::HullOuterCorner,
+        crate::ship::ModuleVariant::Standard,
+    ),
+    (
+        crate::ship::ModuleKind::Interior,
+        crate::ship::ModuleVariant::Standard,
+    ),
+];
+const TOOLBOX_GROUP_COMMAND: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
+    (
+        crate::ship::ModuleKind::Core,
+        crate::ship::ModuleVariant::BasicCore,
+    ),
+    (
+        crate::ship::ModuleKind::Core,
+        crate::ship::ModuleVariant::ExpandedCore,
+    ),
+    (
+        crate::ship::ModuleKind::Cockpit,
+        crate::ship::ModuleVariant::Standard,
+    ),
+    (
+        crate::ship::ModuleKind::Cockpit,
+        crate::ship::ModuleVariant::AdvancedHelm,
+    ),
+    (
+        crate::ship::ModuleKind::Computer,
+        crate::ship::ModuleVariant::Standard,
+    ),
+];
+const TOOLBOX_GROUP_POWER: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
+    (
+        crate::ship::ModuleKind::Reactor,
+        crate::ship::ModuleVariant::Fission,
+    ),
+    (
+        crate::ship::ModuleKind::Reactor,
+        crate::ship::ModuleVariant::Fusion,
+    ),
+    (
+        crate::ship::ModuleKind::Battery,
+        crate::ship::ModuleVariant::BatteryCell,
+    ),
+    (
+        crate::ship::ModuleKind::Battery,
+        crate::ship::ModuleVariant::Capacitor,
+    ),
+    (
+        crate::ship::ModuleKind::Engine,
+        crate::ship::ModuleVariant::Standard,
+    ),
+];
+const TOOLBOX_GROUP_LOGISTICS: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
+    (
+        crate::ship::ModuleKind::Processor,
+        crate::ship::ModuleVariant::FabricatorSlow,
+    ),
+    (
+        crate::ship::ModuleKind::Processor,
+        crate::ship::ModuleVariant::FabricatorFast,
+    ),
+    (
+        crate::ship::ModuleKind::Cargo,
+        crate::ship::ModuleVariant::GeneralCargo,
+    ),
+    (
+        crate::ship::ModuleKind::Cargo,
+        crate::ship::ModuleVariant::FuelTank,
+    ),
+    (
+        crate::ship::ModuleKind::Cargo,
+        crate::ship::ModuleVariant::AmmoRack,
+    ),
+    (
+        crate::ship::ModuleKind::Airlock,
+        crate::ship::ModuleVariant::Standard,
+    ),
+];
+const TOOLBOX_GROUP_COMBAT: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
+    (
+        crate::ship::ModuleKind::Turret,
+        crate::ship::ModuleVariant::LaserTurret,
+    ),
+    (
+        crate::ship::ModuleKind::Turret,
+        crate::ship::ModuleVariant::BallisticTurret,
+    ),
+    (
+        crate::ship::ModuleKind::Shield,
+        crate::ship::ModuleVariant::RadialShield,
+    ),
+    (
+        crate::ship::ModuleKind::Shield,
+        crate::ship::ModuleVariant::DirectionalShield,
+    ),
+];
+
+fn toolbox_groups() -> [(
+    &'static str,
+    &'static [(crate::ship::ModuleKind, crate::ship::ModuleVariant)],
+); 5] {
+    [
+        ("Structure", TOOLBOX_GROUP_STRUCTURE),
+        ("Command", TOOLBOX_GROUP_COMMAND),
+        ("Power", TOOLBOX_GROUP_POWER),
+        ("Logistics", TOOLBOX_GROUP_LOGISTICS),
+        ("Combat", TOOLBOX_GROUP_COMBAT),
+    ]
+}
+
+fn spawn_tool_mode_button(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    mode: EditorToolMode,
+    selected_mode: EditorToolMode,
+    font: &Handle<Font>,
+) {
+    parent
+        .spawn((
+            Button,
+            Node {
+                width: Val::Percent(50.0),
+                height: Val::Px(36.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
+                ..default()
+            },
+            BackgroundColor(if mode == selected_mode {
+                crate::SELECTED_BUTTON
+            } else {
+                crate::NORMAL_BUTTON
+            }),
+            EditorToolModeButton { mode },
+        ))
+        .with_child((
+            Text::new(label),
+            TextFont {
+                font: font.clone(),
+                font_size: 15.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            EditorToolModeButtonText { mode },
+        ));
+}
+
+fn spawn_variant_button_grid(
+    parent: &mut ChildSpawnerCommands,
+    asset_server: &AssetServer,
+    font: &Handle<Font>,
+    mode: EditorMode,
+    progression: &DemoProgression,
+    selected_kind: crate::ship::ModuleKind,
+    selected_variant: crate::ship::ModuleVariant,
+    entries: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)],
+) {
+    for row in entries.chunks(3) {
+        parent
+            .spawn(Node {
+                width: Val::Percent(100.0),
+                column_gap: Val::Px(8.0),
+                ..default()
+            })
+            .with_children(|row_parent| {
+                for (kind, variant) in row {
+                    let available = mode == EditorMode::Enemy
+                        || progression.ready_count(*kind, *variant) > 0
+                        || progression.damaged_count(*kind, *variant) > 0;
+                    row_parent
+                        .spawn((
+                            Button,
+                            Node {
+                                width: Val::Px(74.0),
+                                height: Val::Px(92.0),
+                                flex_direction: FlexDirection::Column,
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                row_gap: Val::Px(6.0),
+                                padding: UiRect::all(Val::Px(6.0)),
+                                border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
+                                ..default()
+                            },
+                            BackgroundColor(toolbox_variant_color(
+                                available,
+                                *kind == selected_kind && *variant == selected_variant,
+                            )),
+                            ToolboxVariantButton {
+                                kind: *kind,
+                                variant: *variant,
+                            },
+                        ))
+                        .with_children(|button| {
+                            button.spawn((
+                                ImageNode::new(asset_server.load(
+                                    super::super::helpers::sprite_path_for_kind(kind, *variant),
+                                )),
+                                Node {
+                                    width: Val::Px(32.0),
+                                    height: Val::Px(32.0),
+                                    ..default()
+                                },
+                            ));
+                            button.spawn((
+                                Text::new(format!(
+                                    "{}\n{}",
+                                    variant.display_name(),
+                                    variant_inventory_label(mode, progression, *kind, *variant)
+                                )),
+                                TextFont {
+                                    font: font.clone(),
+                                    font_size: 11.0,
+                                    ..default()
+                                },
+                                TextColor(Color::WHITE),
+                                TextLayout::new_with_justify(Justify::Center),
+                                ToolboxVariantButtonText {
+                                    kind: *kind,
+                                    variant: *variant,
+                                },
+                            ));
+                        });
+                }
+            });
+    }
+}
+
+fn spawn_select_action_button<T: Bundle + 'static>(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    color: Color,
+    marker: T,
+    font: &Handle<Font>,
+) {
+    parent
+        .spawn((
+            Button,
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(36.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
+                ..default()
+            },
+            BackgroundColor(color),
+            marker,
+        ))
+        .with_child((
+            Text::new(label),
+            TextFont {
+                font: font.clone(),
+                font_size: 14.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+        ));
+}
+
+fn toolbox_variant_color(available: bool, selected: bool) -> Color {
+    if selected {
+        if available {
+            crate::SELECTED_BUTTON
+        } else {
+            crate::editor::SELECTED_UNAFFORDABLE_BUTTON
+        }
+    } else if available {
+        crate::NORMAL_BUTTON
+    } else {
+        crate::editor::UNAFFORDABLE_BUTTON
+    }
+}
+
 pub(crate) fn update_editor_status_text(
     editor_ship: Res<EditorShip>,
     editor_session: Res<EditorSessionState>,
     enemy_editor_state: Res<EnemyEditorState>,
     enemy_library_state: Res<EnemyShipLibraryState>,
+    selection_state: Res<EditorSelectionState>,
     tool_state: Res<EditorToolState>,
     progression: Res<DemoProgression>,
     last_mission_report: Res<LastMissionReport>,
@@ -681,10 +1095,15 @@ pub(crate) fn update_editor_status_text(
                 Without<EditorMissionReportText>,
             ),
         >,
+        Query<'_, '_, &'static mut Text, With<EditorSelectionSummaryText>>,
+        Query<'_, '_, &'static mut Text, With<EditorToolboxTooltipText>>,
+        Query<'_, '_, &'static mut Node, With<EditorBuildSection>>,
+        Query<'_, '_, &'static mut Node, With<EditorSelectSection>>,
     )>,
 ) {
     if !editor_ship.is_changed()
         && !tool_state.is_changed()
+        && !selection_state.is_changed()
         && !progression.is_changed()
         && !last_mission_report.is_changed()
         && !editor_ui_state.is_changed()
@@ -696,6 +1115,7 @@ pub(crate) fn update_editor_status_text(
     for mut text in &mut ui_queries.p0() {
         **text = editor_status_line(
             editor_session.mode,
+            tool_state.tool_mode,
             &enemy_entry_label(&editor_session, &enemy_editor_state, &enemy_library_state),
             &editor_ship.ship.name,
             &tool_state.selected_kind,
@@ -705,6 +1125,8 @@ pub(crate) fn update_editor_status_text(
             editor_ship.ship.modules.len(),
             progression.scrap,
             &progression,
+            &editor_ship.ship,
+            &selection_state,
         );
     }
 
@@ -722,6 +1144,45 @@ pub(crate) fn update_editor_status_text(
             "Hide Last Mission".to_string()
         } else {
             "Show Last Mission".to_string()
+        };
+    }
+
+    for mut text in &mut ui_queries.p3() {
+        **text = format!(
+            "Selection\n{}",
+            selection_summary(&editor_ship.ship, &selection_state)
+        );
+    }
+
+    for mut text in &mut ui_queries.p4() {
+        **text = if editor_ui_state.toolbox_tooltip.title.is_empty() {
+            variant_tooltip_text(
+                editor_session.mode,
+                &progression,
+                tool_state.selected_kind,
+                tool_state.selected_variant,
+            )
+        } else {
+            format!(
+                "{}\n{}",
+                editor_ui_state.toolbox_tooltip.title, editor_ui_state.toolbox_tooltip.detail
+            )
+        };
+    }
+
+    for mut node in &mut ui_queries.p5() {
+        node.display = if tool_state.tool_mode == EditorToolMode::Build {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+
+    for mut node in &mut ui_queries.p6() {
+        node.display = if tool_state.tool_mode == EditorToolMode::Select {
+            Display::Flex
+        } else {
+            Display::None
         };
     }
 }

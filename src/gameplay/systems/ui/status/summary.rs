@@ -28,14 +28,26 @@ pub(crate) fn build_top_banner(
         Some(return_line) => format!("{}  |  {}", mission_status_line(mission_state), return_line),
         None => mission_status_line(mission_state).to_string(),
     };
-    format!(
+    let mut banner = format!(
         "{outcome}\nNode: {} [{}]  |  Threat x{}  |  Projectiles {}  |  Turret Cooldown {}",
         mission_state.node_name,
         mission_state.node_kind_name,
         hostile_count,
         projectile_count,
         format_fx2(weapon_state.cooldown_remaining.max(Fx::from_num(0)))
-    )
+    );
+    if let Some(contract_title) = mission_state.contract_title.as_deref() {
+        banner.push_str(&format!("\nContract: {contract_title}"));
+    }
+    if let Some(opposition) = mission_state.opposition_summary.as_deref() {
+        banner.push_str(&format!("\nContact: {opposition}"));
+    }
+    if let Some(comms) = mission_state.opposition_comms.as_deref() {
+        banner.push_str(&format!("\nComms: {comms}"));
+    } else if let Some(briefing) = mission_state.mission_briefing.as_deref() {
+        banner.push_str(&format!("\nBrief: {briefing}"));
+    }
+    banner
 }
 
 #[allow(clippy::too_many_arguments)]

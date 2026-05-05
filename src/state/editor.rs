@@ -68,10 +68,11 @@ pub(crate) struct EditorPanState {
     pub(crate) last_cursor: Option<Vec2>,
 }
 
-#[derive(Resource, Clone, Copy)]
+#[derive(Resource, Clone)]
 pub(crate) struct EditorUiState {
     pub(crate) mission_report_expanded: bool,
     pub(crate) toolbox_scroll: f32,
+    pub(crate) toolbox_tooltip: EditorToolboxTooltip,
 }
 
 impl Default for EditorUiState {
@@ -79,12 +80,27 @@ impl Default for EditorUiState {
         Self {
             mission_report_expanded: false,
             toolbox_scroll: 0.0,
+            toolbox_tooltip: EditorToolboxTooltip::default(),
         }
     }
 }
 
+#[derive(Clone, Default)]
+pub(crate) struct EditorToolboxTooltip {
+    pub(crate) title: String,
+    pub(crate) detail: String,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum EditorToolMode {
+    #[default]
+    Build,
+    Select,
+}
+
 #[derive(Resource)]
 pub(crate) struct EditorToolState {
+    pub(crate) tool_mode: EditorToolMode,
     pub(crate) selected_kind: ModuleKind,
     pub(crate) selected_variant: ModuleVariant,
     pub(crate) selected_rotation: u8,
@@ -94,6 +110,7 @@ pub(crate) struct EditorToolState {
 impl Default for EditorToolState {
     fn default() -> Self {
         Self {
+            tool_mode: EditorToolMode::Build,
             selected_kind: ModuleKind::Hull,
             selected_variant: ModuleVariant::default_for_kind(ModuleKind::Hull),
             selected_rotation: 0,
@@ -164,13 +181,72 @@ pub(crate) struct EditorToolboxScrollViewport;
 pub(crate) struct EditorToolboxScrollContent;
 
 #[derive(Component)]
-pub(crate) struct ToolboxButton {
+pub(crate) struct ToolboxVariantButton {
     pub(crate) kind: ModuleKind,
+    pub(crate) variant: ModuleVariant,
 }
 
 #[derive(Component)]
-pub(crate) struct ToolboxButtonText {
+pub(crate) struct ToolboxVariantButtonText {
     pub(crate) kind: ModuleKind,
+    pub(crate) variant: ModuleVariant,
+}
+
+#[derive(Component)]
+pub(crate) struct EditorToolModeButton {
+    pub(crate) mode: EditorToolMode,
+}
+
+#[derive(Component)]
+pub(crate) struct EditorToolModeButtonText {
+    pub(crate) mode: EditorToolMode,
+}
+
+#[derive(Component)]
+pub(crate) struct EditorBuildSection;
+
+#[derive(Component)]
+pub(crate) struct EditorSelectSection;
+
+#[derive(Component)]
+pub(crate) struct EditorSelectionSummaryText;
+
+#[derive(Component)]
+pub(crate) struct EditorToolboxTooltipText;
+
+#[derive(Component)]
+pub(crate) struct EditorAutoHullButton;
+
+#[derive(Component)]
+pub(crate) struct EditorDeleteSelectionButton;
+
+#[derive(Component)]
+pub(crate) struct EditorCopySelectionButton;
+
+#[derive(Component)]
+pub(crate) struct EditorPasteSelectionButton;
+
+#[derive(Resource, Default, Clone)]
+pub(crate) struct EditorSelectionState {
+    pub(crate) selected_module_ids: Vec<u64>,
+    pub(crate) clipboard: Vec<ShipModuleSnapshot>,
+    pub(crate) marquee_origin: Option<(i32, i32)>,
+    pub(crate) marquee_current: Option<(i32, i32)>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ShipModuleSnapshot {
+    pub(crate) kind: ModuleKind,
+    pub(crate) variant: ModuleVariant,
+    pub(crate) grid_x: i32,
+    pub(crate) grid_y: i32,
+    pub(crate) rotation_quadrants: u8,
+    pub(crate) channel: u8,
+}
+
+#[derive(Resource, Default, Clone, Copy)]
+pub(crate) struct EditorPointerState {
+    pub(crate) last_build_cell: Option<(i32, i32, MouseButton)>,
 }
 
 #[derive(Clone, Copy)]

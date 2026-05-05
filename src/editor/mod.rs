@@ -22,11 +22,14 @@ pub(crate) use input::{
     repair_selected_component_shortcut,
     rotate_selected_tool,
     save_editor_ship_shortcut,
+    selection_action_button_system,
+    selection_shortcuts,
     sync_program_text_editor_state,
     toggle_editor_module_overlay_shortcuts,
     toolbox_button_system,
 };
 pub(crate) use render::{
+    draw_editor_selection_overlay,
     draw_grid_overlay,
     spawn_preview_tile,
     sync_preview_tile,

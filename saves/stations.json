@@ -1,0 +1,133 @@
+{
+  "stations": [
+    {
+      "id": "needle_rest",
+      "name": "Needle Rest",
+      "faction": "ContinuantGuild",
+      "flavor": "A Continuant splice-station threaded through a dead shipping spar. Needle Rest survives by salvaging the Quiet After one careful sortie at a time.",
+      "contacts": [
+        {
+          "id": "ivra_quell",
+          "name": "Ivra Quell",
+          "role": "Harbormaster",
+          "bio": "Ivra keeps the slips alive, knows every hull scar in the yard, and speaks like every minute dockside is borrowed from a worse emergency.",
+          "brief": "Keep the ship flying, keep the crew breathing, and don't waste a clean launch window."
+        },
+        {
+          "id": "sable_ren",
+          "name": "Sable Ren",
+          "role": "Contract Broker",
+          "bio": "Sable turns station rumors into paid routes. She cares less about glory than about what can be carried home and who will still trade with Needle Rest tomorrow.",
+          "brief": "Take the jobs that keep us useful. Leave the heroic nonsense to dead captains."
+        },
+        {
+          "id": "peregrine_cho",
+          "name": "Peregrine Cho",
+          "role": "Archive Custodian",
+          "bio": "Cho curates logs, fragments, and oral accounts from the Quiet After. He treats every recovered scrap as an argument against forgetting.",
+          "brief": "History here survives in fragments. Bring anything that still speaks."
+        }
+      ],
+      "services": [
+        "Shipyard",
+        "Quartermaster",
+        "Contracts",
+        "Archives"
+      ],
+      "contracts": [
+        {
+          "id": "needle_calibration_ring",
+          "title": "Calibration Ring Shakeout",
+          "contact_id": "ivra_quell",
+          "target_node_id": 6,
+          "kind": "Calibration",
+          "briefing": "Take the fresh refit through the Calibration Ring. We need a clean systems shakedown before riskier work leaves the dock.",
+          "launch_blurb": "Quell patches you into the Ring telemetry feed. 'Clean lap, clean readback, then come home.'",
+          "success_debrief": "Calibration pass logged. The yard signs off on the current configuration and updates its trust in your hull math.",
+          "failure_debrief": "The shakedown came back dirty. Needle Rest logs the faults and Quell wants the next launch treated as remedial, not routine.",
+          "reward_bonus_scrap": 2,
+          "lore_unlock_ids": [
+            "needle_rest_flight_discipline"
+          ]
+        },
+        {
+          "id": "needle_latchline_recovery",
+          "title": "Latchline Recovery Sweep",
+          "contact_id": "sable_ren",
+          "target_node_id": 1,
+          "kind": "SalvageRecovery",
+          "briefing": "Latchline Debris is still coughing up useful structure. Bring back what you can before raiders strip the route bare.",
+          "launch_blurb": "Ren forwards a salvage manifest with half the items already crossed out by competitors.",
+          "success_debrief": "The sweep paid out. Ren posts the haul under Needle Rest colors and opens a few more quiet favors on the local exchange.",
+          "failure_debrief": "The route went wrong and the station gets less for showing its badge on that wreck field than Ren promised.",
+          "reward_bonus_scrap": 5,
+          "lore_unlock_ids": [
+            "quiet_after_salvage_custom"
+          ]
+        },
+        {
+          "id": "needle_gravehook_cleanup",
+          "title": "Gravehook Interdiction",
+          "contact_id": "sable_ren",
+          "target_node_id": 2,
+          "kind": "HostileCleanup",
+          "briefing": "A rogue Continuant cell has been leaning on traffic near Gravehook Nest. Break their hold long enough for station scavengers to work again.",
+          "launch_blurb": "Ren's brief ends with a captain name underlined twice: 'Expect a thinking crew, not a blind machine.'",
+          "success_debrief": "Traffic opens again and Ren quietly admits the station needed this win more than the ledger suggests.",
+          "failure_debrief": "The rogue cell keeps its grip on Gravehook. Needle Rest loses face and another route turns expensive.",
+          "reward_bonus_scrap": 8,
+          "lore_unlock_ids": [
+            "rogue_continuants_field_note"
+          ]
+        },
+        {
+          "id": "needle_blueglass_retrieval",
+          "title": "Blueglass Archive Pull",
+          "contact_id": "peregrine_cho",
+          "target_node_id": 3,
+          "kind": "Retrieval",
+          "briefing": "Cho wants surviving records from Blueglass Hush. The node is unstable, but the archive fragments there may predate the Quiet After.",
+          "launch_blurb": "Cho sends a tag-list of dead names and lost facilities, then quietly asks you not to leave the logs behind this time.",
+          "success_debrief": "Recovered archive traces fold into Cho's growing map of the Quiet After. He treats the return like a funeral conducted correctly.",
+          "failure_debrief": "The archive pull failed. Cho says little, but the silence feels heavier than an argument.",
+          "reward_bonus_scrap": 6,
+          "lore_unlock_ids": [
+            "continuant_memory_practice"
+          ]
+        }
+      ],
+      "lore_entries": [
+        {
+          "id": "needle_rest_foundation",
+          "title": "Needle Rest",
+          "body": "Needle Rest was assembled after the Quiet After from a transit spar, a broken spindle dock, and whatever hullwork the early crews could keep pressurized. Its people believe a place becomes real when enough crews can return there alive."
+        },
+        {
+          "id": "quiet_after_salvage_custom",
+          "title": "Quiet After Salvage Law",
+          "body": "Out here, salvage rights are mostly the rights you can enforce and survive. Stations like Needle Rest survive by making those rights social before they have to be violent."
+        },
+        {
+          "id": "continuant_memory_practice",
+          "title": "Continuant Memory Practice",
+          "body": "Continuant stations keep layered records: machine logs, witness accounts, route songs, and repair marks cut into hull braces. If one memory format dies, another may still carry the shape of what mattered."
+        },
+        {
+          "id": "needle_rest_flight_discipline",
+          "title": "Flight Discipline",
+          "body": "Every launch from Needle Rest is tracked like a wound under observation. The station remembers which crews came back, which hulls failed warm, and which routes punish carelessness faster than fear can teach it."
+        },
+        {
+          "id": "rogue_continuants_field_note",
+          "title": "Rogue Continuants",
+          "body": "Not every Continuant crew stayed tied to a station. Some turned their ships into roaming cells, trading obligation for autonomy and often mistaking that freedom for permission."
+        },
+        {
+          "id": "null_swarms_brief",
+          "title": "Null Swarms",
+          "body": "Null Swarms are machine clusters that survived the Quiet After without anyone left to contextualize their directives. Some hold routes, some strip wrecks, and some simply continue patterns no one living can explain."
+        }
+      ]
+    }
+  ]
+}

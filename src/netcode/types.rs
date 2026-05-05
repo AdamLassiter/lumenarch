@@ -44,6 +44,8 @@ pub(crate) enum RollbackMetaOp {
     LaunchEncounter = 5,
     ReturnToDock = 6,
     LeaveEditor = 7,
+    AcceptContract = 8,
+    LaunchContract = 9,
 }
 
 #[repr(u8)]
@@ -100,6 +102,8 @@ impl PlayerGgrsInput {
             5 => RollbackMetaOp::LaunchEncounter,
             6 => RollbackMetaOp::ReturnToDock,
             7 => RollbackMetaOp::LeaveEditor,
+            8 => RollbackMetaOp::AcceptContract,
+            9 => RollbackMetaOp::LaunchContract,
             _ => RollbackMetaOp::None,
         }
     }

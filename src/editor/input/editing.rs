@@ -11,14 +11,17 @@ use super::super::helpers::{
     cursor_grid_position,
     is_cursor_over_editor_ui,
     is_cursor_over_toolbox,
+    module_family_label,
+    variant_tooltip_text,
 };
 use crate::{
     HOVERED_BUTTON,
     PRESSED_BUTTON,
-    TOOLBOX_COMPONENTS,
     netcode,
     ship::{
+        ModuleKind,
         ModuleVariant,
+        ShipDefinition,
         ShipModule,
         enemy::{
             EnemyShipEntryValidationStatus,
@@ -31,11 +34,19 @@ use crate::{
     state::{
         ArchEditorState,
         DemoProgression,
+        EditorAutoHullButton,
+        EditorCopySelectionButton,
+        EditorDeleteSelectionButton,
         EditorMissionReportButton,
         EditorMode,
         EditorPanState,
+        EditorPasteSelectionButton,
+        EditorPointerState,
+        EditorSelectionState,
         EditorSessionState,
         EditorShip,
+        EditorToolMode,
+        EditorToolModeButton,
         EditorToolState,
         EditorUiState,
         EditorViewState,
@@ -46,37 +57,69 @@ use crate::{
         LeaveEditorButton,
         MainCamera,
         ProgrammingLanguageMode,
-        ToolboxButton,
+        ToolboxVariantButton,
     },
 };
 
 pub(crate) fn toolbox_button_system(
     mut interaction_query: Query<
-        (&Interaction, &ToolboxButton, &mut BackgroundColor),
+        (
+            &Interaction,
+            Option<&ToolboxVariantButton>,
+            Option<&EditorToolModeButton>,
+            &mut BackgroundColor,
+        ),
         (Changed<Interaction>, With<Button>),
     >,
+    editor_session: Res<EditorSessionState>,
     progression: Res<DemoProgression>,
     mut tool_state: ResMut<EditorToolState>,
+    mut editor_ui_state: ResMut<EditorUiState>,
 ) {
-    for (interaction, button, mut background) in &mut interaction_query {
-        let available =
-            progression.ready_count(button.kind, ModuleVariant::default_for_kind(button.kind)) > 0;
+    for (interaction, variant_button, mode_button, mut background) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {
-                tool_state.selected_kind = button.kind;
-                tool_state.selected_variant = ModuleVariant::default_for_kind(button.kind);
-                *background = BackgroundColor(if available {
-                    PRESSED_BUTTON
-                } else {
-                    super::super::SELECTED_UNAFFORDABLE_BUTTON
-                });
+                if let Some(button) = mode_button {
+                    tool_state.tool_mode = button.mode;
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                } else if let Some(button) = variant_button {
+                    let available = editor_session.mode == EditorMode::Enemy
+                        || progression.ready_count(button.kind, button.variant) > 0
+                        || progression.damaged_count(button.kind, button.variant) > 0;
+                    if !available {
+                        *background = BackgroundColor(super::super::SELECTED_UNAFFORDABLE_BUTTON);
+                        continue;
+                    }
+                    tool_state.tool_mode = EditorToolMode::Build;
+                    tool_state.selected_kind = button.kind;
+                    tool_state.selected_variant = button.variant;
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                }
             }
             Interaction::Hovered => {
-                *background = BackgroundColor(if available {
-                    HOVERED_BUTTON
+                if let Some(button) = variant_button {
+                    editor_ui_state.toolbox_tooltip.title = format!(
+                        "{} / {}",
+                        module_family_label(button.kind),
+                        button.kind.as_str()
+                    );
+                    editor_ui_state.toolbox_tooltip.detail = variant_tooltip_text(
+                        editor_session.mode,
+                        &progression,
+                        button.kind,
+                        button.variant,
+                    );
+                    let available = editor_session.mode == EditorMode::Enemy
+                        || progression.ready_count(button.kind, button.variant) > 0
+                        || progression.damaged_count(button.kind, button.variant) > 0;
+                    *background = BackgroundColor(if available {
+                        HOVERED_BUTTON
+                    } else {
+                        super::super::UNAFFORDABLE_BUTTON
+                    });
                 } else {
-                    super::super::UNAFFORDABLE_BUTTON
-                });
+                    *background = BackgroundColor(HOVERED_BUTTON);
+                }
             }
             Interaction::None => {}
         }
@@ -178,17 +221,17 @@ pub(crate) fn rotate_selected_tool(
     keys: Res<ButtonInput<KeyCode>>,
     mut tool_state: ResMut<EditorToolState>,
 ) {
-    if keys.just_pressed(KeyCode::KeyR) {
+    if tool_state.tool_mode == EditorToolMode::Build && keys.just_pressed(KeyCode::KeyR) {
         tool_state.selected_rotation = (tool_state.selected_rotation + 1) % 4;
     }
 
-    if keys.just_pressed(KeyCode::KeyZ) {
+    if tool_state.tool_mode == EditorToolMode::Build && keys.just_pressed(KeyCode::KeyZ) {
         tool_state.selected_variant = tool_state
             .selected_variant
             .cycle_for_kind(tool_state.selected_kind, -1);
     }
 
-    if keys.just_pressed(KeyCode::KeyX) {
+    if tool_state.tool_mode == EditorToolMode::Build && keys.just_pressed(KeyCode::KeyX) {
         tool_state.selected_variant = tool_state
             .selected_variant
             .cycle_for_kind(tool_state.selected_kind, 1);
@@ -213,6 +256,8 @@ pub(crate) fn place_or_remove_tile(
     mut rollback_state: ResMut<netcode::RollbackGameState>,
     editor_session: Res<EditorSessionState>,
     tool_state: Res<EditorToolState>,
+    mut selection_state: ResMut<EditorSelectionState>,
+    mut pointer_state: ResMut<EditorPointerState>,
     mut arch_editor_state: ResMut<ArchEditorState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
 ) {
@@ -245,71 +290,158 @@ pub(crate) fn place_or_remove_tile(
         return;
     };
 
-    if buttons.just_pressed(MouseButton::Left) {
-        let selected_variant = tool_state
-            .selected_variant
-            .normalize_for_kind(tool_state.selected_kind);
-        if let Some(existing) = editor_ship.ship.module_at_mut(grid_x, grid_y) {
-            if existing.kind == tool_state.selected_kind && existing.variant == selected_variant {
-                existing.rotation_quadrants = tool_state.selected_rotation;
-                existing.channel = tool_state.selected_channel;
-                return;
+    match tool_state.tool_mode {
+        EditorToolMode::Build => {
+            selection_state.marquee_origin = None;
+            selection_state.marquee_current = None;
+
+            if buttons.just_released(MouseButton::Left) || buttons.just_released(MouseButton::Right)
+            {
+                pointer_state.last_build_cell = None;
             }
 
-            if editor_session.mode == EditorMode::Player {
-                if !progression
-                    .try_consume_ready_component(tool_state.selected_kind, selected_variant)
+            for (mouse_button, erase) in [(MouseButton::Left, false), (MouseButton::Right, true)] {
+                if (buttons.just_pressed(mouse_button) || buttons.pressed(mouse_button))
+                    && pointer_state.last_build_cell != Some((grid_x, grid_y, mouse_button))
+                    && apply_build_action(
+                        &mut editor_ship.ship,
+                        &mut progression,
+                        editor_session.mode,
+                        tool_state.as_ref(),
+                        grid_x,
+                        grid_y,
+                        erase,
+                    )
                 {
-                    return;
+                    pointer_state.last_build_cell = Some((grid_x, grid_y, mouse_button));
+                    sync_editor_resources(
+                        &editor_ship.ship,
+                        &progression,
+                        editor_session.mode,
+                        &mut rollback_state,
+                        &mut enemy_editor_state,
+                    );
                 }
+            }
+        }
+        EditorToolMode::Select => {
+            pointer_state.last_build_cell = None;
+            if buttons.just_pressed(MouseButton::Left) {
+                selection_state.marquee_origin = Some((grid_x, grid_y));
+                selection_state.marquee_current = Some((grid_x, grid_y));
+            } else if buttons.pressed(MouseButton::Left) {
+                selection_state.marquee_current = Some((grid_x, grid_y));
+            } else if buttons.just_released(MouseButton::Left) {
+                if let Some(origin) = selection_state.marquee_origin {
+                    let current = selection_state.marquee_current.unwrap_or(origin);
+                    selection_state.selected_module_ids =
+                        select_modules_in_rect(&editor_ship.ship, origin, current);
+                }
+                selection_state.marquee_origin = None;
+                selection_state.marquee_current = None;
+            }
+        }
+    }
+}
+
+fn apply_build_action(
+    ship: &mut ShipDefinition,
+    progression: &mut DemoProgression,
+    mode: EditorMode,
+    tool_state: &EditorToolState,
+    grid_x: i32,
+    grid_y: i32,
+    erase: bool,
+) -> bool {
+    if erase {
+        if let Some(existing) = ship.module_at(grid_x, grid_y).cloned() {
+            if mode == EditorMode::Player {
                 progression.add_ready_component(existing.kind, existing.variant, 1);
             }
-            existing.kind = tool_state.selected_kind;
-            existing.variant = selected_variant;
-            existing.rotation_quadrants = tool_state.selected_rotation;
-            existing.channel = tool_state.selected_channel;
-        } else {
-            if editor_session.mode == EditorMode::Player
-                && !progression
-                    .try_consume_ready_component(tool_state.selected_kind, selected_variant)
-            {
-                return;
-            }
-            let next_id = editor_ship.ship.next_module_id();
-            editor_ship.ship.replace_module(ShipModule::new(
-                next_id,
-                tool_state.selected_kind,
-                grid_x,
-                grid_y,
-                tool_state.selected_rotation,
-            ));
-            if let Some(module) = editor_ship.ship.module_at_mut(grid_x, grid_y) {
-                module.variant = selected_variant;
-                module.channel = tool_state.selected_channel;
-            }
+            ship.remove_module_at(grid_x, grid_y);
+            return true;
         }
-        if editor_session.mode == EditorMode::Player {
-            rollback_state.editor_ship = editor_ship.ship.clone();
-            rollback_state.progression = progression.clone();
-        } else {
-            enemy_editor_state.dirty = true;
-        }
+        return false;
     }
 
-    if buttons.just_pressed(MouseButton::Right) {
-        if let Some(existing) = editor_ship.ship.module_at(grid_x, grid_y).cloned()
-            && editor_session.mode == EditorMode::Player
+    let selected_variant = tool_state
+        .selected_variant
+        .normalize_for_kind(tool_state.selected_kind);
+    if let Some(existing) = ship.module_at_mut(grid_x, grid_y) {
+        if existing.kind == tool_state.selected_kind && existing.variant == selected_variant {
+            existing.rotation_quadrants = tool_state.selected_rotation % 4;
+            existing.channel = tool_state.selected_channel;
+            return true;
+        }
+
+        if mode == EditorMode::Player
+            && !progression.try_consume_ready_component(tool_state.selected_kind, selected_variant)
         {
+            return false;
+        }
+        if mode == EditorMode::Player {
             progression.add_ready_component(existing.kind, existing.variant, 1);
         }
-        editor_ship.ship.remove_module_at(grid_x, grid_y);
-        if editor_session.mode == EditorMode::Player {
-            rollback_state.progression = progression.clone();
-            rollback_state.editor_ship = editor_ship.ship.clone();
-        } else {
-            enemy_editor_state.dirty = true;
-        }
+        existing.kind = tool_state.selected_kind;
+        existing.variant = selected_variant;
+        existing.rotation_quadrants = tool_state.selected_rotation % 4;
+        existing.channel = tool_state.selected_channel;
+        return true;
     }
+
+    if mode == EditorMode::Player
+        && !progression.try_consume_ready_component(tool_state.selected_kind, selected_variant)
+    {
+        return false;
+    }
+    let next_id = ship.next_module_id();
+    let mut module = ShipModule::new(
+        next_id,
+        tool_state.selected_kind,
+        grid_x,
+        grid_y,
+        tool_state.selected_rotation % 4,
+    );
+    module.variant = selected_variant;
+    module.channel = tool_state.selected_channel;
+    ship.replace_module(module);
+    true
+}
+
+fn sync_editor_resources(
+    ship: &ShipDefinition,
+    progression: &DemoProgression,
+    mode: EditorMode,
+    rollback_state: &mut netcode::RollbackGameState,
+    enemy_editor_state: &mut EnemyEditorState,
+) {
+    if mode == EditorMode::Player {
+        rollback_state.editor_ship = ship.clone();
+        rollback_state.progression = progression.clone();
+    } else {
+        enemy_editor_state.dirty = true;
+    }
+}
+
+fn select_modules_in_rect(
+    ship: &ShipDefinition,
+    origin: (i32, i32),
+    current: (i32, i32),
+) -> Vec<u64> {
+    let min_x = origin.0.min(current.0);
+    let max_x = origin.0.max(current.0);
+    let min_y = origin.1.min(current.1);
+    let max_y = origin.1.max(current.1);
+    ship.modules
+        .iter()
+        .filter(|module| {
+            module.grid_x >= min_x
+                && module.grid_x <= max_x
+                && module.grid_y >= min_y
+                && module.grid_y <= max_y
+        })
+        .map(|module| module.id)
+        .collect()
 }
 
 pub(crate) fn toggle_editor_module_overlay_shortcuts(
@@ -318,6 +450,7 @@ pub(crate) fn toggle_editor_module_overlay_shortcuts(
     camera_query: Single<(&Camera, &GlobalTransform)>,
     editor_ship: Res<EditorShip>,
     mut tool_state: ResMut<EditorToolState>,
+    mut selection_state: ResMut<EditorSelectionState>,
     mut arch_editor_state: ResMut<ArchEditorState>,
 ) {
     if keys.just_pressed(KeyCode::KeyQ) {
@@ -338,9 +471,10 @@ pub(crate) fn toggle_editor_module_overlay_shortcuts(
     };
     arch_editor_state.selected_module_id = Some(module.id);
     arch_editor_state.panel_open = true;
+    selection_state.selected_module_ids = vec![module.id];
+    tool_state.tool_mode = EditorToolMode::Select;
     tool_state.selected_kind = module.kind;
     tool_state.selected_variant = module.variant;
-    tool_state.selected_rotation = module.rotation_quadrants;
     tool_state.selected_channel = module.effective_channel();
 }
 
@@ -489,6 +623,176 @@ pub(crate) fn repair_selected_component_shortcut(
     }
 }
 
+pub(crate) fn selection_action_button_system(
+    mut interaction_query: Query<
+        (
+            &Interaction,
+            Option<&EditorAutoHullButton>,
+            Option<&EditorCopySelectionButton>,
+            Option<&EditorPasteSelectionButton>,
+            Option<&EditorDeleteSelectionButton>,
+            &mut BackgroundColor,
+        ),
+        (Changed<Interaction>, With<Button>),
+    >,
+    window: Single<&Window, With<PrimaryWindow>>,
+    camera_query: Single<(&Camera, &GlobalTransform)>,
+    editor_session: Res<EditorSessionState>,
+    status: Res<netcode::SessionStatus>,
+    mut editor_ship: ResMut<EditorShip>,
+    mut progression: ResMut<DemoProgression>,
+    mut selection_state: ResMut<EditorSelectionState>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
+) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
+    let window = window.into_inner();
+    let camera_query = *camera_query;
+
+    for (interaction, auto_hull, copy, paste, delete, mut background) in &mut interaction_query {
+        match *interaction {
+            Interaction::Pressed => {
+                let mut changed = false;
+                if auto_hull.is_some() {
+                    changed = apply_auto_hull_to_ship(
+                        &mut editor_ship.ship,
+                        &mut progression,
+                        editor_session.mode,
+                    );
+                } else if copy.is_some() {
+                    selection_state.clipboard = selected_or_all_modules(
+                        &editor_ship.ship,
+                        &selection_state.selected_module_ids,
+                    )
+                    .into_iter()
+                    .map(module_snapshot)
+                    .collect();
+                } else if paste.is_some() {
+                    let anchor = cursor_grid_position(window, camera_query)
+                        .unwrap_or_else(|| ship_anchor(&editor_ship.ship));
+                    changed = paste_clipboard_group(
+                        &mut editor_ship.ship,
+                        &mut progression,
+                        editor_session.mode,
+                        &mut selection_state,
+                        anchor,
+                    );
+                } else if delete.is_some() {
+                    changed = delete_selected_group(
+                        &mut editor_ship.ship,
+                        &mut progression,
+                        editor_session.mode,
+                        &mut selection_state,
+                    );
+                }
+
+                if changed {
+                    sync_editor_resources(
+                        &editor_ship.ship,
+                        &progression,
+                        editor_session.mode,
+                        &mut rollback_state,
+                        &mut enemy_editor_state,
+                    );
+                }
+                *background = BackgroundColor(PRESSED_BUTTON);
+            }
+            Interaction::Hovered => {
+                *background = BackgroundColor(HOVERED_BUTTON);
+            }
+            Interaction::None => {
+                *background = BackgroundColor(if auto_hull.is_some() {
+                    Color::srgb(0.46, 0.36, 0.18)
+                } else if copy.is_some() {
+                    Color::srgb(0.26, 0.42, 0.62)
+                } else if paste.is_some() {
+                    Color::srgb(0.22, 0.52, 0.34)
+                } else {
+                    Color::srgb(0.58, 0.26, 0.18)
+                });
+            }
+        }
+    }
+}
+
+pub(crate) fn selection_shortcuts(
+    keys: Res<ButtonInput<KeyCode>>,
+    window: Single<&Window, With<PrimaryWindow>>,
+    camera_query: Single<(&Camera, &GlobalTransform)>,
+    editor_session: Res<EditorSessionState>,
+    status: Res<netcode::SessionStatus>,
+    tool_state: Res<EditorToolState>,
+    mut editor_ship: ResMut<EditorShip>,
+    mut progression: ResMut<DemoProgression>,
+    mut selection_state: ResMut<EditorSelectionState>,
+    mut rollback_state: ResMut<netcode::RollbackGameState>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
+) {
+    if !netcode::is_host_authority(&status) || tool_state.tool_mode != EditorToolMode::Select {
+        return;
+    }
+
+    let ctrl_pressed = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
+    let mut changed = false;
+
+    if ctrl_pressed && keys.just_pressed(KeyCode::KeyC) {
+        selection_state.clipboard =
+            selected_or_all_modules(&editor_ship.ship, &selection_state.selected_module_ids)
+                .into_iter()
+                .map(module_snapshot)
+                .collect();
+    }
+
+    if ctrl_pressed && keys.just_pressed(KeyCode::KeyV) {
+        let anchor = cursor_grid_position(window.into_inner(), *camera_query)
+            .unwrap_or_else(|| ship_anchor(&editor_ship.ship));
+        changed |= paste_clipboard_group(
+            &mut editor_ship.ship,
+            &mut progression,
+            editor_session.mode,
+            &mut selection_state,
+            anchor,
+        );
+    }
+
+    if keys.just_pressed(KeyCode::Delete) || keys.just_pressed(KeyCode::Backspace) {
+        changed |= delete_selected_group(
+            &mut editor_ship.ship,
+            &mut progression,
+            editor_session.mode,
+            &mut selection_state,
+        );
+    }
+
+    if keys.just_pressed(KeyCode::KeyH) {
+        changed |=
+            apply_auto_hull_to_ship(&mut editor_ship.ship, &mut progression, editor_session.mode);
+    }
+
+    for (key, dx, dy) in [
+        (KeyCode::ArrowLeft, -1, 0),
+        (KeyCode::ArrowRight, 1, 0),
+        (KeyCode::ArrowUp, 0, -1),
+        (KeyCode::ArrowDown, 0, 1),
+    ] {
+        if keys.just_pressed(key) {
+            changed |= move_selected_group(&mut editor_ship.ship, &selection_state, dx, dy);
+        }
+    }
+
+    if changed {
+        sync_editor_resources(
+            &editor_ship.ship,
+            &progression,
+            editor_session.mode,
+            &mut rollback_state,
+            &mut enemy_editor_state,
+        );
+    }
+}
+
 pub(crate) fn save_editor_ship_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     editor_ship: Res<EditorShip>,
@@ -577,9 +881,9 @@ pub(crate) fn pan_and_zoom_editor_view(
 
     for event in mouse_wheel.read() {
         if is_cursor_over_toolbox(window) {
-            let estimated_content_height = TOOLBOX_COMPONENTS.len() as f32 * 48.0 + 180.0;
-            let viewport_height = 430.0;
-            let max_scroll = (estimated_content_height - viewport_height).max(0.0);
+            let estimated_content_height: f32 = 980.0;
+            let viewport_height: f32 = 470.0;
+            let max_scroll = (estimated_content_height - viewport_height).max(0.0_f32);
             editor_ui_state.toolbox_scroll =
                 (editor_ui_state.toolbox_scroll - event.y * 28.0).clamp(0.0, max_scroll);
         } else {
@@ -718,5 +1022,327 @@ pub(crate) fn persist_editor_ship(
 
     if let Err(error) = result {
         eprintln!("editor: failed to autosave ship: {error}");
+    }
+}
+
+fn selected_or_all_modules(ship: &ShipDefinition, selected_module_ids: &[u64]) -> Vec<ShipModule> {
+    ship.modules
+        .iter()
+        .filter(|module| selected_module_ids.is_empty() || selected_module_ids.contains(&module.id))
+        .cloned()
+        .collect()
+}
+
+fn module_snapshot(module: ShipModule) -> crate::state::ShipModuleSnapshot {
+    crate::state::ShipModuleSnapshot {
+        kind: module.kind,
+        variant: module.variant,
+        grid_x: module.grid_x,
+        grid_y: module.grid_y,
+        rotation_quadrants: module.rotation_quadrants,
+        channel: module.channel,
+    }
+}
+
+fn ship_anchor(ship: &ShipDefinition) -> (i32, i32) {
+    ship.bounds()
+        .map(|(min_x, _, min_y, _)| (min_x, min_y))
+        .unwrap_or((0, 0))
+}
+
+fn move_selected_group(
+    ship: &mut ShipDefinition,
+    selection_state: &EditorSelectionState,
+    dx: i32,
+    dy: i32,
+) -> bool {
+    if selection_state.selected_module_ids.is_empty() {
+        return false;
+    }
+
+    let selected = ship
+        .modules
+        .iter()
+        .filter(|module| selection_state.selected_module_ids.contains(&module.id))
+        .cloned()
+        .collect::<Vec<_>>();
+    if selected.is_empty() {
+        return false;
+    }
+
+    for module in &selected {
+        let next_x = module.grid_x + dx;
+        let next_y = module.grid_y + dy;
+        if let Some(blocker) = ship.module_at(next_x, next_y)
+            && !selection_state.selected_module_ids.contains(&blocker.id)
+        {
+            return false;
+        }
+    }
+
+    for module in &selected {
+        if let Some(target) = ship.modules.iter_mut().find(|entry| entry.id == module.id) {
+            target.grid_x += dx;
+            target.grid_y += dy;
+        }
+    }
+    true
+}
+
+fn delete_selected_group(
+    ship: &mut ShipDefinition,
+    progression: &mut DemoProgression,
+    mode: EditorMode,
+    selection_state: &mut EditorSelectionState,
+) -> bool {
+    let selected = selected_or_all_modules(ship, &selection_state.selected_module_ids);
+    if selected.is_empty() {
+        return false;
+    }
+
+    for module in &selected {
+        if mode == EditorMode::Player {
+            progression.add_ready_component(module.kind, module.variant, 1);
+        }
+        ship.modules.retain(|entry| entry.id != module.id);
+    }
+    selection_state.selected_module_ids.clear();
+    true
+}
+
+fn paste_clipboard_group(
+    ship: &mut ShipDefinition,
+    progression: &mut DemoProgression,
+    mode: EditorMode,
+    selection_state: &mut EditorSelectionState,
+    anchor: (i32, i32),
+) -> bool {
+    if selection_state.clipboard.is_empty() {
+        return false;
+    }
+    let min_x = selection_state
+        .clipboard
+        .iter()
+        .map(|module| module.grid_x)
+        .min()
+        .unwrap_or(anchor.0);
+    let min_y = selection_state
+        .clipboard
+        .iter()
+        .map(|module| module.grid_y)
+        .min()
+        .unwrap_or(anchor.1);
+
+    let planned = selection_state
+        .clipboard
+        .iter()
+        .map(|module| {
+            (
+                module,
+                anchor.0 + (module.grid_x - min_x),
+                anchor.1 + (module.grid_y - min_y),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    for (_, grid_x, grid_y) in &planned {
+        if ship.module_at(*grid_x, *grid_y).is_some() {
+            return false;
+        }
+    }
+
+    if mode == EditorMode::Player {
+        let mut needed = std::collections::HashMap::<(ModuleKind, ModuleVariant), u32>::new();
+        for (module, _, _) in &planned {
+            *needed.entry((module.kind, module.variant)).or_default() += 1;
+        }
+        if needed
+            .into_iter()
+            .any(|((kind, variant), amount)| progression.ready_count(kind, variant) < amount)
+        {
+            return false;
+        }
+        for (module, _, _) in &planned {
+            progression.try_consume_ready_component(module.kind, module.variant);
+        }
+    }
+
+    selection_state.selected_module_ids.clear();
+    for (module, grid_x, grid_y) in planned {
+        let mut next = ShipModule::new(
+            ship.next_module_id(),
+            module.kind,
+            grid_x,
+            grid_y,
+            module.rotation_quadrants,
+        );
+        next.variant = module.variant;
+        next.channel = module.channel;
+        let new_id = next.id;
+        ship.replace_module(next);
+        selection_state.selected_module_ids.push(new_id);
+    }
+    true
+}
+
+fn apply_auto_hull_to_ship(
+    ship: &mut ShipDefinition,
+    progression: &mut DemoProgression,
+    mode: EditorMode,
+) -> bool {
+    let base = ship
+        .modules
+        .iter()
+        .filter(|module| {
+            !matches!(
+                module.kind,
+                ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner
+            )
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    if base.is_empty() {
+        return false;
+    }
+
+    let occupied = base
+        .iter()
+        .map(|module| (module.grid_x, module.grid_y))
+        .collect::<std::collections::HashSet<_>>();
+    let mut changed = false;
+
+    for module in &base {
+        for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+            let target = (module.grid_x + dx, module.grid_y + dy);
+            if occupied.contains(&target) || ship.module_at(target.0, target.1).is_some() {
+                continue;
+            }
+
+            let (kind, rotation) = auto_hull_kind_for_cell(&occupied, target);
+            let variant = ModuleVariant::default_for_kind(kind);
+            if mode == EditorMode::Player && !progression.try_consume_ready_component(kind, variant)
+            {
+                continue;
+            }
+
+            let next_id = ship.next_module_id();
+            let mut hull = ShipModule::new(next_id, kind, target.0, target.1, rotation);
+            hull.variant = variant;
+            ship.replace_module(hull);
+            changed = true;
+        }
+    }
+
+    changed
+}
+
+fn auto_hull_kind_for_cell(
+    occupied: &std::collections::HashSet<(i32, i32)>,
+    target: (i32, i32),
+) -> (ModuleKind, u8) {
+    let north = occupied.contains(&(target.0, target.1 - 1));
+    let south = occupied.contains(&(target.0, target.1 + 1));
+    let west = occupied.contains(&(target.0 - 1, target.1));
+    let east = occupied.contains(&(target.0 + 1, target.1));
+    let northeast = occupied.contains(&(target.0 + 1, target.1 - 1));
+    let northwest = occupied.contains(&(target.0 - 1, target.1 - 1));
+    let southeast = occupied.contains(&(target.0 + 1, target.1 + 1));
+    let southwest = occupied.contains(&(target.0 - 1, target.1 + 1));
+
+    if (north || south) && (east || west) {
+        let rotation = if north && east {
+            0
+        } else if east && south {
+            1
+        } else if south && west {
+            2
+        } else {
+            3
+        };
+        return (ModuleKind::HullInnerCorner, rotation);
+    }
+
+    if northeast || northwest || southeast || southwest {
+        let rotation = if northeast {
+            0
+        } else if southeast {
+            1
+        } else if southwest {
+            2
+        } else {
+            3
+        };
+        return (ModuleKind::HullOuterCorner, rotation);
+    }
+
+    let rotation = if south {
+        0
+    } else if west {
+        1
+    } else if north {
+        2
+    } else {
+        3
+    };
+    (ModuleKind::Hull, rotation)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{apply_auto_hull_to_ship, paste_clipboard_group};
+    use crate::{
+        ship::{ModuleKind, ModuleVariant, ShipDefinition, ShipModule},
+        state::{DemoProgression, EditorMode, EditorSelectionState, ShipModuleSnapshot},
+    };
+
+    #[test]
+    fn auto_hull_adds_shell_tiles_around_structure() {
+        let mut ship = ShipDefinition::empty("Hull Test");
+        ship.replace_module(ShipModule::new(1, ModuleKind::Core, 0, 0, 0));
+        ship.replace_module(ShipModule::new(2, ModuleKind::Interior, 1, 0, 0));
+
+        let mut progression = DemoProgression::default();
+        let changed = apply_auto_hull_to_ship(&mut ship, &mut progression, EditorMode::Player);
+
+        assert!(changed);
+        assert!(ship.modules.iter().any(|module| {
+            matches!(
+                module.kind,
+                ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner
+            )
+        }));
+    }
+
+    #[test]
+    fn pasting_group_consumes_variant_inventory_in_player_mode() {
+        let mut ship = ShipDefinition::empty("Paste Test");
+        let mut progression = DemoProgression::default();
+        progression.add_ready_component(ModuleKind::Turret, ModuleVariant::BallisticTurret, 1);
+        let mut selection_state = EditorSelectionState {
+            clipboard: vec![ShipModuleSnapshot {
+                kind: ModuleKind::Turret,
+                variant: ModuleVariant::BallisticTurret,
+                grid_x: 0,
+                grid_y: 0,
+                rotation_quadrants: 0,
+                channel: 2,
+            }],
+            ..Default::default()
+        };
+
+        let pasted = paste_clipboard_group(
+            &mut ship,
+            &mut progression,
+            EditorMode::Player,
+            &mut selection_state,
+            (4, 5),
+        );
+
+        assert!(pasted);
+        assert_eq!(
+            progression.ready_count(ModuleKind::Turret, ModuleVariant::BallisticTurret),
+            0
+        );
+        assert!(ship.module_at(4, 5).is_some());
     }
 }
