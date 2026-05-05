@@ -12,6 +12,7 @@ use crate::{
     balance::BalanceConfig,
     gameplay::{
         components::{HostileShip, HostileShipModule, HostileTurretPlatform, ShipRoot},
+        effects::{EngineFlameMaterial, ReactorGlowMaterial},
         helpers::{FixedVec2, Fx},
     },
     netcode,
@@ -23,6 +24,9 @@ use crate::{
 pub(crate) fn spawn_runtime_scene(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut reactor_materials: ResMut<Assets<ReactorGlowMaterial>>,
+    mut engine_materials: ResMut<Assets<EngineFlameMaterial>>,
     editor_ship: Res<EditorShip>,
     progression: Res<DemoProgression>,
     enemy_library_state: Res<EnemyShipLibraryState>,
@@ -77,10 +81,8 @@ pub(crate) fn spawn_runtime_scene(
     spawn_test_arena(
         &mut commands,
         &balance,
-        &active_node.encounter.arena_variant,
+        &active_node.encounter,
         platform_hostile_count,
-        active_node.encounter.ambient_heat_pressure,
-        active_node.encounter.ambient_electrical_pressure,
     );
     spawn_salvage_wreck(&mut commands, active_node.encounter.salvage_value);
     let active_contract = progression
@@ -129,6 +131,9 @@ pub(crate) fn spawn_runtime_scene(
     spawn_runtime_ship(
         &mut commands,
         &asset_server,
+        &mut meshes,
+        &mut reactor_materials,
+        &mut engine_materials,
         &editor_ship.ship,
         &(0..session_status.total_players.max(1)).collect::<Vec<_>>(),
         local_handle.0,
@@ -207,6 +212,9 @@ pub(crate) fn spawn_runtime_scene(
         spawn_hostile_ship(
             &mut commands,
             &asset_server,
+            &mut meshes,
+            &mut reactor_materials,
+            &mut engine_materials,
             &entry.ship,
             &balance,
             spawn_position,
@@ -302,7 +310,7 @@ pub(crate) fn cleanup_runtime_entities(
     mut commands: Commands,
     mut player_handle_map: ResMut<netcode::PlayerHandleMap>,
     mut observed_local_player: ResMut<netcode::ObservedLocalPlayer>,
-    query: Query<Entity, With<super::super::super::state::PlayingCleanup>>,
+    query: Query<(Entity, Option<&ChildOf>), With<super::super::super::state::PlayingCleanup>>,
 ) {
     player_handle_map.entities.clear();
     observed_local_player.entity = None;
@@ -311,7 +319,10 @@ pub(crate) fn cleanup_runtime_entities(
         "Cleaning up runtime encounter scene and {} presentation/runtime entities",
         entity_count
     );
-    for entity in &query {
+    for (entity, parent) in &query {
+        if parent.is_some() {
+            continue;
+        }
         commands.entity(entity).despawn();
     }
 }

@@ -101,6 +101,8 @@ pub(crate) use frontend::{
 };
 pub(crate) use sector::{
     DemoProgression,
+    EncounterBackdrop,
+    EncounterSpec,
     LastMissionReport,
     SectorMapCanvas,
     SectorMapDetailText,

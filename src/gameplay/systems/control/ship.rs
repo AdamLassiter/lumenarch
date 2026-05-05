@@ -22,6 +22,7 @@ pub(crate) fn update_station_command_input(
         Option<&mut ManipulatorCommandState>,
         Option<&mut ProcessorCommandState>,
         Option<&mut AirlockCommandState>,
+        Option<&mut crate::gameplay::components::DroneStationCommandState>,
         Option<&mut RuntimeArchComputer>,
     )>,
     candidate_query: Query<&RuntimeShipModule>,
@@ -85,7 +86,7 @@ pub(crate) fn update_station_command_input(
                 if !claimed_entities.insert(focused_entity) {
                     continue;
                 }
-                let Ok((_, _, turret_state, _, _, _, _, _, _)) =
+                let Ok((_, _, turret_state, _, _, _, _, _, _, _)) =
                     module_query.get_mut(focused_entity)
                 else {
                     continue;
@@ -122,7 +123,7 @@ pub(crate) fn update_station_command_input(
                 if !claimed_entities.insert(focused_entity) {
                     continue;
                 }
-                let Ok((_, _, _, reactor_state, _, _, _, _, _)) =
+                let Ok((_, _, _, reactor_state, _, _, _, _, _, _)) =
                     module_query.get_mut(focused_entity)
                 else {
                     continue;
@@ -178,6 +179,7 @@ pub(crate) fn update_station_command_input(
                     manipulator_cmd,
                     processor_cmd,
                     airlock_state,
+                    drone_station_cmd,
                     _,
                 )) = module_query.get_mut(focused_entity)
                 else {
@@ -253,6 +255,26 @@ pub(crate) fn update_station_command_input(
                         manipulator_cmd.source_module_id = Some(runtime_module.module_id);
                     }
                 }
+                if let Some(mut drone_station_cmd) = drone_station_cmd {
+                    if command.raw.pressed(netcode::INPUT_AUX_EDGE)
+                        || command.station.op == netcode::StationControlOp::LogisticsToggleProcessor
+                    {
+                        drone_station_cmd.selected_task = match drone_station_cmd.selected_task {
+                            crate::gameplay::components::DroneTask::Idle => {
+                                crate::gameplay::components::DroneTask::Salvage
+                            }
+                            crate::gameplay::components::DroneTask::Salvage => {
+                                crate::gameplay::components::DroneTask::Logistics
+                            }
+                            crate::gameplay::components::DroneTask::Logistics => {
+                                crate::gameplay::components::DroneTask::Return
+                            }
+                            crate::gameplay::components::DroneTask::Return => {
+                                crate::gameplay::components::DroneTask::Idle
+                            }
+                        };
+                    }
+                }
                 if let Some(mut processor_cmd) = processor_cmd {
                     if command.raw.pressed(netcode::INPUT_SPACE_EDGE)
                         || command.station.op == netcode::StationControlOp::LogisticsToggleProcessor
@@ -281,7 +303,7 @@ pub(crate) fn update_station_command_input(
                 if !claimed_entities.insert(focused_entity) {
                     continue;
                 }
-                let Ok((_, _, _, _, _, _, _, _, arch_runtime)) =
+                let Ok((_, _, _, _, _, _, _, _, _, arch_runtime)) =
                     module_query.get_mut(focused_entity)
                 else {
                     continue;

@@ -1,4 +1,5 @@
 pub(crate) mod components;
+pub(crate) mod effects;
 mod helpers;
 mod spawn;
 mod systems;
@@ -37,15 +38,22 @@ pub(crate) use systems::{
     return_button_system,
     return_keyboard_shortcut,
     run_arch_automation,
+    run_drone_logistics,
     run_logistics_transfers,
     run_processors,
     run_shipboard_interaction_input,
     sample_player_atmosphere,
     sample_ship_fields,
     station_panel_button_system,
+    sync_backdrop_parallax,
     sync_crew_name_labels,
+    sync_drone_station_population,
+    sync_engine_flame_visuals,
+    sync_eva_thruster_visuals,
     sync_hostile_ship_state,
+    sync_module_work_effect_visuals,
     sync_player_reference_frame_parenting,
+    sync_reactor_glow_visuals,
     sync_runtime_ship_state,
     sync_shipboard_player_visual,
     tick_recent_action_feedback,

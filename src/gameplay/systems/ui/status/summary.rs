@@ -13,6 +13,7 @@ pub(crate) struct StationFlags {
     pub(crate) manipulator: bool,
     pub(crate) processor: bool,
     pub(crate) airlock: bool,
+    pub(crate) drone: bool,
     pub(crate) computer: bool,
     pub(crate) reactor: bool,
     pub(crate) turret: bool,

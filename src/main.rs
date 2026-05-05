@@ -170,6 +170,7 @@ fn add_core_plugins(app: &mut App, mode: AppRuntimeMode) {
                     ..default()
                 }),
         );
+        app.add_plugins(gameplay::effects::GameplayEffectsPlugin);
     } else {
         app.add_plugins(MinimalPlugins)
             .add_plugins(bevy::asset::AssetPlugin::default())
@@ -177,7 +178,10 @@ fn add_core_plugins(app: &mut App, mode: AppRuntimeMode) {
             .add_plugins(bevy::state::app::StatesPlugin)
             .add_plugins(bevy::transform::TransformPlugin);
         app.init_asset::<bevy::image::Image>()
-            .init_asset::<bevy::text::Font>();
+            .init_asset::<bevy::text::Font>()
+            .init_asset::<Mesh>()
+            .init_asset::<gameplay::effects::EngineFlameMaterial>()
+            .init_asset::<gameplay::effects::ReactorGlowMaterial>();
     }
 
     app.add_plugins(GgrsPlugin::<LumenGgrsConfig>::default());
@@ -213,6 +217,7 @@ fn register_rollback_state(app: &mut App) {
         .rollback_component_with_clone::<gameplay::components::AirlockCommandState>()
         .rollback_component_with_clone::<gameplay::components::ManipulatorCommandState>()
         .rollback_component_with_clone::<gameplay::components::ProcessorCommandState>()
+        .rollback_component_with_clone::<gameplay::components::DroneStationCommandState>()
         .rollback_component_with_clone::<gameplay::components::ModuleRuntimeState>()
         .rollback_component_with_clone::<gameplay::components::ModuleFieldEmitter>()
         .rollback_component_with_clone::<gameplay::components::ShipMovementModel>()
@@ -230,6 +235,8 @@ fn register_rollback_state(app: &mut App) {
         .rollback_component_with_clone::<gameplay::components::StorageModule>()
         .rollback_component_with_clone::<gameplay::components::ManipulatorModule>()
         .rollback_component_with_clone::<gameplay::components::ProcessorModule>()
+        .rollback_component_with_clone::<gameplay::components::DroneStationModule>()
+        .rollback_component_with_clone::<gameplay::components::DroneUnit>()
         .rollback_component_with_clone::<gameplay::components::LooseCargo>()
         .rollback_component_with_clone::<gameplay::components::Projectile>()
         .rollback_component_with_clone::<gameplay::components::HostileWeaponState>()
@@ -239,6 +246,7 @@ fn register_rollback_state(app: &mut App) {
         .update_component_with_map_entities::<gameplay::components::ShipboardControlState>()
         .update_component_with_map_entities::<gameplay::components::NearbyInteraction>()
         .update_component_with_map_entities::<gameplay::components::HeldInteraction>()
+        .update_component_with_map_entities::<gameplay::components::DroneUnit>()
         .init_state::<FrontendMode>();
 }
 
@@ -293,6 +301,8 @@ fn add_rollback_systems(app: &mut App) {
                 gameplay::update_module_runtime_state,
                 gameplay::run_arch_automation,
                 gameplay::run_logistics_transfers,
+                gameplay::sync_drone_station_population,
+                gameplay::run_drone_logistics,
                 gameplay::run_processors,
                 gameplay::update_mission_telemetry,
                 gameplay::tick_recent_action_feedback,
@@ -576,12 +586,17 @@ fn add_encounter_presentation_systems(app: &mut App) {
                 .run_if(netcode::session_presents_encounter),
             (
                 gameplay::update_destroyed_module_visuals,
+                gameplay::sync_reactor_glow_visuals,
+                gameplay::sync_engine_flame_visuals,
+                gameplay::sync_module_work_effect_visuals,
+                gameplay::sync_eva_thruster_visuals,
                 gameplay::sync_shipboard_player_visual,
                 gameplay::sync_crew_name_labels,
                 gameplay::integrate_player_ship_motion,
                 gameplay::integrate_hostile_ship_motion,
                 gameplay::handle_ship_collisions,
                 gameplay::camera_follow_player_ship,
+                gameplay::sync_backdrop_parallax,
                 gameplay::draw_debug_overlay,
             )
                 .chain()

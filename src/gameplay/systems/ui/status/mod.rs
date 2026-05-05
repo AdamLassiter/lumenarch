@@ -12,6 +12,8 @@ use crate::{
             CarriedResource,
             CurrentStation,
             DestroyedModule,
+            DroneStationCommandState,
+            DroneStationModule,
             EquippedSuit,
             HeldInteraction,
             HostileShip,

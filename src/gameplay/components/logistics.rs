@@ -1,10 +1,17 @@
-use bevy::prelude::*;
+use bevy::{
+    ecs::entity::{EntityMapper, MapEntities},
+    prelude::*,
+};
 use serde::{Deserialize, Serialize};
 
-use super::{super::helpers::Fx, CarriedItemKind};
+use super::{
+    super::helpers::{FixedVec2, Fx},
+    CarriedItemKind,
+    DroneTask,
+};
 use crate::ship::{ModuleKind, ModuleVariant};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum ResourceKind {
     RawSalvage,
     RepairCharge,
@@ -135,4 +142,62 @@ pub(crate) struct ProcessorModule {
 pub(crate) struct LooseCargo {
     pub(crate) kind: CarriedItemKind,
     pub(crate) amount: u32,
+}
+
+#[derive(Component, Clone)]
+pub(crate) struct DroneStationModule {
+    pub(crate) max_drones: u32,
+    pub(crate) operational_range: Fx,
+    pub(crate) active_drones: u32,
+    pub(crate) active_tasks: u32,
+    pub(crate) queued_tasks: u32,
+    pub(crate) idle_drones: u32,
+    pub(crate) power_draw: Fx,
+    pub(crate) last_status: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DronePhase {
+    Idle,
+    Assigned,
+    TravelingToSource,
+    PickingUp,
+    TravelingToDestination,
+    Delivering,
+    Returning,
+}
+
+impl DronePhase {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Idle => "Idle",
+            Self::Assigned => "Assigned",
+            Self::TravelingToSource => "Traveling to Source",
+            Self::PickingUp => "Picking Up",
+            Self::TravelingToDestination => "Traveling to Destination",
+            Self::Delivering => "Delivering",
+            Self::Returning => "Returning",
+        }
+    }
+}
+
+#[derive(Component, Clone)]
+pub(crate) struct DroneUnit {
+    pub(crate) station_entity: Entity,
+    pub(crate) station_module_id: u64,
+    pub(crate) home_local_position: FixedVec2,
+    pub(crate) local_position: FixedVec2,
+    pub(crate) phase: DronePhase,
+    pub(crate) mode: DroneTask,
+    pub(crate) source_module_id: Option<u64>,
+    pub(crate) target_module_id: Option<u64>,
+    pub(crate) resource_kind: Option<ResourceKind>,
+    pub(crate) payload_amount: u32,
+    pub(crate) reserved_amount: u32,
+}
+
+impl MapEntities for DroneUnit {
+    fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
+        self.station_entity = entity_mapper.get_mapped(self.station_entity);
+    }
 }

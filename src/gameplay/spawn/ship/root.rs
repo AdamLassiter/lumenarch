@@ -21,6 +21,7 @@ use crate::{
             CurrentStation,
             EncounterCommsScript,
             EquippedSuit,
+            EvaThrusterOverlay,
             HeldInteraction,
             HostileShip,
             HostileShipAi,
@@ -59,6 +60,7 @@ use crate::{
             SimRotation,
             StationFocusMode,
         },
+        effects::{EngineFlameMaterial, ReactorGlowMaterial},
         helpers::{
             FixedVec2,
             Fx,
@@ -148,6 +150,9 @@ fn accumulate_ship_variant_totals(ship: &ShipDefinition) -> ShipVariantTotals {
 pub(crate) fn spawn_runtime_ship(
     commands: &mut Commands,
     asset_server: &AssetServer,
+    meshes: &mut Assets<Mesh>,
+    reactor_materials: &mut Assets<ReactorGlowMaterial>,
+    engine_materials: &mut Assets<EngineFlameMaterial>,
     ship: &ShipDefinition,
     player_handles: &[PlayerHandle],
     local_handle: Option<PlayerHandle>,
@@ -343,6 +348,9 @@ pub(crate) fn spawn_runtime_ship(
             spawn_runtime_module(
                 commands,
                 asset_server,
+                meshes,
+                reactor_materials,
+                engine_materials,
                 module,
                 balance,
                 center_x,
@@ -444,6 +452,19 @@ pub(crate) fn spawn_runtime_ship(
                 entity_commands.insert(ObservedLocalPlayerMarker);
             }
             let entity = entity_commands.id();
+            commands.entity(entity).with_children(|parent| {
+                for side in [-1, 1] {
+                    parent.spawn((
+                        Sprite::from_color(
+                            Color::srgba(0.56, 0.86, 1.0, 0.0),
+                            Vec2::new(4.0, 10.0),
+                        ),
+                        Transform::from_xyz(side as f32 * 4.0, -7.0, 0.08),
+                        Visibility::Hidden,
+                        EvaThrusterOverlay { side },
+                    ));
+                }
+            });
             let name_width = (player_profile.name.chars().count() as f32 * 6.5).clamp(28.0, 120.0);
             commands.spawn((
                 Sprite::from_color(
@@ -540,6 +561,9 @@ pub(crate) fn spawn_runtime_ship(
 pub(crate) fn spawn_hostile_ship(
     commands: &mut Commands,
     asset_server: &AssetServer,
+    meshes: &mut Assets<Mesh>,
+    reactor_materials: &mut Assets<ReactorGlowMaterial>,
+    engine_materials: &mut Assets<EngineFlameMaterial>,
     ship: &ShipDefinition,
     balance: &BalanceConfig,
     spawn_position: FixedVec2,
@@ -677,6 +701,9 @@ pub(crate) fn spawn_hostile_ship(
             spawn_runtime_module(
                 commands,
                 asset_server,
+                meshes,
+                reactor_materials,
+                engine_materials,
                 module,
                 balance,
                 center_x,

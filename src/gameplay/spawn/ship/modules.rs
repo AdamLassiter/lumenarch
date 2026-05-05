@@ -3,12 +3,17 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::prelude::*;
 
 use crate::{
+    TILE_SIZE,
     balance::BalanceConfig,
     gameplay::{
         components::{
             AirlockCommandState,
             ArchComputerModule,
             ArchExecutionResult,
+            DroneStationCommandState,
+            DroneStationModule,
+            DroneTask,
+            EngineFlameOverlay,
             EngineModule,
             HostileShipModule,
             Integrity,
@@ -17,12 +22,16 @@ use crate::{
             ManipulatorModule,
             ModuleFieldEmitter,
             ModuleRuntimeState,
+            ModuleWorkEffect,
+            ModuleWorkProgressFill,
+            ModuleWorkProgressRoot,
             PowerConsumer,
             PowerProducer,
             ProcessorCommandState,
             ProcessorModule,
             ProcessorRecipe,
             ReactorCommandState,
+            ReactorGlowOverlay,
             ResourceInventory,
             RuntimeArchComputer,
             RuntimeShipModule,
@@ -32,6 +41,7 @@ use crate::{
             TurretTopSprite,
             WeaponModule,
         },
+        effects::{EngineFlameMaterial, ReactorGlowMaterial},
         helpers::{
             Fx,
             module_integrity,
@@ -53,6 +63,9 @@ use crate::{
 pub(crate) fn spawn_runtime_module(
     commands: &mut Commands,
     asset_server: &AssetServer,
+    meshes: &mut Assets<Mesh>,
+    reactor_materials: &mut Assets<ReactorGlowMaterial>,
+    engine_materials: &mut Assets<EngineFlameMaterial>,
     module: &ShipModule,
     balance: &BalanceConfig,
     center_x: f32,
@@ -122,6 +135,16 @@ pub(crate) fn spawn_runtime_module(
                     fuel_remaining: Fx::from_num(balance.reactor.starting_fuel * 0.35),
                 },
             ));
+            entity.with_children(|parent| {
+                parent.spawn((
+                    Mesh2d(meshes.add(Rectangle::new(38.0, 38.0))),
+                    MeshMaterial2d(reactor_materials.add(ReactorGlowMaterial::default())),
+                    Transform::from_xyz(0.0, 0.0, 0.16),
+                    Visibility::Hidden,
+                    ReactorGlowOverlay,
+                ));
+                spawn_work_effect_children(parent);
+            });
         }
         ModuleKind::Battery => {
             entity.insert(PowerProducer { output: 4 });
@@ -152,7 +175,7 @@ pub(crate) fn spawn_runtime_module(
             ));
         }
         ModuleKind::Airlock => {
-            entity.insert((
+            let mut bundle = (
                 AirlockCommandState {
                     open: module.defaults.airlock_open,
                 },
@@ -196,7 +219,30 @@ pub(crate) fn spawn_runtime_module(
                         }
                     },
                 },
-            ));
+            );
+            entity.insert(bundle);
+            if module.variant == ModuleVariant::DroneBay {
+                entity.insert((
+                    DroneStationCommandState {
+                        selected_task: DroneTask::Logistics,
+                    },
+                    DroneStationModule {
+                        max_drones: 2,
+                        operational_range: Fx::from_num(
+                            TILE_SIZE * balance.logistics.manipulator_range_tiles * 3.6,
+                        ),
+                        active_drones: 0,
+                        active_tasks: 0,
+                        queued_tasks: 0,
+                        idle_drones: 2,
+                        power_draw: Fx::from_num(0),
+                        last_status: "Ready".to_string(),
+                    },
+                ));
+            }
+            entity.with_children(|parent| {
+                spawn_work_effect_children(parent);
+            });
         }
         ModuleKind::Engine => {
             entity.insert((
@@ -205,6 +251,16 @@ pub(crate) fn spawn_runtime_module(
                     thrust_multiplier: Fx::from_num(spec.engine_multiplier.max(1.0)),
                 },
             ));
+            entity.with_children(|parent| {
+                parent.spawn((
+                    Mesh2d(meshes.add(Rectangle::new(20.0, 34.0))),
+                    MeshMaterial2d(engine_materials.add(EngineFlameMaterial::default())),
+                    Transform::from_xyz(0.0, 40.0, -0.14),
+                    Visibility::Hidden,
+                    EngineFlameOverlay,
+                ));
+                spawn_work_effect_children(parent);
+            });
         }
         ModuleKind::Computer => {
             entity.insert((
@@ -250,6 +306,9 @@ pub(crate) fn spawn_runtime_module(
                     enabled: module.defaults.processor_enabled,
                 },
             ));
+            entity.with_children(|parent| {
+                spawn_work_effect_children(parent);
+            });
         }
         ModuleKind::Turret => {
             entity
@@ -298,10 +357,35 @@ pub(crate) fn spawn_runtime_module(
                 },
             ));
         }
-        _ => {}
+        _ => {
+            entity.with_children(|parent| {
+                spawn_work_effect_children(parent);
+            });
+        }
     }
 
     entity.id()
+}
+
+fn spawn_work_effect_children(parent: &mut ChildSpawnerCommands<'_>) {
+    parent.spawn((
+        Sprite::from_color(Color::srgba(1.0, 0.72, 0.28, 0.0), Vec2::new(18.0, 18.0)),
+        Transform::from_xyz(0.0, 0.0, 0.18),
+        Visibility::Hidden,
+        ModuleWorkEffect,
+    ));
+    parent.spawn((
+        Sprite::from_color(Color::srgba(0.08, 0.10, 0.14, 0.80), Vec2::new(22.0, 4.0)),
+        Transform::from_xyz(0.0, 21.0, 0.2),
+        Visibility::Hidden,
+        ModuleWorkProgressRoot,
+    ));
+    parent.spawn((
+        Sprite::from_color(Color::srgb(0.36, 0.92, 0.72), Vec2::new(20.0, 2.0)),
+        Transform::from_xyz(-10.0, 21.0, 0.21),
+        Visibility::Hidden,
+        ModuleWorkProgressFill,
+    ));
 }
 
 fn module_field_emitter(kind: ModuleKind, balance: &BalanceConfig) -> ModuleFieldEmitter {

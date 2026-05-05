@@ -25,11 +25,25 @@ pub(crate) use fields::{
     sample_ship_fields,
     update_module_runtime_state,
 };
-pub(crate) use logistics::{collect_salvage, run_logistics_transfers, run_processors};
+pub(crate) use logistics::{
+    collect_salvage,
+    run_drone_logistics,
+    run_logistics_transfers,
+    run_processors,
+    sync_drone_station_population,
+};
 pub(crate) use mission::{
     return_after_mission_resolution,
     sync_runtime_ship_state,
     update_mission_state,
     update_mission_telemetry,
 };
-pub(crate) use visuals::{draw_debug_overlay, update_destroyed_module_visuals};
+pub(crate) use visuals::{
+    draw_debug_overlay,
+    sync_backdrop_parallax,
+    sync_engine_flame_visuals,
+    sync_eva_thruster_visuals,
+    sync_module_work_effect_visuals,
+    sync_reactor_glow_visuals,
+    update_destroyed_module_visuals,
+};

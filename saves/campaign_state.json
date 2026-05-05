@@ -2,8 +2,21 @@
   "progression": {
     "scrap": 31,
     "hull_wear": 0,
-    "jump_count": 171,
-    "stored_components": [],
+    "jump_count": 208,
+    "stored_components": [
+      {
+        "kind": "Hull",
+        "variant": "Standard",
+        "ready": 0,
+        "damaged": 0
+      },
+      {
+        "kind": "HullOuterCorner",
+        "variant": "Standard",
+        "ready": 0,
+        "damaged": 0
+      }
+    ],
     "known_station_ids": [],
     "unlocked_contact_ids": [],
     "unlocked_lore_ids": [],
@@ -41,7 +54,24 @@
           "ambient_heat_pressure": 0,
           "ambient_electrical_pressure": 0,
           "reward_multiplier": 1,
-          "arena_variant": "station"
+          "arena_variant": "station",
+          "backdrop": {
+            "seed": 0,
+            "star_density": 96,
+            "dust_density": 40,
+            "parallax_strength": 0.35,
+            "haze_tint": [
+              0.16,
+              0.22,
+              0.3
+            ],
+            "galaxy_tint": [
+              0.72,
+              0.84,
+              1.0
+            ],
+            "galaxy_arc_strength": 0.55
+          }
         }
       },
       {
@@ -69,7 +99,24 @@
           "ambient_heat_pressure": 0,
           "ambient_electrical_pressure": 0,
           "reward_multiplier": 2,
-          "arena_variant": "salvage"
+          "arena_variant": "salvage",
+          "backdrop": {
+            "seed": 0,
+            "star_density": 96,
+            "dust_density": 40,
+            "parallax_strength": 0.35,
+            "haze_tint": [
+              0.16,
+              0.22,
+              0.3
+            ],
+            "galaxy_tint": [
+              0.72,
+              0.84,
+              1.0
+            ],
+            "galaxy_arc_strength": 0.55
+          }
         }
       },
       {
@@ -94,7 +141,24 @@
           "ambient_heat_pressure": 0,
           "ambient_electrical_pressure": 0,
           "reward_multiplier": 1,
-          "arena_variant": "test"
+          "arena_variant": "test",
+          "backdrop": {
+            "seed": 0,
+            "star_density": 96,
+            "dust_density": 40,
+            "parallax_strength": 0.35,
+            "haze_tint": [
+              0.16,
+              0.22,
+              0.3
+            ],
+            "galaxy_tint": [
+              0.72,
+              0.84,
+              1.0
+            ],
+            "galaxy_arc_strength": 0.55
+          }
         }
       },
       {
@@ -123,7 +187,24 @@
           "ambient_heat_pressure": 1,
           "ambient_electrical_pressure": 0,
           "reward_multiplier": 3,
-          "arena_variant": "hostile"
+          "arena_variant": "hostile",
+          "backdrop": {
+            "seed": 0,
+            "star_density": 96,
+            "dust_density": 40,
+            "parallax_strength": 0.35,
+            "haze_tint": [
+              0.16,
+              0.22,
+              0.3
+            ],
+            "galaxy_tint": [
+              0.72,
+              0.84,
+              1.0
+            ],
+            "galaxy_arc_strength": 0.55
+          }
         }
       },
       {
@@ -152,7 +233,24 @@
           "ambient_heat_pressure": 1,
           "ambient_electrical_pressure": 2,
           "reward_multiplier": 3,
-          "arena_variant": "unstable"
+          "arena_variant": "unstable",
+          "backdrop": {
+            "seed": 0,
+            "star_density": 96,
+            "dust_density": 40,
+            "parallax_strength": 0.35,
+            "haze_tint": [
+              0.16,
+              0.22,
+              0.3
+            ],
+            "galaxy_tint": [
+              0.72,
+              0.84,
+              1.0
+            ],
+            "galaxy_arc_strength": 0.55
+          }
         }
       },
       {
@@ -181,7 +279,24 @@
           "ambient_heat_pressure": 1,
           "ambient_electrical_pressure": 1,
           "reward_multiplier": 4,
-          "arena_variant": "cache"
+          "arena_variant": "cache",
+          "backdrop": {
+            "seed": 0,
+            "star_density": 96,
+            "dust_density": 40,
+            "parallax_strength": 0.35,
+            "haze_tint": [
+              0.16,
+              0.22,
+              0.3
+            ],
+            "galaxy_tint": [
+              0.72,
+              0.84,
+              1.0
+            ],
+            "galaxy_arc_strength": 0.55
+          }
         }
       },
       {
@@ -210,7 +325,24 @@
           "ambient_heat_pressure": 2,
           "ambient_electrical_pressure": 3,
           "reward_multiplier": 5,
-          "arena_variant": "storm"
+          "arena_variant": "storm",
+          "backdrop": {
+            "seed": 0,
+            "star_density": 96,
+            "dust_density": 40,
+            "parallax_strength": 0.35,
+            "haze_tint": [
+              0.16,
+              0.22,
+              0.3
+            ],
+            "galaxy_tint": [
+              0.72,
+              0.84,
+              1.0
+            ],
+            "galaxy_arc_strength": 0.55
+          }
         }
       }
     ]

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use bevy::prelude::*;
 
 use crate::{
@@ -7,6 +9,8 @@ use crate::{
         components::{
             CollectedSalvage,
             DestroyedModule,
+            DroneStationCommandState,
+            DroneStationModule,
             ManipulatorCommandState,
             ManipulatorModule,
             MissionState,
@@ -22,7 +26,6 @@ use crate::{
             ShipArchCommandState,
             ShipPowerState,
             ShipRoot,
-            SimPosition,
             StorageModule,
         },
         helpers::{FixedVec2, Fx, fx_from_time_delta, local_field_distance, resource_kind_label},
@@ -30,12 +33,44 @@ use crate::{
     ship::ModuleKind,
 };
 
+mod drones;
+mod transfers;
+
+pub(crate) use drones::{run_drone_logistics, sync_drone_station_population};
+
+#[derive(Clone, Copy)]
+struct StorageSnapshot {
+    capacity: u32,
+    inventory: crate::gameplay::components::ResourceInventory,
+    accepts_fuel: bool,
+    accepts_ammunition: bool,
+    accepts_general: bool,
+}
+
+#[derive(Clone, Copy)]
+struct ProcessorSnapshot {
+    input_required: u32,
+    output_amount: u32,
+    inventory: crate::gameplay::components::ResourceInventory,
+}
+
+#[derive(Clone, Copy)]
+struct LogisticsEndpointSnapshot {
+    entity: Entity,
+    module_id: u64,
+    kind: ModuleKind,
+    local_position: FixedVec2,
+    storage: Option<StorageSnapshot>,
+    processor: Option<ProcessorSnapshot>,
+    destroyed: bool,
+}
+
 pub(crate) fn collect_salvage(
     _commands: Commands,
     _balance: Res<BalanceConfig>,
     _keys: Res<ButtonInput<KeyCode>>,
     _player_ship_query: Single<
-        (&SimPosition, &mut MissionState),
+        (&crate::gameplay::components::SimPosition, &mut MissionState),
         (With<PlayerShip>, With<ShipRoot>),
     >,
     _storage_query: Query<(
@@ -44,7 +79,11 @@ pub(crate) fn collect_salvage(
         Option<&DestroyedModule>,
     )>,
     _salvage_query: Query<
-        (Entity, &SimPosition, &SalvagePickup),
+        (
+            Entity,
+            &crate::gameplay::components::SimPosition,
+            &SalvagePickup,
+        ),
         (With<SalvageWreck>, Without<CollectedSalvage>),
     >,
 ) {
@@ -143,7 +182,7 @@ pub(crate) fn run_logistics_transfers(
                 command_state.resource_kind,
             ));
         } else if logistics_mode {
-            task = find_automation_transfer_task(
+            task = transfers::find_automation_transfer_task(
                 &snapshots,
                 &in_range,
                 arch_commands.logistics_preference,
@@ -151,7 +190,7 @@ pub(crate) fn run_logistics_transfers(
         }
 
         if task.is_none() {
-            task = find_airlock_to_cargo_transfer(&snapshots, &in_range);
+            task = transfers::find_airlock_to_cargo_transfer(&snapshots, &in_range);
         }
 
         let Some((source_module_id, target_module_id, resource_kind)) = task else {
@@ -346,195 +385,169 @@ pub(crate) fn run_processors(
     }
 }
 
-fn find_automation_transfer_task(
-    snapshots: &[(
+fn collect_endpoint_snapshots(
+    logistics_query: &Query<(
         Entity,
-        u64,
-        ModuleKind,
-        FixedVec2,
-        Option<(
-            u32,
-            crate::gameplay::components::ResourceInventory,
-            bool,
-            bool,
-            bool,
-        )>,
-        Option<(u32, u32, crate::gameplay::components::ResourceInventory)>,
-        bool,
-    )],
-    in_range: &impl Fn(FixedVec2) -> bool,
-    preference: crate::gameplay::components::ArchLogisticsPreference,
-) -> Option<(u64, u64, ResourceKind)> {
-    for (_, source_id, _, source_pos, storage, _, source_destroyed) in snapshots {
-        if *source_destroyed || !in_range(*source_pos) {
-            continue;
-        }
-        let Some((_, source_inventory, _, _, _)) = storage else {
-            continue;
-        };
-        if source_inventory.raw_salvage == 0 {
-            continue;
-        }
-        for (_, target_id, target_kind, target_pos, _, processor, target_destroyed) in snapshots {
-            if *target_destroyed || !in_range(*target_pos) || source_id == target_id {
-                continue;
-            }
-            let Some((input_required, _, processor_inventory)) = processor else {
-                continue;
-            };
-            if *target_kind != ModuleKind::Processor
-                || processor_inventory.raw_salvage >= input_required * 2
-            {
-                continue;
-            }
-            return Some((*source_id, *target_id, ResourceKind::RawSalvage));
-        }
-    }
-
-    if matches!(
-        preference,
-        crate::gameplay::components::ArchLogisticsPreference::FeedProcessor
-    ) {
-        return None;
-    }
-
-    for (_, source_id, source_kind, source_pos, _, processor, source_destroyed) in snapshots {
-        if *source_destroyed || !in_range(*source_pos) {
-            continue;
-        }
-        let Some((_, _, processor_inventory)) = processor else {
-            continue;
-        };
-        if *source_kind != ModuleKind::Processor || processor_inventory.repair_charge == 0 {
-            continue;
-        }
-        for (_, target_id, target_kind, target_pos, storage, _, target_destroyed) in snapshots {
-            if *target_destroyed || !in_range(*target_pos) || source_id == target_id {
-                continue;
-            }
-            let Some((capacity, storage_inventory, _, _, accepts_general)) = storage else {
-                continue;
-            };
-            if *target_kind != ModuleKind::Cargo
-                || !accepts_general
-                || storage_inventory.total_units() >= *capacity
-            {
-                continue;
-            }
-            return Some((*source_id, *target_id, ResourceKind::RepairCharge));
-        }
-    }
-
-    for (_, source_id, source_kind, source_pos, _, processor, source_destroyed) in snapshots {
-        if *source_destroyed || !in_range(*source_pos) {
-            continue;
-        }
-        let Some((_, _, processor_inventory)) = processor else {
-            continue;
-        };
-        let outputs = [
-            (ResourceKind::Fuel, processor_inventory.fuel),
-            (ResourceKind::Ammunition, processor_inventory.ammunition),
-        ];
-        for (resource_kind, amount) in outputs {
-            if amount == 0 {
-                continue;
-            }
-            for (_, target_id, target_kind, target_pos, storage, _, target_destroyed) in snapshots {
-                if *target_destroyed || !in_range(*target_pos) || source_id == target_id {
-                    continue;
-                }
-                let Some((capacity, storage_inventory, accepts_fuel, accepts_ammunition, _)) =
-                    storage
-                else {
-                    continue;
-                };
-                let accepts = match resource_kind {
-                    ResourceKind::Fuel => *accepts_fuel,
-                    ResourceKind::Ammunition => *accepts_ammunition,
-                    _ => false,
-                };
-                if !accepts
-                    || *target_kind != ModuleKind::Cargo
-                    || storage_inventory.total_units() >= *capacity
-                {
-                    continue;
-                }
-                return Some((*source_id, *target_id, resource_kind));
-            }
-        }
-        let _ = source_kind;
-    }
-
-    None
+        &RuntimeShipModule,
+        Option<&StorageModule>,
+        Option<&ProcessorModule>,
+        Option<&DestroyedModule>,
+    )>,
+) -> Vec<LogisticsEndpointSnapshot> {
+    let mut endpoints: Vec<_> = logistics_query
+        .iter()
+        .map(
+            |(entity, runtime_module, storage, processor, destroyed)| LogisticsEndpointSnapshot {
+                entity,
+                module_id: runtime_module.module_id,
+                kind: runtime_module.kind,
+                local_position: runtime_module.local_position,
+                storage: storage.map(|storage| StorageSnapshot {
+                    capacity: storage.capacity,
+                    inventory: storage.inventory,
+                    accepts_fuel: storage.accepts_fuel,
+                    accepts_ammunition: storage.accepts_ammunition,
+                    accepts_general: storage.accepts_general,
+                }),
+                processor: processor.map(|processor| ProcessorSnapshot {
+                    input_required: processor.input_required,
+                    output_amount: processor.output_amount,
+                    inventory: processor.inventory,
+                }),
+                destroyed: destroyed.is_some(),
+            },
+        )
+        .collect();
+    endpoints.sort_by_key(|endpoint| endpoint.module_id);
+    endpoints
 }
 
-fn find_airlock_to_cargo_transfer(
-    snapshots: &[(
-        Entity,
-        u64,
-        ModuleKind,
-        FixedVec2,
-        Option<(
-            u32,
-            crate::gameplay::components::ResourceInventory,
-            bool,
-            bool,
-            bool,
-        )>,
-        Option<(u32, u32, crate::gameplay::components::ResourceInventory)>,
-        bool,
-    )],
-    in_range: &impl Fn(FixedVec2) -> bool,
-) -> Option<(u64, u64, ResourceKind)> {
-    for (_, source_id, source_kind, source_pos, storage, _, source_destroyed) in snapshots {
-        if *source_destroyed || !in_range(*source_pos) {
-            continue;
-        }
-        let Some((_, source_inventory, _, _, _)) = storage else {
-            continue;
-        };
-        if *source_kind != ModuleKind::Airlock {
-            continue;
-        }
-        for (resource_kind, amount) in [
-            (ResourceKind::RawSalvage, source_inventory.raw_salvage),
-            (ResourceKind::RepairCharge, source_inventory.repair_charge),
-            (ResourceKind::Fuel, source_inventory.fuel),
-            (ResourceKind::Ammunition, source_inventory.ammunition),
-        ] {
-            if amount == 0 {
-                continue;
-            }
-            for (_, target_id, target_kind, target_pos, storage, _, target_destroyed) in snapshots {
-                if *target_destroyed || !in_range(*target_pos) || source_id == target_id {
-                    continue;
-                }
-                let Some((
-                    capacity,
-                    storage_inventory,
-                    accepts_fuel,
-                    accepts_ammunition,
-                    accepts_general,
-                )) = storage
-                else {
-                    continue;
-                };
-                let accepts = match resource_kind {
-                    ResourceKind::Fuel => *accepts_fuel,
-                    ResourceKind::Ammunition => *accepts_ammunition,
-                    ResourceKind::RawSalvage | ResourceKind::RepairCharge => *accepts_general,
-                };
-                if *target_kind != ModuleKind::Cargo
-                    || !accepts
-                    || storage_inventory.total_units() >= *capacity
-                {
-                    continue;
-                }
-                return Some((*source_id, *target_id, resource_kind));
-            }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gameplay::components::{DroneTask, ResourceInventory};
+
+    fn endpoint(
+        module_id: u64,
+        kind: ModuleKind,
+        x: f32,
+        storage: Option<StorageSnapshot>,
+        processor: Option<ProcessorSnapshot>,
+    ) -> LogisticsEndpointSnapshot {
+        LogisticsEndpointSnapshot {
+            entity: Entity::PLACEHOLDER,
+            module_id,
+            kind,
+            local_position: FixedVec2::from_num(x, 0.0),
+            storage,
+            processor,
+            destroyed: false,
         }
     }
 
-    None
+    #[test]
+    fn drone_planner_respects_existing_reservations() {
+        let endpoints = vec![
+            endpoint(
+                1,
+                ModuleKind::Airlock,
+                0.0,
+                Some(StorageSnapshot {
+                    capacity: 6,
+                    inventory: ResourceInventory {
+                        raw_salvage: 1,
+                        ..Default::default()
+                    },
+                    accepts_fuel: false,
+                    accepts_ammunition: false,
+                    accepts_general: true,
+                }),
+                None,
+            ),
+            endpoint(
+                2,
+                ModuleKind::Cargo,
+                64.0,
+                Some(StorageSnapshot {
+                    capacity: 6,
+                    inventory: ResourceInventory::default(),
+                    accepts_fuel: false,
+                    accepts_ammunition: false,
+                    accepts_general: true,
+                }),
+                None,
+            ),
+        ];
+
+        let mut reservations = BTreeMap::new();
+        reservations.insert((1, ResourceKind::RawSalvage), 1);
+        let plan = drones::plan_drone_transfer(
+            &endpoints,
+            FixedVec2::from_num(0.0, 0.0),
+            Fx::from_num(128.0),
+            DroneTask::Salvage,
+            &reservations,
+            &BTreeMap::new(),
+        );
+        assert!(plan.is_none());
+    }
+
+    #[test]
+    fn drone_planner_prefers_airlock_then_processor_chain_deterministically() {
+        let endpoints = vec![
+            endpoint(
+                1,
+                ModuleKind::Airlock,
+                0.0,
+                Some(StorageSnapshot {
+                    capacity: 6,
+                    inventory: ResourceInventory {
+                        raw_salvage: 2,
+                        ..Default::default()
+                    },
+                    accepts_fuel: false,
+                    accepts_ammunition: false,
+                    accepts_general: true,
+                }),
+                None,
+            ),
+            endpoint(
+                2,
+                ModuleKind::Cargo,
+                64.0,
+                Some(StorageSnapshot {
+                    capacity: 6,
+                    inventory: ResourceInventory::default(),
+                    accepts_fuel: false,
+                    accepts_ammunition: false,
+                    accepts_general: true,
+                }),
+                None,
+            ),
+            endpoint(
+                3,
+                ModuleKind::Processor,
+                96.0,
+                None,
+                Some(ProcessorSnapshot {
+                    input_required: 2,
+                    output_amount: 1,
+                    inventory: ResourceInventory::default(),
+                }),
+            ),
+        ];
+
+        let plan = drones::plan_drone_transfer(
+            &endpoints,
+            FixedVec2::from_num(0.0, 0.0),
+            Fx::from_num(160.0),
+            DroneTask::Logistics,
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert_eq!(plan.source_module_id, 1);
+        assert_eq!(plan.target_module_id, 2);
+        assert_eq!(plan.resource_kind, ResourceKind::RawSalvage);
+    }
 }

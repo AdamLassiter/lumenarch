@@ -1586,6 +1586,7 @@ struct EditorStationFlags {
     manipulator: bool,
     processor: bool,
     airlock: bool,
+    drone: bool,
 }
 
 fn editor_station_flags(kind: crate::ship::ModuleKind) -> EditorStationFlags {
@@ -1597,6 +1598,7 @@ fn editor_station_flags(kind: crate::ship::ModuleKind) -> EditorStationFlags {
         manipulator: kind == crate::ship::ModuleKind::Airlock,
         processor: kind == crate::ship::ModuleKind::Processor,
         airlock: kind == crate::ship::ModuleKind::Airlock,
+        drone: kind == crate::ship::ModuleKind::Airlock,
     }
 }
 
@@ -1629,7 +1631,7 @@ fn editor_station_action_visible(
             | StationPanelButtonAction::LogisticsCycleManipulatorTarget { .. }
             | StationPanelButtonAction::LogisticsCycleResource => flags.manipulator,
             StationPanelButtonAction::LogisticsToggleProcessor => {
-                flags.processor || active_kind == crate::ship::ModuleKind::Airlock
+                flags.processor || flags.drone || active_kind == crate::ship::ModuleKind::Airlock
             }
             _ => false,
         },
@@ -1653,6 +1655,11 @@ fn editor_station_button_label(
             crate::state::ProgrammingLanguageMode::Arch => "Cycle ARCH Template".to_string(),
             crate::state::ProgrammingLanguageMode::Lumen => "Cycle LUMEN Template".to_string(),
         },
+        StationPanelButtonAction::LogisticsToggleProcessor
+            if mode == crate::gameplay::components::ShipControlMode::Logistics && flags.drone =>
+        {
+            "Cycle Drone Mode".to_string()
+        }
         StationPanelButtonAction::LogisticsToggleProcessor
             if mode == crate::gameplay::components::ShipControlMode::Logistics
                 && !flags.processor =>
@@ -1783,6 +1790,21 @@ fn editor_station_readouts(module: &crate::ship::ShipModule) -> Vec<EditorReadou
                 "Resource",
                 module.defaults.manipulator_resource_kind.as_str(),
                 Color::srgb(0.86, 0.74, 0.30),
+            ),
+            editor_light(
+                module,
+                "DRM",
+                "Drone Frame",
+                if module.variant == crate::ship::ModuleVariant::DroneBay {
+                    "Installed"
+                } else {
+                    "None"
+                },
+                if module.variant == crate::ship::ModuleVariant::DroneBay {
+                    Color::srgb(0.54, 0.86, 1.0)
+                } else {
+                    Color::srgb(0.42, 0.46, 0.52)
+                },
             ),
         ],
         crate::ship::ModuleKind::Processor => vec![

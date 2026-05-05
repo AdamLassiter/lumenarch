@@ -55,6 +55,15 @@ pub(crate) struct GameplayStatusWorldQueries<'w, 's> {
         ),
         With<RuntimeShipModule>,
     >,
+    drone_query: Query<
+        'w,
+        's,
+        (
+            Option<&'static DroneStationModule>,
+            Option<&'static DroneStationCommandState>,
+        ),
+        With<RuntimeShipModule>,
+    >,
 }
 
 #[derive(SystemParam)]
@@ -271,6 +280,7 @@ pub(crate) fn update_gameplay_status_text(
         player_fields,
         player_motion,
         &status_world.module_query,
+        &status_world.drone_query,
         focused_station_context,
         &arch_summary,
     );
@@ -280,6 +290,7 @@ pub(crate) fn update_gameplay_status_text(
         weapon_state,
         player_fields,
         &status_world.module_query,
+        &status_world.drone_query,
         focused_station_context,
         &arch_summary,
     );

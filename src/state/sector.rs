@@ -7,6 +7,30 @@ const DEFAULT_SECTOR_LAYOUT_PATH: &str = "saves/sector_layout.json";
 
 use crate::ship::{ModuleKind, ModuleSpec, ModuleVariant};
 
+const fn default_star_density() -> u32 {
+    96
+}
+
+const fn default_dust_density() -> u32 {
+    40
+}
+
+const fn default_parallax_strength() -> f32 {
+    0.35
+}
+
+const fn default_haze_tint() -> [f32; 3] {
+    [0.16, 0.22, 0.30]
+}
+
+const fn default_galaxy_tint() -> [f32; 3] {
+    [0.72, 0.84, 1.0]
+}
+
+const fn default_galaxy_arc_strength() -> f32 {
+    0.55
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct StoredComponentStack {
     pub(crate) kind: ModuleKind,
@@ -290,6 +314,12 @@ fn starter_component_inventory() -> Vec<StoredComponentStack> {
             damaged: 0,
         },
         StoredComponentStack {
+            kind: ModuleKind::Airlock,
+            variant: ModuleVariant::DroneBay,
+            ready: 1,
+            damaged: 0,
+        },
+        StoredComponentStack {
             kind: ModuleKind::Turret,
             variant: ModuleVariant::LaserTurret,
             ready: 1,
@@ -400,6 +430,38 @@ impl SectorNodeKind {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct EncounterBackdrop {
+    #[serde(default)]
+    pub(crate) seed: u64,
+    #[serde(default = "default_star_density")]
+    pub(crate) star_density: u32,
+    #[serde(default = "default_dust_density")]
+    pub(crate) dust_density: u32,
+    #[serde(default = "default_parallax_strength")]
+    pub(crate) parallax_strength: f32,
+    #[serde(default = "default_haze_tint")]
+    pub(crate) haze_tint: [f32; 3],
+    #[serde(default = "default_galaxy_tint")]
+    pub(crate) galaxy_tint: [f32; 3],
+    #[serde(default = "default_galaxy_arc_strength")]
+    pub(crate) galaxy_arc_strength: f32,
+}
+
+impl Default for EncounterBackdrop {
+    fn default() -> Self {
+        Self {
+            seed: 0,
+            star_density: default_star_density(),
+            dust_density: default_dust_density(),
+            parallax_strength: default_parallax_strength(),
+            haze_tint: default_haze_tint(),
+            galaxy_tint: default_galaxy_tint(),
+            galaxy_arc_strength: default_galaxy_arc_strength(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct EncounterSpec {
     #[serde(default)]
     pub(crate) enemy_ship_ids: Vec<String>,
@@ -409,6 +471,8 @@ pub(crate) struct EncounterSpec {
     pub(crate) ambient_electrical_pressure: i32,
     pub(crate) reward_multiplier: u32,
     pub(crate) arena_variant: String,
+    #[serde(default)]
+    pub(crate) backdrop: EncounterBackdrop,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -598,6 +662,15 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                     ambient_electrical_pressure: 0,
                     reward_multiplier: 1,
                     arena_variant: "station".to_string(),
+                    backdrop: EncounterBackdrop {
+                        seed: seed ^ 0x1000,
+                        star_density: 72,
+                        dust_density: 18,
+                        parallax_strength: 0.18,
+                        haze_tint: [0.12, 0.17, 0.24],
+                        galaxy_tint: [0.58, 0.72, 0.94],
+                        galaxy_arc_strength: 0.22,
+                    },
                 },
             },
             SectorNode {
@@ -618,6 +691,15 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                     ambient_electrical_pressure: 0,
                     reward_multiplier: 2,
                     arena_variant: "salvage".to_string(),
+                    backdrop: EncounterBackdrop {
+                        seed: seed ^ 0x2000,
+                        star_density: 132,
+                        dust_density: 84,
+                        parallax_strength: 0.42,
+                        haze_tint: [0.18, 0.26, 0.18],
+                        galaxy_tint: [0.88, 0.78, 0.54],
+                        galaxy_arc_strength: 0.64,
+                    },
                 },
             },
             SectorNode {
@@ -638,6 +720,15 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                     ambient_electrical_pressure: 0,
                     reward_multiplier: 1,
                     arena_variant: "test".to_string(),
+                    backdrop: EncounterBackdrop {
+                        seed: seed ^ 0x3000,
+                        star_density: 64,
+                        dust_density: 12,
+                        parallax_strength: 0.14,
+                        haze_tint: [0.10, 0.14, 0.22],
+                        galaxy_tint: [0.60, 0.82, 1.00],
+                        galaxy_arc_strength: 0.18,
+                    },
                 },
             },
             SectorNode {
@@ -658,6 +749,15 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                     ambient_electrical_pressure: 0,
                     reward_multiplier: 3,
                     arena_variant: "hostile".to_string(),
+                    backdrop: EncounterBackdrop {
+                        seed: seed ^ 0x4000,
+                        star_density: 88,
+                        dust_density: 36,
+                        parallax_strength: 0.28,
+                        haze_tint: [0.28, 0.12, 0.14],
+                        galaxy_tint: [0.94, 0.46, 0.34],
+                        galaxy_arc_strength: 0.40,
+                    },
                 },
             },
             SectorNode {
@@ -678,6 +778,15 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                     ambient_electrical_pressure: 2,
                     reward_multiplier: 3,
                     arena_variant: "unstable".to_string(),
+                    backdrop: EncounterBackdrop {
+                        seed: seed ^ 0x5000,
+                        star_density: 110,
+                        dust_density: 58,
+                        parallax_strength: 0.38,
+                        haze_tint: [0.14, 0.16, 0.34],
+                        galaxy_tint: [0.56, 0.86, 1.00],
+                        galaxy_arc_strength: 0.52,
+                    },
                 },
             },
             SectorNode {
@@ -698,6 +807,15 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                     ambient_electrical_pressure: 1,
                     reward_multiplier: 4,
                     arena_variant: "cache".to_string(),
+                    backdrop: EncounterBackdrop {
+                        seed: seed ^ 0x6000,
+                        star_density: 124,
+                        dust_density: 62,
+                        parallax_strength: 0.34,
+                        haze_tint: [0.18, 0.20, 0.16],
+                        galaxy_tint: [0.96, 0.84, 0.60],
+                        galaxy_arc_strength: 0.58,
+                    },
                 },
             },
             SectorNode {
@@ -718,6 +836,15 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                     ambient_electrical_pressure: 3,
                     reward_multiplier: 5,
                     arena_variant: "storm".to_string(),
+                    backdrop: EncounterBackdrop {
+                        seed: seed ^ 0x7000,
+                        star_density: 118,
+                        dust_density: 76,
+                        parallax_strength: 0.46,
+                        haze_tint: [0.18, 0.14, 0.38],
+                        galaxy_tint: [0.62, 0.70, 1.00],
+                        galaxy_arc_strength: 0.72,
+                    },
                 },
             },
         ],

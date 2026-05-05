@@ -7,6 +7,7 @@ use crate::{
         ARENA_HEIGHT_TILES,
         ARENA_WIDTH_TILES,
         components::{
+            ArenaBackdropLayer,
             HostileTarget,
             HostileTurretPlatform,
             HostileWeaponState,
@@ -15,40 +16,178 @@ use crate::{
         },
         helpers::{FixedVec2, Fx, angle_from_vector, render_translation},
     },
-    state::PlayingCleanup,
+    state::{EncounterBackdrop, EncounterSpec, PlayingCleanup},
 };
 
 pub(crate) fn spawn_test_arena(
     commands: &mut Commands,
     balance: &BalanceConfig,
-    arena_variant: &str,
+    encounter: &EncounterSpec,
     platform_hostile_count: u32,
-    ambient_heat_pressure: i32,
-    ambient_electrical_pressure: i32,
 ) {
     let arena_width = ARENA_WIDTH_TILES as f32 * TILE_SIZE;
     let arena_height = ARENA_HEIGHT_TILES as f32 * TILE_SIZE;
-    let backdrop = match arena_variant {
-        "salvage" | "cache" => Color::srgb(0.08, 0.11, 0.10),
-        "hostile" => Color::srgb(0.11, 0.08, 0.09),
-        "unstable" | "storm" => Color::srgb(0.07, 0.08, 0.13),
-        _ => Color::srgb(0.07, 0.09, 0.13),
-    };
+    let backdrop = backdrop_color(&encounter.arena_variant, &encounter.backdrop);
 
-    commands.spawn((
-        Sprite::from_color(backdrop, Vec2::new(arena_width, arena_height)),
-        Transform::from_xyz(0.0, 0.0, -20.0),
-        PlayingCleanup,
-    ));
-
+    spawn_backdrop_layers(
+        commands,
+        arena_width,
+        arena_height,
+        &encounter.backdrop,
+        backdrop,
+    );
     spawn_arena_walls(commands, arena_width, arena_height);
     spawn_hostile_platforms(
         commands,
         balance,
         platform_hostile_count,
-        ambient_heat_pressure,
-        ambient_electrical_pressure,
+        encounter.ambient_heat_pressure,
+        encounter.ambient_electrical_pressure,
     );
+}
+
+fn backdrop_color(arena_variant: &str, backdrop: &EncounterBackdrop) -> Color {
+    let [r, g, b] = backdrop.haze_tint;
+    match arena_variant {
+        "salvage" | "cache" => Color::srgb(r.max(0.08), g.max(0.11), b.max(0.10)),
+        "hostile" => Color::srgb(r.max(0.11), g.max(0.08), b.max(0.09)),
+        "unstable" | "storm" => Color::srgb(r.max(0.07), g.max(0.08), b.max(0.13)),
+        _ => Color::srgb(r.max(0.07), g.max(0.09), b.max(0.13)),
+    }
+}
+
+fn spawn_backdrop_layers(
+    commands: &mut Commands,
+    arena_width: f32,
+    arena_height: f32,
+    backdrop: &EncounterBackdrop,
+    base_color: Color,
+) {
+    let bounds = Vec2::new(arena_width, arena_height);
+    spawn_backdrop_sprite(
+        commands,
+        base_color,
+        Vec2::new(arena_width * 1.4, arena_height * 1.4),
+        Vec3::new(0.0, 0.0, -25.0),
+        0.04,
+    );
+    spawn_backdrop_sprite(
+        commands,
+        Color::srgba(
+            backdrop.haze_tint[0],
+            backdrop.haze_tint[1],
+            backdrop.haze_tint[2],
+            0.18,
+        ),
+        Vec2::new(arena_width * 0.95, arena_height * 0.78),
+        Vec3::new(-arena_width * 0.08, arena_height * 0.06, -24.7),
+        0.08,
+    );
+    spawn_backdrop_sprite(
+        commands,
+        Color::srgba(
+            backdrop.galaxy_tint[0],
+            backdrop.galaxy_tint[1],
+            backdrop.galaxy_tint[2],
+            0.16 + backdrop.galaxy_arc_strength * 0.10,
+        ),
+        Vec2::new(arena_width * 0.82, arena_height * 0.16),
+        Vec3::new(0.0, arena_height * 0.12, -24.4),
+        0.14,
+    );
+
+    let star_count = backdrop.star_density.max(24);
+    let dust_count = backdrop.dust_density.max(8);
+    let mut seed = if backdrop.seed == 0 {
+        0xC0FFEE_u64
+    } else {
+        backdrop.seed
+    };
+
+    for index in 0..star_count {
+        let x = rand_range(&mut seed, -bounds.x * 0.62, bounds.x * 0.62);
+        let y = rand_range(&mut seed, -bounds.y * 0.62, bounds.y * 0.62);
+        let depth = 0.10 + (index % 3) as f32 * backdrop.parallax_strength * 0.15;
+        let size = 1.5 + rand_range(&mut seed, 0.0, 2.8);
+        let alpha = 0.35 + rand_range(&mut seed, 0.0, 0.45);
+        spawn_backdrop_sprite(
+            commands,
+            Color::srgba(0.82, 0.90, 1.0, alpha),
+            Vec2::splat(size),
+            Vec3::new(x, y, -24.0 + depth),
+            depth,
+        );
+    }
+
+    let cluster_count = ((dust_count as f32) / 3.5).ceil() as u32;
+    let mut remaining = dust_count;
+    for cluster_index in 0..cluster_count.max(1) {
+        if remaining == 0 {
+            break;
+        }
+        let clusters_left = cluster_count.saturating_sub(cluster_index).max(1);
+        let min_pieces = 2u32.min(remaining);
+        let max_pieces = 4u32.min(remaining - min_pieces + 1) + min_pieces - 1;
+        let target_for_cluster = ((remaining as f32) / clusters_left as f32).ceil() as u32;
+        let pieces = target_for_cluster.clamp(min_pieces, max_pieces.max(min_pieces));
+        remaining = remaining.saturating_sub(pieces);
+
+        let center_x = rand_range(&mut seed, -bounds.x * 0.42, bounds.x * 0.42);
+        let center_y = rand_range(&mut seed, -bounds.y * 0.38, bounds.y * 0.38);
+        let cluster_rotation = rand_range(&mut seed, -0.65, 0.65);
+        let spread_x = rand_range(&mut seed, 10.0, 28.0);
+        let spread_y = rand_range(&mut seed, 8.0, 18.0);
+
+        for piece_index in 0..pieces {
+            let x = center_x + rand_range(&mut seed, -spread_x, spread_x);
+            let y = center_y + rand_range(&mut seed, -spread_y, spread_y);
+            let width = if piece_index == 0 && rand_range(&mut seed, 0.0, 1.0) > 0.65 {
+                rand_range(&mut seed, 26.0, 38.0)
+            } else {
+                rand_range(&mut seed, 10.0, 24.0)
+            };
+            let height = rand_range(&mut seed, 3.0, 7.0);
+            let rotation = cluster_rotation + rand_range(&mut seed, -0.25, 0.25);
+            let tint_mix = rand_range(&mut seed, 0.0, 1.0);
+            let color = Color::srgba(
+                backdrop.galaxy_tint[0] * (0.52 + tint_mix * 0.34),
+                backdrop.galaxy_tint[1] * (0.52 + tint_mix * 0.34),
+                backdrop.galaxy_tint[2] * (0.52 + tint_mix * 0.34),
+                0.07 + rand_range(&mut seed, 0.0, 0.08),
+            );
+            commands.spawn((
+                Sprite::from_color(color, Vec2::new(width, height)),
+                Transform {
+                    translation: Vec3::new(x, y, -23.7),
+                    rotation: Quat::from_rotation_z(rotation),
+                    ..default()
+                },
+                ArenaBackdropLayer {
+                    depth: 0.22 + backdrop.parallax_strength * 0.18,
+                    base_translation: Vec3::new(x, y, -23.7),
+                },
+                PlayingCleanup,
+            ));
+        }
+    }
+}
+
+fn spawn_backdrop_sprite(
+    commands: &mut Commands,
+    color: Color,
+    size: Vec2,
+    translation: Vec3,
+    depth: f32,
+) {
+    commands.spawn((
+        Sprite::from_color(color, size),
+        Transform::from_translation(translation),
+        ArenaBackdropLayer {
+            depth,
+            base_translation: translation,
+        },
+        PlayingCleanup,
+    ));
 }
 
 fn spawn_arena_walls(commands: &mut Commands, arena_width: f32, arena_height: f32) {
@@ -147,4 +286,15 @@ fn spawn_hostile_platforms(
             PlayingCleanup,
         ));
     }
+}
+
+fn rand_unit(seed: &mut u64) -> f32 {
+    *seed = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    ((*seed >> 16) as u32) as f32 / u32::MAX as f32
+}
+
+fn rand_range(seed: &mut u64, min: f32, max: f32) -> f32 {
+    min + (max - min) * rand_unit(seed)
 }

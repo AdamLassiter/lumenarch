@@ -170,8 +170,8 @@ pub(crate) struct DetectorCommandState {
 pub(crate) enum DroneTask {
     Idle,
     Salvage,
-    Repair,
-    Defend,
+    Logistics,
+    Return,
 }
 
 #[allow(dead_code)]
@@ -180,14 +180,14 @@ impl DroneTask {
         match self {
             Self::Idle => "Idle",
             Self::Salvage => "Salvage",
-            Self::Repair => "Repair",
-            Self::Defend => "Defend",
+            Self::Logistics => "Logistics",
+            Self::Return => "Return",
         }
     }
 }
 
 #[allow(dead_code)]
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub(crate) struct DroneStationCommandState {
     pub(crate) selected_task: DroneTask,
 }
@@ -229,3 +229,29 @@ pub(crate) struct ModuleFieldEmitter {
 
 #[derive(Component)]
 pub(crate) struct DestroyedModule;
+
+#[derive(Component)]
+pub(crate) struct ReactorGlowOverlay;
+
+#[derive(Component)]
+pub(crate) struct EngineFlameOverlay;
+
+#[derive(Component)]
+pub(crate) struct ModuleWorkEffect;
+
+#[derive(Component)]
+pub(crate) struct ModuleWorkProgressRoot;
+
+#[derive(Component)]
+pub(crate) struct ModuleWorkProgressFill;
+
+#[derive(Component)]
+pub(crate) struct EvaThrusterOverlay {
+    pub(crate) side: i8,
+}
+
+#[derive(Component)]
+pub(crate) struct ArenaBackdropLayer {
+    pub(crate) depth: f32,
+    pub(crate) base_translation: Vec3,
+}

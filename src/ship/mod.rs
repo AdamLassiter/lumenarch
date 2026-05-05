@@ -106,6 +106,7 @@ pub enum ModuleVariant {
     FabricatorFast,
     RadialShield,
     DirectionalShield,
+    DroneBay,
 }
 
 impl ModuleVariant {
@@ -128,6 +129,7 @@ impl ModuleVariant {
             Self::FabricatorFast => "Fast Fabricator",
             Self::RadialShield => "Radial Shield",
             Self::DirectionalShield => "Directional Shield",
+            Self::DroneBay => "Drone Bay",
         }
     }
 
@@ -141,6 +143,7 @@ impl ModuleVariant {
             ModuleKind::Battery => Self::BatteryCell,
             ModuleKind::Turret => Self::LaserTurret,
             ModuleKind::Shield => Self::RadialShield,
+            ModuleKind::Airlock => Self::Standard,
             _ => Self::Standard,
         }
     }
@@ -156,6 +159,7 @@ impl ModuleVariant {
             ModuleKind::Battery => &[BatteryCell, Capacitor],
             ModuleKind::Turret => &[LaserTurret, BallisticTurret],
             ModuleKind::Shield => &[RadialShield, DirectionalShield],
+            ModuleKind::Airlock => &[Standard, DroneBay],
             _ => &[Standard],
         }
     }
@@ -667,6 +671,11 @@ impl ModuleSpec {
                 spec.shield_capacity = 20.0;
                 spec.shield_arc_degrees = 110.0;
                 spec.shield_regen = 0.75;
+            }
+            ModuleVariant::DroneBay => {
+                spec.placement_cost = 6;
+                spec.integrity = 10;
+                spec.storage_capacity = 6;
             }
             _ => {}
         }

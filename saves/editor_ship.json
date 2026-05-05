@@ -1015,7 +1015,7 @@
       "kind": "Hull",
       "variant": "Standard",
       "grid_x": 1,
-      "grid_y": 0,
+      "grid_y": 2,
       "rotation_quadrants": 1,
       "channel": 0,
       "defaults": {
@@ -1063,7 +1063,7 @@
       "kind": "Hull",
       "variant": "Standard",
       "grid_x": 1,
-      "grid_y": 2,
+      "grid_y": 0,
       "rotation_quadrants": 1,
       "channel": 0,
       "defaults": {
