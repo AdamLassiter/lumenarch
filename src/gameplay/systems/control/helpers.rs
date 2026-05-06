@@ -51,24 +51,6 @@ pub(crate) fn take_first_available(
     }
 }
 
-pub(crate) fn resource_label(kind: ResourceKind) -> &'static str {
-    match kind {
-        ResourceKind::RawSalvage => "raw salvage",
-        ResourceKind::RepairCharge => "repair charge",
-        ResourceKind::Fuel => "fuel",
-        ResourceKind::Ammunition => "ammunition",
-    }
-}
-
-pub(crate) fn cargo_color(kind: ResourceKind) -> Color {
-    match kind {
-        ResourceKind::RawSalvage => Color::srgb(0.90, 0.78, 0.34),
-        ResourceKind::RepairCharge => Color::srgb(0.38, 0.88, 0.98),
-        ResourceKind::Fuel => Color::srgb(0.98, 0.52, 0.22),
-        ResourceKind::Ammunition => Color::srgb(0.86, 0.86, 0.90),
-    }
-}
-
 pub(crate) fn anchor_player_to_focused_station(
     motion: &mut PlayerMotionState,
     position: &mut InternalPosition,

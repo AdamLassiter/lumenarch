@@ -258,7 +258,7 @@ pub(crate) fn place_or_remove_tile(
     tool_state: Res<EditorToolState>,
     mut selection_state: ResMut<EditorSelectionState>,
     mut pointer_state: ResMut<EditorPointerState>,
-    mut arch_editor_state: ResMut<ArchEditorState>,
+    arch_editor_state: ResMut<ArchEditorState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
 ) {
     if !netcode::is_host_authority(&status) {

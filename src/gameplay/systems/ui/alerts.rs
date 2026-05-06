@@ -5,7 +5,6 @@ use crate::{
     gameplay::{
         components::{
             AirlockCommandState,
-            CurrentStation,
             DestroyedModule,
             HeldInteraction,
             Integrity,
@@ -14,9 +13,7 @@ use crate::{
             MissionState,
             ModuleRuntimeState,
             NearbyInteraction,
-            ObservedLocalPlayerMarker,
             PlayerFieldState,
-            PlayerShip,
             ProcessorCommandState,
             ProcessorModule,
             ReactorCommandState,
@@ -24,7 +21,6 @@ use crate::{
             RuntimeShipModule,
             ShipAtmosphereState,
             ShipAutomationState,
-            ShipRoot,
             StorageCommandState,
             StorageModule,
             TurretCommandState,
@@ -39,76 +35,7 @@ use crate::{
         },
         systems::shared::{condition_severity, interaction_label, module_display_name},
     },
-    state::{GameplayAlertsText, GameplayInspectionText},
 };
-
-pub(crate) fn update_inspection_and_alerts_text(
-    balance: Res<BalanceConfig>,
-    player_query: Single<
-        (
-            &CurrentStation,
-            &NearbyInteraction,
-            &HeldInteraction,
-            &PlayerFieldState,
-        ),
-        With<ObservedLocalPlayerMarker>,
-    >,
-    ship_query: Single<
-        (&ShipAutomationState, &MissionState, &ShipAtmosphereState),
-        (With<PlayerShip>, With<ShipRoot>),
-    >,
-    module_query: Query<
-        (
-            Entity,
-            &RuntimeShipModule,
-            &Integrity,
-            &ModuleRuntimeState,
-            Option<&RuntimeArchComputer>,
-            Option<&StorageModule>,
-            Option<&StorageCommandState>,
-            Option<&ManipulatorModule>,
-            Option<&ManipulatorCommandState>,
-            Option<&ProcessorModule>,
-            Option<&ProcessorCommandState>,
-            Option<&ReactorCommandState>,
-            Option<&TurretCommandState>,
-            Option<&AirlockCommandState>,
-            Option<&DestroyedModule>,
-        ),
-        With<RuntimeShipModule>,
-    >,
-    mut inspection_query: Query<
-        &mut Text,
-        (With<GameplayInspectionText>, Without<GameplayAlertsText>),
-    >,
-    mut alerts_query: Query<&mut Text, (With<GameplayAlertsText>, Without<GameplayInspectionText>)>,
-) {
-    let (station, nearby, held, player_fields) = player_query.into_inner();
-    let (automation_state, mission_state, atmosphere_state) = ship_query.into_inner();
-    let current_module = module_query.iter().find(
-        |(_, runtime_module, _, _, _, _, _, _, _, _, _, _, _, _, _)| {
-            runtime_module.module_id == station.module_id
-        },
-    );
-
-    for mut text in &mut inspection_query {
-        **text = inspection_text(current_module, nearby, held, automation_state, &balance);
-    }
-
-    let mut issues = collect_alert_issues(&module_query, &balance);
-    issues.sort_by_key(|a| std::cmp::Reverse(a.0));
-    issues.truncate(3);
-
-    for mut text in &mut alerts_query {
-        **text = alerts_text(
-            player_fields,
-            nearby,
-            mission_state,
-            atmosphere_state,
-            &issues,
-        );
-    }
-}
 
 pub(crate) fn inspection_text(
     current_module: Option<(

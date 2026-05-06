@@ -142,9 +142,6 @@ pub(crate) fn station_panel_display(
         manipulator: manipulator.is_some(),
         processor: processor.is_some(),
         airlock: airlock_state.is_some(),
-        computer: computer.is_some(),
-        reactor: reactor.is_some(),
-        turret: turret.is_some(),
         drone: drone_station.is_some(),
     };
 
@@ -524,9 +521,6 @@ pub(crate) fn station_panel_content(
         manipulator: manipulator.is_some(),
         processor: processor.is_some(),
         airlock: airlock_state.is_some(),
-        computer: computer.is_some(),
-        reactor: reactor.is_some(),
-        turret: turret.is_some(),
         drone: drone_station.is_some(),
     };
 

@@ -1,16 +1,7 @@
 use bevy::prelude::*;
 
-use super::{FixedVec2, Fx, fixed_radius_sq};
-use crate::{
-    gameplay::components::{
-        CollectedSalvage,
-        MissionState,
-        SalvagePickup,
-        SalvageWreck,
-        SimPosition,
-    },
-    ship::ShipDefinition,
-};
+use super::Fx;
+use crate::{gameplay::components::MissionState, ship::ShipDefinition};
 
 pub(crate) fn gameplay_status_line(ship: &ShipDefinition) -> String {
     format!(
@@ -47,33 +38,6 @@ pub(crate) fn mission_return_line(mission_state: &MissionState) -> Option<String
             seconds.to_num::<f32>().max(0.0)
         )
     })
-}
-
-pub(crate) fn salvage_status_line(
-    ship_position: FixedVec2,
-    mission_state: &MissionState,
-    salvage_query: &Query<
-        (&SimPosition, &SalvagePickup),
-        (With<SalvageWreck>, Without<CollectedSalvage>),
-    >,
-    salvage_pickup_radius: f32,
-) -> String {
-    if mission_state.salvage_collected {
-        return format!("recovered {} scrap", mission_state.salvage_scrap_awarded);
-    }
-
-    if !mission_state.encounter_cleared || mission_state.failed {
-        return "secure the encounter first".to_string();
-    }
-
-    let pickup_radius_sq = fixed_radius_sq(salvage_pickup_radius);
-    for (position, salvage) in salvage_query.iter() {
-        if ship_position.distance_sq(position.value) <= pickup_radius_sq {
-            return format!("press F for {} scrap", salvage.scrap_value);
-        }
-    }
-
-    "find the salvage wreck".to_string()
 }
 
 pub(crate) fn meter_bar(value: Fx, max: Fx, width: usize) -> String {

@@ -141,10 +141,6 @@ impl EnemyShipLibrary {
     }
 }
 
-pub fn load_default_enemy_library() -> Result<Option<EnemyShipLibrary>, String> {
-    load_validated_default_enemy_library().map(|library| library.map(|validated| validated.library))
-}
-
 pub fn load_validated_default_enemy_library() -> Result<Option<ValidatedEnemyLibrary>, String> {
     load_enemy_library_from_path(Path::new(DEFAULT_ENEMY_SHIPS_PATH)).map(|library| {
         library.map(|mut library| {

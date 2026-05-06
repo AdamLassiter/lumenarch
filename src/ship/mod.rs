@@ -32,24 +32,6 @@ pub enum ModuleKind {
 }
 
 impl ModuleKind {
-    pub const ALL: [Self; 15] = [
-        Self::Core,
-        Self::Interior,
-        Self::Cockpit,
-        Self::Computer,
-        Self::Processor,
-        Self::Reactor,
-        Self::Engine,
-        Self::Cargo,
-        Self::Battery,
-        Self::Airlock,
-        Self::Turret,
-        Self::Shield,
-        Self::Hull,
-        Self::HullInnerCorner,
-        Self::HullOuterCorner,
-    ];
-
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Core => "core",

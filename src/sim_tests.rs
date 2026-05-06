@@ -134,6 +134,145 @@ fn headless_host_lobby_editor_sector_and_cockpit_flow() {
     }
 }
 
+#[test]
+fn launching_after_reselect_uses_the_latest_sector_node() {
+    let mut app = build_app(AppRuntimeMode::Headless);
+
+    begin_headless_host_lobby(&mut app);
+    start_headless_host_session(&mut app);
+    apply_host_meta(&mut app, RollbackMetaOp::OpenSectorMap, 0, 0, 0);
+
+    let (first_node_id, second_node_id, second_node_label) = {
+        let rollback = app.world().resource::<netcode::RollbackGameState>();
+        let launchable: Vec<_> = rollback
+            .sector
+            .nodes
+            .iter()
+            .filter(|node| rollback.sector.is_reachable(node.id))
+            .filter(|node| !matches!(node.kind, crate::state::SectorNodeKind::HubStation))
+            .collect();
+        let first = launchable
+            .first()
+            .expect("expected at least one launchable sector node");
+        let second = launchable
+            .get(1)
+            .expect("expected at least two launchable sector nodes");
+        (first.id, second.id, second.label.clone())
+    };
+
+    apply_host_meta(
+        &mut app,
+        RollbackMetaOp::SelectSectorNode,
+        first_node_id as i16,
+        0,
+        0,
+    );
+    apply_host_meta(
+        &mut app,
+        RollbackMetaOp::SelectSectorNode,
+        second_node_id as i16,
+        0,
+        0,
+    );
+    apply_host_meta(
+        &mut app,
+        RollbackMetaOp::LaunchEncounter,
+        second_node_id as i16,
+        0,
+        0,
+    );
+
+    wait_until(
+        &mut app,
+        |app| {
+            app.world().resource::<netcode::RollbackGameState>().phase == RollbackPhase::Encounter
+        },
+        "encounter phase entered after reselection",
+    );
+
+    let mut mission_query = app
+        .world_mut()
+        .query::<&gameplay::components::MissionState>();
+    let mission = mission_query
+        .single(app.world())
+        .expect("expected one active mission state");
+    assert_eq!(mission.node_id, second_node_id);
+    assert_eq!(mission.node_name, second_node_label);
+}
+
+#[test]
+fn repeated_encounter_cycles_cleanup_runtime_entities() {
+    let mut app = build_app(AppRuntimeMode::Headless);
+
+    begin_headless_host_lobby(&mut app);
+    start_headless_host_session(&mut app);
+    apply_host_meta(&mut app, RollbackMetaOp::OpenSectorMap, 0, 0, 0);
+
+    let node_id = {
+        let rollback = app.world().resource::<netcode::RollbackGameState>();
+        rollback
+            .sector
+            .nodes
+            .iter()
+            .find(|node| rollback.sector.is_reachable(node.id))
+            .filter(|node| !matches!(node.kind, crate::state::SectorNodeKind::HubStation))
+            .map(|node| node.id)
+            .expect("expected at least one launchable sector node")
+    };
+
+    for cycle in 0..2 {
+        apply_host_meta(
+            &mut app,
+            RollbackMetaOp::SelectSectorNode,
+            node_id as i16,
+            0,
+            0,
+        );
+        apply_host_meta(
+            &mut app,
+            RollbackMetaOp::LaunchEncounter,
+            node_id as i16,
+            0,
+            0,
+        );
+
+        wait_until(
+            &mut app,
+            |app| {
+                app.world().resource::<netcode::RollbackGameState>().phase
+                    == RollbackPhase::Encounter
+            },
+            "encounter phase entered",
+        );
+        wait_until(
+            &mut app,
+            |app| count_cleanup_entities(app) > 0,
+            "runtime encounter entities spawned",
+        );
+
+        let cleanup_count = count_cleanup_entities(&mut app);
+        assert!(
+            cleanup_count > 0,
+            "expected runtime cleanup entities during encounter cycle {cycle}"
+        );
+
+        apply_host_meta(&mut app, RollbackMetaOp::ReturnToDock, 0, 0, 0);
+        wait_until(
+            &mut app,
+            |app| {
+                app.world().resource::<netcode::RollbackGameState>().phase == RollbackPhase::Docked
+            },
+            "return to docked phase",
+        );
+        wait_until(
+            &mut app,
+            |app| count_cleanup_entities(app) == 0,
+            "runtime encounter entities cleaned up",
+        );
+    }
+}
+
+/// Boots the host-side lobby state without opening sockets so tests can drive rollback locally.
 fn begin_headless_host_lobby(app: &mut App) {
     let host_addr = crate::DEFAULT_HOST_ADDR
         .parse()
@@ -178,6 +317,7 @@ fn begin_headless_host_lobby(app: &mut App) {
     }
 }
 
+/// Starts a single-player synctest session that exercises the normal rollback presentation flow.
 fn start_headless_host_session(app: &mut App) {
     let bootstrap = app
         .world()
@@ -230,6 +370,7 @@ fn start_headless_host_session(app: &mut App) {
     app.update();
 }
 
+/// Applies one host-authored rollback meta command and advances the app through its effects.
 fn apply_host_meta(app: &mut App, op: RollbackMetaOp, arg0: i16, arg1: i16, arg2: i16) {
     {
         let mut decoded = app.world_mut().resource_mut::<DecodedPlayerCommands>();
@@ -257,6 +398,7 @@ fn apply_host_meta(app: &mut App, op: RollbackMetaOp, arg0: i16, arg1: i16, arg2
     app.update();
 }
 
+/// Toggles the observed local player into the currently focused station, mirroring in-game input.
 fn drive_local_toggle_station(app: &mut App) {
     app.world_mut()
         .run_system_once(gameplay::update_current_station)
@@ -287,6 +429,14 @@ fn pump_once(app: &mut App) {
     app.update();
 }
 
+fn count_cleanup_entities(app: &mut App) -> usize {
+    let mut query = app
+        .world_mut()
+        .query_filtered::<Entity, With<crate::state::PlayingCleanup>>();
+    query.iter(app.world()).count()
+}
+
+/// Advances the headless app until a gameplay condition becomes true or the test times out.
 fn wait_until(app: &mut App, predicate: impl Fn(&mut App) -> bool, description: &str) {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {

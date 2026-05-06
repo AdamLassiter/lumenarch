@@ -1,6 +1,5 @@
 mod init;
 mod layout;
-mod programs;
 
 pub(crate) use init::initialize_editor_ship;
 pub(crate) use layout::{

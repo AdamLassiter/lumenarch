@@ -228,6 +228,7 @@ pub(crate) fn apply_host_meta_ops(
                     .map(|node| !matches!(node.kind, crate::state::SectorNodeKind::HubStation))
                     .unwrap_or(false)
             {
+                rollback_state.sector.selected_node_id = Some(node_id);
                 rollback_state.sector.active_encounter_node_id = Some(node_id);
                 rollback_state.progression.jump_count += 1;
                 rollback_state.phase = RollbackPhase::Encounter;

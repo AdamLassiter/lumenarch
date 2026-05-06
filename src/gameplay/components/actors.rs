@@ -242,14 +242,6 @@ pub(crate) struct PlayerIdentity {
     pub(crate) color_index: u8,
 }
 
-impl PlayerIdentity {
-    pub(crate) fn color(&self) -> Color {
-        let [r, g, b, a] = crate::state::LocalPlayerProfile::PALETTE
-            [self.color_index as usize % crate::state::LocalPlayerProfile::PALETTE.len()];
-        Color::srgba(r, g, b, a)
-    }
-}
-
 #[derive(Clone)]
 pub(crate) struct ShipInteriorNode {
     pub(crate) module_id: u64,

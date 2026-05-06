@@ -5,7 +5,7 @@ use crate::{
     TILE_SIZE,
     balance::BalanceConfig,
     gameplay::components::{ShipMovementModel, ShipPowerModel, ShipPowerState},
-    ship::{ModuleKind, ModuleSpec, ShipDefinition, ShipModule},
+    ship::{ModuleKind, ModuleSpec, ShipModule},
 };
 
 pub(crate) fn module_local_translation(module: &ShipModule, center_x: f32, center_y: f32) -> Vec3 {
@@ -25,20 +25,6 @@ pub(crate) fn module_local_position(module: &ShipModule, center_x: Fx, center_y:
 
 pub(crate) fn module_integrity(kind: ModuleKind, variant: crate::ship::ModuleVariant) -> i32 {
     ModuleSpec::for_module(kind, variant).integrity
-}
-
-pub(crate) fn ship_movement_model(
-    module_count: usize,
-    engine_count: u32,
-    balance: &BalanceConfig,
-) -> ShipMovementModel {
-    ship_movement_model_with_effective(
-        module_count,
-        engine_count,
-        Fx::from_num(engine_count.max(1)),
-        Fx::from_num(1),
-        balance,
-    )
 }
 
 pub(crate) fn ship_movement_model_with_effective(
@@ -69,30 +55,6 @@ pub(crate) fn ship_movement_model_with_effective(
         linear_damping: Fx::from_num(balance.ship.linear_damping),
         angular_damping: Fx::from_num(balance.ship.angular_damping),
     }
-}
-
-pub(crate) fn ship_power_model(
-    module_count: usize,
-    reactor_count: u32,
-    battery_count: u32,
-    engine_count: u32,
-    turret_count: u32,
-    balance: &BalanceConfig,
-) -> ShipPowerModel {
-    ship_power_model_with_effective(
-        module_count,
-        reactor_count,
-        battery_count,
-        engine_count,
-        turret_count,
-        Fx::from_num(reactor_count.max(1)),
-        Fx::from_num(battery_count),
-        Fx::from_num(battery_count.max(1)),
-        Fx::from_num(battery_count.max(1)),
-        Fx::from_num(engine_count),
-        Fx::from_num(turret_count),
-        balance,
-    )
 }
 
 pub(crate) fn ship_power_model_with_effective(
@@ -206,11 +168,4 @@ pub(crate) fn update_ship_power_state(
     power_state.engine_power_ratio = engine_power_ratio;
     power_state.weapons_powered = weapons_powered;
     power_state.engines_powered = engine_power_ratio > Fx::from_num(0);
-}
-
-pub(crate) fn count_modules(ship: &ShipDefinition, kind: ModuleKind) -> u32 {
-    ship.modules
-        .iter()
-        .filter(|module| module.kind == kind)
-        .count() as u32
 }

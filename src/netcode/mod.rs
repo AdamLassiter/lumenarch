@@ -4,10 +4,11 @@ mod lobby;
 mod presentation;
 mod types;
 
+#[cfg(test)]
+pub(crate) use bootstrap::load_initial_rollback_state;
 pub(crate) use bootstrap::{
     begin_session_attempt,
     finalize_pending_session_bootstrap,
-    load_initial_rollback_state,
     request_lobby_session_start,
 };
 pub(crate) use input::{

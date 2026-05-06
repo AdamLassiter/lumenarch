@@ -37,15 +37,6 @@ pub(crate) enum StationPanelButtonAction {
 }
 
 #[derive(Component)]
-pub(crate) struct GameplayStatusText;
-
-#[derive(Component)]
-pub(crate) struct GameplayInspectionText;
-
-#[derive(Component)]
-pub(crate) struct GameplayAlertsText;
-
-#[derive(Component)]
 pub(crate) struct GameplayControlsText;
 
 #[derive(Component)]

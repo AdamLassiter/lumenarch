@@ -2,11 +2,6 @@ use super::{FixedVec2, Fx, WideFx, widen, wrap_radians};
 
 pub(crate) const FX_QUARTER_MAX_BITS: i32 = i32::MAX / 4;
 
-pub(crate) fn clamp_signed(value: Fx, max_abs: Fx) -> Fx {
-    debug_assert!(max_abs >= Fx::from_num(0));
-    value.clamp(-max_abs, max_abs)
-}
-
 pub(crate) fn clamp_non_negative(value: Fx, max_value: Fx) -> Fx {
     debug_assert!(max_value >= Fx::from_num(0));
     value.clamp(Fx::from_num(0), max_value)

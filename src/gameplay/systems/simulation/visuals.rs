@@ -47,6 +47,7 @@ use crate::{
     state::GameplayInfoPanelMode,
 };
 
+/// Draws contextual tactical overlays for the currently focused station or module.
 pub(crate) fn draw_debug_overlay(
     hud_mode: Res<GameplayInfoPanelMode>,
     player_ship_query: Single<(&SimPosition, &SimRotation), (With<PlayerShip>, With<ShipRoot>)>,
@@ -157,6 +158,7 @@ pub(crate) fn draw_debug_overlay(
     }
 }
 
+/// Tints or hides module sprites to reflect heat, instability, disablement, and destruction.
 pub(crate) fn update_destroyed_module_visuals(
     balance: Res<BalanceConfig>,
     mut module_query: Query<
@@ -218,6 +220,7 @@ pub(crate) fn update_destroyed_module_visuals(
     }
 }
 
+/// Drives the reactor's front-layer presentation glow from its live runtime state.
 pub(crate) fn sync_reactor_glow_visuals(
     time: Res<Time>,
     mut reactor_materials: ResMut<Assets<ReactorGlowMaterial>>,
@@ -276,6 +279,7 @@ pub(crate) fn sync_reactor_glow_visuals(
     }
 }
 
+/// Shows and scales engine exhaust only while the player's ship is actually under thrust.
 pub(crate) fn sync_engine_flame_visuals(
     time: Res<Time>,
     ship_query: Single<(&ShipControlState, &ShipPowerState), (With<PlayerShip>, With<ShipRoot>)>,
@@ -309,7 +313,8 @@ pub(crate) fn sync_engine_flame_visuals(
     if engine_alpha <= 0.01 {
         *flame_growth = 0.0;
     } else {
-        *flame_growth = (*flame_growth + time.delta_secs() * (0.9 + engine_alpha * 1.1)).clamp(0.0, 1.0);
+        *flame_growth =
+            (*flame_growth + time.delta_secs() * (0.9 + engine_alpha * 1.1)).clamp(0.0, 1.0);
     }
     for (_parent, material_handle, mut visibility, mut transform) in &mut engine_flame_query {
         if engine_alpha <= 0.01 {
@@ -327,6 +332,7 @@ pub(crate) fn sync_engine_flame_visuals(
     }
 }
 
+/// Syncs repair/extraction sparks and progress bars to the player's current held interaction.
 pub(crate) fn sync_module_work_effect_visuals(
     time: Res<Time>,
     player_query: Query<
@@ -412,6 +418,7 @@ pub(crate) fn sync_module_work_effect_visuals(
     }
 }
 
+/// Shows suit thrusters while an EVA-suited actor is accelerating in open space.
 pub(crate) fn sync_eva_thruster_visuals(
     player_query: Query<
         (&PlayerMotionState, &EquippedSuit, &HeldInteraction),
@@ -479,6 +486,7 @@ fn collect_active_work(
     active_work
 }
 
+/// Applies parallax offsets to the combat backdrop based on the camera position.
 pub(crate) fn sync_backdrop_parallax(
     camera_query: Single<&Transform, With<Camera2d>>,
     mut backdrop_query: Query<(&ArenaBackdropLayer, &mut Transform), Without<Camera2d>>,

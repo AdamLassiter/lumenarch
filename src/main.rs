@@ -41,7 +41,7 @@ use self::state::{
     SectorMapViewState,
     SectorState,
 };
-use crate::{netcode::LumenGgrsConfig, ship::ModuleKind};
+use crate::netcode::LumenGgrsConfig;
 
 pub(crate) const TICK_FPS: u64 = 30;
 pub(crate) const TICK_MILLIS: u64 = 1000 / TICK_FPS;
@@ -61,7 +61,6 @@ pub(crate) const HOVERED_BUTTON: Color = Color::srgb(0.30, 0.55, 0.88);
 pub(crate) const PRESSED_BUTTON: Color = Color::srgb(0.18, 0.36, 0.62);
 pub(crate) const SELECTED_BUTTON: Color = Color::srgb(0.78, 0.48, 0.20);
 pub(crate) const GRID_COLOR: Color = Color::srgba(0.38, 0.45, 0.56, 0.28);
-pub(crate) const TOOLBOX_COMPONENTS: [ModuleKind; 15] = ModuleKind::ALL;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum AppRuntimeMode {

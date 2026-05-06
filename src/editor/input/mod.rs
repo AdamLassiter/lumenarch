@@ -3,8 +3,6 @@ mod editing;
 mod enemy;
 
 pub(crate) use arch::{
-    arch_editor_button_system,
-    computer_program_button_system,
     edit_program_text_editor,
     focus_program_text_editor_on_click,
     program_editor_action_button_system,

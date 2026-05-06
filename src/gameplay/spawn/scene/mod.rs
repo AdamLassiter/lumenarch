@@ -17,7 +17,7 @@ use crate::{
     },
     netcode,
     ship::enemy::EnemyShipEntryValidationStatus,
-    state::{DemoProgression, EditorShip, EnemyShipLibraryState, SectorNodeKind, SectorState},
+    state::{DemoProgression, EditorShip, EnemyShipLibraryState, SectorNodeKind},
     stations::StationCatalogResource,
 };
 
@@ -31,7 +31,7 @@ pub(crate) fn spawn_runtime_scene(
     progression: Res<DemoProgression>,
     enemy_library_state: Res<EnemyShipLibraryState>,
     station_catalog: Res<StationCatalogResource>,
-    sector_state: Res<SectorState>,
+    rollback_state: Res<netcode::RollbackGameState>,
     session_status: Res<netcode::SessionStatus>,
     local_handle: Res<netcode::LocalPlayerHandle>,
     mut player_handle_map: ResMut<netcode::PlayerHandleMap>,
@@ -46,17 +46,18 @@ pub(crate) fn spawn_runtime_scene(
         "Spawning runtime encounter scene: local_handle={:?}, total_players={}, current_node={}, active_node={:?}, selected_node={:?}",
         local_handle.0,
         session_status.total_players,
-        sector_state.current_node_id,
-        sector_state.active_encounter_node_id,
-        sector_state.selected_node_id
+        rollback_state.sector.current_node_id,
+        rollback_state.sector.active_encounter_node_id,
+        rollback_state.sector.selected_node_id
     );
 
     spawn_runtime_hud(&mut commands, &asset_server, &editor_ship.ship);
-    let active_node = sector_state
+    let active_node = rollback_state
+        .sector
         .active_node()
-        .or_else(|| sector_state.selected_node())
+        .or_else(|| rollback_state.sector.selected_node())
         .cloned()
-        .unwrap_or_else(|| sector_state.nodes[1].clone());
+        .unwrap_or_else(|| rollback_state.sector.nodes[1].clone());
     log::debug!(
         "Runtime encounter source node: id={}, label='{}', hostile_count={}, enemy_ship_ids={:?}, salvage_value={}, reward_multiplier={}",
         active_node.id,

@@ -937,7 +937,7 @@ fn spawn_tool_mode_button(
                 ..default()
             },
             TextColor(Color::WHITE),
-            EditorToolModeButtonText { mode },
+            EditorToolModeButtonText,
         ));
 }
 
@@ -1530,23 +1530,6 @@ pub(crate) fn update_editor_module_overlay(
                 }
             }
         }
-    }
-}
-
-fn toolbox_label(
-    kind: crate::ship::ModuleKind,
-    mode: EditorMode,
-    progression: &DemoProgression,
-) -> String {
-    let variant = crate::ship::ModuleVariant::default_for_kind(kind);
-    match mode {
-        EditorMode::Player => format!(
-            "{}  [ready {} / damaged {}]",
-            kind.as_str(),
-            progression.ready_count(kind, variant),
-            progression.damaged_count(kind, variant),
-        ),
-        EditorMode::Enemy => format!("{}  [∞]", kind.as_str(),),
     }
 }
 

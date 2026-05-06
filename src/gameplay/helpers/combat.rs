@@ -15,25 +15,6 @@ use crate::{
     state::PlayingCleanup,
 };
 
-pub(crate) fn spawn_player_projectile(
-    commands: &mut Commands,
-    origin: FixedVec2,
-    velocity: FixedVec2,
-    balance: &BalanceConfig,
-) {
-    spawn_projectile_entity(
-        commands,
-        origin,
-        velocity,
-        balance,
-        ProjectileFaction::Player,
-        2,
-        Fx::from_num(0),
-        Fx::from_num(0),
-        Color::srgb(0.98, 0.84, 0.30),
-    );
-}
-
 pub(crate) fn spawn_projectile_entity(
     commands: &mut Commands,
     origin: FixedVec2,

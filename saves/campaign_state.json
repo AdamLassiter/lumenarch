@@ -2,7 +2,7 @@
   "progression": {
     "scrap": 31,
     "hull_wear": 0,
-    "jump_count": 208,
+    "jump_count": 216,
     "stored_components": [
       {
         "kind": "Hull",
@@ -26,8 +26,8 @@
   "sector": {
     "seed": 66790,
     "current_node_id": 0,
-    "selected_node_id": 6,
-    "active_encounter_node_id": 6,
+    "selected_node_id": 1,
+    "active_encounter_node_id": 1,
     "nodes": [
       {
         "id": 0,

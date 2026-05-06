@@ -99,8 +99,4 @@ mod station_panel;
 mod summary;
 
 pub(crate) use hud::{toggle_gameplay_info_panel, update_gameplay_status_text};
-pub(crate) use station_panel::{
-    station_action_visible,
-    station_button_label,
-    station_panel_button_system,
-};
+pub(crate) use station_panel::station_panel_button_system;

@@ -175,7 +175,7 @@ pub(crate) fn spawn_runtime_module(
             ));
         }
         ModuleKind::Airlock => {
-            let mut bundle = (
+            let bundle = (
                 AirlockCommandState {
                     open: module.defaults.airlock_open,
                 },

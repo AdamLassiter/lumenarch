@@ -4,12 +4,7 @@ mod sector;
 mod ui;
 
 pub(crate) use editor::{
-    ArchEditorButton,
-    ArchEditorButtonAction,
     ArchEditorState,
-    ComputerProgramButton,
-    ComputerProgramEntry,
-    ComputerProgramPanel,
     EditingCleanup,
     EditorAutoHullButton,
     EditorBuildSection,
@@ -45,7 +40,6 @@ pub(crate) use editor::{
     EnemyShipLibraryState,
     LeaveEditorButton,
     PreviewTile,
-    ProgramButtonAction,
     ProgramEditorAction,
     ProgramEditorActionButton,
     ProgramEditorDiagnosticsText,
@@ -124,7 +118,6 @@ pub(crate) use sector::{
 pub(crate) use ui::{
     AbortEncounterButton,
     BackToStationButton,
-    GameplayAlertsText,
     GameplayBarFill,
     GameplayBarKind,
     GameplayBarLabel,
@@ -134,7 +127,6 @@ pub(crate) use ui::{
     GameplayControlsText,
     GameplayInfoPanelMode,
     GameplayInfoPanelRoot,
-    GameplayInspectionText,
     GameplayOverviewBarsPanel,
     GameplayPanelBodyText,
     GameplayPanelTitleText,

@@ -14,9 +14,6 @@ pub(crate) struct StationFlags {
     pub(crate) processor: bool,
     pub(crate) airlock: bool,
     pub(crate) drone: bool,
-    pub(crate) computer: bool,
-    pub(crate) reactor: bool,
-    pub(crate) turret: bool,
 }
 
 pub(crate) fn build_top_banner(
@@ -350,24 +347,6 @@ pub(crate) fn ship_affiliation_label(
             }
         })
         .unwrap_or("Unknown Ship")
-}
-
-pub(crate) fn nearby_logistics_target_ids(
-    focused_module_id: u64,
-    candidate_query: &Query<&RuntimeShipModule>,
-) -> Vec<u64> {
-    candidate_query
-        .iter()
-        .filter(|runtime_module| {
-            matches!(
-                runtime_module.kind,
-                crate::ship::ModuleKind::Cargo
-                    | crate::ship::ModuleKind::Processor
-                    | crate::ship::ModuleKind::Airlock
-            ) && runtime_module.module_id != focused_module_id
-        })
-        .map(|runtime_module| runtime_module.module_id)
-        .collect()
 }
 
 pub(crate) fn percent(value: f32, max: f32) -> f32 {

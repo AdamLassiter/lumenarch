@@ -198,9 +198,7 @@ pub(crate) struct EditorToolModeButton {
 }
 
 #[derive(Component)]
-pub(crate) struct EditorToolModeButtonText {
-    pub(crate) mode: EditorToolMode,
-}
+pub(crate) struct EditorToolModeButtonText;
 
 #[derive(Component)]
 pub(crate) struct EditorBuildSection;
@@ -249,124 +247,6 @@ pub(crate) struct EditorPointerState {
     pub(crate) last_build_cell: Option<(i32, i32, MouseButton)>,
 }
 
-#[derive(Clone, Copy)]
-pub(crate) enum ProgramButtonAction {
-    SwitchLanguage(ProgrammingLanguageMode),
-    CycleArchTemplate,
-    AdjustArchConstant { index: usize, delta: i32 },
-    CycleLumenTemplate,
-    ToggleLumenEnabled,
-}
-
-#[derive(Clone, Copy)]
-pub(crate) enum ArchEditorButtonAction {
-    SelectModule(u64),
-    SelectLine {
-        module_id: u64,
-        line: usize,
-    },
-    AddLine(u64),
-    InsertLineAfter {
-        module_id: u64,
-        line: usize,
-    },
-    RemoveLine {
-        module_id: u64,
-        line: usize,
-    },
-    MoveLineUp {
-        module_id: u64,
-        line: usize,
-    },
-    MoveLineDown {
-        module_id: u64,
-        line: usize,
-    },
-    CycleOpcode {
-        module_id: u64,
-        line: usize,
-    },
-    CycleDst {
-        module_id: u64,
-        line: usize,
-    },
-    CycleSrcA {
-        module_id: u64,
-        line: usize,
-    },
-    CycleSrcB {
-        module_id: u64,
-        line: usize,
-    },
-    AdjustImmediateA {
-        module_id: u64,
-        line: usize,
-        delta: i32,
-    },
-    AdjustImmediateB {
-        module_id: u64,
-        line: usize,
-        delta: i32,
-    },
-    AdjustJump {
-        module_id: u64,
-        line: usize,
-        delta: i32,
-    },
-    RenameModuleProgram(u64),
-    SelectLumenLine {
-        module_id: u64,
-        line: usize,
-    },
-    AddLumenLine(u64),
-    InsertLumenLineAfter {
-        module_id: u64,
-        line: usize,
-    },
-    RemoveLumenLine {
-        module_id: u64,
-        line: usize,
-    },
-    MoveLumenLineUp {
-        module_id: u64,
-        line: usize,
-    },
-    MoveLumenLineDown {
-        module_id: u64,
-        line: usize,
-    },
-    CycleLumenOp {
-        module_id: u64,
-        line: usize,
-    },
-    CycleLumenTarget {
-        module_id: u64,
-        line: usize,
-    },
-    CycleLumenAspect {
-        module_id: u64,
-        line: usize,
-    },
-    AdjustLumenWeight {
-        module_id: u64,
-        line: usize,
-        delta: i32,
-    },
-    RenameLumenProgram(u64),
-}
-
-#[derive(Component)]
-pub(crate) struct ComputerProgramPanel;
-
-#[derive(Component)]
-pub(crate) struct ComputerProgramEntry;
-
-#[derive(Component)]
-pub(crate) struct ComputerProgramButton {
-    pub(crate) module_id: u64,
-    pub(crate) action: ProgramButtonAction,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ProgramEditorAction {
     SwitchArch,
@@ -374,7 +254,6 @@ pub(crate) enum ProgramEditorAction {
     Check,
     Apply,
     Revert,
-    Focus,
 }
 
 #[derive(Component)]
@@ -393,11 +272,6 @@ pub(crate) struct ProgramEditorStatusText;
 
 #[derive(Component)]
 pub(crate) struct ProgramEditorDiagnosticsText;
-
-#[derive(Component)]
-pub(crate) struct ArchEditorButton {
-    pub(crate) action: ArchEditorButtonAction,
-}
 
 #[derive(Component)]
 pub(crate) struct ShipTileSprite;

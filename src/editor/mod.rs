@@ -4,8 +4,6 @@ mod render;
 mod ui;
 
 pub(crate) use input::{
-    arch_editor_button_system,
-    computer_program_button_system,
     edit_program_text_editor,
     editor_station_panel_button_system,
     enemy_library_button_system,

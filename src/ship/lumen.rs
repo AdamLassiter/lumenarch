@@ -50,13 +50,6 @@ impl LumenOp {
             Self::Nerf => "NERF",
         }
     }
-
-    pub fn next(self) -> Self {
-        match self {
-            Self::Buff => Self::Nerf,
-            Self::Nerf => Self::Buff,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -70,15 +63,6 @@ pub enum LumenTarget {
 }
 
 impl LumenTarget {
-    pub const ALL: [Self; 6] = [
-        Self::Reactors,
-        Self::Turrets,
-        Self::Cargo,
-        Self::Processors,
-        Self::Computers,
-        Self::HotModules,
-    ];
-
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Reactors => "reactors",
@@ -88,11 +72,6 @@ impl LumenTarget {
             Self::Computers => "computers",
             Self::HotModules => "hot_modules",
         }
-    }
-
-    pub fn next(self) -> Self {
-        let index = Self::ALL.iter().position(|item| *item == self).unwrap_or(0);
-        Self::ALL[(index + 1) % Self::ALL.len()]
     }
 }
 
@@ -106,14 +85,6 @@ pub enum LumenAspect {
 }
 
 impl LumenAspect {
-    pub const ALL: [Self; 5] = [
-        Self::HeatCooling,
-        Self::Instability,
-        Self::Throughput,
-        Self::FireControl,
-        Self::PowerDraw,
-    ];
-
     pub fn as_str(self) -> &'static str {
         match self {
             Self::HeatCooling => "heat_cooling",
@@ -122,11 +93,6 @@ impl LumenAspect {
             Self::FireControl => "fire_control",
             Self::PowerDraw => "power_draw",
         }
-    }
-
-    pub fn next(self) -> Self {
-        let index = Self::ALL.iter().position(|item| *item == self).unwrap_or(0);
-        Self::ALL[(index + 1) % Self::ALL.len()]
     }
 }
 
