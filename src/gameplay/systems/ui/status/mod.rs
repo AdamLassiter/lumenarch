@@ -69,7 +69,6 @@ use crate::{
     },
     netcode,
     state::{
-        DemoProgression,
         GameplayBarFill,
         GameplayBarKind,
         GameplayBarLabel,
@@ -90,6 +89,7 @@ use crate::{
         GameplayStationReadoutValue,
         GameplayStationTitleText,
         GameplayTopBannerText,
+        Progression,
         StationPanelButtonAction,
     },
 };

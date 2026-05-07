@@ -17,7 +17,7 @@ use crate::{
     },
     netcode,
     ship::enemy::EnemyShipEntryValidationStatus,
-    state::{DemoProgression, EditorShip, EnemyShipLibraryState, SectorNodeKind},
+    state::{EditorShip, EnemyShipLibraryState, Progression, SectorNodeKind},
     stations::StationCatalogResource,
 };
 
@@ -28,7 +28,7 @@ pub(crate) fn spawn_runtime_scene(
     mut reactor_materials: ResMut<Assets<ReactorGlowMaterial>>,
     mut engine_materials: ResMut<Assets<EngineFlameMaterial>>,
     editor_ship: Res<EditorShip>,
-    progression: Res<DemoProgression>,
+    progression: Res<Progression>,
     enemy_library_state: Res<EnemyShipLibraryState>,
     station_catalog: Res<StationCatalogResource>,
     rollback_state: Res<netcode::RollbackGameState>,

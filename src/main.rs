@@ -22,7 +22,6 @@ use self::state::{
     ArchEditorState,
     CampaignLoadState,
     DebugOverlayState,
-    DemoProgression,
     DockedState,
     EditorPanState,
     EditorPointerState,
@@ -37,6 +36,7 @@ use self::state::{
     FrontendMode,
     LastMissionReport,
     MainCamera,
+    Progression,
     SectorMapPanState,
     SectorMapViewState,
     SectorState,
@@ -136,7 +136,7 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
     .insert_resource(EditorSessionState::default())
     .insert_resource(EnemyEditorState::default())
     .insert_resource(EnemyShipLibraryState::default())
-    .insert_resource(DemoProgression::default())
+    .insert_resource(Progression::default())
     .insert_resource(DockedState::default())
     .insert_resource(SectorState::default())
     .insert_resource(CampaignLoadState::default())

@@ -1,14 +1,13 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, ui::UiGlobalTransform};
 
 use super::super::{
     HALF_TILE_SIZE,
     TILE_SIZE,
-    TOOLBOX_WIDTH,
-    state::{EditorMode, LastMissionReport},
+    state::{EditorMode, EditorPlacementBlocker, EditorToolboxPanel, LastMissionReport},
 };
 use crate::{
     ship::{ModuleKind, ModuleSpec, ModuleVariant, ShipDefinition},
-    state::{DemoProgression, EditorSelectionState, EditorToolMode},
+    state::{EditorSelectionState, EditorToolMode, Progression},
 };
 
 pub(crate) fn editor_status_line(
@@ -22,7 +21,7 @@ pub(crate) fn editor_status_line(
     selected_channel: u8,
     module_count: usize,
     scrap_total: u32,
-    progression: &DemoProgression,
+    progression: &Progression,
     editor_ship: &ShipDefinition,
     selection_state: &EditorSelectionState,
 ) -> String {
@@ -142,7 +141,7 @@ pub(crate) fn selection_summary(
 
 pub(crate) fn variant_inventory_label(
     mode: EditorMode,
-    progression: &DemoProgression,
+    progression: &Progression,
     kind: ModuleKind,
     variant: ModuleVariant,
 ) -> String {
@@ -158,7 +157,7 @@ pub(crate) fn variant_inventory_label(
 
 pub(crate) fn variant_tooltip_text(
     mode: EditorMode,
-    progression: &DemoProgression,
+    progression: &Progression,
     kind: ModuleKind,
     variant: ModuleVariant,
 ) -> String {
@@ -204,32 +203,52 @@ pub(crate) fn grid_to_world(grid_x: i32, grid_y: i32, z: f32) -> Vec3 {
     Vec3::new(grid_x as f32 * TILE_SIZE, -(grid_y as f32) * TILE_SIZE, z)
 }
 
-pub(crate) fn is_cursor_over_toolbox(window: &Window) -> bool {
+fn cursor_over_ui_region<M: Component>(
+    window: &Window,
+    query: &Query<
+        (
+            &ComputedNode,
+            &UiGlobalTransform,
+            Option<&InheritedVisibility>,
+        ),
+        With<M>,
+    >,
+) -> bool {
     let Some(cursor) = window.cursor_position() else {
         return false;
     };
-    cursor.x <= TOOLBOX_WIDTH
+    query.iter().any(|(node, transform, visibility)| {
+        visibility.is_none_or(|visibility| visibility.get())
+            && node.contains_point(*transform, cursor)
+    })
 }
 
-pub(crate) fn is_cursor_over_editor_ui(window: &Window) -> bool {
-    let Some(cursor) = window.cursor_position() else {
-        return false;
-    };
+pub(crate) fn is_cursor_over_toolbox(
+    window: &Window,
+    toolbox_query: &Query<
+        (
+            &ComputedNode,
+            &UiGlobalTransform,
+            Option<&InheritedVisibility>,
+        ),
+        With<EditorToolboxPanel>,
+    >,
+) -> bool {
+    cursor_over_ui_region(window, toolbox_query)
+}
 
-    if cursor.x <= TOOLBOX_WIDTH {
-        return true;
-    }
-
-    let width = window.width();
-    let height = window.height();
-
-    let over_arch_panel = cursor.x >= TOOLBOX_WIDTH + 16.0
-        && cursor.x <= TOOLBOX_WIDTH + 16.0 + 640.0
-        && cursor.y >= height - 360.0;
-    let over_status_panel = cursor.x >= width - 380.0 && cursor.y <= 420.0;
-    let over_controls_panel = cursor.x <= 380.0 && cursor.y >= height - 180.0;
-
-    over_arch_panel || over_status_panel || over_controls_panel
+pub(crate) fn is_cursor_over_editor_ui(
+    window: &Window,
+    blocker_query: &Query<
+        (
+            &ComputedNode,
+            &UiGlobalTransform,
+            Option<&InheritedVisibility>,
+        ),
+        With<EditorPlacementBlocker>,
+    >,
+) -> bool {
+    cursor_over_ui_region(window, blocker_query)
 }
 
 pub(crate) fn sprite_path_for_kind(kind: &ModuleKind, variant: ModuleVariant) -> String {

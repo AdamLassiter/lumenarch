@@ -9,7 +9,7 @@ use super::{
     RollbackPhase,
     bootstrap::stable_hash,
 };
-use crate::state::{DemoProgression, FrontendMode, LastMissionReport, SectorState};
+use crate::state::{FrontendMode, LastMissionReport, Progression, SectorState};
 
 pub(crate) fn advance_rollback_state(
     frame: Res<RollbackFrameCount>,
@@ -43,7 +43,7 @@ pub(crate) fn sync_presentation_from_rollback(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
     mut editor_ship: ResMut<crate::state::EditorShip>,
-    mut progression: ResMut<DemoProgression>,
+    mut progression: ResMut<Progression>,
     mut sector: ResMut<SectorState>,
     mut last_mission_report: ResMut<LastMissionReport>,
 ) {

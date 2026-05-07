@@ -52,7 +52,7 @@ impl StoredComponentStack {
 }
 
 #[derive(Resource, Clone, Debug, Serialize, Deserialize)]
-pub(crate) struct DemoProgression {
+pub(crate) struct Progression {
     pub(crate) scrap: u32,
     pub(crate) hull_wear: u32,
     pub(crate) jump_count: u32,
@@ -70,7 +70,7 @@ pub(crate) struct DemoProgression {
     pub(crate) active_contract_id: Option<String>,
 }
 
-impl Default for DemoProgression {
+impl Default for Progression {
     fn default() -> Self {
         Self {
             scrap: 100,
@@ -93,7 +93,7 @@ impl Default for DemoProgression {
     }
 }
 
-impl DemoProgression {
+impl Progression {
     pub(crate) fn knows_station(&self, station_id: &str) -> bool {
         self.known_station_ids
             .iter()

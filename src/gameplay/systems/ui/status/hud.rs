@@ -193,7 +193,7 @@ pub(crate) fn update_gameplay_status_text(
         With<ObservedLocalPlayerMarker>,
     >,
     status_world: GameplayStatusWorldQueries,
-    progression: Res<DemoProgression>,
+    progression: Res<Progression>,
     rollback_state: Res<netcode::RollbackGameState>,
     checksum_history: Res<netcode::ChecksumHistory>,
     mut hud_ui: GameplayHudUiQueries,

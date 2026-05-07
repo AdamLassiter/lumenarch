@@ -16,6 +16,7 @@ pub(crate) use editor::{
     EditorMode,
     EditorPanState,
     EditorPasteSelectionButton,
+    EditorPlacementBlocker,
     EditorPointerState,
     EditorRoot,
     EditorSelectSection,
@@ -28,6 +29,7 @@ pub(crate) use editor::{
     EditorToolModeButton,
     EditorToolModeButtonText,
     EditorToolState,
+    EditorToolboxPanel,
     EditorToolboxScrollContent,
     EditorToolboxScrollViewport,
     EditorToolboxTooltipText,
@@ -94,10 +96,10 @@ pub(crate) use frontend::{
     TextBoxText,
 };
 pub(crate) use sector::{
-    DemoProgression,
     EncounterBackdrop,
     EncounterSpec,
     LastMissionReport,
+    Progression,
     SectorMapCanvas,
     SectorMapDetailText,
     SectorMapLinkDash,

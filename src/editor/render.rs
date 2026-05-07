@@ -10,9 +10,9 @@ use super::{
         SELECTED_BUTTON,
         TILE_SIZE,
         state::{
-            DemoProgression,
             EditingCleanup,
             EditorMode,
+            EditorPlacementBlocker,
             EditorSelectionState,
             EditorSessionState,
             EditorShip,
@@ -22,6 +22,7 @@ use super::{
             EditorUiState,
             MainCamera,
             PreviewTile,
+            Progression,
             ShipTileSprite,
             ToolboxVariantButton,
             ToolboxVariantButtonText,
@@ -30,7 +31,7 @@ use super::{
     helpers::{
         cursor_grid_position,
         grid_to_world,
-        is_cursor_over_toolbox,
+        is_cursor_over_editor_ui,
         sprite_path_for_kind,
         variant_inventory_label,
     },
@@ -61,12 +62,21 @@ pub(crate) fn sync_preview_tile(
     camera_query: Single<(&Camera, &GlobalTransform)>,
     tool_state: Res<EditorToolState>,
     asset_server: Res<AssetServer>,
+    ui_blocker_query: Query<
+        (
+            &ComputedNode,
+            &bevy::ui::UiGlobalTransform,
+            Option<&InheritedVisibility>,
+        ),
+        With<EditorPlacementBlocker>,
+    >,
     preview_query: Single<(&mut Sprite, &mut Transform, &mut Visibility), With<PreviewTile>>,
 ) {
     let (mut sprite, mut transform, mut visibility) = preview_query.into_inner();
     let window = window.into_inner();
 
-    if tool_state.tool_mode != crate::state::EditorToolMode::Build || is_cursor_over_toolbox(window)
+    if tool_state.tool_mode != crate::state::EditorToolMode::Build
+        || is_cursor_over_editor_ui(window, &ui_blocker_query)
     {
         *visibility = Visibility::Hidden;
         return;
@@ -118,7 +128,7 @@ pub(crate) fn sync_ship_tile_entities(
 
 pub(crate) fn sync_toolbox_visuals(
     tool_state: Res<EditorToolState>,
-    progression: Res<DemoProgression>,
+    progression: Res<Progression>,
     editor_session: Res<EditorSessionState>,
     mut query: Query<(&ToolboxVariantButton, &mut BackgroundColor), Without<EditorToolModeButton>>,
     mut text_query: Query<(&ToolboxVariantButtonText, &mut Text)>,

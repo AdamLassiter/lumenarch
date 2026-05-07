@@ -15,7 +15,6 @@ use crate::{
     UI_PANEL_RADIUS,
     UI_TITLE_FONT_SIZE,
     state::{
-        DemoProgression,
         EditingCleanup,
         EditorAutoHullButton,
         EditorBuildSection,
@@ -26,6 +25,7 @@ use crate::{
         EditorMissionReportText,
         EditorMode,
         EditorPasteSelectionButton,
+        EditorPlacementBlocker,
         EditorRoot,
         EditorSelectSection,
         EditorSelectionState,
@@ -37,6 +37,7 @@ use crate::{
         EditorToolModeButton,
         EditorToolModeButtonText,
         EditorToolState,
+        EditorToolboxPanel,
         EditorToolboxScrollContent,
         EditorToolboxScrollViewport,
         EditorToolboxTooltipText,
@@ -64,6 +65,7 @@ use crate::{
         ProgramEditorDraftText,
         ProgramEditorStatusText,
         ProgramEditorTextBox,
+        Progression,
         StationPanelButtonAction,
         ToolboxVariantButton,
         ToolboxVariantButtonText,
@@ -87,7 +89,7 @@ pub(crate) fn spawn_editor_ui(
     editor_ship: Res<EditorShip>,
     tool_state: Res<EditorToolState>,
     selection_state: Res<EditorSelectionState>,
-    progression: Res<DemoProgression>,
+    progression: Res<Progression>,
     last_mission_report: Res<LastMissionReport>,
     editor_ui_state: Res<EditorUiState>,
 ) {
@@ -119,6 +121,8 @@ pub(crate) fn spawn_editor_ui(
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
+                EditorPlacementBlocker,
+                EditorToolboxPanel,
             ))
             .with_children(|toolbox| {
                 toolbox.spawn((
@@ -396,6 +400,7 @@ pub(crate) fn spawn_editor_ui(
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
+                EditorPlacementBlocker,
             ))
             .with_children(|hud| {
                 hud.spawn((
@@ -442,6 +447,7 @@ pub(crate) fn spawn_editor_ui(
                         ..default()
                     },
                     BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
+                    EditorPlacementBlocker,
                 ))
                 .with_children(|panel| {
                     panel
@@ -508,6 +514,7 @@ pub(crate) fn spawn_editor_ui(
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.04, 0.06, 0.11, 0.96)),
+                EditorPlacementBlocker,
                 GameplayStationPanel,
             ))
             .with_children(|panel| {
@@ -764,6 +771,7 @@ pub(crate) fn spawn_editor_ui(
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
+                EditorPlacementBlocker,
             ))
             .with_children(|panel| {
                 panel.spawn((
@@ -946,7 +954,7 @@ fn spawn_variant_button_grid(
     asset_server: &AssetServer,
     font: &Handle<Font>,
     mode: EditorMode,
-    progression: &DemoProgression,
+    progression: &Progression,
     selected_kind: crate::ship::ModuleKind,
     selected_variant: crate::ship::ModuleVariant,
     entries: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)],
@@ -1074,7 +1082,7 @@ pub(crate) fn update_editor_status_text(
     enemy_library_state: Res<EnemyShipLibraryState>,
     selection_state: Res<EditorSelectionState>,
     tool_state: Res<EditorToolState>,
-    progression: Res<DemoProgression>,
+    progression: Res<Progression>,
     last_mission_report: Res<LastMissionReport>,
     editor_ui_state: Res<EditorUiState>,
     mut ui_queries: ParamSet<(

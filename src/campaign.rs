@@ -2,13 +2,13 @@ use std::{fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 
-use super::state::{DemoProgression, LastMissionReport, SectorState};
+use super::state::{LastMissionReport, Progression, SectorState};
 
 const DEFAULT_CAMPAIGN_PATH: &str = "saves/campaign_state.json";
 
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct CampaignSave {
-    pub(crate) progression: DemoProgression,
+    pub(crate) progression: Progression,
     pub(crate) sector: SectorState,
     pub(crate) last_mission_report: LastMissionReport,
 }

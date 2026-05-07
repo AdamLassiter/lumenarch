@@ -19,7 +19,6 @@ use super::{
     ship::{ModuleKind, ModuleVariant},
     state::{
         CampaignLoadState,
-        DemoProgression,
         DockedAcceptContractButton,
         DockedContactNextButton,
         DockedContactPrevButton,
@@ -42,6 +41,7 @@ use super::{
         LastMissionReport,
         LocalPlayerProfile,
         OpenSectorMapButton,
+        Progression,
         RefitButton,
         RepairShipButton,
         SectorState,
@@ -132,7 +132,7 @@ pub(crate) fn initialize_campaign_state(
     rollback_state: Res<netcode::RollbackGameState>,
     stations: Res<StationCatalogResource>,
     mut campaign_load_state: ResMut<CampaignLoadState>,
-    mut progression: ResMut<DemoProgression>,
+    mut progression: ResMut<Progression>,
     mut sector_state: ResMut<SectorState>,
     mut docked_state: ResMut<DockedState>,
     mut last_mission_report: ResMut<LastMissionReport>,
@@ -213,13 +213,13 @@ pub(crate) fn initialize_campaign_state(
                     *last_mission_report = save.last_mission_report;
                 }
                 Ok(None) => {
-                    *progression = DemoProgression::default();
+                    *progression = Progression::default();
                     *sector_state = SectorState::default();
                     *last_mission_report = LastMissionReport::default();
                 }
                 Err(error) => {
                     eprintln!("campaign: failed to load save state: {error}");
-                    *progression = DemoProgression::default();
+                    *progression = Progression::default();
                     *sector_state = SectorState::default();
                     *last_mission_report = LastMissionReport::default();
                 }
@@ -265,7 +265,7 @@ pub(crate) fn initialize_campaign_state(
 
 pub(crate) fn persist_campaign_state(
     campaign_load_state: Res<CampaignLoadState>,
-    progression: Res<DemoProgression>,
+    progression: Res<Progression>,
     sector_state: Res<SectorState>,
     last_mission_report: Res<LastMissionReport>,
 ) {
@@ -292,7 +292,7 @@ pub(crate) fn spawn_docked_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     docked_state: Res<DockedState>,
-    progression: Res<DemoProgression>,
+    progression: Res<Progression>,
     last_mission_report: Res<LastMissionReport>,
     editor_ship: Res<EditorShip>,
     status: Res<netcode::SessionStatus>,
@@ -629,7 +629,7 @@ pub(crate) fn docked_button_system(
     mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
     mut editor_session: ResMut<EditorSessionState>,
     mut docked_state: ResMut<DockedState>,
-    progression: Res<DemoProgression>,
+    progression: Res<Progression>,
     sector_state: Res<SectorState>,
     stations: Res<StationCatalogResource>,
 ) {
@@ -791,7 +791,7 @@ pub(crate) fn docked_button_system(
 
 pub(crate) fn update_docked_status_text(
     docked_state: Res<DockedState>,
-    progression: Res<DemoProgression>,
+    progression: Res<Progression>,
     last_mission_report: Res<LastMissionReport>,
     editor_ship: Res<EditorShip>,
     local_profile: Res<LocalPlayerProfile>,
@@ -819,7 +819,7 @@ pub(crate) fn update_docked_status_text(
 
 pub(crate) fn update_docked_surface_ui(
     docked_state: Res<DockedState>,
-    progression: Res<DemoProgression>,
+    progression: Res<Progression>,
     last_mission_report: Res<LastMissionReport>,
     sector_state: Res<SectorState>,
     stations: Res<StationCatalogResource>,
@@ -1031,7 +1031,7 @@ fn spawn_half_width_action_button<T: Bundle + 'static>(
 
 fn docked_status_text(
     docked_state: &DockedState,
-    progression: &DemoProgression,
+    progression: &Progression,
     editor_ship: &EditorShip,
     last_mission_report: &LastMissionReport,
     local_profile: &LocalPlayerProfile,
@@ -1106,7 +1106,7 @@ fn docked_help_text(surface: DockedSurface) -> String {
 fn docked_content_text(
     station: Option<&stations::StationDefinition>,
     docked_state: &DockedState,
-    progression: &DemoProgression,
+    progression: &Progression,
     last_mission_report: &LastMissionReport,
     sector_state: &SectorState,
 ) -> String {

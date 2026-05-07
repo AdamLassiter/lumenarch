@@ -143,17 +143,17 @@
         "turret_fire_intent": false
       },
       "arch_program": {
-        "template": "TurretAssist",
-        "name": "TurretAssist",
+        "template": "LogisticsFeed",
+        "name": "LogisticsFeed",
         "constants": [
-          1,
-          2
+          2,
+          1
         ],
-        "source_text": "",
+        "source_text": "MOV LMC0 0\nMOV LMP0 0\nGT GP0 LSR0 0\nLT GP1 LPR0 2\nADD GP2 GP0 GP1\nGT GP3 GP2 1\nJNZ GP3 9\nJMP 11\nMOV LMC0 1\nMOV LMP0 0",
         "instructions": [
           {
             "Mov": {
-              "dst": "CmdTurretAssist",
+              "dst": "CmdLogisticsEnable",
               "src": {
                 "Immediate": 0
               }
@@ -161,7 +161,7 @@
           },
           {
             "Mov": {
-              "dst": "CmdTurretAutoFire",
+              "dst": "CmdLogisticsPreference",
               "src": {
                 "Immediate": 0
               }
@@ -171,7 +171,7 @@
             "Gt": {
               "dst": "Gp0",
               "lhs": {
-                "Register": "MissionThreat"
+                "Register": "StorageRawSalvage"
               },
               "rhs": {
                 "Immediate": 0
@@ -179,21 +179,10 @@
             }
           },
           {
-            "Gt": {
+            "Lt": {
               "dst": "Gp1",
               "lhs": {
-                "Register": "TurretReady"
-              },
-              "rhs": {
-                "Immediate": 0
-              }
-            }
-          },
-          {
-            "Gt": {
-              "dst": "Gp2",
-              "lhs": {
-                "Register": "ShipPowerReserve"
+                "Register": "ProcessorRawSalvage"
               },
               "rhs": {
                 "Immediate": 2
@@ -202,7 +191,7 @@
           },
           {
             "Add": {
-              "dst": "Gp3",
+              "dst": "Gp2",
               "lhs": {
                 "Register": "Gp0"
               },
@@ -212,24 +201,13 @@
             }
           },
           {
-            "Add": {
-              "dst": "Gp3",
-              "lhs": {
-                "Register": "Gp3"
-              },
-              "rhs": {
-                "Register": "Gp2"
-              }
-            }
-          },
-          {
             "Gt": {
               "dst": "Gp3",
               "lhs": {
-                "Register": "Gp3"
+                "Register": "Gp2"
               },
               "rhs": {
-                "Immediate": 2
+                "Immediate": 1
               }
             }
           },
@@ -238,17 +216,17 @@
               "cond": {
                 "Register": "Gp3"
               },
-              "target": 11
+              "target": 9
             }
           },
           {
             "Jmp": {
-              "target": 13
+              "target": 11
             }
           },
           {
             "Mov": {
-              "dst": "CmdTurretAssist",
+              "dst": "CmdLogisticsEnable",
               "src": {
                 "Immediate": 1
               }
@@ -256,9 +234,9 @@
           },
           {
             "Mov": {
-              "dst": "CmdTurretAutoFire",
+              "dst": "CmdLogisticsPreference",
               "src": {
-                "Immediate": 1
+                "Immediate": 0
               }
             }
           }
@@ -891,54 +869,6 @@
       "lumen_program": null
     },
     {
-      "id": 35,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": -2,
-      "grid_y": -4,
-      "rotation_quadrants": 0,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 36,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": -1,
-      "grid_y": -4,
-      "rotation_quadrants": 0,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
       "id": 37,
       "kind": "Hull",
       "variant": "Standard",
@@ -1065,6 +995,54 @@
       "grid_x": 1,
       "grid_y": 0,
       "rotation_quadrants": 1,
+      "channel": 0,
+      "defaults": {
+        "reaction_rate_milli": 350,
+        "turbine_load_milli": 300,
+        "storage_allow_intake": true,
+        "airlock_open": false,
+        "manipulator_manual_mode": false,
+        "manipulator_transfer_enabled": false,
+        "manipulator_resource_kind": "RawSalvage",
+        "processor_recipe": "RepairCharge",
+        "processor_enabled": true,
+        "computer_enabled": true,
+        "turret_fire_intent": false
+      },
+      "arch_program": null,
+      "lumen_program": null
+    },
+    {
+      "id": 43,
+      "kind": "Hull",
+      "variant": "Standard",
+      "grid_x": -1,
+      "grid_y": -4,
+      "rotation_quadrants": 0,
+      "channel": 0,
+      "defaults": {
+        "reaction_rate_milli": 350,
+        "turbine_load_milli": 300,
+        "storage_allow_intake": true,
+        "airlock_open": false,
+        "manipulator_manual_mode": false,
+        "manipulator_transfer_enabled": false,
+        "manipulator_resource_kind": "RawSalvage",
+        "processor_recipe": "RepairCharge",
+        "processor_enabled": true,
+        "computer_enabled": true,
+        "turret_fire_intent": false
+      },
+      "arch_program": null,
+      "lumen_program": null
+    },
+    {
+      "id": 44,
+      "kind": "Hull",
+      "variant": "Standard",
+      "grid_x": -2,
+      "grid_y": -4,
+      "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
         "reaction_rate_milli": 350,

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     DEFAULT_HOST_ADDR,
     ship::ShipDefinition,
-    state::{DemoProgression, LastMissionReport, LocalPlayerProfile, SectorState},
+    state::{LastMissionReport, LocalPlayerProfile, Progression, SectorState},
 };
 
 pub(crate) type LumenGgrsConfig = bevy_ggrs::GgrsConfig<PlayerGgrsInput, SocketAddr, u128>;
@@ -145,7 +145,7 @@ pub(crate) struct RollbackGameState {
     pub(crate) seed: u64,
     pub(crate) scene_generation: u32,
     pub(crate) editor_ship: ShipDefinition,
-    pub(crate) progression: DemoProgression,
+    pub(crate) progression: Progression,
     pub(crate) sector: SectorState,
     pub(crate) last_mission_report: LastMissionReport,
 }
@@ -158,7 +158,7 @@ impl Default for RollbackGameState {
             seed: 0x10_4E6,
             scene_generation: 0,
             editor_ship: ShipDefinition::empty("Untitled Knot"),
-            progression: DemoProgression::default(),
+            progression: Progression::default(),
             sector: SectorState::default(),
             last_mission_report: LastMissionReport::default(),
         }

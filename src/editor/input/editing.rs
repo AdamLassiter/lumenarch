@@ -1,4 +1,7 @@
-use std::ops::DerefMut;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::DerefMut,
+};
 
 use bevy::{
     input::mouse::{MouseButton, MouseWheel},
@@ -33,7 +36,6 @@ use crate::{
     },
     state::{
         ArchEditorState,
-        DemoProgression,
         EditorAutoHullButton,
         EditorCopySelectionButton,
         EditorDeleteSelectionButton,
@@ -41,6 +43,7 @@ use crate::{
         EditorMode,
         EditorPanState,
         EditorPasteSelectionButton,
+        EditorPlacementBlocker,
         EditorPointerState,
         EditorSelectionState,
         EditorSessionState,
@@ -48,6 +51,7 @@ use crate::{
         EditorToolMode,
         EditorToolModeButton,
         EditorToolState,
+        EditorToolboxPanel,
         EditorUiState,
         EditorViewState,
         EnemyEditorState,
@@ -57,6 +61,7 @@ use crate::{
         LeaveEditorButton,
         MainCamera,
         ProgrammingLanguageMode,
+        Progression,
         ToolboxVariantButton,
     },
 };
@@ -72,7 +77,7 @@ pub(crate) fn toolbox_button_system(
         (Changed<Interaction>, With<Button>),
     >,
     editor_session: Res<EditorSessionState>,
-    progression: Res<DemoProgression>,
+    progression: Res<Progression>,
     mut tool_state: ResMut<EditorToolState>,
     mut editor_ui_state: ResMut<EditorUiState>,
 ) {
@@ -250,15 +255,22 @@ pub(crate) fn place_or_remove_tile(
     buttons: Res<ButtonInput<MouseButton>>,
     window: Single<&Window, With<PrimaryWindow>>,
     camera_query: Single<(&Camera, &GlobalTransform)>,
+    ui_blocker_query: Query<
+        (
+            &ComputedNode,
+            &bevy::ui::UiGlobalTransform,
+            Option<&InheritedVisibility>,
+        ),
+        With<EditorPlacementBlocker>,
+    >,
     mut editor_ship: ResMut<EditorShip>,
-    mut progression: ResMut<DemoProgression>,
+    mut progression: ResMut<Progression>,
     status: Res<netcode::SessionStatus>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
     editor_session: Res<EditorSessionState>,
     tool_state: Res<EditorToolState>,
     mut selection_state: ResMut<EditorSelectionState>,
     mut pointer_state: ResMut<EditorPointerState>,
-    arch_editor_state: ResMut<ArchEditorState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
 ) {
     if !netcode::is_host_authority(&status) {
@@ -266,24 +278,8 @@ pub(crate) fn place_or_remove_tile(
     }
     let window = window.into_inner();
 
-    if is_cursor_over_editor_ui(window) {
+    if is_cursor_over_editor_ui(window, &ui_blocker_query) {
         return;
-    }
-
-    if arch_editor_state.panel_open {
-        let width = window.width();
-        let height = window.height();
-        let over_module_panel = if let Some(cursor) = window.cursor_position() {
-            cursor.x >= width * 0.2
-                && cursor.x <= width * 0.8
-                && cursor.y >= 160.0
-                && cursor.y <= height - 40.0
-        } else {
-            false
-        };
-        if over_module_panel {
-            return;
-        }
     }
 
     let Some((grid_x, grid_y)) = cursor_grid_position(window, *camera_query) else {
@@ -346,7 +342,7 @@ pub(crate) fn place_or_remove_tile(
 
 fn apply_build_action(
     ship: &mut ShipDefinition,
-    progression: &mut DemoProgression,
+    progression: &mut Progression,
     mode: EditorMode,
     tool_state: &EditorToolState,
     grid_x: i32,
@@ -410,7 +406,7 @@ fn apply_build_action(
 
 fn sync_editor_resources(
     ship: &ShipDefinition,
-    progression: &DemoProgression,
+    progression: &Progression,
     mode: EditorMode,
     rollback_state: &mut netcode::RollbackGameState,
     enemy_editor_state: &mut EnemyEditorState,
@@ -609,7 +605,7 @@ pub(crate) fn repair_selected_component_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     editor_session: Res<EditorSessionState>,
     tool_state: Res<EditorToolState>,
-    mut progression: ResMut<DemoProgression>,
+    mut progression: ResMut<Progression>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
 ) {
     if editor_session.mode != EditorMode::Player || !keys.just_pressed(KeyCode::KeyT) {
@@ -640,7 +636,7 @@ pub(crate) fn selection_action_button_system(
     editor_session: Res<EditorSessionState>,
     status: Res<netcode::SessionStatus>,
     mut editor_ship: ResMut<EditorShip>,
-    mut progression: ResMut<DemoProgression>,
+    mut progression: ResMut<Progression>,
     mut selection_state: ResMut<EditorSelectionState>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
@@ -656,11 +652,7 @@ pub(crate) fn selection_action_button_system(
             Interaction::Pressed => {
                 let mut changed = false;
                 if auto_hull.is_some() {
-                    changed = apply_auto_hull_to_ship(
-                        &mut editor_ship.ship,
-                        &mut progression,
-                        editor_session.mode,
-                    );
+                    changed = apply_auto_hull_to_ship(&mut editor_ship.ship);
                 } else if copy.is_some() {
                     selection_state.clipboard = selected_or_all_modules(
                         &editor_ship.ship,
@@ -725,7 +717,7 @@ pub(crate) fn selection_shortcuts(
     status: Res<netcode::SessionStatus>,
     tool_state: Res<EditorToolState>,
     mut editor_ship: ResMut<EditorShip>,
-    mut progression: ResMut<DemoProgression>,
+    mut progression: ResMut<Progression>,
     mut selection_state: ResMut<EditorSelectionState>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
@@ -767,8 +759,7 @@ pub(crate) fn selection_shortcuts(
     }
 
     if keys.just_pressed(KeyCode::KeyH) {
-        changed |=
-            apply_auto_hull_to_ship(&mut editor_ship.ship, &mut progression, editor_session.mode);
+        changed |= apply_auto_hull_to_ship(&mut editor_ship.ship);
     }
 
     for (key, dx, dy) in [
@@ -868,6 +859,22 @@ pub(crate) fn pan_and_zoom_editor_view(
     mut mouse_wheel: MessageReader<MouseWheel>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     window: Single<&Window, With<PrimaryWindow>>,
+    toolbox_query: Query<
+        (
+            &ComputedNode,
+            &bevy::ui::UiGlobalTransform,
+            Option<&InheritedVisibility>,
+        ),
+        With<EditorToolboxPanel>,
+    >,
+    ui_blocker_query: Query<
+        (
+            &ComputedNode,
+            &bevy::ui::UiGlobalTransform,
+            Option<&InheritedVisibility>,
+        ),
+        With<EditorPlacementBlocker>,
+    >,
     mut editor_ui_state: ResMut<EditorUiState>,
     mut pan_state: ResMut<EditorPanState>,
     mut view_state: ResMut<EditorViewState>,
@@ -880,7 +887,7 @@ pub(crate) fn pan_and_zoom_editor_view(
     };
 
     for event in mouse_wheel.read() {
-        if is_cursor_over_toolbox(window) {
+        if is_cursor_over_toolbox(window, &toolbox_query) {
             let estimated_content_height: f32 = 980.0;
             let viewport_height: f32 = 470.0;
             let max_scroll = (estimated_content_height - viewport_height).max(0.0_f32);
@@ -893,7 +900,9 @@ pub(crate) fn pan_and_zoom_editor_view(
     }
 
     let cursor_position = window.cursor_position();
-    if mouse_buttons.pressed(MouseButton::Middle) && !is_cursor_over_editor_ui(window) {
+    if mouse_buttons.pressed(MouseButton::Middle)
+        && !is_cursor_over_editor_ui(window, &ui_blocker_query)
+    {
         if let Some(cursor) = cursor_position {
             if let Some(previous_cursor) = pan_state.last_cursor {
                 let delta = cursor - previous_cursor;
@@ -1091,7 +1100,7 @@ fn move_selected_group(
 
 fn delete_selected_group(
     ship: &mut ShipDefinition,
-    progression: &mut DemoProgression,
+    progression: &mut Progression,
     mode: EditorMode,
     selection_state: &mut EditorSelectionState,
 ) -> bool {
@@ -1112,7 +1121,7 @@ fn delete_selected_group(
 
 fn paste_clipboard_group(
     ship: &mut ShipDefinition,
-    progression: &mut DemoProgression,
+    progression: &mut Progression,
     mode: EditorMode,
     selection_state: &mut EditorSelectionState,
     anchor: (i32, i32),
@@ -1152,7 +1161,7 @@ fn paste_clipboard_group(
     }
 
     if mode == EditorMode::Player {
-        let mut needed = std::collections::HashMap::<(ModuleKind, ModuleVariant), u32>::new();
+        let mut needed = HashMap::<(ModuleKind, ModuleVariant), u32>::new();
         for (module, _, _) in &planned {
             *needed.entry((module.kind, module.variant)).or_default() += 1;
         }
@@ -1185,20 +1194,12 @@ fn paste_clipboard_group(
     true
 }
 
-fn apply_auto_hull_to_ship(
-    ship: &mut ShipDefinition,
-    progression: &mut DemoProgression,
-    mode: EditorMode,
-) -> bool {
+/// Rebuilds the derived hull shell around all non-hull structure modules in the editor ship.
+fn apply_auto_hull_to_ship(ship: &mut ShipDefinition) -> bool {
     let base = ship
         .modules
         .iter()
-        .filter(|module| {
-            !matches!(
-                module.kind,
-                ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner
-            )
-        })
+        .filter(|module| !is_generated_hull_kind(module.kind))
         .cloned()
         .collect::<Vec<_>>();
     if base.is_empty() {
@@ -1207,39 +1208,87 @@ fn apply_auto_hull_to_ship(
 
     let occupied = base
         .iter()
+        .filter(|module| !is_manual_hull_kind(module.kind))
         .map(|module| (module.grid_x, module.grid_y))
-        .collect::<std::collections::HashSet<_>>();
-    let mut changed = false;
+        .collect::<HashSet<_>>();
 
+    let existing_hull = ship
+        .modules
+        .iter()
+        .filter(|module| is_manual_hull_kind(module.kind))
+        .map(|module| {
+            (
+                (module.grid_x, module.grid_y),
+                (module.kind, module.rotation_quadrants),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+
+    let mut candidates = HashSet::new();
     for module in &base {
-        for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
-            let target = (module.grid_x + dx, module.grid_y + dy);
-            if occupied.contains(&target) || ship.module_at(target.0, target.1).is_some() {
-                continue;
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
+                let target = (module.grid_x + dx, module.grid_y + dy);
+                if !occupied.contains(&target) {
+                    candidates.insert(target);
+                }
             }
-
-            let (kind, rotation) = auto_hull_kind_for_cell(&occupied, target);
-            let variant = ModuleVariant::default_for_kind(kind);
-            if mode == EditorMode::Player && !progression.try_consume_ready_component(kind, variant)
-            {
-                continue;
-            }
-
-            let next_id = ship.next_module_id();
-            let mut hull = ShipModule::new(next_id, kind, target.0, target.1, rotation);
-            hull.variant = variant;
-            ship.replace_module(hull);
-            changed = true;
         }
     }
 
-    changed
+    let mut desired_hull = candidates
+        .into_iter()
+        .filter_map(|target| {
+            auto_hull_kind_for_cell(&occupied, target)
+                .map(|(kind, rotation)| (target, (kind, rotation)))
+        })
+        .collect::<Vec<_>>();
+    desired_hull.sort_by_key(|((x, y), _)| (*y, *x));
+
+    ship.modules
+        .retain(|module| !is_generated_hull_kind(module.kind));
+
+    for ((grid_x, grid_y), (kind, rotation)) in desired_hull {
+        if existing_hull.contains_key(&(grid_x, grid_y)) {
+            continue;
+        }
+        let variant = ModuleVariant::default_for_kind(kind);
+        let next_id = ship.next_module_id();
+        let mut hull = ShipModule::new(next_id, kind, grid_x, grid_y, rotation);
+        hull.variant = variant;
+        ship.replace_module(hull);
+    }
+
+    true
 }
 
+fn is_generated_hull_kind(kind: ModuleKind) -> bool {
+    matches!(
+        kind,
+        ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner
+    )
+}
+
+fn is_manual_hull_kind(kind: ModuleKind) -> bool {
+    matches!(
+        kind,
+        ModuleKind::Hull
+            | ModuleKind::HullInnerCorner
+            | ModuleKind::HullOuterCorner
+            | ModuleKind::Airlock
+            | ModuleKind::Engine
+            | ModuleKind::Turret
+    )
+}
+
+/// Chooses the hull piece and orientation that best wraps one empty shell cell around structure.
 fn auto_hull_kind_for_cell(
-    occupied: &std::collections::HashSet<(i32, i32)>,
+    occupied: &HashSet<(i32, i32)>,
     target: (i32, i32),
-) -> (ModuleKind, u8) {
+) -> Option<(ModuleKind, u8)> {
     let north = occupied.contains(&(target.0, target.1 - 1));
     let south = occupied.contains(&(target.0, target.1 + 1));
     let west = occupied.contains(&(target.0 - 1, target.1));
@@ -1249,42 +1298,35 @@ fn auto_hull_kind_for_cell(
     let southeast = occupied.contains(&(target.0 + 1, target.1 + 1));
     let southwest = occupied.contains(&(target.0 - 1, target.1 + 1));
 
-    if (north || south) && (east || west) {
-        let rotation = if north && east {
-            0
-        } else if east && south {
-            1
-        } else if south && west {
-            2
-        } else {
-            3
-        };
-        return (ModuleKind::HullInnerCorner, rotation);
-    }
-
-    if northeast || northwest || southeast || southwest {
-        let rotation = if northeast {
-            0
-        } else if southeast {
-            1
-        } else if southwest {
-            2
-        } else {
-            3
-        };
-        return (ModuleKind::HullOuterCorner, rotation);
-    }
-
-    let rotation = if south {
-        0
+    if (south && north) || (east && west) {
+        None
+    } else if north && east && northeast {
+        Some((ModuleKind::HullInnerCorner, 0))
+    } else if south && east && southeast {
+        Some((ModuleKind::HullInnerCorner, 1))
+    } else if south && west && southwest {
+        Some((ModuleKind::HullInnerCorner, 2))
+    } else if north && west && northwest {
+        Some((ModuleKind::HullInnerCorner, 3))
+    } else if south {
+        Some((ModuleKind::Hull, 0))
     } else if west {
-        1
+        Some((ModuleKind::Hull, 1))
     } else if north {
-        2
+        Some((ModuleKind::Hull, 2))
+    } else if east {
+        Some((ModuleKind::Hull, 3))
+    } else if southeast {
+        Some((ModuleKind::HullOuterCorner, 0))
+    } else if southwest {
+        Some((ModuleKind::HullOuterCorner, 1))
+    } else if northwest {
+        Some((ModuleKind::HullOuterCorner, 2))
+    } else if northeast {
+        Some((ModuleKind::HullOuterCorner, 3))
     } else {
-        3
-    };
-    (ModuleKind::Hull, rotation)
+        None
+    }
 }
 
 #[cfg(test)]
@@ -1292,7 +1334,7 @@ mod tests {
     use super::{apply_auto_hull_to_ship, paste_clipboard_group};
     use crate::{
         ship::{ModuleKind, ModuleVariant, ShipDefinition, ShipModule},
-        state::{DemoProgression, EditorMode, EditorSelectionState, ShipModuleSnapshot},
+        state::{EditorMode, EditorSelectionState, Progression, ShipModuleSnapshot},
     };
 
     #[test]
@@ -1301,8 +1343,7 @@ mod tests {
         ship.replace_module(ShipModule::new(1, ModuleKind::Core, 0, 0, 0));
         ship.replace_module(ShipModule::new(2, ModuleKind::Interior, 1, 0, 0));
 
-        let mut progression = DemoProgression::default();
-        let changed = apply_auto_hull_to_ship(&mut ship, &mut progression, EditorMode::Player);
+        let changed = apply_auto_hull_to_ship(&mut ship);
 
         assert!(changed);
         assert!(ship.modules.iter().any(|module| {
@@ -1314,9 +1355,59 @@ mod tests {
     }
 
     #[test]
+    fn auto_hull_builds_edges_and_outer_corners_around_single_component() {
+        let mut ship = ShipDefinition::empty("Outer Shell Test");
+        ship.replace_module(ShipModule::new(1, ModuleKind::Core, 0, 0, 0));
+
+        let changed = apply_auto_hull_to_ship(&mut ship);
+
+        assert!(changed);
+        let shell = ship
+            .modules
+            .iter()
+            .filter(|module| module.kind != ModuleKind::Core)
+            .map(|module| {
+                (
+                    (module.grid_x, module.grid_y),
+                    (module.kind, module.rotation_quadrants),
+                )
+            })
+            .collect::<std::collections::HashMap<_, _>>();
+
+        assert_eq!(
+            shell.get(&(-1, -1)),
+            Some(&(ModuleKind::HullOuterCorner, 0))
+        );
+        assert_eq!(shell.get(&(0, -1)), Some(&(ModuleKind::Hull, 0)));
+        assert_eq!(shell.get(&(1, -1)), Some(&(ModuleKind::HullOuterCorner, 1)));
+        assert_eq!(shell.get(&(-1, 0)), Some(&(ModuleKind::Hull, 3)));
+        assert_eq!(shell.get(&(1, 0)), Some(&(ModuleKind::Hull, 1)));
+        assert_eq!(shell.get(&(-1, 1)), Some(&(ModuleKind::HullOuterCorner, 3)));
+        assert_eq!(shell.get(&(0, 1)), Some(&(ModuleKind::Hull, 2)));
+        assert_eq!(shell.get(&(1, 1)), Some(&(ModuleKind::HullOuterCorner, 2)));
+    }
+
+    #[test]
+    fn auto_hull_uses_inner_corner_for_l_shaped_structure() {
+        let mut ship = ShipDefinition::empty("Inner Corner Test");
+        ship.replace_module(ShipModule::new(1, ModuleKind::Core, 0, 0, 0));
+        ship.replace_module(ShipModule::new(2, ModuleKind::Interior, 1, 0, 0));
+        ship.replace_module(ShipModule::new(3, ModuleKind::Interior, 0, 1, 0));
+
+        let changed = apply_auto_hull_to_ship(&mut ship);
+
+        assert!(changed);
+        let corner = ship
+            .module_at(1, 1)
+            .expect("expected derived inner corner at the L-shape notch");
+        assert_eq!(corner.kind, ModuleKind::HullInnerCorner);
+        assert_eq!(corner.rotation_quadrants, 2);
+    }
+
+    #[test]
     fn pasting_group_consumes_variant_inventory_in_player_mode() {
         let mut ship = ShipDefinition::empty("Paste Test");
-        let mut progression = DemoProgression::default();
+        let mut progression = Progression::default();
         progression.add_ready_component(ModuleKind::Turret, ModuleVariant::BallisticTurret, 1);
         let mut selection_state = EditorSelectionState {
             clipboard: vec![ShipModuleSnapshot {

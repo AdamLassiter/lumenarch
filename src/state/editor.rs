@@ -181,6 +181,12 @@ pub(crate) struct EditorToolboxScrollViewport;
 pub(crate) struct EditorToolboxScrollContent;
 
 #[derive(Component)]
+pub(crate) struct EditorPlacementBlocker;
+
+#[derive(Component)]
+pub(crate) struct EditorToolboxPanel;
+
+#[derive(Component)]
 pub(crate) struct ToolboxVariantButton {
     pub(crate) kind: ModuleKind,
     pub(crate) variant: ModuleVariant,
