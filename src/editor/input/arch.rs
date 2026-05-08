@@ -143,26 +143,32 @@ pub(crate) fn edit_program_text_editor(
                 program_editor_state.cursor_index = program_editor_state.draft_text.chars().count();
                 program_editor_state.select_all = true;
             }
-            Key::Character(chars) if ctrl_pressed && chars.eq_ignore_ascii_case("c") => {
-                if program_editor_state.select_all {
-                    clipboard.contents = program_editor_state.draft_text.clone();
-                }
+            Key::Character(chars)
+                if ctrl_pressed
+                    && chars.eq_ignore_ascii_case("c")
+                    && program_editor_state.select_all =>
+            {
+                clipboard.contents = program_editor_state.draft_text.clone();
             }
-            Key::Character(chars) if ctrl_pressed && chars.eq_ignore_ascii_case("x") => {
-                if program_editor_state.select_all {
-                    clipboard.contents = program_editor_state.draft_text.clone();
-                    program_editor_state.draft_text.clear();
-                    program_editor_state.cursor_index = 0;
-                    program_editor_state.select_all = false;
-                    program_editor_state.dirty = true;
-                    program_editor_state.status_line = "Draft edited".to_string();
-                }
+            Key::Character(chars)
+                if ctrl_pressed
+                    && chars.eq_ignore_ascii_case("x")
+                    && program_editor_state.select_all =>
+            {
+                clipboard.contents = program_editor_state.draft_text.clone();
+                program_editor_state.draft_text.clear();
+                program_editor_state.cursor_index = 0;
+                program_editor_state.select_all = false;
+                program_editor_state.dirty = true;
+                program_editor_state.status_line = "Draft edited".to_string();
             }
-            Key::Character(chars) if ctrl_pressed && chars.eq_ignore_ascii_case("v") => {
-                if !clipboard.contents.is_empty() {
-                    let contents = clipboard.contents.clone();
-                    insert_program_text(&mut program_editor_state, &contents);
-                }
+            Key::Character(chars)
+                if ctrl_pressed
+                    && chars.eq_ignore_ascii_case("v")
+                    && !clipboard.contents.is_empty() =>
+            {
+                let contents = clipboard.contents.clone();
+                insert_program_text(&mut program_editor_state, &contents);
             }
             Key::Character(chars) if !ctrl_pressed => {
                 let sanitized: String = chars

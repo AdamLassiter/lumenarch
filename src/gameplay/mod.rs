@@ -61,6 +61,7 @@ pub(crate) use systems::{
     toggle_shipboard_control_mode,
     update_current_station,
     update_destroyed_module_visuals,
+    update_detector_modules,
     update_gameplay_status_text,
     update_mission_state,
     update_mission_telemetry,

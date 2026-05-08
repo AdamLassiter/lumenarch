@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use super::super::helpers::Fx;
+use super::super::helpers::{FixedVec2, Fx};
 use crate::ship::ModuleKind;
 
 #[derive(Component, Clone)]
@@ -90,6 +90,25 @@ pub(crate) struct ShipArchCommandState {
     pub(crate) turret_assist_enabled: bool,
     pub(crate) turret_auto_fire: bool,
     pub(crate) turret_fire_hold: bool,
+}
+
+#[derive(Component, Clone)]
+pub(crate) struct ShipDamageSensorState {
+    pub(crate) recent_direction: FixedVec2,
+    pub(crate) recent_distance: Fx,
+    pub(crate) recent_intensity: Fx,
+    pub(crate) recent_timer: Fx,
+}
+
+impl Default for ShipDamageSensorState {
+    fn default() -> Self {
+        Self {
+            recent_direction: FixedVec2::zero(),
+            recent_distance: Fx::from_num(0),
+            recent_intensity: Fx::from_num(0),
+            recent_timer: Fx::from_num(0),
+        }
+    }
 }
 
 impl Default for ShipArchCommandState {

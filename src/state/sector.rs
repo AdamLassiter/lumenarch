@@ -302,6 +302,24 @@ fn starter_component_inventory() -> Vec<StoredComponentStack> {
             damaged: 0,
         },
         StoredComponentStack {
+            kind: ModuleKind::Detector,
+            variant: ModuleVariant::LifePulse,
+            ready: 1,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Detector,
+            variant: ModuleVariant::ShipPing,
+            ready: 1,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Detector,
+            variant: ModuleVariant::DamageAlarm,
+            ready: 1,
+            damaged: 0,
+        },
+        StoredComponentStack {
             kind: ModuleKind::Processor,
             variant: ModuleVariant::FabricatorSlow,
             ready: 1,
@@ -328,6 +346,12 @@ fn starter_component_inventory() -> Vec<StoredComponentStack> {
         StoredComponentStack {
             kind: ModuleKind::Shield,
             variant: ModuleVariant::RadialShield,
+            ready: 1,
+            damaged: 0,
+        },
+        StoredComponentStack {
+            kind: ModuleKind::Detector,
+            variant: ModuleVariant::PowerMonitor,
             ready: 1,
             damaged: 0,
         },

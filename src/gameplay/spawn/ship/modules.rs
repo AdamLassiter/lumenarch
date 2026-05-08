@@ -10,6 +10,9 @@ use crate::{
             AirlockCommandState,
             ArchComputerModule,
             ArchExecutionResult,
+            DetectorCommandState,
+            DetectorKind,
+            DetectorModule,
             DroneStationCommandState,
             DroneStationModule,
             DroneTask,
@@ -43,6 +46,7 @@ use crate::{
         },
         effects::{EngineFlameMaterial, ReactorGlowMaterial},
         helpers::{
+            FixedVec2,
             Fx,
             module_integrity,
             module_local_position,
@@ -283,6 +287,28 @@ pub(crate) fn spawn_runtime_module(
                 },
             ));
         }
+        ModuleKind::Detector => {
+            let (kind, tier, range, draw) = detector_profile(module.variant);
+            entity.insert((
+                PowerConsumer { draw },
+                DetectorCommandState {
+                    show_targets: true,
+                    show_heat: true,
+                    show_electrical: true,
+                },
+                DetectorModule {
+                    kind,
+                    tier,
+                    range,
+                    detected: false,
+                    secondary_detected: false,
+                    direction: FixedVec2::zero(),
+                    distance: Fx::from_num(0),
+                    magnitude: Fx::from_num(0),
+                    critical: false,
+                },
+            ));
+        }
         ModuleKind::Processor => {
             entity.insert((
                 PowerConsumer { draw: 2 },
@@ -420,6 +446,13 @@ fn module_field_emitter(kind: ModuleKind, balance: &BalanceConfig) -> ModuleFiel
             electrical_output: Fx::from_num(balance.fields.emitter_computer_electrical),
             grounding_output: Fx::from_num(balance.fields.emitter_computer_grounding),
         },
+        ModuleKind::Detector => ModuleFieldEmitter {
+            heat_output: Fx::from_num(balance.fields.emitter_computer_heat) * Fx::from_num(0.45),
+            cooling_output: Fx::from_num(0),
+            electrical_output: Fx::from_num(balance.fields.emitter_computer_electrical)
+                * Fx::from_num(0.6),
+            grounding_output: Fx::from_num(balance.fields.emitter_computer_grounding),
+        },
         ModuleKind::Processor => ModuleFieldEmitter {
             heat_output: Fx::from_num(balance.fields.emitter_processor_heat),
             cooling_output: Fx::from_num(0),
@@ -449,5 +482,23 @@ fn module_field_emitter(kind: ModuleKind, balance: &BalanceConfig) -> ModuleFiel
                 grounding_output: Fx::from_num(balance.fields.emitter_generic_grounding),
             }
         }
+    }
+}
+
+fn detector_profile(variant: ModuleVariant) -> (DetectorKind, u8, Fx, i32) {
+    match variant {
+        ModuleVariant::LifePulse => (DetectorKind::LifeSign, 1, Fx::from_num(170), 1),
+        ModuleVariant::LifeSweep => (DetectorKind::LifeSign, 2, Fx::from_num(260), 2),
+        ModuleVariant::LifeSurvey => (DetectorKind::LifeSign, 3, Fx::from_num(360), 2),
+        ModuleVariant::ShipPing => (DetectorKind::Ship, 1, Fx::from_num(260), 1),
+        ModuleVariant::ShipVector => (DetectorKind::Ship, 2, Fx::from_num(360), 2),
+        ModuleVariant::ShipSurvey => (DetectorKind::Ship, 3, Fx::from_num(480), 2),
+        ModuleVariant::DamageAlarm => (DetectorKind::Damage, 1, Fx::from_num(0), 1),
+        ModuleVariant::DamageArray => (DetectorKind::Damage, 2, Fx::from_num(0), 2),
+        ModuleVariant::StructuralSurveyor => (DetectorKind::Damage, 3, Fx::from_num(0), 2),
+        ModuleVariant::PowerMonitor => (DetectorKind::Power, 1, Fx::from_num(0), 1),
+        ModuleVariant::HeatMonitor => (DetectorKind::Heat, 1, Fx::from_num(0), 1),
+        ModuleVariant::LogisticsBeacon => (DetectorKind::Logistics, 1, Fx::from_num(0), 1),
+        _ => (DetectorKind::LifeSign, 1, Fx::from_num(170), 1),
     }
 }

@@ -1,8 +1,105 @@
-mod alerts;
-mod status;
-
-pub(crate) use status::{
-    station_panel_button_system,
-    toggle_gameplay_info_panel,
-    update_gameplay_status_text,
+use bevy::{
+    ecs::{relationship::Relationship, system::SystemParam},
+    prelude::*,
 };
+
+use crate::{
+    balance::BalanceConfig,
+    gameplay::{
+        components::{
+            AirlockCommandState,
+            AngularVelocity,
+            CarriedResource,
+            CurrentStation,
+            DestroyedModule,
+            DroneStationCommandState,
+            DroneStationModule,
+            EquippedSuit,
+            HeldInteraction,
+            HostileShip,
+            HostileTarget,
+            Integrity,
+            LinearVelocity,
+            ManipulatorCommandState,
+            ManipulatorModule,
+            MissionState,
+            ModuleCondition,
+            ModuleRuntimeState,
+            NearbyInteraction,
+            ObservedLocalPlayerMarker,
+            PlayerConditionState,
+            PlayerFieldState,
+            PlayerIdentity,
+            PlayerMotionState,
+            PlayerReferenceFrame,
+            PlayerShip,
+            ProcessorCommandState,
+            ProcessorModule,
+            Projectile,
+            ReactorCommandState,
+            RuntimeArchComputer,
+            RuntimeShipModule,
+            ShipAtmosphereState,
+            ShipAutomationState,
+            ShipControlMode,
+            ShipControlState,
+            ShipMovementModel,
+            ShipPowerModel,
+            ShipPowerState,
+            ShipRoot,
+            ShipWeaponState,
+            ShipboardControlState,
+            SimPosition,
+            StorageCommandState,
+            StorageModule,
+            TurretCommandState,
+        },
+        helpers::{
+            Fx,
+            danger_level,
+            format_fx0,
+            format_fx1,
+            format_fx2,
+            mission_return_line,
+            mission_status_line,
+            module_condition,
+            resource_kind_label,
+        },
+        systems::shared::module_display_name,
+    },
+    netcode,
+    state::{
+        GameplayBarFill,
+        GameplayBarKind,
+        GameplayBarLabel,
+        GameplayBlackoutOverlay,
+        GameplayCompactStatusText,
+        GameplayControlsText,
+        GameplayInfoPanelMode,
+        GameplayPanelBodyText,
+        GameplayPanelTitleText,
+        GameplayStationPanel,
+        GameplayStationPanelButton,
+        GameplayStationPanelButtonLabel,
+        GameplayStationReadoutBarFill,
+        GameplayStationReadoutBarTrack,
+        GameplayStationReadoutLabel,
+        GameplayStationReadoutLight,
+        GameplayStationReadoutSlot,
+        GameplayStationReadoutValue,
+        GameplayStationTitleText,
+        GameplayTopBannerText,
+        Progression,
+        StationPanelButtonAction,
+    },
+};
+
+mod alerts;
+mod hud;
+mod station_panel;
+mod station_panel_actions;
+mod station_panel_readouts;
+mod summary;
+
+pub(crate) use hud::{toggle_gameplay_info_panel, update_gameplay_status_text};
+pub(crate) use station_panel::station_panel_button_system;
