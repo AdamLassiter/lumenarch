@@ -70,10 +70,10 @@ The codebase is organized mostly around how the game is played rather than aroun
 - [src/state](src/state)  
   Frontend/UI resources and high-level presentation state.
 
-- [src/lobby.rs](src/lobby.rs)  
+- [src/lobby](src/lobby)  
   Lobby UI and local profile editing.
 
-- [src/docked.rs](src/docked.rs)  
+- [src/docked](src/docked)  
   Docked-state presentation and campaign persistence hooks.
 
 - [src/sector_map](src/sector_map)  
