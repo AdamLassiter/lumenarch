@@ -180,6 +180,7 @@ pub(crate) fn module_family_label(kind: ModuleKind) -> &'static str {
         ModuleKind::Interior => "Interior and walkways",
         ModuleKind::Core => "Core systems",
         ModuleKind::Cockpit | ModuleKind::Computer => "Control and compute",
+        ModuleKind::Detector => "Automation and sensors",
         ModuleKind::Processor | ModuleKind::Cargo | ModuleKind::Airlock => "Logistics and utility",
         ModuleKind::Reactor | ModuleKind::Battery => "Power systems",
         ModuleKind::Engine => "Propulsion",
@@ -255,6 +256,7 @@ pub(crate) fn sprite_path_for_kind(kind: &ModuleKind, variant: ModuleVariant) ->
     let _ = variant;
     let asset_name = match kind {
         ModuleKind::Shield => "battery",
+        ModuleKind::Detector => "computer",
         _ => kind.as_str(),
     };
     format!("tiles/{asset_name}.png")

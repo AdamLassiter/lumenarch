@@ -46,6 +46,7 @@ use crate::{
             ShipAutomationState,
             ShipControlMode,
             ShipControlState,
+            ShipDamageSensorState,
             ShipEncounterIdentity,
             ShipInertiaField,
             ShipInteriorMap,
@@ -258,6 +259,7 @@ pub(crate) fn spawn_runtime_ship(
             },
             power_model,
             ShipControlState::default(),
+            ShipDamageSensorState::default(),
             ShipWeaponState {
                 turret_count: totals.turret_count,
                 cooldown_remaining: Fx::from_num(0),

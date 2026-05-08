@@ -880,6 +880,56 @@ const TOOLBOX_GROUP_LOGISTICS: &[(crate::ship::ModuleKind, crate::ship::ModuleVa
         crate::ship::ModuleVariant::Standard,
     ),
 ];
+const TOOLBOX_GROUP_AUTOMATION: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::LifePulse,
+    ),
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::LifeSweep,
+    ),
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::LifeSurvey,
+    ),
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::ShipPing,
+    ),
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::ShipVector,
+    ),
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::ShipSurvey,
+    ),
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::DamageAlarm,
+    ),
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::DamageArray,
+    ),
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::StructuralSurveyor,
+    ),
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::PowerMonitor,
+    ),
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::HeatMonitor,
+    ),
+    (
+        crate::ship::ModuleKind::Detector,
+        crate::ship::ModuleVariant::LogisticsBeacon,
+    ),
+];
 const TOOLBOX_GROUP_COMBAT: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
     (
         crate::ship::ModuleKind::Turret,
@@ -902,12 +952,13 @@ const TOOLBOX_GROUP_COMBAT: &[(crate::ship::ModuleKind, crate::ship::ModuleVaria
 fn toolbox_groups() -> [(
     &'static str,
     &'static [(crate::ship::ModuleKind, crate::ship::ModuleVariant)],
-); 5] {
+); 6] {
     [
         ("Structure", TOOLBOX_GROUP_STRUCTURE),
         ("Command", TOOLBOX_GROUP_COMMAND),
         ("Power", TOOLBOX_GROUP_POWER),
         ("Logistics", TOOLBOX_GROUP_LOGISTICS),
+        ("Automation", TOOLBOX_GROUP_AUTOMATION),
         ("Combat", TOOLBOX_GROUP_COMBAT),
     ]
 }

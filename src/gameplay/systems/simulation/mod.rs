@@ -1,29 +1,35 @@
+mod arch;
 mod atmosphere;
-mod automation;
-mod combat;
+mod collisions;
+mod detectors;
+mod drones;
 mod fields;
+mod helpers;
+mod hostiles;
 mod logistics;
 mod mission;
+mod player;
+mod projectiles;
+mod snapshots;
+mod transfers;
 mod visuals;
 
+pub(crate) use arch::{run_arch_automation, tick_recent_action_feedback};
 pub(crate) use atmosphere::{sample_player_atmosphere, update_ship_atmosphere};
-pub(crate) use automation::{run_arch_automation, tick_recent_action_feedback};
-pub(crate) use combat::{
-    advance_projectiles,
-    aim_hostile_turrets,
-    drive_hostile_ships,
-    fire_hostile_ship_weapons,
-    fire_hostile_targets,
-    fire_player_weapons,
-    handle_projectile_hits,
-    handle_ship_collisions,
-    integrate_hostile_ship_motion,
-    sync_hostile_ship_state,
-};
+pub(crate) use collisions::handle_ship_collisions;
+pub(crate) use detectors::update_detector_modules;
 pub(crate) use fields::{
     apply_player_environmental_effects,
     sample_ship_fields,
     update_module_runtime_state,
+};
+pub(crate) use hostiles::{
+    aim_hostile_turrets,
+    drive_hostile_ships,
+    fire_hostile_ship_weapons,
+    fire_hostile_targets,
+    integrate_hostile_ship_motion,
+    sync_hostile_ship_state,
 };
 pub(crate) use logistics::{
     collect_salvage,
@@ -38,6 +44,8 @@ pub(crate) use mission::{
     update_mission_state,
     update_mission_telemetry,
 };
+pub(crate) use player::fire_player_weapons;
+pub(crate) use projectiles::{advance_projectiles, handle_projectile_hits};
 pub(crate) use visuals::{
     draw_debug_overlay,
     sync_backdrop_parallax,

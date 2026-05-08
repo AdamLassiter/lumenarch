@@ -1,68 +1,45 @@
-use std::collections::BTreeMap;
-
 use bevy::prelude::*;
 
+pub(crate) use super::drones::{run_drone_logistics, sync_drone_station_population};
 use crate::{
     TILE_SIZE,
     balance::BalanceConfig,
     gameplay::{
-        components::{
-            CollectedSalvage,
-            DestroyedModule,
-            DroneStationCommandState,
-            DroneStationModule,
-            ManipulatorCommandState,
-            ManipulatorModule,
-            MissionState,
-            ModuleRuntimeState,
-            PlayerShip,
-            ProcessorCommandState,
-            ProcessorModule,
-            ProcessorRecipe,
-            ResourceKind,
-            RuntimeShipModule,
-            SalvagePickup,
-            SalvageWreck,
-            ShipArchCommandState,
-            ShipPowerState,
-            ShipRoot,
-            StorageModule,
+        components::*,
+        helpers::*,
+        systems::simulation::transfers::{
+            find_airlock_to_cargo_transfer,
+            find_automation_transfer_task,
         },
-        helpers::{FixedVec2, Fx, fx_from_time_delta, local_field_distance, resource_kind_label},
     },
     ship::ModuleKind,
 };
 
-mod drones;
-mod transfers;
-
-pub(crate) use drones::{run_drone_logistics, sync_drone_station_population};
-
 #[derive(Clone, Copy)]
-struct StorageSnapshot {
-    capacity: u32,
-    inventory: crate::gameplay::components::ResourceInventory,
-    accepts_fuel: bool,
-    accepts_ammunition: bool,
-    accepts_general: bool,
+pub(crate) struct StorageSnapshot {
+    pub(crate) capacity: u32,
+    pub(crate) inventory: crate::gameplay::components::ResourceInventory,
+    pub(crate) accepts_fuel: bool,
+    pub(crate) accepts_ammunition: bool,
+    pub(crate) accepts_general: bool,
 }
 
 #[derive(Clone, Copy)]
-struct ProcessorSnapshot {
-    input_required: u32,
-    output_amount: u32,
-    inventory: crate::gameplay::components::ResourceInventory,
+pub(crate) struct ProcessorSnapshot {
+    pub(crate) input_required: u32,
+    pub(crate) output_amount: u32,
+    pub(crate) inventory: crate::gameplay::components::ResourceInventory,
 }
 
 #[derive(Clone, Copy)]
-struct LogisticsEndpointSnapshot {
-    entity: Entity,
-    module_id: u64,
-    kind: ModuleKind,
-    local_position: FixedVec2,
-    storage: Option<StorageSnapshot>,
-    processor: Option<ProcessorSnapshot>,
-    destroyed: bool,
+pub(crate) struct LogisticsEndpointSnapshot {
+    pub(crate) entity: Entity,
+    pub(crate) module_id: u64,
+    pub(crate) kind: ModuleKind,
+    pub(crate) local_position: FixedVec2,
+    pub(crate) storage: Option<StorageSnapshot>,
+    pub(crate) processor: Option<ProcessorSnapshot>,
+    pub(crate) destroyed: bool,
 }
 
 pub(crate) fn collect_salvage(
@@ -182,7 +159,7 @@ pub(crate) fn run_logistics_transfers(
                 command_state.resource_kind,
             ));
         } else if logistics_mode {
-            task = transfers::find_automation_transfer_task(
+            task = find_automation_transfer_task(
                 &snapshots,
                 &in_range,
                 arch_commands.logistics_preference,
@@ -190,7 +167,7 @@ pub(crate) fn run_logistics_transfers(
         }
 
         if task.is_none() {
-            task = transfers::find_airlock_to_cargo_transfer(&snapshots, &in_range);
+            task = find_airlock_to_cargo_transfer(&snapshots, &in_range);
         }
 
         let Some((source_module_id, target_module_id, resource_kind)) = task else {
@@ -385,7 +362,7 @@ pub(crate) fn run_processors(
     }
 }
 
-fn collect_endpoint_snapshots(
+pub(crate) fn collect_endpoint_snapshots(
     logistics_query: &Query<(
         Entity,
         &RuntimeShipModule,

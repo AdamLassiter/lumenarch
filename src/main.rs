@@ -298,6 +298,7 @@ fn add_rollback_systems(app: &mut App) {
                 gameplay::sample_ship_fields,
                 gameplay::apply_player_environmental_effects,
                 gameplay::update_module_runtime_state,
+                gameplay::update_detector_modules,
                 gameplay::run_arch_automation,
                 gameplay::run_logistics_transfers,
                 gameplay::sync_drone_station_population,

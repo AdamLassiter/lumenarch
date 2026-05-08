@@ -165,6 +165,29 @@ pub(crate) struct DetectorCommandState {
     pub(crate) show_electrical: bool,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DetectorKind {
+    LifeSign,
+    Ship,
+    Damage,
+    Power,
+    Heat,
+    Logistics,
+}
+
+#[derive(Component, Clone)]
+pub(crate) struct DetectorModule {
+    pub(crate) kind: DetectorKind,
+    pub(crate) tier: u8,
+    pub(crate) range: Fx,
+    pub(crate) detected: bool,
+    pub(crate) secondary_detected: bool,
+    pub(crate) direction: FixedVec2,
+    pub(crate) distance: Fx,
+    pub(crate) magnitude: Fx,
+    pub(crate) critical: bool,
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DroneTask {

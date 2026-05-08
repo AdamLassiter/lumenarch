@@ -58,6 +58,7 @@ pub(crate) use simulation::{
     sync_runtime_ship_state,
     tick_recent_action_feedback,
     update_destroyed_module_visuals,
+    update_detector_modules,
     update_mission_state,
     update_mission_telemetry,
     update_module_runtime_state,
