@@ -89,6 +89,8 @@ pub(crate) use frontend::{
     PlayerRole,
     RefitButton,
     RepairShipButton,
+    SplashRoot,
+    SplashScreenState,
     StatusText,
     TextBoxClipboard,
     TextBoxField,

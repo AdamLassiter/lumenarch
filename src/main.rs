@@ -10,6 +10,7 @@ pub(crate) mod gameplay;
 mod lobby;
 mod netcode;
 mod sector_map;
+mod splash;
 pub(crate) mod state;
 mod stations;
 
@@ -40,6 +41,7 @@ use self::state::{
     SectorMapPanState,
     SectorMapViewState,
     SectorState,
+    SplashScreenState,
 };
 use crate::netcode::LumenGgrsConfig;
 
@@ -87,6 +89,9 @@ pub(crate) fn build_app(mode: AppRuntimeMode) -> App {
     let mut app = App::new();
 
     insert_core_resources(&mut app, balance_config);
+    if mode.is_interactive() {
+        app.insert_resource(SplashScreenState::interactive_startup());
+    }
     add_core_plugins(&mut app, mode);
     register_rollback_state(&mut app);
     register_messages(&mut app);
@@ -152,7 +157,8 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
     .insert_resource(EditorPanState::default())
     .insert_resource(EditorViewState::default())
     .insert_resource(SectorMapPanState::default())
-    .insert_resource(SectorMapViewState::default());
+    .insert_resource(SectorMapViewState::default())
+    .insert_resource(SplashScreenState::default());
 }
 
 fn add_core_plugins(app: &mut App, mode: AppRuntimeMode) {
@@ -422,6 +428,9 @@ fn add_session_ui_update_systems(app: &mut App) {
     app.add_systems(
         Update,
         (
+            splash::spawn_splash_ui.run_if(splash::splash_active),
+            splash::dismiss_splash_screen.run_if(netcode::session_presents_docked),
+            splash::cleanup_splash_ui.run_if(splash::splash_inactive),
             lobby::spawn_lobby_ui
                 .run_if(netcode::frontend_mode_is_lobby)
                 .run_if(lobby::lobby_ui_missing),
@@ -466,6 +475,10 @@ fn add_session_ui_update_systems(app: &mut App) {
 }
 
 fn add_lobby_ui_fixed_systems(app: &mut App) {
+    app.add_systems(
+        Update,
+        splash::tick_splash_screen.run_if(splash::splash_active),
+    );
     app.add_systems(
         FixedUpdate,
         (

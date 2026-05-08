@@ -57,19 +57,16 @@ pub(crate) fn spawn_lobby_ui(
                     BackgroundColor(Color::srgba(0.09, 0.12, 0.18, 0.94)),
                 ))
                 .with_children(|panel| {
-                    panel.spawn((
-                        Text::new("LUMEN//ARCH"),
-                        TextFont {
-                            font: title_font.clone(),
-                            font_size: 34.0,
-                            ..default()
-                        },
-                        TextColor(Color::WHITE),
-                    ));
-
+                    spawn_labeled_textbox(
+                        panel,
+                        "Session",
+                        TextBoxField::SessionDescriptor,
+                        &mono_font,
+                        &config.session_descriptor,
+                    );
                     panel.spawn((
                         Text::new(format!(
-                            "Click a textbox to edit it.\nExamples: host@{} or client1@{}>{}",
+                            "Examples: host@{} or client1@{}>{}",
                             DEFAULT_HOST_ADDR, DEFAULT_CLIENT_ADDR, DEFAULT_HOST_ADDR
                         )),
                         TextFont {
@@ -80,13 +77,6 @@ pub(crate) fn spawn_lobby_ui(
                         TextColor(Color::srgb(0.74, 0.78, 0.86)),
                     ));
 
-                    spawn_labeled_textbox(
-                        panel,
-                        "Session",
-                        TextBoxField::SessionDescriptor,
-                        &mono_font,
-                        &config.session_descriptor,
-                    );
                     spawn_labeled_textbox(
                         panel,
                         "Player Name",

@@ -11,6 +11,30 @@ pub(crate) enum FrontendMode {
     DebugEnemyEditor,
 }
 
+#[derive(Resource, Clone)]
+pub(crate) struct SplashScreenState {
+    pub(crate) active: bool,
+    pub(crate) remaining_seconds: f32,
+}
+
+impl Default for SplashScreenState {
+    fn default() -> Self {
+        Self {
+            active: false,
+            remaining_seconds: 0.0,
+        }
+    }
+}
+
+impl SplashScreenState {
+    pub(crate) fn interactive_startup() -> Self {
+        Self {
+            active: true,
+            remaining_seconds: 3.0,
+        }
+    }
+}
+
 #[derive(Resource, Default)]
 pub(crate) struct DebugOverlayState {
     pub(crate) enabled: bool,
@@ -168,6 +192,9 @@ pub(crate) enum TextBoxField {
 
 #[derive(Component)]
 pub(crate) struct LobbyRoot;
+
+#[derive(Component)]
+pub(crate) struct SplashRoot;
 
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct TextBoxRoot {
