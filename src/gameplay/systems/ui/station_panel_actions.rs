@@ -1,4 +1,5 @@
 use super::*;
+use crate::ship::ModuleKind;
 
 pub(super) fn pending_station_command(
     action: StationPanelButtonAction,
@@ -132,7 +133,7 @@ pub(super) fn pending_station_command(
 pub(crate) fn station_action_visible(
     action: StationPanelButtonAction,
     mode: ShipControlMode,
-    active_station_kind: Option<crate::ship::ModuleKind>,
+    active_station_kind: Option<ModuleKind>,
     flags: summary::StationFlags,
 ) -> bool {
     match mode {

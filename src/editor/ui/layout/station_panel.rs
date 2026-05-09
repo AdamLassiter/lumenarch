@@ -1,17 +1,37 @@
-fn editor_control_mode(
-    kind: crate::ship::ModuleKind,
-) -> crate::gameplay::components::ShipControlMode {
+use bevy::prelude::*;
+
+use crate::{
+    editor::ui::layout::{EditorReadout, EditorReadoutVisual},
+    gameplay::components::ShipControlMode,
+    ship::{
+        ModuleKind,
+        ModuleSpec,
+        ModuleVariant,
+        ShipModule,
+        enemy::EnemyShipEntryValidationStatus,
+    },
+    state::{
+        EditingCleanup,
+        EditorMode,
+        EditorSessionState,
+        EnemyEditorState,
+        EnemyShipLibraryState,
+        ProgramTextEditorState,
+        ProgrammingLanguageMode,
+        StationPanelButtonAction,
+    },
+};
+
+fn editor_control_mode(kind: ModuleKind) -> ShipControlMode {
     match kind {
-        crate::ship::ModuleKind::Cockpit => crate::gameplay::components::ShipControlMode::Cockpit,
-        crate::ship::ModuleKind::Turret => crate::gameplay::components::ShipControlMode::Turret,
-        crate::ship::ModuleKind::Reactor => crate::gameplay::components::ShipControlMode::Reactor,
-        crate::ship::ModuleKind::Cargo
-        | crate::ship::ModuleKind::Airlock
-        | crate::ship::ModuleKind::Processor => {
-            crate::gameplay::components::ShipControlMode::Logistics
+        ModuleKind::Cockpit => ShipControlMode::Cockpit,
+        ModuleKind::Turret => ShipControlMode::Turret,
+        ModuleKind::Reactor => ShipControlMode::Reactor,
+        ModuleKind::Cargo | ModuleKind::Airlock | ModuleKind::Processor => {
+            ShipControlMode::Logistics
         }
-        crate::ship::ModuleKind::Computer => crate::gameplay::components::ShipControlMode::Computer,
-        _ => crate::gameplay::components::ShipControlMode::Interior,
+        ModuleKind::Computer => ShipControlMode::Computer,
+        _ => ShipControlMode::Interior,
     }
 }
 
@@ -24,80 +44,76 @@ struct EditorStationFlags {
     drone: bool,
 }
 
-fn editor_station_flags(kind: crate::ship::ModuleKind) -> EditorStationFlags {
+fn editor_station_flags(kind: ModuleKind) -> EditorStationFlags {
     EditorStationFlags {
-        storage: matches!(
-            kind,
-            crate::ship::ModuleKind::Cargo | crate::ship::ModuleKind::Airlock
-        ),
-        manipulator: kind == crate::ship::ModuleKind::Airlock,
-        processor: kind == crate::ship::ModuleKind::Processor,
-        airlock: kind == crate::ship::ModuleKind::Airlock,
-        drone: kind == crate::ship::ModuleKind::Airlock,
+        storage: matches!(kind, ModuleKind::Cargo | ModuleKind::Airlock),
+        manipulator: kind == ModuleKind::Airlock,
+        processor: kind == ModuleKind::Processor,
+        airlock: kind == ModuleKind::Airlock,
+        drone: kind == ModuleKind::Airlock,
     }
 }
 
 fn editor_station_action_visible(
     action: StationPanelButtonAction,
-    mode: crate::gameplay::components::ShipControlMode,
-    active_kind: crate::ship::ModuleKind,
+    mode: ShipControlMode,
+    active_kind: ModuleKind,
     flags: EditorStationFlags,
 ) -> bool {
     match mode {
-        crate::gameplay::components::ShipControlMode::Cockpit => matches!(
+        ShipControlMode::Cockpit => matches!(
             action,
             StationPanelButtonAction::HelmThrottle { .. }
                 | StationPanelButtonAction::HelmTurn { .. }
         ),
-        crate::gameplay::components::ShipControlMode::Turret => matches!(
+        ShipControlMode::Turret => matches!(
             action,
             StationPanelButtonAction::TurretAdjustAim { .. }
                 | StationPanelButtonAction::TurretFireToggle
         ),
-        crate::gameplay::components::ShipControlMode::Reactor => matches!(
+        ShipControlMode::Reactor => matches!(
             action,
             StationPanelButtonAction::ReactorAdjustRate { .. }
                 | StationPanelButtonAction::ReactorAdjustTurbine { .. }
         ),
-        crate::gameplay::components::ShipControlMode::Logistics => match action {
+        ShipControlMode::Logistics => match action {
             StationPanelButtonAction::LogisticsToggleStorageIntake => flags.storage,
             StationPanelButtonAction::LogisticsToggleAirlock => flags.airlock,
             StationPanelButtonAction::LogisticsToggleManipulator
             | StationPanelButtonAction::LogisticsCycleManipulatorTarget { .. }
             | StationPanelButtonAction::LogisticsCycleResource => flags.manipulator,
             StationPanelButtonAction::LogisticsToggleProcessor => {
-                flags.processor || flags.drone || active_kind == crate::ship::ModuleKind::Airlock
+                flags.processor || flags.drone || active_kind == ModuleKind::Airlock
             }
             _ => false,
         },
-        crate::gameplay::components::ShipControlMode::Computer => matches!(
+        ShipControlMode::Computer => matches!(
             action,
             StationPanelButtonAction::ComputerToggleEnabled
                 | StationPanelButtonAction::ComputerCycleTemplate
         ),
-        crate::gameplay::components::ShipControlMode::Interior => false,
+        ShipControlMode::Interior => false,
     }
 }
 
 fn editor_station_button_label(
     action: StationPanelButtonAction,
-    mode: crate::gameplay::components::ShipControlMode,
+    mode: ShipControlMode,
     flags: EditorStationFlags,
-    language: crate::state::ProgrammingLanguageMode,
+    language: ProgrammingLanguageMode,
 ) -> String {
     match action {
         StationPanelButtonAction::ComputerCycleTemplate => match language {
-            crate::state::ProgrammingLanguageMode::Arch => "Cycle ARCH Template".to_string(),
-            crate::state::ProgrammingLanguageMode::Lumen => "Cycle LUMEN Template".to_string(),
+            ProgrammingLanguageMode::Arch => "Cycle ARCH Template".to_string(),
+            ProgrammingLanguageMode::Lumen => "Cycle LUMEN Template".to_string(),
         },
         StationPanelButtonAction::LogisticsToggleProcessor
-            if mode == crate::gameplay::components::ShipControlMode::Logistics && flags.drone =>
+            if mode == ShipControlMode::Logistics && flags.drone =>
         {
             "Cycle Drone Mode".to_string()
         }
         StationPanelButtonAction::LogisticsToggleProcessor
-            if mode == crate::gameplay::components::ShipControlMode::Logistics
-                && !flags.processor =>
+            if mode == ShipControlMode::Logistics && !flags.processor =>
         {
             "Cycle Recipe".to_string()
         }
@@ -105,9 +121,9 @@ fn editor_station_button_label(
     }
 }
 
-fn editor_station_readouts(module: &crate::ship::ShipModule) -> Vec<EditorReadout> {
+fn editor_station_readouts(module: &ShipModule) -> Vec<EditorReadout> {
     match module.kind {
-        crate::ship::ModuleKind::Reactor => vec![
+        ModuleKind::Reactor => vec![
             editor_bar(
                 module,
                 "RRF",
@@ -137,7 +153,7 @@ fn editor_station_readouts(module: &crate::ship::ShipModule) -> Vec<EditorReadou
                 Color::srgb(0.86, 0.74, 0.30),
             ),
         ],
-        crate::ship::ModuleKind::Turret => vec![
+        ModuleKind::Turret => vec![
             editor_light(
                 module,
                 "WTF",
@@ -168,7 +184,7 @@ fn editor_station_readouts(module: &crate::ship::ShipModule) -> Vec<EditorReadou
                 Color::srgb(0.96, 0.56, 0.24),
             ),
         ],
-        crate::ship::ModuleKind::Cargo => vec![
+        ModuleKind::Cargo => vec![
             editor_light(
                 module,
                 "LSI",
@@ -180,13 +196,13 @@ fn editor_station_readouts(module: &crate::ship::ShipModule) -> Vec<EditorReadou
                 module,
                 "LSC",
                 "Capacity",
-                &crate::ship::ModuleSpec::for_module(module.kind, module.variant)
+                &ModuleSpec::for_module(module.kind, module.variant)
                     .storage_capacity
                     .to_string(),
                 Color::srgb(0.36, 0.72, 0.96),
             ),
         ],
-        crate::ship::ModuleKind::Airlock => vec![
+        ModuleKind::Airlock => vec![
             editor_light(
                 module,
                 "LAC",
@@ -230,19 +246,19 @@ fn editor_station_readouts(module: &crate::ship::ShipModule) -> Vec<EditorReadou
                 module,
                 "DRM",
                 "Drone Frame",
-                if module.variant == crate::ship::ModuleVariant::DroneBay {
+                if module.variant == ModuleVariant::DroneBay {
                     "Installed"
                 } else {
                     "None"
                 },
-                if module.variant == crate::ship::ModuleVariant::DroneBay {
+                if module.variant == ModuleVariant::DroneBay {
                     Color::srgb(0.54, 0.86, 1.0)
                 } else {
                     Color::srgb(0.42, 0.46, 0.52)
                 },
             ),
         ],
-        crate::ship::ModuleKind::Processor => vec![
+        ModuleKind::Processor => vec![
             editor_light(
                 module,
                 "LPY",
@@ -258,7 +274,7 @@ fn editor_station_readouts(module: &crate::ship::ShipModule) -> Vec<EditorReadou
                 bool_color(module.defaults.processor_enabled),
             ),
         ],
-        crate::ship::ModuleKind::Computer => vec![
+        ModuleKind::Computer => vec![
             editor_light(
                 module,
                 "CCA",
@@ -289,7 +305,7 @@ fn editor_station_readouts(module: &crate::ship::ShipModule) -> Vec<EditorReadou
                 Color::srgb(0.62, 0.90, 0.80),
             ),
         ],
-        crate::ship::ModuleKind::Cockpit => vec![
+        ModuleKind::Cockpit => vec![
             editor_light(
                 module,
                 "HLC",
@@ -325,7 +341,7 @@ fn editor_station_readouts(module: &crate::ship::ShipModule) -> Vec<EditorReadou
 }
 
 fn editor_bar(
-    module: &crate::ship::ShipModule,
+    module: &ShipModule,
     register: &str,
     label: &str,
     percent: f32,
@@ -342,7 +358,7 @@ fn editor_bar(
 }
 
 fn editor_light(
-    module: &crate::ship::ShipModule,
+    module: &ShipModule,
     register: &str,
     label: &str,
     value: &str,
@@ -372,10 +388,10 @@ fn bool_color(value: bool) -> Color {
 }
 
 fn format_program_textbox(
-    program_editor_state: &crate::state::ProgramTextEditorState,
+    program_editor_state: &ProgramTextEditorState,
     module_id: u64,
-    language: crate::state::ProgrammingLanguageMode,
-    module: &crate::ship::ShipModule,
+    language: ProgrammingLanguageMode,
+    module: &ShipModule,
 ) -> String {
     let draft_text = if program_editor_state.module_id == Some(module_id)
         && program_editor_state.language == language
@@ -383,12 +399,12 @@ fn format_program_textbox(
         program_editor_state.draft_text.clone()
     } else {
         match language {
-            crate::state::ProgrammingLanguageMode::Arch => module
+            ProgrammingLanguageMode::Arch => module
                 .arch_program
                 .as_ref()
                 .map(|program| program.source_text.clone())
                 .unwrap_or_default(),
-            crate::state::ProgrammingLanguageMode::Lumen => module
+            ProgrammingLanguageMode::Lumen => module
                 .lumen_program
                 .as_ref()
                 .map(|program| program.source_text.clone())
@@ -440,10 +456,8 @@ fn enemy_entry_label(
             return "No Enemy Entry".to_string();
         };
         let status_suffix = match enemy_library_state.entry_statuses.get(&entry.id).copied() {
-            Some(crate::ship::enemy::EnemyShipEntryValidationStatus::RepairedInMemory) => {
-                " [repaired in memory]"
-            }
-            Some(crate::ship::enemy::EnemyShipEntryValidationStatus::Invalid) => " [invalid]",
+            Some(EnemyShipEntryValidationStatus::RepairedInMemory) => " [repaired in memory]",
+            Some(EnemyShipEntryValidationStatus::Invalid) => " [invalid]",
             _ => "",
         };
         let dirty_suffix = if enemy_editor_state.dirty {

@@ -2,6 +2,7 @@ use bevy::log;
 
 pub(crate) use super::station_panel_actions::{station_action_visible, station_button_label};
 use super::{station_panel_actions::pending_station_command, station_panel_readouts::*, *};
+use crate::ship::ModuleKind;
 
 #[derive(Clone)]
 pub(crate) struct StationPanelReadout {
@@ -18,7 +19,7 @@ pub(crate) enum StationReadoutVisual {
 
 pub(crate) struct StationPanelDisplay {
     pub(crate) title: String,
-    pub(crate) active_station_kind: Option<crate::ship::ModuleKind>,
+    pub(crate) active_station_kind: Option<ModuleKind>,
     pub(crate) flags: summary::StationFlags,
     pub(crate) readouts: Vec<StationPanelReadout>,
 }
@@ -457,12 +458,7 @@ pub(crate) fn station_panel_content(
     >,
     focused_station_context: &str,
     arch_summary: &summary::ArchSummary,
-) -> (
-    String,
-    String,
-    Option<crate::ship::ModuleKind>,
-    summary::StationFlags,
-) {
+) -> (String, String, Option<ModuleKind>, summary::StationFlags) {
     let Some(focused_entity) = control_mode.focused_entity else {
         return (
             "Station Console".to_string(),

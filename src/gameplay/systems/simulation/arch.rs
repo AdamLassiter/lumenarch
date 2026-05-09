@@ -10,6 +10,7 @@ use crate::{
             DestroyedModule,
             DetectorModule,
             HostileTarget,
+            LumenExecutionResult,
             MissionState,
             ModuleRuntimeState,
             PlayerShip,
@@ -260,7 +261,7 @@ pub(crate) fn run_arch_automation(
             }
             arch_runtime.last_lumen_result = lumen_result;
         } else {
-            arch_runtime.last_lumen_result = crate::gameplay::components::LumenExecutionResult {
+            arch_runtime.last_lumen_result = LumenExecutionResult {
                 resolved_targets: 0,
                 recent_effects: Vec::new(),
                 halted_reason: Some("offline".to_string()),
@@ -963,10 +964,7 @@ fn write_register(
 fn execute_lumen_program(
     program: &LumenProgram,
     snapshot: LumenSnapshot,
-) -> (
-    crate::gameplay::components::LumenExecutionResult,
-    PendingArchCommands,
-) {
+) -> (LumenExecutionResult, PendingArchCommands) {
     let mut commands = PendingArchCommands::default();
     let mut resolved_targets = 0u32;
     let mut effects = Vec::new();
@@ -992,7 +990,7 @@ fn execute_lumen_program(
     }
 
     (
-        crate::gameplay::components::LumenExecutionResult {
+        LumenExecutionResult {
             resolved_targets,
             recent_effects: effects.into_iter().take(4).collect(),
             halted_reason: None,
@@ -1111,8 +1109,23 @@ mod tests {
     use bevy::prelude::*;
 
     use super::*;
+    use crate::{
+        gameplay::{
+            components::{
+                DetectorKind,
+                HostileShip,
+                PlayerMotionState,
+                PlayerReferenceFrame,
+                SimPosition,
+                SimRotation,
+            },
+            helpers::FixedVec2,
+            update_detector_modules,
+        },
+        ship::ModuleVariant,
+    };
 
-    fn runtime_module(kind: ModuleKind, variant: crate::ship::ModuleVariant) -> RuntimeShipModule {
+    fn runtime_module(kind: ModuleKind, variant: ModuleVariant) -> RuntimeShipModule {
         RuntimeShipModule {
             module_id: 1,
             kind,
@@ -1156,7 +1169,7 @@ mod tests {
             ShipDamageSensorState::default(),
         ));
         app.world_mut().spawn((
-            runtime_module(ModuleKind::Detector, crate::ship::ModuleVariant::LifePulse),
+            runtime_module(ModuleKind::Detector, ModuleVariant::LifePulse),
             DetectorModule {
                 kind: DetectorKind::LifeSign,
                 tier: 1,
@@ -1170,7 +1183,7 @@ mod tests {
             },
         ));
         app.world_mut().spawn(PlayerMotionState {
-            frame: crate::gameplay::components::PlayerReferenceFrame::World,
+            frame: PlayerReferenceFrame::World,
             world_position: FixedVec2::from_num(48, 12),
             world_velocity: FixedVec2::zero(),
             local_position: FixedVec2::zero(),
@@ -1216,7 +1229,7 @@ mod tests {
             },
         ));
         app.world_mut().spawn((
-            runtime_module(ModuleKind::Detector, crate::ship::ModuleVariant::ShipSurvey),
+            runtime_module(ModuleKind::Detector, ModuleVariant::ShipSurvey),
             DetectorModule {
                 kind: DetectorKind::Ship,
                 tier: 3,

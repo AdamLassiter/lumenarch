@@ -1,5 +1,8 @@
 use super::*;
-use crate::gameplay::components::PlayerConditionState;
+use crate::{
+    gameplay::{components::PlayerConditionState, helpers::sampled_decompression_pull},
+    ship::ModuleVariant,
+};
 
 pub(crate) fn toggle_shipboard_control_mode(
     decoded_commands: Res<netcode::DecodedPlayerCommands>,
@@ -249,10 +252,8 @@ pub(crate) fn move_shipboard_player(
                 } else {
                     Fx::from_num(1)
                 };
-                let decompression_pull = crate::gameplay::helpers::sampled_decompression_pull(
-                    motion.local_position,
-                    atmosphere_state,
-                );
+                let decompression_pull =
+                    sampled_decompression_pull(motion.local_position, atmosphere_state);
                 motion.local_velocity += input
                     * Fx::from_num(balance.player.walk_acceleration)
                     * movement_multiplier
@@ -656,7 +657,7 @@ pub(crate) fn handle_player_cargo_interaction(
 struct CarriedItemDeposit {
     resource_kind: Option<ResourceKind>,
     resource_amount: u32,
-    component: Option<(ModuleKind, crate::ship::ModuleVariant, u32)>,
+    component: Option<(ModuleKind, ModuleVariant, u32)>,
     label: String,
 }
 

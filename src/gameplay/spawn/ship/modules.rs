@@ -21,6 +21,7 @@ use crate::{
             HostileShipModule,
             Integrity,
             Interactable,
+            LumenExecutionResult,
             ManipulatorCommandState,
             ManipulatorModule,
             ModuleFieldEmitter,
@@ -36,8 +37,10 @@ use crate::{
             ReactorCommandState,
             ReactorGlowOverlay,
             ResourceInventory,
+            ResourceKind,
             RuntimeArchComputer,
             RuntimeShipModule,
+            ShieldCommandState,
             StorageCommandState,
             StorageModule,
             TurretCommandState,
@@ -61,7 +64,10 @@ use crate::{
         ShipModule,
         StoredProcessorRecipe,
         StoredResourceKind,
+        arch::{ArchProgram, ArchProgramTemplate},
+        lumen::{LumenProgram, LumenProgramTemplate},
     },
+    state::PlayingCleanup,
 };
 
 pub(crate) fn spawn_runtime_module(
@@ -117,7 +123,7 @@ pub(crate) fn spawn_runtime_module(
         },
         module_field_emitter(module.kind, balance),
         Interactable,
-        crate::state::PlayingCleanup,
+        PlayingCleanup,
     ));
 
     if hostile {
@@ -211,16 +217,10 @@ pub(crate) fn spawn_runtime_module(
                     source_module_id: Some(module.id),
                     target_module_id: None,
                     resource_kind: match module.defaults.manipulator_resource_kind {
-                        StoredResourceKind::RawSalvage => {
-                            crate::gameplay::components::ResourceKind::RawSalvage
-                        }
-                        StoredResourceKind::RepairCharge => {
-                            crate::gameplay::components::ResourceKind::RepairCharge
-                        }
-                        StoredResourceKind::Fuel => crate::gameplay::components::ResourceKind::Fuel,
-                        StoredResourceKind::Ammunition => {
-                            crate::gameplay::components::ResourceKind::Ammunition
-                        }
+                        StoredResourceKind::RawSalvage => ResourceKind::RawSalvage,
+                        StoredResourceKind::RepairCharge => ResourceKind::RepairCharge,
+                        StoredResourceKind::Fuel => ResourceKind::Fuel,
+                        StoredResourceKind::Ammunition => ResourceKind::Ammunition,
                     },
                 },
             );
@@ -273,17 +273,13 @@ pub(crate) fn spawn_runtime_module(
                     enabled: module.defaults.computer_enabled,
                     instruction_budget: 24,
                     program: module.arch_program.clone().unwrap_or_else(|| {
-                        crate::ship::arch::ArchProgram::from_template(
-                            crate::ship::arch::ArchProgramTemplate::BalancedOps,
-                        )
+                        ArchProgram::from_template(ArchProgramTemplate::BalancedOps)
                     }),
                     last_result: ArchExecutionResult::default(),
                     lumen_program: module.lumen_program.clone().unwrap_or_else(|| {
-                        crate::ship::lumen::LumenProgram::from_template(
-                            crate::ship::lumen::LumenProgramTemplate::BalancedSupervision,
-                        )
+                        LumenProgram::from_template(LumenProgramTemplate::BalancedSupervision)
                     }),
-                    last_lumen_result: crate::gameplay::components::LumenExecutionResult::default(),
+                    last_lumen_result: LumenExecutionResult::default(),
                 },
             ));
         }
@@ -373,7 +369,7 @@ pub(crate) fn spawn_runtime_module(
         ModuleKind::Shield => {
             entity.insert((
                 PowerConsumer { draw: 2 },
-                crate::gameplay::components::ShieldCommandState {
+                ShieldCommandState {
                     desired_angle: Fx::from_num(0),
                     width: Fx::from_num(spec.shield_arc_degrees),
                     strength: Fx::from_num(spec.shield_capacity),

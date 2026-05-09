@@ -3,7 +3,11 @@ use bevy::prelude::*;
 use crate::{
     TILE_SIZE,
     balance::BalanceConfig,
-    gameplay::{components::*, helpers::*, systems::simulation::helpers::*},
+    gameplay::{
+        components::{ResourceKind, *},
+        helpers::*,
+        systems::simulation::helpers::*,
+    },
 };
 
 pub(crate) fn fire_player_weapons(
@@ -73,7 +77,7 @@ pub(crate) fn fire_player_weapons(
             && !consume_ship_resource(
                 &mut storage_query,
                 children,
-                crate::gameplay::components::ResourceKind::Ammunition,
+                ResourceKind::Ammunition,
                 weapon_stats.ammo_per_shot.max(1),
             )
         {

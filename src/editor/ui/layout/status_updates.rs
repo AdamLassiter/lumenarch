@@ -1,3 +1,8 @@
+use crate::{
+    ship::ModuleKind,
+    state::{ArchEditorState, ProgramTextEditorState, ProgrammingLanguageMode},
+};
+
 pub(crate) fn update_editor_status_text(
     editor_ship: Res<EditorShip>,
     editor_session: Res<EditorSessionState>,
@@ -120,8 +125,8 @@ pub(crate) fn update_editor_status_text(
 
 pub(crate) fn update_editor_module_overlay(
     editor_ship: Res<EditorShip>,
-    arch_editor_state: Res<crate::state::ArchEditorState>,
-    program_editor_state: Res<crate::state::ProgramTextEditorState>,
+    arch_editor_state: Res<ArchEditorState>,
+    program_editor_state: Res<ProgramTextEditorState>,
     mut panel_query: Query<
         &mut Node,
         (
@@ -312,7 +317,7 @@ pub(crate) fn update_editor_module_overlay(
     }
 
     let readouts = editor_station_readouts(module);
-    let show_program_editor = module.kind == crate::ship::ModuleKind::Computer;
+    let show_program_editor = module.kind == ModuleKind::Computer;
 
     for mut node in &mut program_box_query {
         node.display = if show_program_editor {
@@ -355,8 +360,8 @@ pub(crate) fn update_editor_module_overlay(
                 format!(
                     "{} source",
                     match arch_editor_state.selected_language {
-                        crate::state::ProgrammingLanguageMode::Arch => "ARCH",
-                        crate::state::ProgrammingLanguageMode::Lumen => "LUMEN",
+                        ProgrammingLanguageMode::Arch => "ARCH",
+                        ProgrammingLanguageMode::Lumen => "LUMEN",
                     }
                 )
             } else {
@@ -476,4 +481,3 @@ enum EditorReadoutVisual {
     Bar { percent: f32, color: Color },
     Light { color: Color },
 }
-

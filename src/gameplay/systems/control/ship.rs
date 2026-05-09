@@ -1,5 +1,15 @@
 use super::*;
-use crate::gameplay::components::PlayerConditionState;
+use crate::{
+    gameplay::components::{
+        DroneStationCommandState,
+        DroneTask,
+        PlayerConditionState,
+        ProcessorRecipe,
+        ResourceKind,
+    },
+    netcode::{INPUT_CYCLE_TEMPLATE, INPUT_SPACE_EDGE, StationControlOp},
+    ship::arch::ArchProgram,
+};
 
 pub(crate) fn update_station_command_input(
     time: Res<Time>,
@@ -22,7 +32,7 @@ pub(crate) fn update_station_command_input(
         Option<&mut ManipulatorCommandState>,
         Option<&mut ProcessorCommandState>,
         Option<&mut AirlockCommandState>,
-        Option<&mut crate::gameplay::components::DroneStationCommandState>,
+        Option<&mut DroneStationCommandState>,
         Option<&mut RuntimeArchComputer>,
     )>,
     candidate_query: Query<&RuntimeShipModule>,
@@ -66,12 +76,12 @@ pub(crate) fn update_station_command_input(
                     .clamp(Fx::from_num(0), Fx::from_num(1));
                 }
                 match command.station.op {
-                    netcode::StationControlOp::HelmThrottle => {
+                    StationControlOp::HelmThrottle => {
                         ship_controls.throttle_demand = (previous_throttle
                             + Fx::from_num(command.station.arg0) / Fx::from_num(1000))
                         .clamp(Fx::from_num(0), Fx::from_num(1));
                     }
-                    netcode::StationControlOp::HelmTurn => {
+                    StationControlOp::HelmTurn => {
                         ship_controls.turn_input = (Fx::from_num(command.station.arg0)
                             / Fx::from_num(1000))
                         .clamp(Fx::from_num(-1), Fx::from_num(1));
@@ -104,12 +114,12 @@ pub(crate) fn update_station_command_input(
                 turret_state.desired_angle += dt * Fx::from_num(command.turn_milli)
                     / Fx::from_num(1000)
                     * Fx::from_num(balance.combat.turret_manual_aim_speed);
-                if command.station.op == netcode::StationControlOp::TurretAdjustAim {
+                if command.station.op == StationControlOp::TurretAdjustAim {
                     turret_state.desired_angle +=
                         Fx::from_num(command.station.arg0) / Fx::from_num(1000);
                 }
                 turret_state.desired_angle = wrap_radians(turret_state.desired_angle);
-                if command.station.op == netcode::StationControlOp::TurretFireToggle {
+                if command.station.op == StationControlOp::TurretFireToggle {
                     turret_state.fire_intent = !turret_state.fire_intent;
                 } else {
                     turret_state.fire_intent = command.raw.pressed(netcode::INPUT_FIRE);
@@ -146,12 +156,12 @@ pub(crate) fn update_station_command_input(
                     .turbine_load
                     .clamp(Fx::from_num(0), Fx::from_num(1));
                 match command.station.op {
-                    netcode::StationControlOp::ReactorAdjustRate => {
+                    StationControlOp::ReactorAdjustRate => {
                         reactor_state.reaction_rate = (reactor_state.reaction_rate
                             + Fx::from_num(command.station.arg0) / Fx::from_num(1000))
                         .clamp(Fx::from_num(0), Fx::from_num(1));
                     }
-                    netcode::StationControlOp::ReactorAdjustTurbine => {
+                    StationControlOp::ReactorAdjustTurbine => {
                         reactor_state.turbine_load = (reactor_state.turbine_load
                             + Fx::from_num(command.station.arg0) / Fx::from_num(1000))
                         .clamp(Fx::from_num(0), Fx::from_num(1));
@@ -186,16 +196,15 @@ pub(crate) fn update_station_command_input(
                     continue;
                 };
                 if let Some(mut airlock_state) = airlock_state {
-                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE)
-                        || command.station.op == netcode::StationControlOp::LogisticsToggleAirlock
+                    if command.raw.pressed(INPUT_SPACE_EDGE)
+                        || command.station.op == StationControlOp::LogisticsToggleAirlock
                     {
                         airlock_state.open = !airlock_state.open;
                         mission_runtime.airlocks_cycled += 1;
                     }
                 } else if let Some(mut storage_cmd) = storage_cmd
-                    && (command.raw.pressed(netcode::INPUT_SPACE_EDGE)
-                        || command.station.op
-                            == netcode::StationControlOp::LogisticsToggleStorageIntake)
+                    && (command.raw.pressed(INPUT_SPACE_EDGE)
+                        || command.station.op == StationControlOp::LogisticsToggleStorageIntake)
                 {
                     storage_cmd.allow_intake = !storage_cmd.allow_intake;
                 }
@@ -204,26 +213,17 @@ pub(crate) fn update_station_command_input(
                         manipulator_cmd.manual_mode = !manipulator_cmd.manual_mode;
                     }
                     if command.reactor_delta_milli != 0
-                        || command.station.op == netcode::StationControlOp::LogisticsCycleResource
+                        || command.station.op == StationControlOp::LogisticsCycleResource
                     {
                         manipulator_cmd.resource_kind = match manipulator_cmd.resource_kind {
-                            crate::gameplay::components::ResourceKind::RawSalvage => {
-                                crate::gameplay::components::ResourceKind::RepairCharge
-                            }
-                            crate::gameplay::components::ResourceKind::RepairCharge => {
-                                crate::gameplay::components::ResourceKind::Fuel
-                            }
-                            crate::gameplay::components::ResourceKind::Fuel => {
-                                crate::gameplay::components::ResourceKind::Ammunition
-                            }
-                            crate::gameplay::components::ResourceKind::Ammunition => {
-                                crate::gameplay::components::ResourceKind::RawSalvage
-                            }
+                            ResourceKind::RawSalvage => ResourceKind::RepairCharge,
+                            ResourceKind::RepairCharge => ResourceKind::Fuel,
+                            ResourceKind::Fuel => ResourceKind::Ammunition,
+                            ResourceKind::Ammunition => ResourceKind::RawSalvage,
                         };
                     }
-                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE)
-                        || command.station.op
-                            == netcode::StationControlOp::LogisticsToggleManipulator
+                    if command.raw.pressed(INPUT_SPACE_EDGE)
+                        || command.station.op == StationControlOp::LogisticsToggleManipulator
                     {
                         manipulator_cmd.transfer_enabled = !manipulator_cmd.transfer_enabled;
                     }
@@ -231,10 +231,10 @@ pub(crate) fn update_station_command_input(
                         && (command.raw.pressed(netcode::INPUT_PREV_EDGE)
                             || command.raw.pressed(netcode::INPUT_NEXT_EDGE)
                             || command.station.op
-                                == netcode::StationControlOp::LogisticsCycleManipulatorTarget)
+                                == StationControlOp::LogisticsCycleManipulatorTarget)
                     {
                         let direction = if command.station.op
-                            == netcode::StationControlOp::LogisticsCycleManipulatorTarget
+                            == StationControlOp::LogisticsCycleManipulatorTarget
                         {
                             command.station.arg0 as i32
                         } else if command.raw.pressed(netcode::INPUT_PREV_EDGE) {
@@ -257,41 +257,26 @@ pub(crate) fn update_station_command_input(
                 }
                 if let Some(mut drone_station_cmd) = drone_station_cmd
                     && (command.raw.pressed(netcode::INPUT_AUX_EDGE)
-                        || command.station.op
-                            == netcode::StationControlOp::LogisticsToggleProcessor)
+                        || command.station.op == StationControlOp::LogisticsToggleProcessor)
                 {
                     drone_station_cmd.selected_task = match drone_station_cmd.selected_task {
-                        crate::gameplay::components::DroneTask::Idle => {
-                            crate::gameplay::components::DroneTask::Salvage
-                        }
-                        crate::gameplay::components::DroneTask::Salvage => {
-                            crate::gameplay::components::DroneTask::Logistics
-                        }
-                        crate::gameplay::components::DroneTask::Logistics => {
-                            crate::gameplay::components::DroneTask::Return
-                        }
-                        crate::gameplay::components::DroneTask::Return => {
-                            crate::gameplay::components::DroneTask::Idle
-                        }
+                        DroneTask::Idle => DroneTask::Salvage,
+                        DroneTask::Salvage => DroneTask::Logistics,
+                        DroneTask::Logistics => DroneTask::Return,
+                        DroneTask::Return => DroneTask::Idle,
                     };
                 }
                 if let Some(mut processor_cmd) = processor_cmd {
-                    if command.raw.pressed(netcode::INPUT_SPACE_EDGE)
-                        || command.station.op == netcode::StationControlOp::LogisticsToggleProcessor
+                    if command.raw.pressed(INPUT_SPACE_EDGE)
+                        || command.station.op == StationControlOp::LogisticsToggleProcessor
                     {
                         processor_cmd.enabled = !processor_cmd.enabled;
                     }
                     if command.reactor_delta_milli != 0 {
                         processor_cmd.selected_recipe = match processor_cmd.selected_recipe {
-                            crate::gameplay::components::ProcessorRecipe::RepairCharge => {
-                                crate::gameplay::components::ProcessorRecipe::Ammunition
-                            }
-                            crate::gameplay::components::ProcessorRecipe::Ammunition => {
-                                crate::gameplay::components::ProcessorRecipe::Fuel
-                            }
-                            crate::gameplay::components::ProcessorRecipe::Fuel => {
-                                crate::gameplay::components::ProcessorRecipe::RepairCharge
-                            }
+                            ProcessorRecipe::RepairCharge => ProcessorRecipe::Ammunition,
+                            ProcessorRecipe::Ammunition => ProcessorRecipe::Fuel,
+                            ProcessorRecipe::Fuel => ProcessorRecipe::RepairCharge,
                         };
                     }
                 }
@@ -311,17 +296,16 @@ pub(crate) fn update_station_command_input(
                 let Some(mut arch_runtime) = arch_runtime else {
                     continue;
                 };
-                if command.raw.pressed(netcode::INPUT_SPACE_EDGE)
-                    || command.station.op == netcode::StationControlOp::ComputerToggleEnabled
+                if command.raw.pressed(INPUT_SPACE_EDGE)
+                    || command.station.op == StationControlOp::ComputerToggleEnabled
                 {
                     arch_runtime.enabled = !arch_runtime.enabled;
                 }
-                if command.raw.pressed(netcode::INPUT_CYCLE_TEMPLATE)
-                    || command.station.op == netcode::StationControlOp::ComputerCycleTemplate
+                if command.raw.pressed(INPUT_CYCLE_TEMPLATE)
+                    || command.station.op == StationControlOp::ComputerCycleTemplate
                 {
-                    arch_runtime.program = crate::ship::arch::ArchProgram::from_template(
-                        arch_runtime.program.template.next(),
-                    );
+                    arch_runtime.program =
+                        ArchProgram::from_template(arch_runtime.program.template.next());
                 }
             }
         }

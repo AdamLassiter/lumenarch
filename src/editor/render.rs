@@ -36,6 +36,7 @@ use super::{
         variant_inventory_label,
     },
 };
+use crate::state::EditorToolMode;
 
 pub(crate) fn spawn_preview_tile(
     mut commands: Commands,
@@ -75,7 +76,7 @@ pub(crate) fn sync_preview_tile(
     let (mut sprite, mut transform, mut visibility) = preview_query.into_inner();
     let window = window.into_inner();
 
-    if tool_state.tool_mode != crate::state::EditorToolMode::Build
+    if tool_state.tool_mode != EditorToolMode::Build
         || is_cursor_over_editor_ui(window, &ui_blocker_query)
     {
         *visibility = Visibility::Hidden;

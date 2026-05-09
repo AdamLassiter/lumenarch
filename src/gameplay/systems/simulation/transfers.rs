@@ -1,7 +1,10 @@
 use bevy::prelude::*;
 
 use crate::{
-    gameplay::{components::*, helpers::*},
+    gameplay::{
+        components::{ArchLogisticsPreference, ResourceInventory, ResourceKind},
+        helpers::FixedVec2,
+    },
     ship::ModuleKind,
 };
 
@@ -11,18 +14,12 @@ pub(super) fn find_automation_transfer_task(
         u64,
         ModuleKind,
         FixedVec2,
-        Option<(
-            u32,
-            crate::gameplay::components::ResourceInventory,
-            bool,
-            bool,
-            bool,
-        )>,
-        Option<(u32, u32, crate::gameplay::components::ResourceInventory)>,
+        Option<(u32, ResourceInventory, bool, bool, bool)>,
+        Option<(u32, u32, ResourceInventory)>,
         bool,
     )],
     in_range: &impl Fn(FixedVec2) -> bool,
-    preference: crate::gameplay::components::ArchLogisticsPreference,
+    preference: ArchLogisticsPreference,
 ) -> Option<(u64, u64, ResourceKind)> {
     for (_, source_id, _, source_pos, storage, _, source_destroyed) in snapshots {
         if *source_destroyed || !in_range(*source_pos) {
@@ -50,10 +47,7 @@ pub(super) fn find_automation_transfer_task(
         }
     }
 
-    if matches!(
-        preference,
-        crate::gameplay::components::ArchLogisticsPreference::FeedProcessor
-    ) {
+    if matches!(preference, ArchLogisticsPreference::FeedProcessor) {
         return None;
     }
 
@@ -134,14 +128,8 @@ pub(super) fn find_airlock_to_cargo_transfer(
         u64,
         ModuleKind,
         FixedVec2,
-        Option<(
-            u32,
-            crate::gameplay::components::ResourceInventory,
-            bool,
-            bool,
-            bool,
-        )>,
-        Option<(u32, u32, crate::gameplay::components::ResourceInventory)>,
+        Option<(u32, ResourceInventory, bool, bool, bool)>,
+        Option<(u32, u32, ResourceInventory)>,
         bool,
     )],
     in_range: &impl Fn(FixedVec2) -> bool,

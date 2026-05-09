@@ -1,11 +1,26 @@
 use bevy::{ecs::relationship::Relationship, prelude::*};
 
 use crate::{
-    gameplay::{components::*, helpers::*},
+    gameplay::{
+        components::{
+            CarriedItemKind,
+            HostileShipModule,
+            LooseCargo,
+            Projectile,
+            ResourceKind,
+            RuntimeShipModule,
+            SalvagePickup,
+            SalvageWreck,
+            ShieldCommandState,
+            SimPosition,
+            StorageModule,
+        },
+        helpers::{FixedVec2, Fx, angle_from_vector, render_translation, wrap_radians},
+    },
     state::PlayingCleanup,
 };
 
-pub(crate) type SimVec = crate::gameplay::helpers::FixedVec2;
+pub(crate) type SimVec = FixedVec2;
 
 pub(crate) fn spawn_hostile_salvage(
     commands: &mut Commands,
@@ -16,16 +31,14 @@ pub(crate) fn spawn_hostile_salvage(
         Sprite::from_color(Color::srgb(0.90, 0.72, 0.28), Vec2::new(30.0, 26.0)),
         Transform::from_translation(render_translation(position, 3.0)),
         SimPosition { value: position },
-        crate::gameplay::components::SalvagePickup {
+        SalvagePickup {
             scrap_value: salvage_reward,
         },
-        crate::gameplay::components::LooseCargo {
-            kind: crate::gameplay::components::CarriedItemKind::Resource(
-                crate::gameplay::components::ResourceKind::RawSalvage,
-            ),
+        LooseCargo {
+            kind: CarriedItemKind::Resource(ResourceKind::RawSalvage),
             amount: salvage_reward,
         },
-        crate::gameplay::components::SalvageWreck,
+        SalvageWreck,
         PlayingCleanup,
     ));
 }
@@ -33,7 +46,7 @@ pub(crate) fn spawn_hostile_salvage(
 pub(crate) fn consume_ship_resource(
     storage_query: &mut Query<(&ChildOf, &mut StorageModule)>,
     children: &Children,
-    resource_kind: crate::gameplay::components::ResourceKind,
+    resource_kind: ResourceKind,
     amount: u32,
 ) -> bool {
     for child in children.iter() {

@@ -6,6 +6,7 @@ use crate::{
     DEFAULT_HOST_ADDR,
     state::{
         DebugEnemyEditorButton,
+        FocusedTextBox,
         JoinButton,
         JoinButtonText,
         LobbyColorText,
@@ -280,7 +281,7 @@ pub(super) fn spawn_textbox(
 pub(super) fn format_textbox_value(
     value: &str,
     field: TextBoxField,
-    focused_textbox: &crate::state::FocusedTextBox,
+    focused_textbox: &FocusedTextBox,
 ) -> String {
     if focused_textbox.field != Some(field) {
         return value.to_string();

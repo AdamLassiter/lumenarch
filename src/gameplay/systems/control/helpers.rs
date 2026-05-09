@@ -1,4 +1,8 @@
 use super::*;
+use crate::gameplay::{
+    components::ResourceInventory,
+    helpers::{WideFx, widen},
+};
 
 pub(crate) fn wrap_angle_f32(angle: f32) -> f32 {
     let mut angle = angle;
@@ -11,8 +15,8 @@ pub(crate) fn wrap_angle_f32(angle: f32) -> f32 {
     angle
 }
 
-pub(crate) fn fixed_square(value: Fx) -> crate::gameplay::helpers::WideFx {
-    crate::gameplay::helpers::widen(value) * crate::gameplay::helpers::widen(value)
+pub(crate) fn fixed_square(value: Fx) -> WideFx {
+    widen(value) * widen(value)
 }
 
 pub(crate) fn nearby_logistics_target_ids(
@@ -32,7 +36,7 @@ pub(crate) fn nearby_logistics_target_ids(
 }
 
 pub(crate) fn take_first_available(
-    inventory: &mut crate::gameplay::components::ResourceInventory,
+    inventory: &mut ResourceInventory,
 ) -> Option<(ResourceKind, u32)> {
     if inventory.raw_salvage > 0 {
         inventory.raw_salvage -= 1;

@@ -4,8 +4,9 @@ use crate::{
     netcode,
     ship::{
         ModuleKind,
+        ModuleVariant,
         ShipDefinition,
-        enemy::load_validated_default_enemy_library,
+        enemy::{EnemyShipLibrary, load_validated_default_enemy_library},
         storage::load_default_ship,
     },
     state::{
@@ -78,12 +79,12 @@ pub(crate) fn initialize_editor_ship(
                     enemy_library_state.entry_statuses = validated.statuses;
                 }
                 Ok(None) => {
-                    enemy_library_state.library = crate::ship::enemy::EnemyShipLibrary::seeded();
+                    enemy_library_state.library = EnemyShipLibrary::seeded();
                     enemy_library_state.entry_statuses.clear();
                 }
                 Err(error) => {
                     eprintln!("editor: failed to load enemy ship library: {error}");
-                    enemy_library_state.library = crate::ship::enemy::EnemyShipLibrary::seeded();
+                    enemy_library_state.library = EnemyShipLibrary::seeded();
                     enemy_library_state.entry_statuses.clear();
                 }
             }
@@ -103,7 +104,7 @@ pub(crate) fn initialize_editor_ship(
 
     tool_state.tool_mode = EditorToolMode::Build;
     tool_state.selected_kind = ModuleKind::Hull;
-    tool_state.selected_variant = crate::ship::ModuleVariant::default_for_kind(ModuleKind::Hull);
+    tool_state.selected_variant = ModuleVariant::default_for_kind(ModuleKind::Hull);
     tool_state.selected_rotation = 0;
     tool_state.selected_channel = 0;
     selection_state.selected_module_ids.clear();

@@ -13,6 +13,7 @@ use super::{
 };
 use crate::{
     HOVERED_BUTTON,
+    NORMAL_BUTTON,
     PRESSED_BUTTON,
     editor::helpers::{
         cursor_grid_position,
@@ -21,7 +22,13 @@ use crate::{
         variant_tooltip_text,
     },
     netcode,
-    ship::{ShipDefinition, ShipModule},
+    ship::{
+        ModuleKind,
+        ShipDefinition,
+        ShipModule,
+        arch::{ArchProgram, ArchProgramTemplate},
+        lumen::{LumenProgram, LumenProgramTemplate},
+    },
     state::{
         ArchEditorState,
         EditorAutoHullButton,
@@ -45,6 +52,7 @@ use crate::{
         LeaveEditorButton,
         ProgrammingLanguageMode,
         Progression,
+        StationPanelButtonAction,
         ToolboxVariantButton,
     },
 };
@@ -199,7 +207,7 @@ pub(crate) fn mission_report_button_system(
                 *background = BackgroundColor(HOVERED_BUTTON);
             }
             Interaction::None => {
-                *background = BackgroundColor(crate::NORMAL_BUTTON);
+                *background = BackgroundColor(NORMAL_BUTTON);
             }
         }
     }
@@ -493,75 +501,67 @@ pub(crate) fn editor_station_panel_button_system(
                     continue;
                 };
                 match button.action {
-                    crate::state::StationPanelButtonAction::HelmThrottle { .. }
-                    | crate::state::StationPanelButtonAction::HelmTurn { .. } => {}
-                    crate::state::StationPanelButtonAction::TurretAdjustAim { .. } => {}
-                    crate::state::StationPanelButtonAction::TurretFireToggle => {
+                    StationPanelButtonAction::HelmThrottle { .. }
+                    | StationPanelButtonAction::HelmTurn { .. } => {}
+                    StationPanelButtonAction::TurretAdjustAim { .. } => {}
+                    StationPanelButtonAction::TurretFireToggle => {
                         module.defaults.turret_fire_intent = !module.defaults.turret_fire_intent;
                     }
-                    crate::state::StationPanelButtonAction::ReactorAdjustRate { delta } => {
+                    StationPanelButtonAction::ReactorAdjustRate { delta } => {
                         let current = module.defaults.reaction_rate_milli as i32;
                         module.defaults.reaction_rate_milli =
                             (current + (delta * 1000.0) as i32).clamp(0, 1000) as u16;
                     }
-                    crate::state::StationPanelButtonAction::ReactorAdjustTurbine { delta } => {
+                    StationPanelButtonAction::ReactorAdjustTurbine { delta } => {
                         let current = module.defaults.turbine_load_milli as i32;
                         module.defaults.turbine_load_milli =
                             (current + (delta * 1000.0) as i32).clamp(0, 1000) as u16;
                     }
-                    crate::state::StationPanelButtonAction::LogisticsToggleStorageIntake => {
+                    StationPanelButtonAction::LogisticsToggleStorageIntake => {
                         module.defaults.storage_allow_intake =
                             !module.defaults.storage_allow_intake;
                     }
-                    crate::state::StationPanelButtonAction::LogisticsToggleAirlock => {
+                    StationPanelButtonAction::LogisticsToggleAirlock => {
                         module.defaults.airlock_open = !module.defaults.airlock_open;
                     }
-                    crate::state::StationPanelButtonAction::LogisticsToggleManipulator => {
+                    StationPanelButtonAction::LogisticsToggleManipulator => {
                         module.defaults.manipulator_transfer_enabled =
                             !module.defaults.manipulator_transfer_enabled;
                     }
-                    crate::state::StationPanelButtonAction::LogisticsCycleManipulatorTarget {
-                        ..
-                    } => {
+                    StationPanelButtonAction::LogisticsCycleManipulatorTarget { .. } => {
                         module.defaults.manipulator_manual_mode =
                             !module.defaults.manipulator_manual_mode;
                     }
-                    crate::state::StationPanelButtonAction::LogisticsCycleResource => {
+                    StationPanelButtonAction::LogisticsCycleResource => {
                         module.defaults.manipulator_resource_kind =
                             module.defaults.manipulator_resource_kind.next();
                     }
-                    crate::state::StationPanelButtonAction::LogisticsToggleProcessor => {
-                        if module.kind == crate::ship::ModuleKind::Processor {
+                    StationPanelButtonAction::LogisticsToggleProcessor => {
+                        if module.kind == ModuleKind::Processor {
                             module.defaults.processor_enabled = !module.defaults.processor_enabled;
                         } else {
                             module.defaults.processor_recipe =
                                 module.defaults.processor_recipe.next();
                         }
                     }
-                    crate::state::StationPanelButtonAction::ComputerToggleEnabled => {
+                    StationPanelButtonAction::ComputerToggleEnabled => {
                         module.defaults.computer_enabled = !module.defaults.computer_enabled;
                     }
-                    crate::state::StationPanelButtonAction::ComputerCycleTemplate => {
+                    StationPanelButtonAction::ComputerCycleTemplate => {
                         match arch_editor_state.selected_language {
                             ProgrammingLanguageMode::Arch => {
                                 let program = module.arch_program.get_or_insert_with(|| {
-                                    crate::ship::arch::ArchProgram::from_template(
-                                        crate::ship::arch::ArchProgramTemplate::BalancedOps,
-                                    )
+                                    ArchProgram::from_template(ArchProgramTemplate::BalancedOps)
                                 });
-                                *program = crate::ship::arch::ArchProgram::from_template(
-                                    program.template.next(),
-                                );
+                                *program = ArchProgram::from_template(program.template.next());
                             }
                             ProgrammingLanguageMode::Lumen => {
                                 let program = module.lumen_program.get_or_insert_with(|| {
-                                    crate::ship::lumen::LumenProgram::from_template(
-                                    crate::ship::lumen::LumenProgramTemplate::BalancedSupervision,
-                                )
+                                    LumenProgram::from_template(
+                                        LumenProgramTemplate::BalancedSupervision,
+                                    )
                                 });
-                                *program = crate::ship::lumen::LumenProgram::from_template(
-                                    program.template.next(),
-                                );
+                                *program = LumenProgram::from_template(program.template.next());
                             }
                         }
                     }

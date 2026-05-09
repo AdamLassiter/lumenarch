@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     ship::{ModuleKind, ModuleVariant, ShipDefinition, ShipModule},
-    state::{EditorMode, EditorSelectionState, Progression},
+    state::{EditorMode, EditorSelectionState, Progression, ShipModuleSnapshot},
 };
 
 pub(super) fn selected_or_all_modules(
@@ -16,8 +16,8 @@ pub(super) fn selected_or_all_modules(
         .collect()
 }
 
-pub(super) fn module_snapshot(module: ShipModule) -> crate::state::ShipModuleSnapshot {
-    crate::state::ShipModuleSnapshot {
+pub(super) fn module_snapshot(module: ShipModule) -> ShipModuleSnapshot {
+    ShipModuleSnapshot {
         kind: module.kind,
         variant: module.variant,
         grid_x: module.grid_x,

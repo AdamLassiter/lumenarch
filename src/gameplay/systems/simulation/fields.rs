@@ -34,7 +34,7 @@ use crate::{
             wrap_radians,
         },
     },
-    ship::ModuleKind,
+    ship::{ModuleKind, ModuleVariant},
 };
 
 pub(crate) fn sample_ship_fields(
@@ -247,12 +247,11 @@ pub(crate) fn update_module_runtime_state(
             let warmup_threshold = Fx::from_num(balance.reactor.warmup_threshold);
             let full_power_threshold = Fx::from_num(balance.reactor.full_power_threshold);
             if reactor_state.fuel_remaining > Fx::from_num(0) {
-                let variant_fuel_scalar =
-                    if reactor_state.variant == crate::ship::ModuleVariant::Fusion {
-                        Fx::from_num(1.25)
-                    } else {
-                        Fx::from_num(1)
-                    };
+                let variant_fuel_scalar = if reactor_state.variant == ModuleVariant::Fusion {
+                    Fx::from_num(1.25)
+                } else {
+                    Fx::from_num(1)
+                };
                 reactor_state.fuel_remaining = (reactor_state.fuel_remaining
                     - reactor_state.reaction_rate
                         * dt
@@ -280,7 +279,7 @@ pub(crate) fn update_module_runtime_state(
                 * Fx::from_num(balance.reactor.reaction_power_factor)
                 + reactor_state.turbine_load * Fx::from_num(balance.reactor.turbine_power_factor))
             .min(Fx::from_num(balance.reactor.max_power_output));
-            if reactor_state.variant == crate::ship::ModuleVariant::Fusion {
+            if reactor_state.variant == ModuleVariant::Fusion {
                 let confinement = reactor_state
                     .confinement
                     .clamp(Fx::from_num(0), Fx::from_num(1));

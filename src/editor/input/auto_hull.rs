@@ -139,8 +139,9 @@ fn auto_hull_kind_for_cell(
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_auto_hull_to_ship, paste_clipboard_group};
+    use super::apply_auto_hull_to_ship;
     use crate::{
+        editor::input::selection::paste_clipboard_group,
         ship::{ModuleKind, ModuleVariant, ShipDefinition, ShipModule},
         state::{EditorMode, EditorSelectionState, Progression, ShipModuleSnapshot},
     };

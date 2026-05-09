@@ -25,6 +25,7 @@ use crate::{
             HeldInteraction,
             HostileShip,
             HostileShipAi,
+            HostileTarget,
             InternalPosition,
             LinearVelocity,
             LooseCargo,
@@ -51,6 +52,7 @@ use crate::{
             ShipInertiaField,
             ShipInteriorMap,
             ShipInteriorNode,
+            ShipMovementModel,
             ShipPowerState,
             ShipRoot,
             ShipWeaponState,
@@ -73,7 +75,7 @@ use crate::{
     },
     netcode,
     ship::{ModuleKind, ModuleSpec, ShipDefinition},
-    state::PlayingCleanup,
+    state::{LocalPlayerProfile, PlayingCleanup},
     stations::FactionId,
 };
 
@@ -641,7 +643,7 @@ pub(crate) fn spawn_hostile_ship(
             ShipInertiaField {
                 radius: inertia_radius,
             },
-            crate::gameplay::components::HostileTarget,
+            HostileTarget,
             HostileShipAi {
                 preferred_range,
                 aggression,
@@ -757,7 +759,7 @@ fn ship_movement_model_with_variant_totals(
     ship: &ShipDefinition,
     totals: &ShipVariantTotals,
     balance: &BalanceConfig,
-) -> crate::gameplay::components::ShipMovementModel {
+) -> ShipMovementModel {
     ship_movement_model_with_effective(
         ship.modules.len(),
         totals.engine_count,
@@ -769,10 +771,7 @@ fn ship_movement_model_with_variant_totals(
     )
 }
 
-fn actor_sprite_for_profile(
-    asset_server: &AssetServer,
-    profile: &crate::state::LocalPlayerProfile,
-) -> Sprite {
+fn actor_sprite_for_profile(asset_server: &AssetServer, profile: &LocalPlayerProfile) -> Sprite {
     let sprite_path = match profile.starting_suit() {
         PlayerSuit::Standard => "actors/player_default.png",
         PlayerSuit::Radiation => "actors/player_radiation.png",

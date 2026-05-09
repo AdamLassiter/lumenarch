@@ -11,7 +11,15 @@ use super::ship::{default_hostile_identity, spawn_hostile_ship, spawn_runtime_sh
 use crate::{
     balance::BalanceConfig,
     gameplay::{
-        components::{HostileShip, HostileShipModule, HostileTurretPlatform, ShipRoot},
+        components::{
+            CaptainProfile,
+            EncounterCommsScript,
+            HostileShip,
+            HostileShipModule,
+            HostileTurretPlatform,
+            ShipEncounterIdentity,
+            ShipRoot,
+        },
         effects::{EngineFlameMaterial, ReactorGlowMaterial},
         helpers::{FixedVec2, Fx},
     },
@@ -224,20 +232,20 @@ pub(crate) fn spawn_runtime_scene(
             balance.hostile_ai.salvage_reward_base
                 + u32::from(entry.threat_tier) * balance.hostile_ai.salvage_reward_per_threat,
             Some(if entry.is_crewed {
-                crate::gameplay::components::ShipEncounterIdentity {
+                ShipEncounterIdentity {
                     faction_id: entry.faction_id,
                     ship_name: entry
                         .ship_name
                         .clone()
                         .unwrap_or_else(|| entry.display_name.clone()),
-                    captain: crate::gameplay::components::CaptainProfile {
+                    captain: CaptainProfile {
                         name: entry
                             .captain_name
                             .clone()
                             .unwrap_or_else(|| "Unknown Captain".to_string()),
                         title: "Commanding".to_string(),
                     },
-                    comms: crate::gameplay::components::EncounterCommsScript {
+                    comms: EncounterCommsScript {
                         intro: entry
                             .comms_intro
                             .clone()

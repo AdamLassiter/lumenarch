@@ -2,6 +2,8 @@ use std::{fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 
+use crate::state::SectorState;
+
 const DEFAULT_STATIONS_PATH: &str = "saves/stations.json";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -158,13 +160,13 @@ impl StationCatalog {
     }
 }
 
-pub(crate) fn current_station_id(sector: &crate::state::SectorState) -> Option<&str> {
+pub(crate) fn current_station_id(sector: &SectorState) -> Option<&str> {
     sector.current_node()?.station_id.as_deref()
 }
 
 pub(crate) fn current_station<'a>(
     catalog: &'a StationCatalog,
-    sector: &crate::state::SectorState,
+    sector: &SectorState,
 ) -> Option<&'a StationDefinition> {
     catalog.station(current_station_id(sector)?)
 }

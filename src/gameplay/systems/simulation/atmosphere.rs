@@ -22,6 +22,7 @@ use crate::{
             ShipboardPlayer,
         },
         helpers::{
+            FixedVec2,
             Fx,
             breach_leak_multiplier,
             decompression_signature,
@@ -265,10 +266,7 @@ pub(crate) fn sample_player_atmosphere(
     }
 }
 
-fn point_inside_tile(
-    point: crate::gameplay::helpers::FixedVec2,
-    tile_center: crate::gameplay::helpers::FixedVec2,
-) -> bool {
+fn point_inside_tile(point: FixedVec2, tile_center: FixedVec2) -> bool {
     let tile_half = Fx::from_num(16);
     (point.x - tile_center.x).abs() <= tile_half && (point.y - tile_center.y).abs() <= tile_half
 }

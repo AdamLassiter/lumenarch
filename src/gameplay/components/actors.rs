@@ -11,7 +11,7 @@ use super::{
 };
 use crate::{
     balance::PlayerBalanceConfig,
-    ship::ModuleKind,
+    ship::{ModuleKind, ModuleVariant},
     state::PlayerRole,
     stations::FactionId,
 };
@@ -201,7 +201,7 @@ pub(crate) enum CarriedItemKind {
     Suit(PlayerSuit),
     ExtractedComponent {
         kind: ModuleKind,
-        variant: crate::ship::ModuleVariant,
+        variant: ModuleVariant,
     },
 }
 

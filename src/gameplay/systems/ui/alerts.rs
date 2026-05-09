@@ -599,19 +599,22 @@ pub(crate) fn alerts_text(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gameplay::components::ShipAutomationMode;
+    use crate::{
+        gameplay::{components::ShipAutomationMode, helpers::FixedVec2},
+        ship::{ModuleKind, ModuleVariant},
+    };
 
     #[test]
     fn inspection_text_includes_detector_register_dump() {
         let runtime_module = RuntimeShipModule {
             module_id: 9,
-            kind: crate::ship::ModuleKind::Detector,
-            variant: crate::ship::ModuleVariant::LifeSurvey,
+            kind: ModuleKind::Detector,
+            variant: ModuleVariant::LifeSurvey,
             channel: 2,
             grid_x: 3,
             grid_y: 4,
             rotation_quadrants: 0,
-            local_position: crate::gameplay::helpers::FixedVec2::zero(),
+            local_position: FixedVec2::zero(),
         };
         let integrity = Integrity { current: 7, max: 7 };
         let runtime_state = ModuleRuntimeState {
@@ -631,7 +634,7 @@ mod tests {
             range: Fx::from_num(300),
             detected: true,
             secondary_detected: false,
-            direction: crate::gameplay::helpers::FixedVec2::from_num(1, 0),
+            direction: FixedVec2::from_num(1, 0),
             distance: Fx::from_num(48),
             magnitude: Fx::from_num(0),
             critical: false,

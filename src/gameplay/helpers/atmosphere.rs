@@ -3,7 +3,10 @@ use std::collections::{HashMap, VecDeque};
 use super::{FixedVec2, Fx, narrow_wide_clamped, safe_sqrt_wide};
 use crate::{
     balance::BalanceConfig,
-    gameplay::components::{ShipAtmosphereState, ShipAtmosphereTile},
+    gameplay::{
+        components::{ShipAtmosphereState, ShipAtmosphereTile},
+        helpers::WideFx,
+    },
 };
 
 const EDGE_TOP: u8 = 1;
@@ -17,9 +20,7 @@ pub(crate) fn breach_leak_multiplier(total_open_edges: u32, balance: &BalanceCon
     }
     let minimum = Fx::from_num(balance.atmosphere.minimum_breach_leak_multiplier);
     let divisor = Fx::from_num(balance.atmosphere.breach_leak_sqrt_divisor).max(Fx::from_num(1));
-    let sqrt_edges = narrow_wide_clamped(safe_sqrt_wide(
-        crate::gameplay::helpers::WideFx::from_num(total_open_edges as i32),
-    ));
+    let sqrt_edges = narrow_wide_clamped(safe_sqrt_wide(WideFx::from_num(total_open_edges as i32)));
     (sqrt_edges / divisor).max(minimum)
 }
 

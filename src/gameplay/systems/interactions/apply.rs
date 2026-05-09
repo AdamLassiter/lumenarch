@@ -14,11 +14,13 @@ use crate::gameplay::{
         ManipulatorModule,
         MissionState,
         ModuleRuntimeState,
+        PlayerShip,
         ProcessorModule,
         ResourceKind,
         RuntimeArchComputer,
         RuntimeShipModule,
         ShipControlMode,
+        ShipRoot,
         ShipboardControlState,
         ShipboardPlayer,
         StationFamily,
@@ -32,13 +34,7 @@ pub(crate) fn apply_module_interactions(
     mut complete_events: MessageReader<CompleteHeldInteraction>,
     mut player_query: Query<&mut ShipboardControlState, With<ShipboardPlayer>>,
     mut player_cargo_query: Query<&mut CarriedResource, With<ShipboardPlayer>>,
-    mission_query: Single<
-        &mut MissionState,
-        (
-            With<crate::gameplay::components::PlayerShip>,
-            With<crate::gameplay::components::ShipRoot>,
-        ),
-    >,
+    mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     mut module_query: Query<(
         Entity,
         &RuntimeShipModule,

@@ -33,7 +33,10 @@ use super::{
     RollbackPhase,
     StationControlOp,
 };
-use crate::stations::{self, StationCatalogResource};
+use crate::{
+    state::SectorNodeKind,
+    stations::{self, StationCatalogResource},
+};
 
 pub(crate) fn read_local_inputs(
     mut commands: Commands,
@@ -207,7 +210,7 @@ pub(crate) fn apply_host_meta_ops(
                 && rollback_state
                     .sector
                     .node(node_id)
-                    .map(|node| !matches!(node.kind, crate::state::SectorNodeKind::HubStation))
+                    .map(|node| !matches!(node.kind, SectorNodeKind::HubStation))
                     .unwrap_or(false)
             {
                 rollback_state.sector.selected_node_id = Some(node_id);
@@ -225,7 +228,7 @@ pub(crate) fn apply_host_meta_ops(
                 && rollback_state
                     .sector
                     .node(node_id)
-                    .map(|node| !matches!(node.kind, crate::state::SectorNodeKind::HubStation))
+                    .map(|node| !matches!(node.kind, SectorNodeKind::HubStation))
                     .unwrap_or(false)
             {
                 rollback_state.sector.selected_node_id = Some(node_id);
@@ -306,7 +309,7 @@ pub(crate) fn apply_host_meta_ops(
                 && rollback_state
                     .sector
                     .node(node_id)
-                    .map(|node| !matches!(node.kind, crate::state::SectorNodeKind::HubStation))
+                    .map(|node| !matches!(node.kind, SectorNodeKind::HubStation))
                     .unwrap_or(false)
             {
                 rollback_state

@@ -8,6 +8,7 @@ use bevy_ggrs::{
 
 use crate::{
     AppRuntimeMode,
+    DEFAULT_HOST_ADDR,
     build_app,
     gameplay::{
         self,
@@ -27,7 +28,7 @@ use crate::{
         SessionRole,
         SessionStatus,
     },
-    state::FrontendMode,
+    state::{FrontendMode, LocalPlayerProfile, PlayingCleanup, SectorNodeKind},
 };
 
 #[test]
@@ -116,7 +117,7 @@ fn headless_host_lobby_editor_sector_and_cockpit_flow() {
         |app| {
             let mut query = app
                 .world_mut()
-                .query_filtered::<Entity, With<crate::state::PlayingCleanup>>();
+                .query_filtered::<Entity, With<PlayingCleanup>>();
             query.iter(app.world()).next().is_some()
         },
         "runtime encounter scene spawned",
@@ -149,7 +150,7 @@ fn launching_after_reselect_uses_the_latest_sector_node() {
             .nodes
             .iter()
             .filter(|node| rollback.sector.is_reachable(node.id))
-            .filter(|node| !matches!(node.kind, crate::state::SectorNodeKind::HubStation))
+            .filter(|node| !matches!(node.kind, SectorNodeKind::HubStation))
             .collect();
         let first = launchable
             .first()
@@ -215,7 +216,7 @@ fn repeated_encounter_cycles_cleanup_runtime_entities() {
             .nodes
             .iter()
             .find(|node| rollback.sector.is_reachable(node.id))
-            .filter(|node| !matches!(node.kind, crate::state::SectorNodeKind::HubStation))
+            .filter(|node| !matches!(node.kind, SectorNodeKind::HubStation))
             .map(|node| node.id)
             .expect("expected at least one launchable sector node")
     };
@@ -274,14 +275,11 @@ fn repeated_encounter_cycles_cleanup_runtime_entities() {
 
 /// Boots the host-side lobby state without opening sockets so tests can drive rollback locally.
 fn begin_headless_host_lobby(app: &mut App) {
-    let host_addr = crate::DEFAULT_HOST_ADDR
+    let host_addr = DEFAULT_HOST_ADDR
         .parse()
         .expect("default host addr should parse");
     let session_config = app.world().resource::<netcode::SessionConfig>().clone();
-    let local_profile = app
-        .world()
-        .resource::<crate::state::LocalPlayerProfile>()
-        .clone();
+    let local_profile = app.world().resource::<LocalPlayerProfile>().clone();
     let initial_state = netcode::load_initial_rollback_state();
 
     {
@@ -432,7 +430,7 @@ fn pump_once(app: &mut App) {
 fn count_cleanup_entities(app: &mut App) -> usize {
     let mut query = app
         .world_mut()
-        .query_filtered::<Entity, With<crate::state::PlayingCleanup>>();
+        .query_filtered::<Entity, With<PlayingCleanup>>();
     query.iter(app.world()).count()
 }
 

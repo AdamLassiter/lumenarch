@@ -9,7 +9,15 @@ use super::{
     RollbackPhase,
     bootstrap::stable_hash,
 };
-use crate::state::{FrontendMode, LastMissionReport, Progression, SectorState};
+use crate::state::{
+    EditorMode,
+    EditorSessionState,
+    EditorShip,
+    FrontendMode,
+    LastMissionReport,
+    Progression,
+    SectorState,
+};
 
 pub(crate) fn advance_rollback_state(
     frame: Res<RollbackFrameCount>,
@@ -42,7 +50,7 @@ pub(crate) fn advance_rollback_state(
 pub(crate) fn sync_presentation_from_rollback(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
-    mut editor_ship: ResMut<crate::state::EditorShip>,
+    mut editor_ship: ResMut<EditorShip>,
     mut progression: ResMut<Progression>,
     mut sector: ResMut<SectorState>,
     mut last_mission_report: ResMut<LastMissionReport>,
@@ -107,16 +115,16 @@ pub(crate) fn sync_active_presentation_phase(
 pub(crate) fn sync_player_editor_mode(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
-    mut editor_session: ResMut<crate::state::EditorSessionState>,
+    mut editor_session: ResMut<EditorSessionState>,
 ) {
     if *frontend_mode.get() == FrontendMode::Session
         && rollback_state.phase == RollbackPhase::Editing
-        && editor_session.mode != crate::state::EditorMode::Player
+        && editor_session.mode != EditorMode::Player
     {
         log::debug!(
             "Synchronizing editor session mode to Player for rollback-driven editing phase"
         );
-        editor_session.mode = crate::state::EditorMode::Player;
+        editor_session.mode = EditorMode::Player;
     }
 }
 

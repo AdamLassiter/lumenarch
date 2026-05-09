@@ -9,6 +9,7 @@ use crate::gameplay::{
         Integrity,
         ModuleRuntimeState,
         PlayerMotionState,
+        PlayerReferenceFrame,
         PlayerShip,
         ProcessorModule,
         RuntimeShipModule,
@@ -102,10 +103,8 @@ pub(crate) fn update_detector_modules(
                     }
 
                     let hostile = match motion.frame {
-                        crate::gameplay::components::PlayerReferenceFrame::Ship(entity) => {
-                            hostile_root_query.contains(entity)
-                        }
-                        crate::gameplay::components::PlayerReferenceFrame::World => false,
+                        PlayerReferenceFrame::Ship(entity) => hostile_root_query.contains(entity),
+                        PlayerReferenceFrame::World => false,
                     };
                     if hostile {
                         secondary_detected = true;

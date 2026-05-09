@@ -2,7 +2,34 @@ use bevy::{ecs::relationship::Relationship, prelude::*};
 
 use crate::{
     balance::BalanceConfig,
-    gameplay::{components::*, helpers::*, systems::simulation::helpers::*},
+    gameplay::{
+        components::{
+            DestroyedModule,
+            HostileShip,
+            HostileShipAi,
+            HostileShipModule,
+            HostileTarget,
+            HostileTurretPlatform,
+            Integrity,
+            MissionState,
+            ModuleRuntimeState,
+            PlayerShip,
+            Projectile,
+            ProjectileFaction,
+            RuntimeShipModule,
+            ShieldCommandState,
+            ShipDamageSensorState,
+            ShipRoot,
+            SimPosition,
+            SimRotation,
+        },
+        helpers::{Fx, fixed_radius_sq, fx_from_time_delta, is_inside_arena, render_translation},
+        systems::simulation::helpers::{
+            absorb_hostile_shield_hit,
+            absorb_player_shield_hit,
+            spawn_hostile_salvage,
+        },
+    },
     ship::ModuleKind,
 };
 

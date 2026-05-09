@@ -5,8 +5,29 @@ use crate::{
     TILE_SIZE,
     balance::BalanceConfig,
     gameplay::{
-        components::*,
-        helpers::*,
+        components::{
+            CollectedSalvage,
+            DestroyedModule,
+            ManipulatorCommandState,
+            ManipulatorModule,
+            MissionState,
+            ModuleRuntimeState,
+            PlayerShip,
+            ProcessorCommandState,
+            ProcessorModule,
+            ProcessorRecipe,
+            ResourceInventory,
+            ResourceKind,
+            RuntimeShipModule,
+            SalvagePickup,
+            SalvageWreck,
+            ShipArchCommandState,
+            ShipPowerState,
+            ShipRoot,
+            SimPosition,
+            StorageModule,
+        },
+        helpers::{FixedVec2, Fx, fx_from_time_delta, local_field_distance, resource_kind_label},
         systems::simulation::transfers::{
             find_airlock_to_cargo_transfer,
             find_automation_transfer_task,
@@ -18,7 +39,7 @@ use crate::{
 #[derive(Clone, Copy)]
 pub(crate) struct StorageSnapshot {
     pub(crate) capacity: u32,
-    pub(crate) inventory: crate::gameplay::components::ResourceInventory,
+    pub(crate) inventory: ResourceInventory,
     pub(crate) accepts_fuel: bool,
     pub(crate) accepts_ammunition: bool,
     pub(crate) accepts_general: bool,
@@ -28,7 +49,7 @@ pub(crate) struct StorageSnapshot {
 pub(crate) struct ProcessorSnapshot {
     pub(crate) input_required: u32,
     pub(crate) output_amount: u32,
-    pub(crate) inventory: crate::gameplay::components::ResourceInventory,
+    pub(crate) inventory: ResourceInventory,
 }
 
 #[derive(Clone, Copy)]
@@ -47,7 +68,7 @@ pub(crate) fn collect_salvage(
     _balance: Res<BalanceConfig>,
     _keys: Res<ButtonInput<KeyCode>>,
     _player_ship_query: Single<
-        (&crate::gameplay::components::SimPosition, &mut MissionState),
+        (&SimPosition, &mut MissionState),
         (With<PlayerShip>, With<ShipRoot>),
     >,
     _storage_query: Query<(
@@ -56,11 +77,7 @@ pub(crate) fn collect_salvage(
         Option<&DestroyedModule>,
     )>,
     _salvage_query: Query<
-        (
-            Entity,
-            &crate::gameplay::components::SimPosition,
-            &SalvagePickup,
-        ),
+        (Entity, &SimPosition, &SalvagePickup),
         (With<SalvageWreck>, Without<CollectedSalvage>),
     >,
 ) {
@@ -401,8 +418,13 @@ pub(crate) fn collect_endpoint_snapshots(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::*;
-    use crate::gameplay::components::{DroneTask, ResourceInventory};
+    use crate::gameplay::{
+        components::{DroneTask, ResourceInventory},
+        systems::simulation::drones::plan_drone_transfer,
+    };
 
     fn endpoint(
         module_id: u64,
@@ -458,7 +480,7 @@ mod tests {
 
         let mut reservations = BTreeMap::new();
         reservations.insert((1, ResourceKind::RawSalvage), 1);
-        let plan = drones::plan_drone_transfer(
+        let plan = plan_drone_transfer(
             &endpoints,
             FixedVec2::from_num(0.0, 0.0),
             Fx::from_num(128.0),
@@ -514,7 +536,7 @@ mod tests {
             ),
         ];
 
-        let plan = drones::plan_drone_transfer(
+        let plan = plan_drone_transfer(
             &endpoints,
             FixedVec2::from_num(0.0, 0.0),
             Fx::from_num(160.0),

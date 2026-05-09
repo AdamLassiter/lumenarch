@@ -1,174 +1,77 @@
 use bevy::{ecs::hierarchy::ChildSpawnerCommands, prelude::*};
 
 use crate::{
-    UI_BODY_FONT_SIZE, UI_BUTTON_RADIUS,
+    NORMAL_BUTTON,
+    SELECTED_BUTTON,
+    UI_BODY_FONT_SIZE,
+    UI_BUTTON_RADIUS,
+    editor::{
+        SELECTED_UNAFFORDABLE_BUTTON,
+        UNAFFORDABLE_BUTTON,
+        helpers::{sprite_path_for_kind, variant_inventory_label},
+    },
+    ship::{ModuleKind, ModuleVariant},
     state::{
-        EditorMode, EditorToolMode, EditorToolModeButton, EditorToolModeButtonText, Progression,
-        ToolboxVariantButton, ToolboxVariantButtonText,
+        EditorMode,
+        EditorToolMode,
+        EditorToolModeButton,
+        EditorToolModeButtonText,
+        Progression,
+        ToolboxVariantButton,
+        ToolboxVariantButtonText,
     },
 };
 
-const TOOLBOX_GROUP_STRUCTURE: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
-    (
-        crate::ship::ModuleKind::Hull,
-        crate::ship::ModuleVariant::Standard,
-    ),
-    (
-        crate::ship::ModuleKind::HullInnerCorner,
-        crate::ship::ModuleVariant::Standard,
-    ),
-    (
-        crate::ship::ModuleKind::HullOuterCorner,
-        crate::ship::ModuleVariant::Standard,
-    ),
-    (
-        crate::ship::ModuleKind::Interior,
-        crate::ship::ModuleVariant::Standard,
-    ),
+const TOOLBOX_GROUP_STRUCTURE: &[(ModuleKind, ModuleVariant)] = &[
+    (ModuleKind::Hull, ModuleVariant::Standard),
+    (ModuleKind::HullInnerCorner, ModuleVariant::Standard),
+    (ModuleKind::HullOuterCorner, ModuleVariant::Standard),
+    (ModuleKind::Interior, ModuleVariant::Standard),
 ];
-const TOOLBOX_GROUP_COMMAND: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
-    (
-        crate::ship::ModuleKind::Core,
-        crate::ship::ModuleVariant::BasicCore,
-    ),
-    (
-        crate::ship::ModuleKind::Core,
-        crate::ship::ModuleVariant::ExpandedCore,
-    ),
-    (
-        crate::ship::ModuleKind::Cockpit,
-        crate::ship::ModuleVariant::Standard,
-    ),
-    (
-        crate::ship::ModuleKind::Cockpit,
-        crate::ship::ModuleVariant::AdvancedHelm,
-    ),
-    (
-        crate::ship::ModuleKind::Computer,
-        crate::ship::ModuleVariant::Standard,
-    ),
+const TOOLBOX_GROUP_COMMAND: &[(ModuleKind, ModuleVariant)] = &[
+    (ModuleKind::Core, ModuleVariant::BasicCore),
+    (ModuleKind::Core, ModuleVariant::ExpandedCore),
+    (ModuleKind::Cockpit, ModuleVariant::Standard),
+    (ModuleKind::Cockpit, ModuleVariant::AdvancedHelm),
+    (ModuleKind::Computer, ModuleVariant::Standard),
 ];
-const TOOLBOX_GROUP_POWER: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
-    (
-        crate::ship::ModuleKind::Reactor,
-        crate::ship::ModuleVariant::Fission,
-    ),
-    (
-        crate::ship::ModuleKind::Reactor,
-        crate::ship::ModuleVariant::Fusion,
-    ),
-    (
-        crate::ship::ModuleKind::Battery,
-        crate::ship::ModuleVariant::BatteryCell,
-    ),
-    (
-        crate::ship::ModuleKind::Battery,
-        crate::ship::ModuleVariant::Capacitor,
-    ),
-    (
-        crate::ship::ModuleKind::Engine,
-        crate::ship::ModuleVariant::Standard,
-    ),
+const TOOLBOX_GROUP_POWER: &[(ModuleKind, ModuleVariant)] = &[
+    (ModuleKind::Reactor, ModuleVariant::Fission),
+    (ModuleKind::Reactor, ModuleVariant::Fusion),
+    (ModuleKind::Battery, ModuleVariant::BatteryCell),
+    (ModuleKind::Battery, ModuleVariant::Capacitor),
+    (ModuleKind::Engine, ModuleVariant::Standard),
 ];
-const TOOLBOX_GROUP_LOGISTICS: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
-    (
-        crate::ship::ModuleKind::Processor,
-        crate::ship::ModuleVariant::FabricatorSlow,
-    ),
-    (
-        crate::ship::ModuleKind::Processor,
-        crate::ship::ModuleVariant::FabricatorFast,
-    ),
-    (
-        crate::ship::ModuleKind::Cargo,
-        crate::ship::ModuleVariant::GeneralCargo,
-    ),
-    (
-        crate::ship::ModuleKind::Cargo,
-        crate::ship::ModuleVariant::FuelTank,
-    ),
-    (
-        crate::ship::ModuleKind::Cargo,
-        crate::ship::ModuleVariant::AmmoRack,
-    ),
-    (
-        crate::ship::ModuleKind::Airlock,
-        crate::ship::ModuleVariant::Standard,
-    ),
+const TOOLBOX_GROUP_LOGISTICS: &[(ModuleKind, ModuleVariant)] = &[
+    (ModuleKind::Processor, ModuleVariant::FabricatorSlow),
+    (ModuleKind::Processor, ModuleVariant::FabricatorFast),
+    (ModuleKind::Cargo, ModuleVariant::GeneralCargo),
+    (ModuleKind::Cargo, ModuleVariant::FuelTank),
+    (ModuleKind::Cargo, ModuleVariant::AmmoRack),
+    (ModuleKind::Airlock, ModuleVariant::Standard),
 ];
-const TOOLBOX_GROUP_AUTOMATION: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::LifePulse,
-    ),
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::LifeSweep,
-    ),
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::LifeSurvey,
-    ),
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::ShipPing,
-    ),
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::ShipVector,
-    ),
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::ShipSurvey,
-    ),
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::DamageAlarm,
-    ),
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::DamageArray,
-    ),
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::StructuralSurveyor,
-    ),
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::PowerMonitor,
-    ),
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::HeatMonitor,
-    ),
-    (
-        crate::ship::ModuleKind::Detector,
-        crate::ship::ModuleVariant::LogisticsBeacon,
-    ),
+const TOOLBOX_GROUP_AUTOMATION: &[(ModuleKind, ModuleVariant)] = &[
+    (ModuleKind::Detector, ModuleVariant::LifePulse),
+    (ModuleKind::Detector, ModuleVariant::LifeSweep),
+    (ModuleKind::Detector, ModuleVariant::LifeSurvey),
+    (ModuleKind::Detector, ModuleVariant::ShipPing),
+    (ModuleKind::Detector, ModuleVariant::ShipVector),
+    (ModuleKind::Detector, ModuleVariant::ShipSurvey),
+    (ModuleKind::Detector, ModuleVariant::DamageAlarm),
+    (ModuleKind::Detector, ModuleVariant::DamageArray),
+    (ModuleKind::Detector, ModuleVariant::StructuralSurveyor),
+    (ModuleKind::Detector, ModuleVariant::PowerMonitor),
+    (ModuleKind::Detector, ModuleVariant::HeatMonitor),
+    (ModuleKind::Detector, ModuleVariant::LogisticsBeacon),
 ];
-const TOOLBOX_GROUP_COMBAT: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)] = &[
-    (
-        crate::ship::ModuleKind::Turret,
-        crate::ship::ModuleVariant::LaserTurret,
-    ),
-    (
-        crate::ship::ModuleKind::Turret,
-        crate::ship::ModuleVariant::BallisticTurret,
-    ),
-    (
-        crate::ship::ModuleKind::Shield,
-        crate::ship::ModuleVariant::RadialShield,
-    ),
-    (
-        crate::ship::ModuleKind::Shield,
-        crate::ship::ModuleVariant::DirectionalShield,
-    ),
+const TOOLBOX_GROUP_COMBAT: &[(ModuleKind, ModuleVariant)] = &[
+    (ModuleKind::Turret, ModuleVariant::LaserTurret),
+    (ModuleKind::Turret, ModuleVariant::BallisticTurret),
+    (ModuleKind::Shield, ModuleVariant::RadialShield),
+    (ModuleKind::Shield, ModuleVariant::DirectionalShield),
 ];
 
-pub(super) fn toolbox_groups() -> [(
-    &'static str,
-    &'static [(crate::ship::ModuleKind, crate::ship::ModuleVariant)],
-); 6] {
+pub(super) fn toolbox_groups() -> [(&'static str, &'static [(ModuleKind, ModuleVariant)]); 6] {
     [
         ("Structure", TOOLBOX_GROUP_STRUCTURE),
         ("Command", TOOLBOX_GROUP_COMMAND),
@@ -198,9 +101,9 @@ pub(super) fn spawn_tool_mode_button(
                 ..default()
             },
             BackgroundColor(if mode == selected_mode {
-                crate::SELECTED_BUTTON
+                SELECTED_BUTTON
             } else {
-                crate::NORMAL_BUTTON
+                NORMAL_BUTTON
             }),
             EditorToolModeButton { mode },
         ))
@@ -222,9 +125,9 @@ pub(super) fn spawn_variant_button_grid(
     font: &Handle<Font>,
     mode: EditorMode,
     progression: &Progression,
-    selected_kind: crate::ship::ModuleKind,
-    selected_variant: crate::ship::ModuleVariant,
-    entries: &[(crate::ship::ModuleKind, crate::ship::ModuleVariant)],
+    selected_kind: ModuleKind,
+    selected_variant: ModuleVariant,
+    entries: &[(ModuleKind, ModuleVariant)],
 ) {
     for row in entries.chunks(3) {
         parent
@@ -263,9 +166,9 @@ pub(super) fn spawn_variant_button_grid(
                         ))
                         .with_children(|button| {
                             button.spawn((
-                                ImageNode::new(asset_server.load(
-                                    super::super::helpers::sprite_path_for_kind(kind, *variant),
-                                )),
+                                ImageNode::new(
+                                    asset_server.load(sprite_path_for_kind(kind, *variant)),
+                                ),
                                 Node {
                                     width: Val::Px(32.0),
                                     height: Val::Px(32.0),
@@ -331,13 +234,13 @@ pub(super) fn spawn_select_action_button<T: Bundle + 'static>(
 pub(super) fn toolbox_variant_color(available: bool, selected: bool) -> Color {
     if selected {
         if available {
-            crate::SELECTED_BUTTON
+            SELECTED_BUTTON
         } else {
-            crate::editor::SELECTED_UNAFFORDABLE_BUTTON
+            SELECTED_UNAFFORDABLE_BUTTON
         }
     } else if available {
-        crate::NORMAL_BUTTON
+        NORMAL_BUTTON
     } else {
-        crate::editor::UNAFFORDABLE_BUTTON
+        UNAFFORDABLE_BUTTON
     }
 }

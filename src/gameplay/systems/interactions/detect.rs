@@ -1,24 +1,27 @@
 use bevy::{ecs::relationship::Relationship, prelude::*};
 
-use crate::gameplay::{
-    components::{
-        CurrentStation,
-        DestroyedModule,
-        EquippedSuit,
-        HostileShip,
-        Integrity,
-        InteractionKind,
-        ModuleRuntimeState,
-        NearbyInteraction,
-        PlayerHandleComponent,
-        PlayerMotionState,
-        PlayerReferenceFrame,
-        PlayerSuit,
-        RuntimeShipModule,
-        ShipRoot,
-        ShipboardPlayer,
+use crate::{
+    gameplay::{
+        components::{
+            CurrentStation,
+            DestroyedModule,
+            EquippedSuit,
+            HostileShip,
+            Integrity,
+            InteractionKind,
+            ModuleRuntimeState,
+            NearbyInteraction,
+            PlayerHandleComponent,
+            PlayerMotionState,
+            PlayerReferenceFrame,
+            PlayerSuit,
+            RuntimeShipModule,
+            ShipRoot,
+            ShipboardPlayer,
+        },
+        helpers::{interaction_for_module, interaction_prompt, module_needs_repair},
     },
-    helpers::{interaction_for_module, interaction_prompt},
+    ship::ModuleKind,
 };
 
 pub(crate) fn detect_nearby_interactions(
@@ -69,15 +72,11 @@ pub(crate) fn detect_nearby_interactions(
             continue;
         };
 
-        let needs_repair = crate::gameplay::helpers::module_needs_repair(
-            integrity,
-            runtime_state,
-            destroyed.is_some(),
-        );
+        let needs_repair = module_needs_repair(integrity, runtime_state, destroyed.is_some());
 
         if on_hostile_ship
-            && runtime_module.kind != crate::ship::ModuleKind::Core
-            && runtime_module.kind != crate::ship::ModuleKind::Cockpit
+            && runtime_module.kind != ModuleKind::Core
+            && runtime_module.kind != ModuleKind::Cockpit
             && !runtime_state.extracted
             && needs_repair
         {
