@@ -1,6 +1,61 @@
+use bevy::{ecs::relationship::Relationship, prelude::*};
+
+use super::station_panel::{
+    EditorReadoutVisual,
+    editor_control_mode,
+    editor_station_action_visible,
+    editor_station_button_label,
+    editor_station_flags,
+    editor_station_readouts,
+    enemy_entry_label,
+    format_program_textbox,
+};
 use crate::{
+    editor::helpers::{
+        editor_mission_report_text,
+        editor_status_line,
+        selection_summary,
+        variant_tooltip_text,
+    },
     ship::ModuleKind,
-    state::{ArchEditorState, ProgramTextEditorState, ProgrammingLanguageMode},
+    state::{
+        ArchEditorState,
+        EditorBuildSection,
+        EditorMissionReportButtonText,
+        EditorMissionReportText,
+        EditorSelectSection,
+        EditorSelectionState,
+        EditorSelectionSummaryText,
+        EditorSessionState,
+        EditorShip,
+        EditorStatusText,
+        EditorToolMode,
+        EditorToolState,
+        EditorToolboxTooltipText,
+        EditorUiState,
+        EnemyEditorState,
+        EnemyShipLibraryState,
+        GameplayStationPanel,
+        GameplayStationPanelButton,
+        GameplayStationPanelButtonLabel,
+        GameplayStationReadoutBarFill,
+        GameplayStationReadoutBarTrack,
+        GameplayStationReadoutLabel,
+        GameplayStationReadoutLight,
+        GameplayStationReadoutSlot,
+        GameplayStationReadoutValue,
+        GameplayStationTitleText,
+        LastMissionReport,
+        ProgramEditorAction,
+        ProgramEditorActionButton,
+        ProgramEditorDiagnosticsText,
+        ProgramEditorDraftText,
+        ProgramEditorStatusText,
+        ProgramEditorTextBox,
+        ProgramTextEditorState,
+        ProgrammingLanguageMode,
+        Progression,
+    },
 };
 
 pub(crate) fn update_editor_status_text(
@@ -14,16 +69,12 @@ pub(crate) fn update_editor_status_text(
     last_mission_report: Res<LastMissionReport>,
     editor_ui_state: Res<EditorUiState>,
     mut ui_queries: ParamSet<(
-        Query<'_, '_, &'static mut Text, With<EditorStatusText>>,
+        Query<&'static mut Text, With<EditorStatusText>>,
         Query<
-            '_,
-            '_,
             (&'static mut Node, &'static mut Text),
             (With<EditorMissionReportText>, Without<EditorStatusText>),
         >,
         Query<
-            '_,
-            '_,
             &'static mut Text,
             (
                 With<EditorMissionReportButtonText>,
@@ -31,10 +82,10 @@ pub(crate) fn update_editor_status_text(
                 Without<EditorMissionReportText>,
             ),
         >,
-        Query<'_, '_, &'static mut Text, With<EditorSelectionSummaryText>>,
-        Query<'_, '_, &'static mut Text, With<EditorToolboxTooltipText>>,
-        Query<'_, '_, &'static mut Node, With<EditorBuildSection>>,
-        Query<'_, '_, &'static mut Node, With<EditorSelectSection>>,
+        Query<&'static mut Text, With<EditorSelectionSummaryText>>,
+        Query<&'static mut Text, With<EditorToolboxTooltipText>>,
+        Query<&'static mut Node, With<EditorBuildSection>>,
+        Query<&'static mut Node, With<EditorSelectSection>>,
     )>,
 ) {
     if !editor_ship.is_changed()
@@ -467,17 +518,4 @@ pub(crate) fn update_editor_module_overlay(
             }
         }
     }
-}
-
-#[derive(Clone)]
-struct EditorReadout {
-    label: String,
-    value: String,
-    visual: EditorReadoutVisual,
-}
-
-#[derive(Clone, Copy)]
-enum EditorReadoutVisual {
-    Bar { percent: f32, color: Color },
-    Light { color: Color },
 }

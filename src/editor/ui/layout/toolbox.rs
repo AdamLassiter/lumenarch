@@ -3,7 +3,6 @@ use bevy::{ecs::hierarchy::ChildSpawnerCommands, prelude::*};
 use crate::{
     NORMAL_BUTTON,
     SELECTED_BUTTON,
-    UI_BODY_FONT_SIZE,
     UI_BUTTON_RADIUS,
     editor::{
         SELECTED_UNAFFORDABLE_BUTTON,

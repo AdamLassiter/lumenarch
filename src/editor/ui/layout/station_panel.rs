@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 
 use crate::{
-    editor::ui::layout::{EditorReadout, EditorReadoutVisual},
     gameplay::components::ShipControlMode,
     ship::{
         ModuleKind,
@@ -22,7 +21,20 @@ use crate::{
     },
 };
 
-fn editor_control_mode(kind: ModuleKind) -> ShipControlMode {
+#[derive(Clone)]
+pub(super) struct EditorReadout {
+    pub(super) label: String,
+    pub(super) value: String,
+    pub(super) visual: EditorReadoutVisual,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum EditorReadoutVisual {
+    Bar { percent: f32, color: Color },
+    Light { color: Color },
+}
+
+pub(super) fn editor_control_mode(kind: ModuleKind) -> ShipControlMode {
     match kind {
         ModuleKind::Cockpit => ShipControlMode::Cockpit,
         ModuleKind::Turret => ShipControlMode::Turret,
@@ -36,7 +48,7 @@ fn editor_control_mode(kind: ModuleKind) -> ShipControlMode {
 }
 
 #[derive(Clone, Copy)]
-struct EditorStationFlags {
+pub(super) struct EditorStationFlags {
     storage: bool,
     manipulator: bool,
     processor: bool,
@@ -44,7 +56,7 @@ struct EditorStationFlags {
     drone: bool,
 }
 
-fn editor_station_flags(kind: ModuleKind) -> EditorStationFlags {
+pub(super) fn editor_station_flags(kind: ModuleKind) -> EditorStationFlags {
     EditorStationFlags {
         storage: matches!(kind, ModuleKind::Cargo | ModuleKind::Airlock),
         manipulator: kind == ModuleKind::Airlock,
@@ -54,7 +66,7 @@ fn editor_station_flags(kind: ModuleKind) -> EditorStationFlags {
     }
 }
 
-fn editor_station_action_visible(
+pub(super) fn editor_station_action_visible(
     action: StationPanelButtonAction,
     mode: ShipControlMode,
     active_kind: ModuleKind,
@@ -96,7 +108,7 @@ fn editor_station_action_visible(
     }
 }
 
-fn editor_station_button_label(
+pub(super) fn editor_station_button_label(
     action: StationPanelButtonAction,
     mode: ShipControlMode,
     flags: EditorStationFlags,
@@ -121,7 +133,7 @@ fn editor_station_button_label(
     }
 }
 
-fn editor_station_readouts(module: &ShipModule) -> Vec<EditorReadout> {
+pub(super) fn editor_station_readouts(module: &ShipModule) -> Vec<EditorReadout> {
     match module.kind {
         ModuleKind::Reactor => vec![
             editor_bar(
@@ -387,7 +399,7 @@ fn bool_color(value: bool) -> Color {
     }
 }
 
-fn format_program_textbox(
+pub(super) fn format_program_textbox(
     program_editor_state: &ProgramTextEditorState,
     module_id: u64,
     language: ProgrammingLanguageMode,
@@ -443,7 +455,7 @@ pub(crate) fn cleanup_editor_entities(
     }
 }
 
-fn enemy_entry_label(
+pub(super) fn enemy_entry_label(
     editor_session: &EditorSessionState,
     enemy_editor_state: &EnemyEditorState,
     enemy_library_state: &EnemyShipLibraryState,
@@ -471,7 +483,7 @@ fn enemy_entry_label(
     }
 }
 
-fn station_actions() -> [StationPanelButtonAction; 21] {
+pub(super) fn station_actions() -> [StationPanelButtonAction; 21] {
     [
         StationPanelButtonAction::HelmThrottle { delta: -0.2 },
         StationPanelButtonAction::HelmThrottle { delta: 0.2 },
@@ -497,7 +509,7 @@ fn station_actions() -> [StationPanelButtonAction; 21] {
     ]
 }
 
-fn station_button_default_label(action: StationPanelButtonAction) -> &'static str {
+pub(super) fn station_button_default_label(action: StationPanelButtonAction) -> &'static str {
     match action {
         StationPanelButtonAction::HelmThrottle { delta } if delta < 0.0 => "Throttle Down",
         StationPanelButtonAction::HelmThrottle { .. } => "Throttle Up",
