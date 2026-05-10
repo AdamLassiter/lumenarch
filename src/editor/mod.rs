@@ -41,6 +41,7 @@ pub(crate) use ui::{
     editor_ui_present,
     initialize_editor_ship,
     spawn_editor_ui,
+    sync_editor_toolbox_layer_sections,
     update_editor_module_overlay,
     update_editor_status_text,
 };

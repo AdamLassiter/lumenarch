@@ -64,6 +64,9 @@ pub(crate) struct GameplayBlackoutOverlay;
 pub(crate) struct GameplayControlsPanel;
 
 #[derive(Component)]
+pub(crate) struct ControlsHelpPanel;
+
+#[derive(Component)]
 pub(crate) struct GameplayStationPanel;
 
 #[derive(Component)]

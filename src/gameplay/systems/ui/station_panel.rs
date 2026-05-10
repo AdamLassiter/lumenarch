@@ -73,6 +73,8 @@ pub(crate) fn station_panel_button_system(
 pub(crate) fn station_panel_display(
     control_mode: &ShipboardControlState,
     mission_state: &MissionState,
+    power_state: &ShipPowerState,
+    power_model: &ShipPowerModel,
     weapon_state: &ShipWeaponState,
     _player_fields: &PlayerFieldState,
     module_query: &Query<
@@ -103,7 +105,7 @@ pub(crate) fn station_panel_display(
         With<RuntimeShipModule>,
     >,
     focused_station_context: &str,
-    arch_summary: &summary::ArchSummary,
+    _arch_summary: &summary::ArchSummary,
 ) -> StationPanelDisplay {
     let Some(focused_entity) = control_mode.focused_entity else {
         return StationPanelDisplay::empty("Station Console");
@@ -194,22 +196,16 @@ pub(crate) fn station_panel_display(
                 Color::srgb(0.34, 0.74, 0.94),
             ),
             readout_bar(
-                register_readout_label(runtime_module, "RRS", "Confinement"),
-                format!("{}%", format_fx0(reactor.confinement * Fx::from_num(100))),
-                percent_from_fx(reactor.confinement, Fx::from_num(1)),
-                Color::srgb(0.70, 0.48, 0.94),
+                register_readout_label(runtime_module, "RRH", "Heat"),
+                format_fx1(runtime_state.current_heat),
+                percent_from_fx(runtime_state.current_heat, Fx::from_num(16)),
+                Color::srgb(0.96, 0.50, 0.24),
             ),
             readout_bar(
                 register_readout_label(runtime_module, "RRP", "Output"),
                 format_fx1(reactor.power_output),
                 percent_from_fx(reactor.power_output, Fx::from_num(20)),
                 Color::srgb(0.86, 0.74, 0.30),
-            ),
-            readout_bar(
-                register_readout_label(runtime_module, "RRE", "Fuel"),
-                format_fx0(reactor.fuel_remaining),
-                percent_from_fx(reactor.fuel_remaining, Fx::from_num(100)),
-                Color::srgb(0.42, 0.86, 0.62),
             ),
             readout_light(
                 "Core Status",
@@ -273,6 +269,50 @@ pub(crate) fn station_panel_display(
                 },
             ),
         ]
+    } else if runtime_module.kind == ModuleKind::Battery {
+        vec![
+            readout_bar(
+                register_readout_label(runtime_module, "VPR", "Stored Power"),
+                format!(
+                    "{} / {}",
+                    format_fx1(power_state.stored_energy),
+                    format_fx1(power_model.battery_capacity)
+                ),
+                percent_from_fx(power_state.stored_energy, power_model.battery_capacity),
+                Color::srgb(0.42, 0.86, 0.62),
+            ),
+            readout_bar(
+                register_readout_label(runtime_module, "VPG", "Generation"),
+                format_fx1(power_state.generation),
+                percent_from_fx(
+                    power_state.generation,
+                    power_state.draw.max(Fx::from_num(1)),
+                ),
+                Color::srgb(0.86, 0.74, 0.30),
+            ),
+            readout_bar(
+                register_readout_label(runtime_module, "VPD", "Draw"),
+                format_fx1(power_state.draw),
+                percent_from_fx(
+                    power_state.draw,
+                    power_state.generation.max(Fx::from_num(1)),
+                ),
+                Color::srgb(0.96, 0.56, 0.24),
+            ),
+            readout_light(
+                "Power Flow",
+                if power_state.surplus >= Fx::from_num(0) {
+                    "Charging"
+                } else {
+                    "Discharging"
+                },
+                if power_state.surplus >= Fx::from_num(0) {
+                    Color::srgb(0.34, 0.78, 0.46)
+                } else {
+                    Color::srgb(0.90, 0.48, 0.18)
+                },
+            ),
+        ]
     } else if storage.is_some()
         || manipulator.is_some()
         || processor.is_some()
@@ -291,14 +331,6 @@ pub(crate) fn station_panel_display(
             focused_station_context,
         )
     } else if let Some(computer) = computer {
-        let budget_pct = if computer.last_result.budget == 0 {
-            0.0
-        } else {
-            percent_from_ratio(
-                computer.last_result.executed as f32,
-                computer.last_result.budget as f32,
-            )
-        };
         vec![
             readout_light(
                 register_readout_label(runtime_module, "CCA", "Online"),
@@ -313,29 +345,20 @@ pub(crate) fn station_panel_display(
                     Color::srgb(0.84, 0.28, 0.28)
                 },
             ),
-            readout_bar(
-                register_readout_label(runtime_module, "CCB", "Exec Budget"),
-                format!(
-                    "{}/{}",
-                    computer.last_result.executed, computer.last_result.budget
-                ),
-                budget_pct,
-                Color::srgb(0.36, 0.72, 0.96),
+            readout_light(
+                register_readout_label(runtime_module, "CCP", "ARCH Program"),
+                computer.program.name.as_str(),
+                Color::srgb(0.52, 0.76, 0.96),
             ),
             readout_light(
-                register_readout_label(runtime_module, "CCW", "Writes"),
-                arch_summary.recent_writes.as_str(),
-                Color::srgb(0.90, 0.64, 0.20),
+                "ARCH Source",
+                program_preview(&computer.program.source_text),
+                Color::srgb(0.72, 0.82, 0.96),
             ),
             readout_light(
-                register_readout_label(runtime_module, "CLT", "LUMEN"),
+                register_readout_label(runtime_module, "CLT", "LUMEN Program"),
                 if computer.lumen_program.enabled {
-                    computer
-                        .last_lumen_result
-                        .recent_effects
-                        .first()
-                        .map(|effect| effect.as_str())
-                        .unwrap_or("Ready")
+                    computer.lumen_program.name.as_str()
                 } else {
                     "Disabled"
                 },
@@ -346,32 +369,33 @@ pub(crate) fn station_panel_display(
                 },
             ),
             readout_light(
+                "LUMEN Source",
+                if computer.lumen_program.enabled {
+                    program_preview(&computer.lumen_program.source_text)
+                } else {
+                    "Disabled".to_string()
+                },
+                Color::srgb(0.62, 0.90, 0.80),
+            ),
+            readout_light(
                 register_readout_label(runtime_module, "CCH", "Halt State"),
                 computer
                     .last_result
                     .halted_reason
                     .as_deref()
-                    .unwrap_or("Running"),
+                    .unwrap_or_else(|| {
+                        computer
+                            .last_result
+                            .recent_writes
+                            .first()
+                            .map(String::as_str)
+                            .unwrap_or("Running")
+                    }),
                 if computer.last_result.halted_reason.is_some() {
                     Color::srgb(0.90, 0.48, 0.18)
                 } else {
                     Color::srgb(0.34, 0.78, 0.46)
                 },
-            ),
-            readout_light(
-                register_readout_label(runtime_module, "CCP", "Program"),
-                computer.program.name.as_str(),
-                Color::srgb(0.52, 0.76, 0.96),
-            ),
-            readout_light(
-                "ARCH Source",
-                first_program_line(&computer.program.source_text),
-                Color::srgb(0.72, 0.82, 0.96),
-            ),
-            readout_light(
-                "LUMEN Source",
-                first_program_line(&computer.lumen_program.source_text),
-                Color::srgb(0.62, 0.90, 0.80),
             ),
         ]
     } else {

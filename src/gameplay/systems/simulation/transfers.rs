@@ -14,7 +14,7 @@ pub(super) fn find_automation_transfer_task(
         u64,
         ModuleKind,
         FixedVec2,
-        Option<(u32, ResourceInventory, bool, bool, bool)>,
+        Option<(u32, ResourceInventory, bool, bool, bool, bool)>,
         Option<(u32, u32, ResourceInventory)>,
         bool,
     )],
@@ -25,7 +25,7 @@ pub(super) fn find_automation_transfer_task(
         if *source_destroyed || !in_range(*source_pos) {
             continue;
         }
-        let Some((_, source_inventory, _, _, _)) = storage else {
+        let Some((_, source_inventory, _, _, _, _)) = storage else {
             continue;
         };
         if source_inventory.raw_salvage == 0 {
@@ -65,7 +65,7 @@ pub(super) fn find_automation_transfer_task(
             if *target_destroyed || !in_range(*target_pos) || source_id == target_id {
                 continue;
             }
-            let Some((capacity, storage_inventory, _, _, accepts_general)) = storage else {
+            let Some((capacity, storage_inventory, _, _, accepts_general, _)) = storage else {
                 continue;
             };
             if *target_kind != ModuleKind::Cargo
@@ -97,14 +97,21 @@ pub(super) fn find_automation_transfer_task(
                 if *target_destroyed || !in_range(*target_pos) || source_id == target_id {
                     continue;
                 }
-                let Some((capacity, storage_inventory, accepts_fuel, accepts_ammunition, _)) =
-                    storage
+                let Some((
+                    capacity,
+                    storage_inventory,
+                    accepts_fuel,
+                    accepts_ammunition,
+                    _,
+                    accepts_oxygen,
+                )) = storage
                 else {
                     continue;
                 };
                 let accepts = match resource_kind {
                     ResourceKind::Fuel => *accepts_fuel,
                     ResourceKind::Ammunition => *accepts_ammunition,
+                    ResourceKind::Oxygen => *accepts_oxygen,
                     _ => false,
                 };
                 if !accepts
@@ -128,7 +135,7 @@ pub(super) fn find_airlock_to_cargo_transfer(
         u64,
         ModuleKind,
         FixedVec2,
-        Option<(u32, ResourceInventory, bool, bool, bool)>,
+        Option<(u32, ResourceInventory, bool, bool, bool, bool)>,
         Option<(u32, u32, ResourceInventory)>,
         bool,
     )],
@@ -138,7 +145,7 @@ pub(super) fn find_airlock_to_cargo_transfer(
         if *source_destroyed || !in_range(*source_pos) {
             continue;
         }
-        let Some((_, source_inventory, _, _, _)) = storage else {
+        let Some((_, source_inventory, _, _, _, _)) = storage else {
             continue;
         };
         if *source_kind != ModuleKind::Airlock {
@@ -149,6 +156,7 @@ pub(super) fn find_airlock_to_cargo_transfer(
             (ResourceKind::RepairCharge, source_inventory.repair_charge),
             (ResourceKind::Fuel, source_inventory.fuel),
             (ResourceKind::Ammunition, source_inventory.ammunition),
+            (ResourceKind::Oxygen, source_inventory.oxygen),
         ] {
             if amount == 0 {
                 continue;
@@ -163,6 +171,7 @@ pub(super) fn find_airlock_to_cargo_transfer(
                     accepts_fuel,
                     accepts_ammunition,
                     accepts_general,
+                    accepts_oxygen,
                 )) = storage
                 else {
                     continue;
@@ -170,6 +179,7 @@ pub(super) fn find_airlock_to_cargo_transfer(
                 let accepts = match resource_kind {
                     ResourceKind::Fuel => *accepts_fuel,
                     ResourceKind::Ammunition => *accepts_ammunition,
+                    ResourceKind::Oxygen => *accepts_oxygen,
                     ResourceKind::RawSalvage | ResourceKind::RepairCharge => *accepts_general,
                 };
                 if *target_kind != ModuleKind::Cargo

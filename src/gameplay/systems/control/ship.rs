@@ -219,7 +219,8 @@ pub(crate) fn update_station_command_input(
                             ResourceKind::RawSalvage => ResourceKind::RepairCharge,
                             ResourceKind::RepairCharge => ResourceKind::Fuel,
                             ResourceKind::Fuel => ResourceKind::Ammunition,
-                            ResourceKind::Ammunition => ResourceKind::RawSalvage,
+                            ResourceKind::Ammunition => ResourceKind::Oxygen,
+                            ResourceKind::Oxygen => ResourceKind::RawSalvage,
                         };
                     }
                     if command.raw.pressed(INPUT_SPACE_EDGE)

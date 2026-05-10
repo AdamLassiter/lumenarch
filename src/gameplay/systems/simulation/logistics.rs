@@ -43,6 +43,7 @@ pub(crate) struct StorageSnapshot {
     pub(crate) accepts_fuel: bool,
     pub(crate) accepts_ammunition: bool,
     pub(crate) accepts_general: bool,
+    pub(crate) accepts_oxygen: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -136,6 +137,7 @@ pub(crate) fn run_logistics_transfers(
                             s.accepts_fuel,
                             s.accepts_ammunition,
                             s.accepts_general,
+                            s.accepts_oxygen,
                         )
                     }),
                     processor.map(|p| (p.input_required, p.output_amount, p.inventory)),
@@ -402,6 +404,7 @@ pub(crate) fn collect_endpoint_snapshots(
                     accepts_fuel: storage.accepts_fuel,
                     accepts_ammunition: storage.accepts_ammunition,
                     accepts_general: storage.accepts_general,
+                    accepts_oxygen: storage.accepts_oxygen,
                 }),
                 processor: processor.map(|processor| ProcessorSnapshot {
                     input_required: processor.input_required,
@@ -460,6 +463,7 @@ mod tests {
                     accepts_fuel: false,
                     accepts_ammunition: false,
                     accepts_general: true,
+                    accepts_oxygen: false,
                 }),
                 None,
             ),
@@ -473,6 +477,7 @@ mod tests {
                     accepts_fuel: false,
                     accepts_ammunition: false,
                     accepts_general: true,
+                    accepts_oxygen: false,
                 }),
                 None,
             ),
@@ -507,6 +512,7 @@ mod tests {
                     accepts_fuel: false,
                     accepts_ammunition: false,
                     accepts_general: true,
+                    accepts_oxygen: false,
                 }),
                 None,
             ),
@@ -520,6 +526,7 @@ mod tests {
                     accepts_fuel: false,
                     accepts_ammunition: false,
                     accepts_general: true,
+                    accepts_oxygen: false,
                 }),
                 None,
             ),

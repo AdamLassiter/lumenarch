@@ -6,6 +6,7 @@ use crate::ship::{
     ModuleKind,
     ModuleVariant,
     ShipDefinition,
+    ShipFoundationKind,
     enemy::{EnemyShipEntryValidationStatus, EnemyShipLibrary},
 };
 
@@ -98,23 +99,36 @@ pub(crate) enum EditorToolMode {
     Select,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum EditorLayer {
+    #[default]
+    Underlay,
+    Overlay,
+}
+
 #[derive(Resource)]
 pub(crate) struct EditorToolState {
     pub(crate) tool_mode: EditorToolMode,
+    pub(crate) active_layer: EditorLayer,
+    pub(crate) selected_foundation_kind: ShipFoundationKind,
     pub(crate) selected_kind: ModuleKind,
     pub(crate) selected_variant: ModuleVariant,
     pub(crate) selected_rotation: u8,
     pub(crate) selected_channel: u8,
+    pub(crate) ignore_component_limits: bool,
 }
 
 impl Default for EditorToolState {
     fn default() -> Self {
         Self {
             tool_mode: EditorToolMode::Build,
+            active_layer: EditorLayer::Underlay,
+            selected_foundation_kind: ShipFoundationKind::Floor,
             selected_kind: ModuleKind::Hull,
             selected_variant: ModuleVariant::default_for_kind(ModuleKind::Hull),
             selected_rotation: 0,
             selected_channel: 0,
+            ignore_component_limits: false,
         }
     }
 }
@@ -193,6 +207,24 @@ pub(crate) struct ToolboxVariantButton {
 }
 
 #[derive(Component)]
+pub(crate) struct ToolboxFoundationButton {
+    pub(crate) kind: ShipFoundationKind,
+}
+
+#[derive(Component)]
+pub(crate) struct ToolboxFoundationButtonText {
+    pub(crate) kind: ShipFoundationKind,
+}
+
+#[derive(Component)]
+pub(crate) struct EditorLayerButton {
+    pub(crate) layer: EditorLayer,
+}
+
+#[derive(Component)]
+pub(crate) struct EditorLayerButtonText;
+
+#[derive(Component)]
 pub(crate) struct ToolboxVariantButtonText {
     pub(crate) kind: ModuleKind,
     pub(crate) variant: ModuleVariant,
@@ -208,6 +240,12 @@ pub(crate) struct EditorToolModeButtonText;
 
 #[derive(Component)]
 pub(crate) struct EditorBuildSection;
+
+#[derive(Component)]
+pub(crate) struct EditorUnderlayBuildSection;
+
+#[derive(Component)]
+pub(crate) struct EditorOverlayBuildSection;
 
 #[derive(Component)]
 pub(crate) struct EditorSelectSection;
@@ -233,7 +271,9 @@ pub(crate) struct EditorPasteSelectionButton;
 #[derive(Resource, Default, Clone)]
 pub(crate) struct EditorSelectionState {
     pub(crate) selected_module_ids: Vec<u64>,
+    pub(crate) selected_foundation_ids: Vec<u64>,
     pub(crate) clipboard: Vec<ShipModuleSnapshot>,
+    pub(crate) foundation_clipboard: Vec<ShipFoundationSnapshot>,
     pub(crate) marquee_origin: Option<(i32, i32)>,
     pub(crate) marquee_current: Option<(i32, i32)>,
 }
@@ -246,6 +286,14 @@ pub(crate) struct ShipModuleSnapshot {
     pub(crate) grid_y: i32,
     pub(crate) rotation_quadrants: u8,
     pub(crate) channel: u8,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ShipFoundationSnapshot {
+    pub(crate) kind: ShipFoundationKind,
+    pub(crate) grid_x: i32,
+    pub(crate) grid_y: i32,
+    pub(crate) rotation_quadrants: u8,
 }
 
 #[derive(Resource, Default, Clone, Copy)]
@@ -281,6 +329,9 @@ pub(crate) struct ProgramEditorDiagnosticsText;
 
 #[derive(Component)]
 pub(crate) struct ShipTileSprite;
+
+#[derive(Component)]
+pub(crate) struct ShipFoundationSprite;
 
 #[derive(Component)]
 pub(crate) struct PreviewTile;

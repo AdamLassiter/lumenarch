@@ -213,6 +213,7 @@ impl CarriedItemKind {
                 ResourceKind::RepairCharge => "repair charge".to_string(),
                 ResourceKind::Fuel => "fuel".to_string(),
                 ResourceKind::Ammunition => "ammunition".to_string(),
+                ResourceKind::Oxygen => "oxygen".to_string(),
             },
             Self::Suit(suit) => suit.as_str().to_string(),
             Self::ExtractedComponent { kind, variant } => {
@@ -228,6 +229,7 @@ impl CarriedItemKind {
                 ResourceKind::RepairCharge => Color::srgb(0.38, 0.88, 0.98),
                 ResourceKind::Fuel => Color::srgb(0.98, 0.52, 0.22),
                 ResourceKind::Ammunition => Color::srgb(0.86, 0.86, 0.90),
+                ResourceKind::Oxygen => Color::srgb(0.48, 0.86, 1.0),
             },
             Self::Suit(suit) => suit.color(),
             Self::ExtractedComponent { .. } => Color::srgb(0.94, 0.76, 0.54),

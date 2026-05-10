@@ -314,10 +314,22 @@ impl ModuleSpec {
                 shield_arc_degrees: 360.0,
                 shield_regen: 1.4,
             },
-            ModuleKind::Interior => Self {
+            ModuleKind::Interior
+            | ModuleKind::InteriorWall
+            | ModuleKind::JunctionBox
+            | ModuleKind::Valve
+            | ModuleKind::O2Generator => Self {
                 integrity: 6,
-                placement_cost: 0,
-                storage_capacity: 0,
+                placement_cost: if matches!(kind, ModuleKind::Interior) {
+                    0
+                } else {
+                    2
+                },
+                storage_capacity: if matches!(kind, ModuleKind::Valve | ModuleKind::O2Generator) {
+                    4
+                } else {
+                    0
+                },
                 engine_multiplier: 0.0,
                 helm_multiplier: 0.0,
                 reactor_output_multiplier: 0.0,
@@ -358,6 +370,14 @@ impl ModuleSpec {
             ModuleVariant::AmmoRack => {
                 spec.placement_cost = 4;
                 spec.storage_capacity = 6;
+            }
+            ModuleVariant::RawSalvageCrate | ModuleVariant::RepairChargeRack => {
+                spec.placement_cost = 3;
+                spec.storage_capacity = 10;
+            }
+            ModuleVariant::O2Canister => {
+                spec.placement_cost = 4;
+                spec.storage_capacity = 12;
             }
             ModuleVariant::Capacitor => {
                 spec.placement_cost = 4;

@@ -220,11 +220,18 @@ pub(super) fn register_readout_label(
     }
 }
 
-pub(super) fn first_program_line(source_text: &str) -> &str {
-    source_text
+pub(super) fn program_preview(source_text: &str) -> String {
+    let lines: Vec<_> = source_text
         .lines()
-        .find(|line| !line.trim().is_empty())
-        .unwrap_or("no source")
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .take(3)
+        .collect();
+    if lines.is_empty() {
+        "no source".to_string()
+    } else {
+        lines.join("\n")
+    }
 }
 
 pub(super) fn percent_from_ratio(current: f32, max: f32) -> f32 {

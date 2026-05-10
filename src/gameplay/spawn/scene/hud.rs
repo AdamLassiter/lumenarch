@@ -9,6 +9,7 @@ use crate::{
     gameplay::helpers::gameplay_status_line,
     ship::ShipDefinition,
     state::{
+        ControlsHelpPanel,
         GameplayBarFill,
         GameplayBarKind,
         GameplayBarLabel,
@@ -367,9 +368,10 @@ fn spawn_station_panel(
                             row.spawn((
                                 Node {
                                     width: Val::Percent(100.0),
-                                    height: Val::Px(10.0),
+                                    height: Val::Px(20.0),
                                     border_radius: BorderRadius::all(Val::Px(999.0)),
                                     display: Display::None,
+                                    overflow: Overflow::clip(),
                                     ..default()
                                 },
                                 BackgroundColor(Color::srgba(0.20, 0.24, 0.30, 0.95)),
@@ -380,11 +382,46 @@ fn spawn_station_panel(
                                     Node {
                                         width: Val::Percent(0.0),
                                         height: Val::Percent(100.0),
+                                        position_type: PositionType::Absolute,
+                                        left: Val::Px(0.0),
+                                        top: Val::Px(0.0),
                                         border_radius: BorderRadius::all(Val::Px(999.0)),
                                         ..default()
                                     },
                                     BackgroundColor(Color::srgb(0.40, 0.72, 0.94)),
                                     GameplayStationReadoutBarFill,
+                                ));
+                                track.spawn((
+                                    Text::new("--"),
+                                    TextFont {
+                                        font: mono_font.clone(),
+                                        font_size: UI_BODY_FONT_SIZE - 2.0,
+                                        ..default()
+                                    },
+                                    TextColor(Color::srgb(0.94, 0.96, 1.0)),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        left: Val::Px(8.0),
+                                        top: Val::Px(2.0),
+                                        ..default()
+                                    },
+                                    GameplayStationReadoutLabel,
+                                ));
+                                track.spawn((
+                                    Text::new("--"),
+                                    TextFont {
+                                        font: mono_font.clone(),
+                                        font_size: UI_BODY_FONT_SIZE - 2.0,
+                                        ..default()
+                                    },
+                                    TextColor(Color::srgb(0.94, 0.96, 1.0)),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        right: Val::Px(8.0),
+                                        top: Val::Px(2.0),
+                                        ..default()
+                                    },
+                                    GameplayStationReadoutValue,
                                 ));
                             });
                         });
@@ -441,6 +478,7 @@ fn spawn_controls_panel(
         position_type: PositionType::Absolute,
         left: Val::Px(18.0),
         bottom: Val::Px(22.0),
+        display: Display::None,
         width: Val::Px(360.0),
         padding: UiRect::all(Val::Px(14.0)),
         flex_direction: FlexDirection::Column,
@@ -449,6 +487,7 @@ fn spawn_controls_panel(
         ..default()
     }))
     .insert(GameplayControlsPanel)
+    .insert(ControlsHelpPanel)
     .with_children(|panel| {
         panel.spawn((
             Text::new("Controls"),

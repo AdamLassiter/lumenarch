@@ -37,6 +37,7 @@ use super::{
     UI_TITLE_FONT_SIZE,
     netcode,
     state::{
+        ControlsHelpPanel,
         DockedAcceptContractButton,
         DockedContactNextButton,
         DockedContactPrevButton,
@@ -373,12 +374,14 @@ pub(crate) fn spawn_docked_ui(
                     position_type: PositionType::Absolute,
                     left: Val::Px(16.0),
                     bottom: Val::Px(16.0),
+                    display: Display::None,
                     width: Val::Px(360.0),
                     padding: UiRect::all(Val::Px(12.0)),
                     border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
                     ..default()
                 },
                 BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.90)),
+                ControlsHelpPanel,
             ))
             .with_children(|panel| {
                 panel.spawn((

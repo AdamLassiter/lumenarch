@@ -3,7 +3,7 @@ use std::{collections::HashMap, fs, path::Path};
 use bevy::log;
 use serde::{Deserialize, Serialize};
 
-use super::{ModuleKind, ModuleVariant, ShipDefinition, ShipModule};
+use super::{ModuleKind, ShipDefinition};
 use crate::stations::FactionId;
 
 pub const DEFAULT_ENEMY_SHIPS_PATH: &str = "saves/enemy_ships.json";
@@ -50,7 +50,7 @@ pub struct EnemyShipLibrary {
 impl EnemyShipLibrary {
     pub fn seeded() -> Self {
         Self {
-            entries: vec![raider_skiff(), scrap_brigand()],
+            entries: vec![core_only_enemy()],
         }
     }
 
@@ -95,16 +95,7 @@ impl EnemyShipLibrary {
                     .to_string(),
             ),
             is_crewed: true,
-            ship: ShipDefinition {
-                name: format!("Enemy {next_index}"),
-                modules: vec![
-                    ShipModule::new(1, ModuleKind::Core, 0, 0, 0),
-                    ShipModule::new(2, ModuleKind::Cockpit, 0, 1, 0),
-                    ShipModule::new(3, ModuleKind::Engine, 0, -1, 2),
-                    ShipModule::new(4, ModuleKind::Turret, 1, 0, 1),
-                    ShipModule::new(5, ModuleKind::Hull, -1, 0, 3),
-                ],
-            },
+            ship: ShipDefinition::core_only(format!("Enemy {next_index}")),
         });
         self.entries.len() - 1
     }
@@ -189,13 +180,6 @@ pub fn validate_enemy_ship_definition(ship: &ShipDefinition) -> Result<(), Strin
     {
         return Err("ship is missing a core".to_string());
     }
-    if !ship
-        .modules
-        .iter()
-        .any(|module| module.kind == ModuleKind::Cockpit)
-    {
-        return Err("ship is missing a cockpit".to_string());
-    }
     Ok(())
 }
 
@@ -234,86 +218,19 @@ fn save_enemy_library_to_path(path: &Path, library: &EnemyShipLibrary) -> Result
     })
 }
 
-fn raider_skiff() -> EnemyShipEntry {
-    let mut modules = vec![
-        ShipModule::new(1, ModuleKind::Core, 0, 0, 0),
-        ShipModule::new(2, ModuleKind::Cockpit, 0, 1, 0),
-        ShipModule::new(3, ModuleKind::Reactor, -1, 0, 3),
-        ShipModule::new(4, ModuleKind::Engine, 0, -1, 2),
-        ShipModule::new(5, ModuleKind::Engine, 1, -1, 2),
-        ShipModule::new(6, ModuleKind::Turret, 1, 0, 1),
-        ShipModule::new(7, ModuleKind::Hull, -1, 1, 3),
-        ShipModule::new(8, ModuleKind::Hull, 1, 1, 1),
-        ShipModule::new(9, ModuleKind::Cargo, -2, 0, 3),
-    ];
-    modules[1].variant = ModuleVariant::AdvancedHelm;
-    modules[2].variant = ModuleVariant::Fission;
-    modules[5].variant = ModuleVariant::LaserTurret;
-    modules[8].variant = ModuleVariant::AmmoRack;
+fn core_only_enemy() -> EnemyShipEntry {
     EnemyShipEntry {
-        id: "raider_skiff".to_string(),
-        display_name: "Raider Skiff".to_string(),
+        id: "ship_core".to_string(),
+        display_name: "Ship Core".to_string(),
         threat_tier: 1,
-        behavior_tag: "skirmisher".to_string(),
+        behavior_tag: "redesign".to_string(),
         faction_id: FactionId::RogueContinuants,
-        ship_name: Some("Cutter Ashfall".to_string()),
-        captain_name: Some("Captain Ilex Marr".to_string()),
-        comms_intro: Some(
-            "Cutter Ashfall to unknown crew: this lane is under private recovery. Break away or be broken.".to_string(),
-        ),
-        comms_outro: Some(
-            "You got your warning. Needle Rest keeps sending crews into other people's futures.".to_string(),
-        ),
+        ship_name: Some("Unbuilt Core".to_string()),
+        captain_name: Some("Unassigned Captain".to_string()),
+        comms_intro: Some("A bare hostile core drifts without a finished hull.".to_string()),
+        comms_outro: Some("The core signal fades.".to_string()),
         is_crewed: true,
-        ship: ShipDefinition {
-            name: "Raider Skiff".to_string(),
-            modules,
-        },
-    }
-}
-
-fn scrap_brigand() -> EnemyShipEntry {
-    let mut modules = vec![
-        ShipModule::new(1, ModuleKind::Core, 0, 0, 0),
-        ShipModule::new(2, ModuleKind::Cockpit, 0, 1, 0),
-        ShipModule::new(3, ModuleKind::Reactor, -1, 0, 3),
-        ShipModule::new(4, ModuleKind::Battery, -2, 0, 3),
-        ShipModule::new(5, ModuleKind::Engine, 0, -1, 2),
-        ShipModule::new(6, ModuleKind::Engine, 1, -1, 2),
-        ShipModule::new(7, ModuleKind::Turret, 1, 0, 1),
-        ShipModule::new(8, ModuleKind::Turret, 2, 0, 1),
-        ShipModule::new(9, ModuleKind::Cargo, -1, 1, 0),
-        ShipModule::new(10, ModuleKind::Hull, -2, 1, 3),
-        ShipModule::new(11, ModuleKind::Hull, 2, 1, 1),
-        ShipModule::new(12, ModuleKind::HullInnerCorner, 2, -1, 2),
-        ShipModule::new(13, ModuleKind::Shield, -2, -1, 0),
-    ];
-    modules[0].variant = ModuleVariant::ExpandedCore;
-    modules[2].variant = ModuleVariant::Fusion;
-    modules[3].variant = ModuleVariant::Capacitor;
-    modules[6].variant = ModuleVariant::BallisticTurret;
-    modules[7].variant = ModuleVariant::LaserTurret;
-    modules[8].variant = ModuleVariant::FuelTank;
-    modules[12].variant = ModuleVariant::DirectionalShield;
-    EnemyShipEntry {
-        id: "scrap_brigand".to_string(),
-        display_name: "Scrap Brigand".to_string(),
-        threat_tier: 3,
-        behavior_tag: "brawler".to_string(),
-        faction_id: FactionId::RogueContinuants,
-        ship_name: Some("Saint-of-Cinders".to_string()),
-        captain_name: Some("Cell Lead Orin Vey".to_string()),
-        comms_intro: Some(
-            "Saint-of-Cinders hails: leave your cargo and your route marks, and we might let the station keep your names.".to_string(),
-        ),
-        comms_outro: Some(
-            "Needle Rest doesn't own this corridor. People like us survived the Quiet by learning that first.".to_string(),
-        ),
-        is_crewed: true,
-        ship: ShipDefinition {
-            name: "Scrap Brigand".to_string(),
-            modules,
-        },
+        ship: ShipDefinition::core_only("Ship Core"),
     }
 }
 
@@ -327,14 +244,14 @@ mod tests {
 
     #[test]
     fn validation_rejects_empty_ship() {
-        let mut entry = valid_entry("raider_skiff");
+        let mut entry = valid_entry("ship_core");
         entry.ship.modules.clear();
         assert!(validate_enemy_ship_entry(&entry).is_err());
     }
 
     #[test]
     fn validation_rejects_ship_without_core() {
-        let mut entry = valid_entry("raider_skiff");
+        let mut entry = valid_entry("ship_core");
         entry
             .ship
             .modules
@@ -343,20 +260,10 @@ mod tests {
     }
 
     #[test]
-    fn validation_rejects_ship_without_cockpit() {
-        let mut entry = valid_entry("raider_skiff");
-        entry
-            .ship
-            .modules
-            .retain(|module| module.kind != ModuleKind::Cockpit);
-        assert!(validate_enemy_ship_entry(&entry).is_err());
-    }
-
-    #[test]
     fn invalid_seeded_entry_is_repaired_in_memory() {
         let mut library = EnemyShipLibrary {
             entries: vec![EnemyShipEntry {
-                id: "raider_skiff".to_string(),
+                id: "ship_core".to_string(),
                 display_name: "Broken Raider".to_string(),
                 threat_tier: 1,
                 behavior_tag: "skirmisher".to_string(),
@@ -371,7 +278,7 @@ mod tests {
         };
         let statuses = library.validate_and_repair_in_memory();
         assert_eq!(
-            statuses.get("raider_skiff"),
+            statuses.get("ship_core"),
             Some(&EnemyShipEntryValidationStatus::RepairedInMemory)
         );
         assert!(!library.entries[0].ship.modules.is_empty());

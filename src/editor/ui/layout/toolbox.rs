@@ -7,25 +7,39 @@ use crate::{
     editor::{
         SELECTED_UNAFFORDABLE_BUTTON,
         UNAFFORDABLE_BUTTON,
-        helpers::{sprite_path_for_kind, variant_inventory_label},
+        helpers::{sprite_path_for_foundation, sprite_path_for_kind, variant_inventory_label},
     },
-    ship::{ModuleKind, ModuleVariant},
+    ship::{ModuleKind, ModuleVariant, ShipFoundationKind},
     state::{
+        EditorLayer,
+        EditorLayerButton,
+        EditorLayerButtonText,
         EditorMode,
         EditorToolMode,
         EditorToolModeButton,
         EditorToolModeButtonText,
         Progression,
+        ToolboxFoundationButton,
+        ToolboxFoundationButtonText,
         ToolboxVariantButton,
         ToolboxVariantButtonText,
     },
 };
 
-const TOOLBOX_GROUP_STRUCTURE: &[(ModuleKind, ModuleVariant)] = &[
-    (ModuleKind::Hull, ModuleVariant::Standard),
-    (ModuleKind::HullInnerCorner, ModuleVariant::Standard),
-    (ModuleKind::HullOuterCorner, ModuleVariant::Standard),
-    (ModuleKind::Interior, ModuleVariant::Standard),
+const TOOLBOX_GROUP_FOUNDATION: &[ShipFoundationKind] = &[
+    ShipFoundationKind::Floor,
+    ShipFoundationKind::Hull,
+    ShipFoundationKind::HullInnerCorner,
+    ShipFoundationKind::HullOuterCorner,
+];
+const TOOLBOX_GROUP_ROUTES: &[ShipFoundationKind] = &[
+    ShipFoundationKind::Wire,
+    ShipFoundationKind::OxygenDuct,
+    ShipFoundationKind::PipeRawSalvage,
+    ShipFoundationKind::PipeRepairCharge,
+    ShipFoundationKind::PipeFuel,
+    ShipFoundationKind::PipeAmmunition,
+    ShipFoundationKind::PipeOxygen,
 ];
 const TOOLBOX_GROUP_COMMAND: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Core, ModuleVariant::BasicCore),
@@ -33,6 +47,12 @@ const TOOLBOX_GROUP_COMMAND: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Cockpit, ModuleVariant::Standard),
     (ModuleKind::Cockpit, ModuleVariant::AdvancedHelm),
     (ModuleKind::Computer, ModuleVariant::Standard),
+];
+const TOOLBOX_GROUP_LEGACY_STRUCTURE: &[(ModuleKind, ModuleVariant)] = &[
+    (ModuleKind::Interior, ModuleVariant::Standard),
+    (ModuleKind::Hull, ModuleVariant::Standard),
+    (ModuleKind::HullInnerCorner, ModuleVariant::Standard),
+    (ModuleKind::HullOuterCorner, ModuleVariant::Standard),
 ];
 const TOOLBOX_GROUP_POWER: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Reactor, ModuleVariant::Fission),
@@ -45,9 +65,19 @@ const TOOLBOX_GROUP_LOGISTICS: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Processor, ModuleVariant::FabricatorSlow),
     (ModuleKind::Processor, ModuleVariant::FabricatorFast),
     (ModuleKind::Cargo, ModuleVariant::GeneralCargo),
+    (ModuleKind::Cargo, ModuleVariant::RawSalvageCrate),
+    (ModuleKind::Cargo, ModuleVariant::RepairChargeRack),
     (ModuleKind::Cargo, ModuleVariant::FuelTank),
     (ModuleKind::Cargo, ModuleVariant::AmmoRack),
+    (ModuleKind::Cargo, ModuleVariant::O2Canister),
     (ModuleKind::Airlock, ModuleVariant::Standard),
+    (ModuleKind::Airlock, ModuleVariant::DroneBay),
+];
+const TOOLBOX_GROUP_ENGINEERING: &[(ModuleKind, ModuleVariant)] = &[
+    (ModuleKind::JunctionBox, ModuleVariant::Standard),
+    (ModuleKind::Valve, ModuleVariant::Standard),
+    (ModuleKind::O2Generator, ModuleVariant::Standard),
+    (ModuleKind::InteriorWall, ModuleVariant::Standard),
 ];
 const TOOLBOX_GROUP_AUTOMATION: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Detector, ModuleVariant::LifePulse),
@@ -70,15 +100,125 @@ const TOOLBOX_GROUP_COMBAT: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Shield, ModuleVariant::DirectionalShield),
 ];
 
-pub(super) fn toolbox_groups() -> [(&'static str, &'static [(ModuleKind, ModuleVariant)]); 6] {
+pub(super) fn toolbox_groups() -> [(&'static str, &'static [(ModuleKind, ModuleVariant)]); 7] {
     [
-        ("Structure", TOOLBOX_GROUP_STRUCTURE),
         ("Command", TOOLBOX_GROUP_COMMAND),
+        ("Legacy Structure", TOOLBOX_GROUP_LEGACY_STRUCTURE),
         ("Power", TOOLBOX_GROUP_POWER),
-        ("Logistics", TOOLBOX_GROUP_LOGISTICS),
-        ("Automation", TOOLBOX_GROUP_AUTOMATION),
         ("Combat", TOOLBOX_GROUP_COMBAT),
+        ("Logistics", TOOLBOX_GROUP_LOGISTICS),
+        ("Engineering", TOOLBOX_GROUP_ENGINEERING),
+        ("Automation", TOOLBOX_GROUP_AUTOMATION),
     ]
+}
+
+pub(super) fn foundation_toolbox_groups() -> [(&'static str, &'static [ShipFoundationKind]); 2] {
+    [
+        ("Foundation", TOOLBOX_GROUP_FOUNDATION),
+        ("Routes", TOOLBOX_GROUP_ROUTES),
+    ]
+}
+
+pub(super) fn spawn_layer_button(
+    parent: &mut ChildSpawnerCommands,
+    label: &str,
+    layer: EditorLayer,
+    selected_layer: EditorLayer,
+    font: &Handle<Font>,
+) {
+    parent
+        .spawn((
+            Button,
+            Node {
+                width: Val::Percent(50.0),
+                height: Val::Px(32.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
+                ..default()
+            },
+            BackgroundColor(if layer == selected_layer {
+                SELECTED_BUTTON
+            } else {
+                NORMAL_BUTTON
+            }),
+            EditorLayerButton { layer },
+        ))
+        .with_child((
+            Text::new(label),
+            TextFont {
+                font: font.clone(),
+                font_size: 14.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            EditorLayerButtonText,
+        ));
+}
+
+pub(super) fn spawn_foundation_button_grid(
+    parent: &mut ChildSpawnerCommands,
+    asset_server: &AssetServer,
+    font: &Handle<Font>,
+    selected_kind: ShipFoundationKind,
+    entries: &[ShipFoundationKind],
+) {
+    for row in entries.chunks(3) {
+        parent
+            .spawn(Node {
+                width: Val::Percent(100.0),
+                column_gap: Val::Px(8.0),
+                ..default()
+            })
+            .with_children(|row_parent| {
+                for kind in row {
+                    row_parent
+                        .spawn((
+                            Button,
+                            Node {
+                                width: Val::Px(74.0),
+                                height: Val::Px(82.0),
+                                flex_direction: FlexDirection::Column,
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                row_gap: Val::Px(6.0),
+                                padding: UiRect::all(Val::Px(6.0)),
+                                border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
+                                ..default()
+                            },
+                            BackgroundColor(if *kind == selected_kind {
+                                SELECTED_BUTTON
+                            } else {
+                                NORMAL_BUTTON
+                            }),
+                            ToolboxFoundationButton { kind: *kind },
+                        ))
+                        .with_children(|button| {
+                            button.spawn((
+                                ImageNode::new(
+                                    asset_server.load(sprite_path_for_foundation(*kind)),
+                                ),
+                                Node {
+                                    width: Val::Px(32.0),
+                                    height: Val::Px(32.0),
+                                    ..default()
+                                },
+                            ));
+                            button.spawn((
+                                Text::new(kind.display_name()),
+                                TextFont {
+                                    font: font.clone(),
+                                    font_size: 10.0,
+                                    ..default()
+                                },
+                                TextColor(Color::WHITE),
+                                TextLayout::new_with_justify(Justify::Center),
+                                ToolboxFoundationButtonText { kind: *kind },
+                            ));
+                        });
+                }
+            });
+    }
 }
 
 pub(super) fn spawn_tool_mode_button(
@@ -124,6 +264,7 @@ pub(super) fn spawn_variant_button_grid(
     font: &Handle<Font>,
     mode: EditorMode,
     progression: &Progression,
+    ignore_component_limits: bool,
     selected_kind: ModuleKind,
     selected_variant: ModuleVariant,
     entries: &[(ModuleKind, ModuleVariant)],
@@ -137,7 +278,8 @@ pub(super) fn spawn_variant_button_grid(
             })
             .with_children(|row_parent| {
                 for (kind, variant) in row {
-                    let available = mode == EditorMode::Enemy
+                    let available = ignore_component_limits
+                        || mode == EditorMode::Enemy
                         || progression.ready_count(*kind, *variant) > 0
                         || progression.damaged_count(*kind, *variant) > 0;
                     row_parent
@@ -178,7 +320,11 @@ pub(super) fn spawn_variant_button_grid(
                                 Text::new(format!(
                                     "{}\n{}",
                                     variant.display_name(),
-                                    variant_inventory_label(mode, progression, *kind, *variant)
+                                    if ignore_component_limits {
+                                        "limits ignored".to_string()
+                                    } else {
+                                        variant_inventory_label(mode, progression, *kind, *variant)
+                                    }
                                 )),
                                 TextFont {
                                     font: font.clone(),

@@ -15,8 +15,11 @@ pub enum ArchRegister {
     ShipPowerReserve,
     ShipAverageHeat,
     MissionThreat,
+    ReactorReactionRate,
+    ReactorTurbineLoad,
     ReactorHeat,
     ReactorInstability,
+    ReactorPowerOutput,
     StorageRawSalvage,
     StorageRepairCharge,
     ProcessorRawSalvage,
@@ -65,8 +68,11 @@ impl ArchRegister {
             Self::ShipPowerReserve => "VPR",
             Self::ShipAverageHeat => "VHT",
             Self::MissionThreat => "VTHR",
+            Self::ReactorReactionRate => "RRF0",
+            Self::ReactorTurbineLoad => "RRT0",
             Self::ReactorHeat => "RRH0",
             Self::ReactorInstability => "RRS0",
+            Self::ReactorPowerOutput => "RRP0",
             Self::StorageRawSalvage => "LSR0",
             Self::StorageRepairCharge => "LSR1",
             Self::ProcessorRawSalvage => "LPR0",
@@ -792,11 +798,20 @@ fn parse_arch_register(token: &str, line: usize) -> Result<ArchRegister, ArchPar
         "VPR" => Ok(ArchRegister::ShipPowerReserve),
         "VHT" => Ok(ArchRegister::ShipAverageHeat),
         "VTHR" => Ok(ArchRegister::MissionThreat),
+        "RRF0" | "RRF1" | "RRF2" | "RRF3" | "RRF4" | "RRF5" | "RRF6" | "RRF7" | "RRF8" | "RRF9" => {
+            Ok(ArchRegister::ReactorReactionRate)
+        }
+        "RRT0" | "RRT1" | "RRT2" | "RRT3" | "RRT4" | "RRT5" | "RRT6" | "RRT7" | "RRT8" | "RRT9" => {
+            Ok(ArchRegister::ReactorTurbineLoad)
+        }
         "RRH0" | "RRH1" | "RRH2" | "RRH3" | "RRH4" | "RRH5" | "RRH6" | "RRH7" | "RRH8" | "RRH9" => {
             Ok(ArchRegister::ReactorHeat)
         }
         "RRS0" | "RRS1" | "RRS2" | "RRS3" | "RRS4" | "RRS5" | "RRS6" | "RRS7" | "RRS8" | "RRS9" => {
             Ok(ArchRegister::ReactorInstability)
+        }
+        "RRP0" | "RRP1" | "RRP2" | "RRP3" | "RRP4" | "RRP5" | "RRP6" | "RRP7" | "RRP8" | "RRP9" => {
+            Ok(ArchRegister::ReactorPowerOutput)
         }
         "LSR0" => Ok(ArchRegister::StorageRawSalvage),
         "LSR1" => Ok(ArchRegister::StorageRepairCharge),

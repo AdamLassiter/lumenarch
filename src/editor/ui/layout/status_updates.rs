@@ -21,8 +21,10 @@ use crate::{
     state::{
         ArchEditorState,
         EditorBuildSection,
+        EditorLayer,
         EditorMissionReportButtonText,
         EditorMissionReportText,
+        EditorOverlayBuildSection,
         EditorSelectSection,
         EditorSelectionState,
         EditorSelectionSummaryText,
@@ -33,6 +35,7 @@ use crate::{
         EditorToolState,
         EditorToolboxTooltipText,
         EditorUiState,
+        EditorUnderlayBuildSection,
         EnemyEditorState,
         EnemyShipLibraryState,
         GameplayStationPanel,
@@ -103,12 +106,15 @@ pub(crate) fn update_editor_status_text(
         **text = editor_status_line(
             editor_session.mode,
             tool_state.tool_mode,
+            tool_state.active_layer,
             &enemy_entry_label(&editor_session, &enemy_editor_state, &enemy_library_state),
             &editor_ship.ship.name,
             &tool_state.selected_kind,
+            tool_state.selected_foundation_kind,
             tool_state.selected_variant,
             tool_state.selected_rotation,
             tool_state.selected_channel,
+            tool_state.ignore_component_limits,
             editor_ship.ship.modules.len(),
             progression.scrap,
             &progression,
@@ -167,6 +173,42 @@ pub(crate) fn update_editor_status_text(
 
     for mut node in &mut ui_queries.p6() {
         node.display = if tool_state.tool_mode == EditorToolMode::Select {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+}
+
+pub(crate) fn sync_editor_toolbox_layer_sections(
+    tool_state: Res<EditorToolState>,
+    mut underlay_sections: Query<&mut Node, With<EditorUnderlayBuildSection>>,
+    mut overlay_sections: Query<
+        &mut Node,
+        (
+            With<EditorOverlayBuildSection>,
+            Without<EditorUnderlayBuildSection>,
+        ),
+    >,
+) {
+    if !tool_state.is_changed() {
+        return;
+    }
+
+    for mut node in &mut underlay_sections {
+        node.display = if tool_state.tool_mode == EditorToolMode::Build
+            && tool_state.active_layer == EditorLayer::Underlay
+        {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+
+    for mut node in &mut overlay_sections {
+        node.display = if tool_state.tool_mode == EditorToolMode::Build
+            && tool_state.active_layer == EditorLayer::Overlay
+        {
             Display::Flex
         } else {
             Display::None
@@ -271,7 +313,7 @@ pub(crate) fn update_editor_module_overlay(
         >,
     )>,
     mut bar_track_query: Query<
-        (&ChildOf, &mut Node),
+        (Entity, &ChildOf, &mut Node, &Children),
         (
             With<GameplayStationReadoutBarTrack>,
             Without<GameplayStationPanel>,
@@ -484,26 +526,34 @@ pub(crate) fn update_editor_module_overlay(
             {
                 **text = readout.value.clone();
             }
-            if let Ok((parent, mut node)) = bar_track_query.get_mut(child)
+            let fill_update = if let Ok((track_entity, parent, mut node, track_children)) =
+                bar_track_query.get_mut(child)
                 && parent.get() == row_entity
             {
-                node.display = if matches!(readout.visual, EditorReadoutVisual::Bar { .. }) {
-                    Display::Flex
-                } else {
-                    Display::None
-                };
-            }
-            if let Ok((parent, mut node, mut color)) = bar_fill_query.get_mut(child)
-                && parent.get() == row_entity
-            {
-                if let EditorReadoutVisual::Bar {
+                let EditorReadoutVisual::Bar {
                     percent,
                     color: fill,
                 } = readout.visual
-                {
-                    node.width = Val::Percent(percent);
-                    *color = BackgroundColor(fill);
-                    node.display = Display::Flex;
+                else {
+                    node.display = Display::None;
+                    continue;
+                };
+
+                node.display = Display::Flex;
+                Some((track_entity, track_children.to_vec(), percent, fill))
+            } else {
+                None
+            };
+
+            if let Some((track_entity, track_children, percent, fill)) = fill_update {
+                for track_child in track_children {
+                    if let Ok((parent, mut node, mut color)) = bar_fill_query.get_mut(track_child)
+                        && parent.get() == track_entity
+                    {
+                        node.width = Val::Percent(percent);
+                        *color = BackgroundColor(fill);
+                        node.display = Display::Flex;
+                    }
                 }
             }
             if let Ok((parent, mut node, mut color)) = light_query.get_mut(child)

@@ -131,7 +131,12 @@ pub(crate) struct GameplayHudUiQueries<'w, 's> {
             Query<
                 'w,
                 's,
-                (&'static ChildOf, &'static mut Node),
+                (
+                    Entity,
+                    &'static ChildOf,
+                    &'static mut Node,
+                    &'static Children,
+                ),
                 With<GameplayStationReadoutBarTrack>,
             >,
             Query<
@@ -289,6 +294,8 @@ pub(crate) fn update_gameplay_status_text(
     let station_display = station_panel::station_panel_display(
         control_mode,
         mission_state,
+        power_state,
+        power_model,
         weapon_state,
         player_fields,
         &status_world.module_query,
@@ -509,30 +516,46 @@ pub(crate) fn update_gameplay_status_text(
                     **text = readout.value.clone();
                 }
             }
-            if let Ok((parent, mut node)) = hud_ui.node_queries.p4().get_mut(child)
+            let fill_update = if let Ok((track_entity, parent, mut node, track_children)) =
+                hud_ui.node_queries.p4().get_mut(child)
                 && parent.get() == row_entity
             {
-                node.display = if matches!(
-                    readout.visual,
-                    station_panel::StationReadoutVisual::Bar { .. }
-                ) {
-                    Display::Flex
-                } else {
-                    Display::None
-                };
-            }
-            if let Ok((parent, mut node, mut color)) = hud_ui.node_queries.p5().get_mut(child)
-                && parent.get() == row_entity
-            {
-                if let station_panel::StationReadoutVisual::Bar {
+                let station_panel::StationReadoutVisual::Bar {
                     percent,
                     color: fill_color,
                 } = readout.visual
-                {
-                    node.width = Val::Percent(percent);
-                    *color = BackgroundColor(fill_color);
-                }
+                else {
+                    node.display = Display::None;
+                    continue;
+                };
+
                 node.display = Display::Flex;
+                Some((track_entity, track_children.to_vec(), percent, fill_color))
+            } else {
+                None
+            };
+
+            if let Some((track_entity, track_children, percent, fill_color)) = fill_update {
+                for track_child in track_children {
+                    if let Ok((parent, mut text, is_label, is_value)) =
+                        hud_ui.text_queries.p3().get_mut(track_child)
+                        && parent.get() == track_entity
+                    {
+                        if is_label.is_some() {
+                            **text = readout.label.clone();
+                        } else if is_value.is_some() {
+                            **text = readout.value.clone();
+                        }
+                    }
+                    if let Ok((parent, mut fill_node, mut color)) =
+                        hud_ui.node_queries.p5().get_mut(track_child)
+                        && parent.get() == track_entity
+                    {
+                        fill_node.width = Val::Percent(percent);
+                        fill_node.display = Display::Flex;
+                        *color = BackgroundColor(fill_color);
+                    }
+                }
             }
             if let Ok((parent, mut node, mut color)) = hud_ui.node_queries.p6().get_mut(child)
                 && parent.get() == row_entity

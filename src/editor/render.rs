@@ -11,6 +11,7 @@ use super::{
         TILE_SIZE,
         state::{
             EditingCleanup,
+            EditorLayerButton,
             EditorMode,
             EditorPlacementBlocker,
             EditorSelectionState,
@@ -23,7 +24,10 @@ use super::{
             MainCamera,
             PreviewTile,
             Progression,
+            ShipFoundationSprite,
             ShipTileSprite,
+            ToolboxFoundationButton,
+            ToolboxFoundationButtonText,
             ToolboxVariantButton,
             ToolboxVariantButtonText,
         },
@@ -32,11 +36,13 @@ use super::{
         cursor_grid_position,
         grid_to_world,
         is_cursor_over_editor_ui,
+        sprite_path_for_foundation,
+        sprite_path_for_foundation_connections,
         sprite_path_for_kind,
         variant_inventory_label,
     },
 };
-use crate::state::EditorToolMode;
+use crate::state::{EditorLayer, EditorToolMode};
 
 pub(crate) fn spawn_preview_tile(
     mut commands: Commands,
@@ -46,10 +52,13 @@ pub(crate) fn spawn_preview_tile(
     commands.spawn((
         Sprite {
             color: Color::srgba(1.0, 1.0, 1.0, 0.72),
-            ..Sprite::from_image(asset_server.load(sprite_path_for_kind(
-                &tool_state.selected_kind,
-                tool_state.selected_variant,
-            )))
+            ..Sprite::from_image(asset_server.load(
+                if tool_state.active_layer == EditorLayer::Underlay {
+                    sprite_path_for_foundation(tool_state.selected_foundation_kind)
+                } else {
+                    sprite_path_for_kind(&tool_state.selected_kind, tool_state.selected_variant)
+                },
+            ))
         },
         Transform::from_xyz(0.0, 0.0, 5.0),
         Visibility::Hidden,
@@ -89,11 +98,20 @@ pub(crate) fn sync_preview_tile(
     };
 
     *visibility = Visibility::Visible;
-    sprite.image = asset_server.load(sprite_path_for_kind(
-        &tool_state.selected_kind,
-        tool_state.selected_variant,
-    ));
-    transform.translation = grid_to_world(grid_x, grid_y, 5.0);
+    sprite.image = asset_server.load(if tool_state.active_layer == EditorLayer::Underlay {
+        sprite_path_for_foundation(tool_state.selected_foundation_kind)
+    } else {
+        sprite_path_for_kind(&tool_state.selected_kind, tool_state.selected_variant)
+    });
+    transform.translation = grid_to_world(
+        grid_x,
+        grid_y,
+        if tool_state.active_layer == EditorLayer::Underlay {
+            0.5
+        } else {
+            5.0
+        },
+    );
     transform.rotation = Quat::from_rotation_z(-(tool_state.selected_rotation as f32) * FRAC_PI_2);
 }
 
@@ -101,21 +119,76 @@ pub(crate) fn sync_ship_tile_entities(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     editor_ship: Res<EditorShip>,
+    tool_state: Res<EditorToolState>,
     existing_tiles: Query<Entity, With<ShipTileSprite>>,
+    existing_foundations: Query<Entity, With<ShipFoundationSprite>>,
 ) {
-    if !editor_ship.is_changed() {
+    if !editor_ship.is_changed() && !tool_state.is_changed() {
         return;
     }
 
     for entity in &existing_tiles {
         commands.entity(entity).despawn();
     }
+    for entity in &existing_foundations {
+        commands.entity(entity).despawn();
+    }
+
+    for tile in &editor_ship.ship.foundation_tiles {
+        let same_kind = |x, y| {
+            editor_ship
+                .ship
+                .foundation_at(x, y)
+                .is_some_and(|other| other.kind == tile.kind)
+        };
+        let (path, connection_rotation) = sprite_path_for_foundation_connections(
+            tile.kind,
+            same_kind(tile.grid_x, tile.grid_y - 1),
+            same_kind(tile.grid_x + 1, tile.grid_y),
+            same_kind(tile.grid_x, tile.grid_y + 1),
+            same_kind(tile.grid_x - 1, tile.grid_y),
+        );
+        let mut sprite = Sprite::from_image(asset_server.load(path));
+        sprite.color = Color::srgba(
+            1.0,
+            1.0,
+            1.0,
+            if tool_state.active_layer == EditorLayer::Underlay {
+                1.0
+            } else {
+                0.32
+            },
+        );
+        commands.spawn((
+            sprite,
+            Transform {
+                translation: grid_to_world(tile.grid_x, tile.grid_y, 0.25),
+                rotation: Quat::from_rotation_z(
+                    -((tile.rotation_quadrants + connection_rotation) as f32) * FRAC_PI_2,
+                ),
+                ..default()
+            },
+            ShipFoundationSprite,
+            EditingCleanup,
+        ));
+    }
 
     for module in &editor_ship.ship.modules {
+        let mut sprite = Sprite::from_image(
+            asset_server.load(sprite_path_for_kind(&module.kind, module.variant)),
+        );
+        sprite.color = Color::srgba(
+            1.0,
+            1.0,
+            1.0,
+            if tool_state.active_layer == EditorLayer::Overlay {
+                1.0
+            } else {
+                0.34
+            },
+        );
         commands.spawn((
-            Sprite::from_image(
-                asset_server.load(sprite_path_for_kind(&module.kind, module.variant)),
-            ),
+            sprite,
             Transform {
                 translation: grid_to_world(module.grid_x, module.grid_y, 1.0),
                 rotation: Quat::from_rotation_z(-(module.rotation_quadrants as f32) * FRAC_PI_2),
@@ -131,11 +204,45 @@ pub(crate) fn sync_toolbox_visuals(
     tool_state: Res<EditorToolState>,
     progression: Res<Progression>,
     editor_session: Res<EditorSessionState>,
-    mut query: Query<(&ToolboxVariantButton, &mut BackgroundColor), Without<EditorToolModeButton>>,
-    mut text_query: Query<(&ToolboxVariantButtonText, &mut Text)>,
+    mut query: Query<
+        (&ToolboxVariantButton, &mut BackgroundColor),
+        (
+            Without<EditorToolModeButton>,
+            Without<ToolboxFoundationButton>,
+            Without<EditorLayerButton>,
+        ),
+    >,
+    mut foundation_query: Query<
+        (&ToolboxFoundationButton, &mut BackgroundColor),
+        (
+            Without<ToolboxVariantButton>,
+            Without<EditorToolModeButton>,
+            Without<EditorLayerButton>,
+        ),
+    >,
+    mut text_query: Query<
+        (&ToolboxVariantButtonText, &mut Text),
+        Without<ToolboxFoundationButtonText>,
+    >,
     mut mode_query: Query<
         (&EditorToolModeButton, &mut BackgroundColor),
-        Without<ToolboxVariantButton>,
+        (
+            Without<ToolboxVariantButton>,
+            Without<ToolboxFoundationButton>,
+            Without<EditorLayerButton>,
+        ),
+    >,
+    mut layer_query: Query<
+        (&EditorLayerButton, &mut BackgroundColor),
+        (
+            Without<ToolboxVariantButton>,
+            Without<ToolboxFoundationButton>,
+            Without<EditorToolModeButton>,
+        ),
+    >,
+    mut foundation_text_query: Query<
+        (&ToolboxFoundationButtonText, &mut Text),
+        Without<ToolboxVariantButtonText>,
     >,
 ) {
     if !tool_state.is_changed() && !progression.is_changed() && !editor_session.is_changed() {
@@ -143,7 +250,8 @@ pub(crate) fn sync_toolbox_visuals(
     }
 
     for (button, mut background) in &mut query {
-        let affordable = editor_session.mode == EditorMode::Enemy
+        let affordable = tool_state.ignore_component_limits
+            || editor_session.mode == EditorMode::Enemy
             || progression.ready_count(button.kind, button.variant) > 0
             || progression.damaged_count(button.kind, button.variant) > 0;
         if button.kind == tool_state.selected_kind && button.variant == tool_state.selected_variant
@@ -162,16 +270,28 @@ pub(crate) fn sync_toolbox_visuals(
         }
     }
 
+    for (button, mut background) in &mut foundation_query {
+        *background = BackgroundColor(if button.kind == tool_state.selected_foundation_kind {
+            SELECTED_BUTTON
+        } else {
+            NORMAL_BUTTON
+        });
+    }
+
     for (button, mut text) in &mut text_query {
         **text = format!(
             "{}\n{}",
             button.variant.display_name(),
-            variant_inventory_label(
-                editor_session.mode,
-                &progression,
-                button.kind,
-                button.variant
-            ),
+            if tool_state.ignore_component_limits {
+                "limits ignored".to_string()
+            } else {
+                variant_inventory_label(
+                    editor_session.mode,
+                    &progression,
+                    button.kind,
+                    button.variant,
+                )
+            },
         );
     }
 
@@ -181,6 +301,18 @@ pub(crate) fn sync_toolbox_visuals(
         } else {
             NORMAL_BUTTON
         });
+    }
+
+    for (button, mut background) in &mut layer_query {
+        *background = BackgroundColor(if button.layer == tool_state.active_layer {
+            SELECTED_BUTTON
+        } else {
+            NORMAL_BUTTON
+        });
+    }
+
+    for (button, mut text) in &mut foundation_text_query {
+        **text = button.kind.display_name().to_string();
     }
 }
 
@@ -243,6 +375,21 @@ pub(crate) fn draw_editor_selection_overlay(
     selection_state: Res<EditorSelectionState>,
     mut gizmos: Gizmos,
 ) {
+    for tile in &editor_ship.ship.foundation_tiles {
+        if !selection_state.selected_foundation_ids.contains(&tile.id) {
+            continue;
+        }
+        let center = Vec2::new(
+            tile.grid_x as f32 * TILE_SIZE,
+            -(tile.grid_y as f32) * TILE_SIZE,
+        );
+        gizmos.rect_2d(
+            center,
+            Vec2::splat(TILE_SIZE + 4.0),
+            Color::srgb(0.25, 0.78, 0.95),
+        );
+    }
+
     for module in &editor_ship.ship.modules {
         if !selection_state.selected_module_ids.contains(&module.id) {
             continue;

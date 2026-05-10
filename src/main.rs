@@ -353,9 +353,27 @@ fn add_shared_update_systems(app: &mut App) {
             gameplay::cleanup_runtime_entities
                 .run_if(netcode::session_not_presents_encounter)
                 .run_if(gameplay::runtime_scene_present),
+            sync_controls_help_panel_visibility,
         ),
     )
     .add_systems(Update, docked::persist_campaign_state);
+}
+
+fn sync_controls_help_panel_visibility(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut panels: Query<&mut Node, With<state::ControlsHelpPanel>>,
+) {
+    let show_help = keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
+    let display = if show_help {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    for mut node in &mut panels {
+        if node.display != display {
+            node.display = display;
+        }
+    }
 }
 
 fn add_session_bootstrap_systems(app: &mut App, mode: AppRuntimeMode) {
@@ -548,6 +566,8 @@ fn add_player_editor_ui_fixed_systems(app: &mut App) {
                 editor::update_editor_status_text,
             )
                 .run_if(netcode::session_presents_player_editor),
+            editor::sync_editor_toolbox_layer_sections
+                .run_if(netcode::session_presents_player_editor),
         ),
     );
 }
@@ -582,6 +602,8 @@ fn add_debug_enemy_editor_fixed_systems(app: &mut App) {
                 editor::sync_toolbox_scroll,
                 editor::update_editor_status_text,
             )
+                .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+            editor::sync_editor_toolbox_layer_sections
                 .run_if(in_state(FrontendMode::DebugEnemyEditor)),
         ),
     );

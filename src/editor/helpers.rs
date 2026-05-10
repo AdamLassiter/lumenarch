@@ -6,19 +6,22 @@ use super::super::{
     state::{EditorMode, EditorPlacementBlocker, EditorToolboxPanel, LastMissionReport},
 };
 use crate::{
-    ship::{ModuleKind, ModuleSpec, ModuleVariant, ShipDefinition},
-    state::{EditorSelectionState, EditorToolMode, Progression},
+    ship::{ModuleKind, ModuleSpec, ModuleVariant, ShipDefinition, ShipFoundationKind},
+    state::{EditorLayer, EditorSelectionState, EditorToolMode, Progression},
 };
 
 pub(crate) fn editor_status_line(
     mode: EditorMode,
     tool_mode: EditorToolMode,
+    active_layer: EditorLayer,
     entry_label: &str,
     ship_name: &str,
     selected_kind: &ModuleKind,
+    selected_foundation_kind: ShipFoundationKind,
     selected_variant: ModuleVariant,
     selected_rotation: u8,
     selected_channel: u8,
+    ignore_component_limits: bool,
     module_count: usize,
     scrap_total: u32,
     progression: &Progression,
@@ -28,7 +31,9 @@ pub(crate) fn editor_status_line(
     let ready_count = progression.ready_count(*selected_kind, selected_variant);
     let damaged_count = progression.damaged_count(*selected_kind, selected_variant);
     let repair_cost = module_kind_cost(*selected_kind, selected_variant).max(1);
-    let availability = if ready_count > 0 {
+    let availability = if ignore_component_limits {
+        "ignored"
+    } else if ready_count > 0 {
         "ready"
     } else if damaged_count > 0 {
         "repair needed"
@@ -37,7 +42,7 @@ pub(crate) fn editor_status_line(
     };
 
     format!(
-        "{}\nEntry: {entry_label}\nShip: {ship_name}\nMode: {}\nBuild Variant: {selected_kind} / {}\nRotation: {selected_rotation}\nChannel: {}\nPlaced Modules: {module_count}\nSelection: {}\nScrap: {scrap_total}\nAvailable: ready {} / damaged {}\nRepair Cost: {} ({availability})",
+        "{}\nEntry: {entry_label}\nShip: {ship_name}\nMode: {}\nLayer: {}\nBuild: {} / {}\nRotation: {selected_rotation}\nChannel: {}\nPlaced Modules: {module_count}\nSelection: {}\nScrap: {scrap_total}\nComponent Limits: {}\nAvailable: ready {} / damaged {}\nRepair Cost: {} ({availability})",
         match mode {
             EditorMode::Player => "Player Refit",
             EditorMode::Enemy => "Enemy Ship Debug Editor",
@@ -46,9 +51,23 @@ pub(crate) fn editor_status_line(
             EditorToolMode::Build => "Build",
             EditorToolMode::Select => "Select",
         },
+        match active_layer {
+            EditorLayer::Underlay => "Underlay",
+            EditorLayer::Overlay => "Overlay",
+        },
+        if matches!(active_layer, EditorLayer::Underlay) {
+            selected_foundation_kind.display_name().to_string()
+        } else {
+            selected_kind.to_string()
+        },
         selected_variant.display_name(),
         selected_channel,
         selection_summary(editor_ship, selection_state),
+        if ignore_component_limits {
+            "ignored"
+        } else {
+            "enforced"
+        },
         ready_count,
         damaged_count,
         repair_cost,
@@ -129,6 +148,15 @@ pub(crate) fn selection_summary(
         })
         .map(|module| module.display_name())
         .collect::<Vec<_>>();
+    if !selection_state.selected_foundation_ids.is_empty() {
+        names.extend(
+            editor_ship
+                .foundation_tiles
+                .iter()
+                .filter(|tile| selection_state.selected_foundation_ids.contains(&tile.id))
+                .map(|tile| tile.display_name().to_string()),
+        );
+    }
     if names.is_empty() {
         return "none".to_string();
     }
@@ -185,6 +213,26 @@ pub(crate) fn module_family_label(kind: ModuleKind) -> &'static str {
         ModuleKind::Reactor | ModuleKind::Battery => "Power systems",
         ModuleKind::Engine => "Propulsion",
         ModuleKind::Turret | ModuleKind::Shield => "Combat systems",
+        ModuleKind::InteriorWall => "Interior walls",
+        ModuleKind::JunctionBox | ModuleKind::Valve | ModuleKind::O2Generator => {
+            "Engineering control"
+        }
+    }
+}
+
+pub(crate) fn foundation_family_label(kind: ShipFoundationKind) -> &'static str {
+    match kind {
+        ShipFoundationKind::Floor => "Deck foundation",
+        ShipFoundationKind::Hull
+        | ShipFoundationKind::HullInnerCorner
+        | ShipFoundationKind::HullOuterCorner => "Hull and structure",
+        ShipFoundationKind::Wire => "Power routing",
+        ShipFoundationKind::OxygenDuct => "Oxygen ducting",
+        ShipFoundationKind::PipeRawSalvage
+        | ShipFoundationKind::PipeRepairCharge
+        | ShipFoundationKind::PipeFuel
+        | ShipFoundationKind::PipeAmmunition
+        | ShipFoundationKind::PipeOxygen => "Resource pipes",
     }
 }
 
@@ -253,11 +301,81 @@ pub(crate) fn is_cursor_over_editor_ui(
 }
 
 pub(crate) fn sprite_path_for_kind(kind: &ModuleKind, variant: ModuleVariant) -> String {
-    let _ = variant;
     let asset_name = match kind {
+        ModuleKind::Cargo => match variant {
+            ModuleVariant::FuelTank => "cargo_fuel_tank",
+            ModuleVariant::AmmoRack => "cargo_ammo_rack",
+            ModuleVariant::RawSalvageCrate => "cargo_raw_salvage",
+            ModuleVariant::RepairChargeRack => "cargo_repair_charge",
+            ModuleVariant::O2Canister => "cargo_o2_canister",
+            _ => "cargo",
+        },
         ModuleKind::Shield => "battery",
         ModuleKind::Detector => "computer",
         _ => kind.as_str(),
     };
     format!("tiles/{asset_name}.png")
+}
+
+pub(crate) fn sprite_path_for_foundation(kind: ShipFoundationKind) -> String {
+    format!("tiles/{}.png", kind.as_str())
+}
+
+pub(crate) fn sprite_path_for_foundation_connections(
+    kind: ShipFoundationKind,
+    north: bool,
+    east: bool,
+    south: bool,
+    west: bool,
+) -> (String, u8) {
+    if !kind.is_route() {
+        return (sprite_path_for_foundation(kind), 0);
+    }
+    let count = [north, east, south, west]
+        .into_iter()
+        .filter(|connected| *connected)
+        .count();
+    let base = kind.as_str();
+    match count {
+        4 => (format!("tiles/{base}_cross.png"), 0),
+        3 => {
+            let missing = if !north {
+                2
+            } else if !east {
+                3
+            } else if !south {
+                0
+            } else {
+                1
+            };
+            (format!("tiles/{base}_tee.png"), missing)
+        }
+        2 if (north && south) || (east && west) => {
+            let rotation = if east && west { 1 } else { 0 };
+            (format!("tiles/{base}_straight.png"), rotation)
+        }
+        2 => {
+            let rotation = match (north, east, south, west) {
+                (true, true, false, false) => 0,
+                (false, true, true, false) => 1,
+                (false, false, true, true) => 2,
+                (true, false, false, true) => 3,
+                _ => 0,
+            };
+            (format!("tiles/{base}_corner.png"), rotation)
+        }
+        1 => {
+            let rotation = if east {
+                1
+            } else if south {
+                2
+            } else if west {
+                3
+            } else {
+                0
+            };
+            (format!("tiles/{base}_straight.png"), rotation)
+        }
+        _ => (format!("tiles/{base}_straight.png"), 0),
+    }
 }

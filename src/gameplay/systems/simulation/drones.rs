@@ -427,6 +427,7 @@ fn find_airlock_candidate(
                 let accepts = match resource_kind {
                     ResourceKind::Fuel => target_storage.accepts_fuel,
                     ResourceKind::Ammunition => target_storage.accepts_ammunition,
+                    ResourceKind::Oxygen => target_storage.accepts_oxygen,
                     ResourceKind::RawSalvage | ResourceKind::RepairCharge => {
                         target_storage.accepts_general
                     }
@@ -545,6 +546,7 @@ fn find_processor_output_candidate(
                 let accepts = match resource_kind {
                     ResourceKind::Fuel => storage.accepts_fuel,
                     ResourceKind::Ammunition => storage.accepts_ammunition,
+                    ResourceKind::Oxygen => storage.accepts_oxygen,
                     ResourceKind::RawSalvage | ResourceKind::RepairCharge => {
                         storage.accepts_general
                     }

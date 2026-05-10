@@ -1,8 +1,14 @@
 use std::collections::HashMap;
 
 use crate::{
-    ship::{ModuleKind, ModuleVariant, ShipDefinition, ShipModule},
-    state::{EditorMode, EditorSelectionState, Progression, ShipModuleSnapshot},
+    ship::{ModuleKind, ModuleVariant, ShipDefinition, ShipFoundationTile, ShipModule},
+    state::{
+        EditorMode,
+        EditorSelectionState,
+        Progression,
+        ShipFoundationSnapshot,
+        ShipModuleSnapshot,
+    },
 };
 
 pub(super) fn selected_or_all_modules(
@@ -24,6 +30,15 @@ pub(super) fn module_snapshot(module: ShipModule) -> ShipModuleSnapshot {
         grid_y: module.grid_y,
         rotation_quadrants: module.rotation_quadrants,
         channel: module.channel,
+    }
+}
+
+pub(super) fn foundation_snapshot(tile: ShipFoundationTile) -> ShipFoundationSnapshot {
+    ShipFoundationSnapshot {
+        kind: tile.kind,
+        grid_x: tile.grid_x,
+        grid_y: tile.grid_y,
+        rotation_quadrants: tile.rotation_quadrants,
     }
 }
 
@@ -72,19 +87,70 @@ pub(super) fn move_selected_group(
     true
 }
 
+pub(super) fn move_selected_foundation_group(
+    ship: &mut ShipDefinition,
+    selection_state: &EditorSelectionState,
+    dx: i32,
+    dy: i32,
+) -> bool {
+    if selection_state.selected_foundation_ids.is_empty() {
+        return false;
+    }
+    let selected = ship
+        .foundation_tiles
+        .iter()
+        .filter(|tile| selection_state.selected_foundation_ids.contains(&tile.id))
+        .cloned()
+        .collect::<Vec<_>>();
+    if selected.is_empty() {
+        return false;
+    }
+    for tile in &selected {
+        let next_x = tile.grid_x + dx;
+        let next_y = tile.grid_y + dy;
+        if let Some(blocker) = ship.foundation_at(next_x, next_y)
+            && !selection_state
+                .selected_foundation_ids
+                .contains(&blocker.id)
+        {
+            return false;
+        }
+    }
+    for tile in &selected {
+        if let Some(target) = ship
+            .foundation_tiles
+            .iter_mut()
+            .find(|entry| entry.id == tile.id)
+        {
+            target.grid_x += dx;
+            target.grid_y += dy;
+        }
+    }
+    true
+}
+
 pub(super) fn delete_selected_group(
     ship: &mut ShipDefinition,
     progression: &mut Progression,
     mode: EditorMode,
+    ignore_component_limits: bool,
     selection_state: &mut EditorSelectionState,
 ) -> bool {
+    if !selection_state.selected_foundation_ids.is_empty() {
+        let selected = selection_state.selected_foundation_ids.clone();
+        ship.foundation_tiles
+            .retain(|tile| !selected.contains(&tile.id));
+        selection_state.selected_foundation_ids.clear();
+        return true;
+    }
+
     let selected = selected_or_all_modules(ship, &selection_state.selected_module_ids);
     if selected.is_empty() {
         return false;
     }
 
     for module in &selected {
-        if mode == EditorMode::Player {
+        if mode == EditorMode::Player && !ignore_component_limits {
             progression.add_ready_component(module.kind, module.variant, 1);
         }
         ship.modules.retain(|entry| entry.id != module.id);
@@ -97,6 +163,7 @@ pub(super) fn paste_clipboard_group(
     ship: &mut ShipDefinition,
     progression: &mut Progression,
     mode: EditorMode,
+    ignore_component_limits: bool,
     selection_state: &mut EditorSelectionState,
     anchor: (i32, i32),
 ) -> bool {
@@ -134,7 +201,7 @@ pub(super) fn paste_clipboard_group(
         }
     }
 
-    if mode == EditorMode::Player {
+    if mode == EditorMode::Player && !ignore_component_limits {
         let mut needed = HashMap::<(ModuleKind, ModuleVariant), u32>::new();
         for (module, _, _) in &planned {
             *needed.entry((module.kind, module.variant)).or_default() += 1;
@@ -164,6 +231,62 @@ pub(super) fn paste_clipboard_group(
         let new_id = next.id;
         ship.replace_module(next);
         selection_state.selected_module_ids.push(new_id);
+    }
+    true
+}
+
+pub(super) fn paste_foundation_clipboard_group(
+    ship: &mut ShipDefinition,
+    selection_state: &mut EditorSelectionState,
+    anchor: (i32, i32),
+) -> bool {
+    if selection_state.foundation_clipboard.is_empty() {
+        return false;
+    }
+    let min_x = selection_state
+        .foundation_clipboard
+        .iter()
+        .map(|tile| tile.grid_x)
+        .min()
+        .unwrap_or(anchor.0);
+    let min_y = selection_state
+        .foundation_clipboard
+        .iter()
+        .map(|tile| tile.grid_y)
+        .min()
+        .unwrap_or(anchor.1);
+
+    let planned = selection_state
+        .foundation_clipboard
+        .iter()
+        .map(|tile| {
+            (
+                tile,
+                anchor.0 + (tile.grid_x - min_x),
+                anchor.1 + (tile.grid_y - min_y),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    for (_, grid_x, grid_y) in &planned {
+        if ship.foundation_at(*grid_x, *grid_y).is_some() {
+            return false;
+        }
+    }
+
+    selection_state.selected_foundation_ids.clear();
+    selection_state.selected_module_ids.clear();
+    for (tile, grid_x, grid_y) in planned {
+        let next = ShipFoundationTile::new(
+            ship.next_foundation_id(),
+            tile.kind,
+            grid_x,
+            grid_y,
+            tile.rotation_quadrants,
+        );
+        let new_id = next.id;
+        ship.replace_foundation_tile(next);
+        selection_state.selected_foundation_ids.push(new_id);
     }
     true
 }

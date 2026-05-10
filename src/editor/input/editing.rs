@@ -4,9 +4,12 @@ use super::{
     auto_hull::apply_auto_hull_to_ship,
     selection::{
         delete_selected_group,
+        foundation_snapshot,
         module_snapshot,
+        move_selected_foundation_group,
         move_selected_group,
         paste_clipboard_group,
+        paste_foundation_clipboard_group,
         selected_or_all_modules,
         ship_anchor,
     },
@@ -17,6 +20,7 @@ use crate::{
     PRESSED_BUTTON,
     editor::helpers::{
         cursor_grid_position,
+        foundation_family_label,
         is_cursor_over_editor_ui,
         module_family_label,
         variant_tooltip_text,
@@ -25,6 +29,7 @@ use crate::{
     ship::{
         ModuleKind,
         ShipDefinition,
+        ShipFoundationTile,
         ShipModule,
         arch::{ArchProgram, ArchProgramTemplate},
         lumen::{LumenProgram, LumenProgramTemplate},
@@ -34,6 +39,8 @@ use crate::{
         EditorAutoHullButton,
         EditorCopySelectionButton,
         EditorDeleteSelectionButton,
+        EditorLayer,
+        EditorLayerButton,
         EditorMissionReportButton,
         EditorMode,
         EditorPasteSelectionButton,
@@ -53,6 +60,7 @@ use crate::{
         ProgrammingLanguageMode,
         Progression,
         StationPanelButtonAction,
+        ToolboxFoundationButton,
         ToolboxVariantButton,
     },
 };
@@ -62,7 +70,9 @@ pub(crate) fn toolbox_button_system(
         (
             &Interaction,
             Option<&ToolboxVariantButton>,
+            Option<&ToolboxFoundationButton>,
             Option<&EditorToolModeButton>,
+            Option<&EditorLayerButton>,
             &mut BackgroundColor,
         ),
         (Changed<Interaction>, With<Button>),
@@ -72,14 +82,32 @@ pub(crate) fn toolbox_button_system(
     mut tool_state: ResMut<EditorToolState>,
     mut editor_ui_state: ResMut<EditorUiState>,
 ) {
-    for (interaction, variant_button, mode_button, mut background) in &mut interaction_query {
+    for (
+        interaction,
+        variant_button,
+        foundation_button,
+        mode_button,
+        layer_button,
+        mut background,
+    ) in &mut interaction_query
+    {
         match *interaction {
             Interaction::Pressed => {
                 if let Some(button) = mode_button {
                     tool_state.tool_mode = button.mode;
                     *background = BackgroundColor(PRESSED_BUTTON);
+                } else if let Some(button) = layer_button {
+                    tool_state.active_layer = button.layer;
+                    tool_state.tool_mode = EditorToolMode::Build;
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                } else if let Some(button) = foundation_button {
+                    tool_state.active_layer = EditorLayer::Underlay;
+                    tool_state.tool_mode = EditorToolMode::Build;
+                    tool_state.selected_foundation_kind = button.kind;
+                    *background = BackgroundColor(PRESSED_BUTTON);
                 } else if let Some(button) = variant_button {
-                    let available = editor_session.mode == EditorMode::Enemy
+                    let available = tool_state.ignore_component_limits
+                        || editor_session.mode == EditorMode::Enemy
                         || progression.ready_count(button.kind, button.variant) > 0
                         || progression.damaged_count(button.kind, button.variant) > 0;
                     if !available {
@@ -87,6 +115,7 @@ pub(crate) fn toolbox_button_system(
                         continue;
                     }
                     tool_state.tool_mode = EditorToolMode::Build;
+                    tool_state.active_layer = EditorLayer::Overlay;
                     tool_state.selected_kind = button.kind;
                     tool_state.selected_variant = button.variant;
                     *background = BackgroundColor(PRESSED_BUTTON);
@@ -105,7 +134,8 @@ pub(crate) fn toolbox_button_system(
                         button.kind,
                         button.variant,
                     );
-                    let available = editor_session.mode == EditorMode::Enemy
+                    let available = tool_state.ignore_component_limits
+                        || editor_session.mode == EditorMode::Enemy
                         || progression.ready_count(button.kind, button.variant) > 0
                         || progression.damaged_count(button.kind, button.variant) > 0;
                     *background = BackgroundColor(if available {
@@ -113,6 +143,16 @@ pub(crate) fn toolbox_button_system(
                     } else {
                         super::super::UNAFFORDABLE_BUTTON
                     });
+                } else if let Some(button) = foundation_button {
+                    editor_ui_state.toolbox_tooltip.title = format!(
+                        "{} / {}",
+                        foundation_family_label(button.kind),
+                        button.kind.as_str()
+                    );
+                    editor_ui_state.toolbox_tooltip.detail =
+                        "Engineering underlay tile. It can share a cell with an overlay component."
+                            .to_string();
+                    *background = BackgroundColor(HOVERED_BUTTON);
                 } else {
                     *background = BackgroundColor(HOVERED_BUTTON);
                 }
@@ -217,6 +257,17 @@ pub(crate) fn rotate_selected_tool(
     keys: Res<ButtonInput<KeyCode>>,
     mut tool_state: ResMut<EditorToolState>,
 ) {
+    if keys.just_pressed(KeyCode::KeyL) {
+        tool_state.active_layer = match tool_state.active_layer {
+            EditorLayer::Underlay => EditorLayer::Overlay,
+            EditorLayer::Overlay => EditorLayer::Underlay,
+        };
+    }
+
+    if keys.just_pressed(KeyCode::F10) {
+        tool_state.ignore_component_limits = !tool_state.ignore_component_limits;
+    }
+
     if tool_state.tool_mode == EditorToolMode::Build && keys.just_pressed(KeyCode::KeyR) {
         tool_state.selected_rotation = (tool_state.selected_rotation + 1) % 4;
     }
@@ -321,14 +372,42 @@ pub(crate) fn place_or_remove_tile(
             } else if buttons.just_released(MouseButton::Left) {
                 if let Some(origin) = selection_state.marquee_origin {
                     let current = selection_state.marquee_current.unwrap_or(origin);
-                    selection_state.selected_module_ids =
-                        select_modules_in_rect(&editor_ship.ship, origin, current);
+                    if tool_state.active_layer == EditorLayer::Underlay {
+                        selection_state.selected_foundation_ids =
+                            select_foundations_in_rect(&editor_ship.ship, origin, current);
+                        selection_state.selected_module_ids.clear();
+                    } else {
+                        selection_state.selected_module_ids =
+                            select_modules_in_rect(&editor_ship.ship, origin, current);
+                        selection_state.selected_foundation_ids.clear();
+                    }
                 }
                 selection_state.marquee_origin = None;
                 selection_state.marquee_current = None;
             }
         }
     }
+}
+
+fn select_foundations_in_rect(
+    ship: &ShipDefinition,
+    origin: (i32, i32),
+    current: (i32, i32),
+) -> Vec<u64> {
+    let min_x = origin.0.min(current.0);
+    let max_x = origin.0.max(current.0);
+    let min_y = origin.1.min(current.1);
+    let max_y = origin.1.max(current.1);
+    ship.foundation_tiles
+        .iter()
+        .filter(|tile| {
+            tile.grid_x >= min_x
+                && tile.grid_x <= max_x
+                && tile.grid_y >= min_y
+                && tile.grid_y <= max_y
+        })
+        .map(|tile| tile.id)
+        .collect()
 }
 
 fn apply_build_action(
@@ -340,9 +419,13 @@ fn apply_build_action(
     grid_y: i32,
     erase: bool,
 ) -> bool {
+    if tool_state.active_layer == EditorLayer::Underlay {
+        return apply_foundation_build_action(ship, tool_state, grid_x, grid_y, erase);
+    }
+
     if erase {
         if let Some(existing) = ship.module_at(grid_x, grid_y).cloned() {
-            if mode == EditorMode::Player {
+            if mode == EditorMode::Player && !tool_state.ignore_component_limits {
                 progression.add_ready_component(existing.kind, existing.variant, 1);
             }
             ship.remove_module_at(grid_x, grid_y);
@@ -362,11 +445,12 @@ fn apply_build_action(
         }
 
         if mode == EditorMode::Player
+            && !tool_state.ignore_component_limits
             && !progression.try_consume_ready_component(tool_state.selected_kind, selected_variant)
         {
             return false;
         }
-        if mode == EditorMode::Player {
+        if mode == EditorMode::Player && !tool_state.ignore_component_limits {
             progression.add_ready_component(existing.kind, existing.variant, 1);
         }
         existing.kind = tool_state.selected_kind;
@@ -377,6 +461,7 @@ fn apply_build_action(
     }
 
     if mode == EditorMode::Player
+        && !tool_state.ignore_component_limits
         && !progression.try_consume_ready_component(tool_state.selected_kind, selected_variant)
     {
         return false;
@@ -392,6 +477,38 @@ fn apply_build_action(
     module.variant = selected_variant;
     module.channel = tool_state.selected_channel;
     ship.replace_module(module);
+    true
+}
+
+fn apply_foundation_build_action(
+    ship: &mut ShipDefinition,
+    tool_state: &EditorToolState,
+    grid_x: i32,
+    grid_y: i32,
+    erase: bool,
+) -> bool {
+    if erase {
+        if ship.foundation_at(grid_x, grid_y).is_some() {
+            ship.remove_foundation_at(grid_x, grid_y);
+            return true;
+        }
+        return false;
+    }
+
+    if let Some(existing) = ship.foundation_at_mut(grid_x, grid_y) {
+        existing.kind = tool_state.selected_foundation_kind;
+        existing.rotation_quadrants = tool_state.selected_rotation % 4;
+        return true;
+    }
+
+    let tile = ShipFoundationTile::new(
+        ship.next_foundation_id(),
+        tool_state.selected_foundation_kind,
+        grid_x,
+        grid_y,
+        tool_state.selected_rotation % 4,
+    );
+    ship.replace_foundation_tile(tile);
     true
 }
 
@@ -621,6 +738,7 @@ pub(crate) fn selection_action_button_system(
     mut editor_ship: ResMut<EditorShip>,
     mut progression: ResMut<Progression>,
     mut selection_state: ResMut<EditorSelectionState>,
+    tool_state: Res<EditorToolState>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
 ) {
@@ -637,28 +755,51 @@ pub(crate) fn selection_action_button_system(
                 if auto_hull.is_some() {
                     changed = apply_auto_hull_to_ship(&mut editor_ship.ship);
                 } else if copy.is_some() {
-                    selection_state.clipboard = selected_or_all_modules(
-                        &editor_ship.ship,
-                        &selection_state.selected_module_ids,
-                    )
-                    .into_iter()
-                    .map(module_snapshot)
-                    .collect();
+                    if !selection_state.selected_foundation_ids.is_empty() {
+                        selection_state.foundation_clipboard = editor_ship
+                            .ship
+                            .foundation_tiles
+                            .iter()
+                            .filter(|tile| {
+                                selection_state.selected_foundation_ids.contains(&tile.id)
+                            })
+                            .cloned()
+                            .map(foundation_snapshot)
+                            .collect();
+                    } else {
+                        selection_state.clipboard = selected_or_all_modules(
+                            &editor_ship.ship,
+                            &selection_state.selected_module_ids,
+                        )
+                        .into_iter()
+                        .map(module_snapshot)
+                        .collect();
+                    }
                 } else if paste.is_some() {
                     let anchor = cursor_grid_position(window, camera_query)
                         .unwrap_or_else(|| ship_anchor(&editor_ship.ship));
-                    changed = paste_clipboard_group(
-                        &mut editor_ship.ship,
-                        &mut progression,
-                        editor_session.mode,
-                        &mut selection_state,
-                        anchor,
-                    );
+                    changed = if !selection_state.foundation_clipboard.is_empty() {
+                        paste_foundation_clipboard_group(
+                            &mut editor_ship.ship,
+                            &mut selection_state,
+                            anchor,
+                        )
+                    } else {
+                        paste_clipboard_group(
+                            &mut editor_ship.ship,
+                            &mut progression,
+                            editor_session.mode,
+                            tool_state.ignore_component_limits,
+                            &mut selection_state,
+                            anchor,
+                        )
+                    };
                 } else if delete.is_some() {
                     changed = delete_selected_group(
                         &mut editor_ship.ship,
                         &mut progression,
                         editor_session.mode,
+                        tool_state.ignore_component_limits,
                         &mut selection_state,
                     );
                 }
@@ -713,23 +854,39 @@ pub(crate) fn selection_shortcuts(
     let mut changed = false;
 
     if ctrl_pressed && keys.just_pressed(KeyCode::KeyC) {
-        selection_state.clipboard =
-            selected_or_all_modules(&editor_ship.ship, &selection_state.selected_module_ids)
-                .into_iter()
-                .map(module_snapshot)
+        if !selection_state.selected_foundation_ids.is_empty() {
+            selection_state.foundation_clipboard = editor_ship
+                .ship
+                .foundation_tiles
+                .iter()
+                .filter(|tile| selection_state.selected_foundation_ids.contains(&tile.id))
+                .cloned()
+                .map(foundation_snapshot)
                 .collect();
+        } else {
+            selection_state.clipboard =
+                selected_or_all_modules(&editor_ship.ship, &selection_state.selected_module_ids)
+                    .into_iter()
+                    .map(module_snapshot)
+                    .collect();
+        }
     }
 
     if ctrl_pressed && keys.just_pressed(KeyCode::KeyV) {
         let anchor = cursor_grid_position(window.into_inner(), *camera_query)
             .unwrap_or_else(|| ship_anchor(&editor_ship.ship));
-        changed |= paste_clipboard_group(
-            &mut editor_ship.ship,
-            &mut progression,
-            editor_session.mode,
-            &mut selection_state,
-            anchor,
-        );
+        changed |= if !selection_state.foundation_clipboard.is_empty() {
+            paste_foundation_clipboard_group(&mut editor_ship.ship, &mut selection_state, anchor)
+        } else {
+            paste_clipboard_group(
+                &mut editor_ship.ship,
+                &mut progression,
+                editor_session.mode,
+                tool_state.ignore_component_limits,
+                &mut selection_state,
+                anchor,
+            )
+        };
     }
 
     if keys.just_pressed(KeyCode::Delete) || keys.just_pressed(KeyCode::Backspace) {
@@ -737,6 +894,7 @@ pub(crate) fn selection_shortcuts(
             &mut editor_ship.ship,
             &mut progression,
             editor_session.mode,
+            tool_state.ignore_component_limits,
             &mut selection_state,
         );
     }
@@ -752,7 +910,11 @@ pub(crate) fn selection_shortcuts(
         (KeyCode::ArrowDown, 0, 1),
     ] {
         if keys.just_pressed(key) {
-            changed |= move_selected_group(&mut editor_ship.ship, &selection_state, dx, dy);
+            changed |= if !selection_state.selected_foundation_ids.is_empty() {
+                move_selected_foundation_group(&mut editor_ship.ship, &selection_state, dx, dy)
+            } else {
+                move_selected_group(&mut editor_ship.ship, &selection_state, dx, dy)
+            };
         }
     }
 

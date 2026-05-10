@@ -45,6 +45,36 @@ Current tile set and intended purpose:
 * `assets/tiles/hull_outer_corner.png`
   Convex hull corner used where two exterior hull edges meet. Default art should clearly read as an outward corner.
 
+Planned 21_TUBES_DEMO engineering-underlay sprites:
+
+* `assets/tiles/floor.png`
+  Walkable deck/floor foundation tile used on the underlay layer.
+* `assets/tiles/wire.png`
+  Power wiring route tile. It should read clearly as electrical infrastructure beneath components.
+* `assets/tiles/duct_oxygen.png`
+  Oxygen duct route tile for moving oxygen supply into breathable rooms.
+* `assets/tiles/pipe_raw_salvage.png`
+  Raw salvage pipe route tile.
+* `assets/tiles/pipe_repair_charge.png`
+  Repair charge pipe route tile.
+* `assets/tiles/pipe_fuel.png`
+  Fuel pipe route tile for reactor fuel delivery.
+* `assets/tiles/pipe_ammunition.png`
+  Ammunition pipe route tile for weapon supply.
+* `assets/tiles/pipe_oxygen.png`
+  Oxygen resource pipe route tile for moving stored oxygen before it becomes atmosphere.
+* Route tiles may also provide adjacency-selected variants with `_straight`, `_corner`, `_tee`, and `_cross` suffixes. The editor/runtime picks these according to connected cardinal neighbors of the same route type.
+* `assets/tiles/junction_box.png`
+  Programmable electrical junction box. It should read as a closeable routing/control component.
+* `assets/tiles/valve.png`
+  Programmable pipe or duct valve. It should have a clear open/closed control identity.
+* `assets/tiles/interior_wall.png`
+  Interior wall overlay tile that blocks walking and atmosphere flow without acting like a major system component.
+* `assets/tiles/o2_generator.png`
+  Oxygen generator component that produces oxygen resource for ducts or storage.
+* `assets/tiles/o2_canister_storage.png`
+  Oxygen storage component for canisters or tanks.
+
 Variant sprite expectations:
 
 * The runtime currently falls back to family sprites such as `reactor.png` and `battery.png` for upgraded variants.
@@ -62,3 +92,6 @@ Variant sprite expectations:
   * `assets/tiles/turret_ballistic.png`
   * `assets/tiles/shield_radial.png`
   * `assets/tiles/shield_directional.png`
+  * `assets/tiles/cargo_raw_salvage.png`
+  * `assets/tiles/cargo_repair_charge.png`
+  * `assets/tiles/cargo_o2_canister.png`

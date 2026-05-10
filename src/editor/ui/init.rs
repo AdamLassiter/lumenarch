@@ -11,6 +11,7 @@ use crate::{
     },
     state::{
         ArchEditorState,
+        EditorLayer,
         EditorMode,
         EditorPointerState,
         EditorSelectionState,
@@ -103,12 +104,17 @@ pub(crate) fn initialize_editor_ship(
     }
 
     tool_state.tool_mode = EditorToolMode::Build;
-    tool_state.selected_kind = ModuleKind::Hull;
-    tool_state.selected_variant = ModuleVariant::default_for_kind(ModuleKind::Hull);
+    tool_state.active_layer = EditorLayer::Underlay;
+    tool_state.selected_foundation_kind = crate::ship::ShipFoundationKind::Floor;
+    tool_state.selected_kind = ModuleKind::Core;
+    tool_state.selected_variant = ModuleVariant::default_for_kind(ModuleKind::Core);
     tool_state.selected_rotation = 0;
     tool_state.selected_channel = 0;
+    tool_state.ignore_component_limits = false;
     selection_state.selected_module_ids.clear();
+    selection_state.selected_foundation_ids.clear();
     selection_state.clipboard.clear();
+    selection_state.foundation_clipboard.clear();
     selection_state.marquee_origin = None;
     selection_state.marquee_current = None;
     pointer_state.last_build_cell = None;

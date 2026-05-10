@@ -15,6 +15,7 @@ use crate::{
             ModuleRuntimeState,
             PlayerShip,
             ProcessorModule,
+            ReactorCommandState,
             RuntimeArchComputer,
             RuntimeShipModule,
             ShipArchCommandState,
@@ -41,8 +42,11 @@ pub(crate) struct ArchSnapshot {
     pub(crate) ship_power_reserve: Fx,
     pub(crate) ship_average_heat: Fx,
     pub(crate) mission_threat: Fx,
+    pub(crate) reactor_reaction_rate: Fx,
+    pub(crate) reactor_turbine_load: Fx,
     pub(crate) reactor_heat: Fx,
     pub(crate) reactor_instability: Fx,
+    pub(crate) reactor_power_output: Fx,
     pub(crate) storage_raw_salvage: Fx,
     pub(crate) storage_repair_charge: Fx,
     pub(crate) processor_raw_salvage: Fx,
@@ -121,6 +125,7 @@ pub(crate) fn run_arch_automation(
         Option<&mut RuntimeArchComputer>,
         Option<&StorageModule>,
         Option<&ProcessorModule>,
+        Option<&ReactorCommandState>,
         Option<&DetectorModule>,
         Option<&DestroyedModule>,
     )>,
@@ -172,6 +177,7 @@ pub(crate) fn run_arch_automation(
             arch_runtime,
             _storage,
             _processor,
+            _reactor,
             _detector,
             destroyed,
         )) = module_query.get_mut(child)
@@ -312,7 +318,7 @@ pub(crate) fn run_arch_automation(
 
     if aggregate.reactor_bias > Fx::from_num(0) {
         for child in children.iter() {
-            let Ok((_, runtime_module, mut runtime_state, _, _, _, _, _, destroyed)) =
+            let Ok((_, runtime_module, mut runtime_state, _, _, _, _, _, _, destroyed)) =
                 module_query.get_mut(child)
             else {
                 continue;
@@ -349,6 +355,7 @@ pub(crate) fn build_lumen_snapshot(
         Option<&mut RuntimeArchComputer>,
         Option<&StorageModule>,
         Option<&ProcessorModule>,
+        Option<&ReactorCommandState>,
         Option<&DetectorModule>,
         Option<&DestroyedModule>,
     )>,
@@ -391,6 +398,7 @@ pub(crate) fn build_snapshot(
         Option<&mut RuntimeArchComputer>,
         Option<&StorageModule>,
         Option<&ProcessorModule>,
+        Option<&ReactorCommandState>,
         Option<&DetectorModule>,
         Option<&DestroyedModule>,
     )>,
@@ -840,8 +848,11 @@ fn read_register(
         ArchRegister::ShipPowerReserve => snapshot.ship_power_reserve,
         ArchRegister::ShipAverageHeat => snapshot.ship_average_heat,
         ArchRegister::MissionThreat => snapshot.mission_threat,
+        ArchRegister::ReactorReactionRate => snapshot.reactor_reaction_rate,
+        ArchRegister::ReactorTurbineLoad => snapshot.reactor_turbine_load,
         ArchRegister::ReactorHeat => snapshot.reactor_heat,
         ArchRegister::ReactorInstability => snapshot.reactor_instability,
+        ArchRegister::ReactorPowerOutput => snapshot.reactor_power_output,
         ArchRegister::StorageRawSalvage => snapshot.storage_raw_salvage,
         ArchRegister::StorageRepairCharge => snapshot.storage_repair_charge,
         ArchRegister::ProcessorRawSalvage => snapshot.processor_raw_salvage,

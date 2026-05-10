@@ -170,6 +170,7 @@ pub(crate) fn spawn_runtime_module(
                             ModuleVariant::AmmoRack => {
                                 inventory.ammunition = spec.storage_capacity * 2
                             }
+                            ModuleVariant::O2Canister => inventory.oxygen = spec.storage_capacity,
                             _ => {}
                         }
                         inventory
@@ -177,7 +178,13 @@ pub(crate) fn spawn_runtime_module(
                     damaged_components: Vec::new(),
                     accepts_fuel: module.variant == ModuleVariant::FuelTank,
                     accepts_ammunition: module.variant == ModuleVariant::AmmoRack,
-                    accepts_general: module.variant == ModuleVariant::GeneralCargo,
+                    accepts_general: matches!(
+                        module.variant,
+                        ModuleVariant::GeneralCargo
+                            | ModuleVariant::RawSalvageCrate
+                            | ModuleVariant::RepairChargeRack
+                    ),
+                    accepts_oxygen: module.variant == ModuleVariant::O2Canister,
                 },
                 StorageCommandState {
                     allow_intake: module.defaults.storage_allow_intake,
@@ -196,6 +203,7 @@ pub(crate) fn spawn_runtime_module(
                     accepts_fuel: false,
                     accepts_ammunition: false,
                     accepts_general: true,
+                    accepts_oxygen: false,
                 },
                 StorageCommandState {
                     allow_intake: module.defaults.storage_allow_intake,
@@ -221,6 +229,7 @@ pub(crate) fn spawn_runtime_module(
                         StoredResourceKind::RepairCharge => ResourceKind::RepairCharge,
                         StoredResourceKind::Fuel => ResourceKind::Fuel,
                         StoredResourceKind::Ammunition => ResourceKind::Ammunition,
+                        StoredResourceKind::Oxygen => ResourceKind::Oxygen,
                     },
                 },
             );
@@ -379,6 +388,27 @@ pub(crate) fn spawn_runtime_module(
                 },
             ));
         }
+        ModuleKind::O2Generator => {
+            entity.insert((
+                PowerConsumer { draw: 1 },
+                StorageModule {
+                    capacity: spec.storage_capacity.max(4),
+                    inventory: {
+                        let mut inventory = ResourceInventory::default();
+                        inventory.oxygen = spec.storage_capacity.max(4);
+                        inventory
+                    },
+                    damaged_components: Vec::new(),
+                    accepts_fuel: false,
+                    accepts_ammunition: false,
+                    accepts_general: false,
+                    accepts_oxygen: true,
+                },
+                StorageCommandState {
+                    allow_intake: module.defaults.storage_allow_intake,
+                },
+            ));
+        }
         _ => {
             entity.with_children(|parent| {
                 spawn_work_effect_children(parent);
@@ -470,14 +500,19 @@ fn module_field_emitter(kind: ModuleKind, balance: &BalanceConfig) -> ModuleFiel
             electrical_output: Fx::from_num(1.2),
             grounding_output: Fx::from_num(0.5),
         },
-        ModuleKind::Core | ModuleKind::Cockpit | ModuleKind::Cargo | ModuleKind::Interior => {
-            ModuleFieldEmitter {
-                heat_output: Fx::from_num(0),
-                cooling_output: Fx::from_num(0),
-                electrical_output: Fx::from_num(0),
-                grounding_output: Fx::from_num(balance.fields.emitter_generic_grounding),
-            }
-        }
+        ModuleKind::Core
+        | ModuleKind::Cockpit
+        | ModuleKind::Cargo
+        | ModuleKind::Interior
+        | ModuleKind::InteriorWall
+        | ModuleKind::JunctionBox
+        | ModuleKind::Valve
+        | ModuleKind::O2Generator => ModuleFieldEmitter {
+            heat_output: Fx::from_num(0),
+            cooling_output: Fx::from_num(0),
+            electrical_output: Fx::from_num(0),
+            grounding_output: Fx::from_num(balance.fields.emitter_generic_grounding),
+        },
     }
 }
 

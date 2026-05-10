@@ -135,36 +135,7 @@ pub(super) fn editor_station_button_label(
 
 pub(super) fn editor_station_readouts(module: &ShipModule) -> Vec<EditorReadout> {
     match module.kind {
-        ModuleKind::Reactor => vec![
-            editor_bar(
-                module,
-                "RRF",
-                "Reaction",
-                module.defaults.reaction_rate_milli as f32 / 10.0,
-                Color::srgb(0.94, 0.42, 0.24),
-            ),
-            editor_bar(
-                module,
-                "RRT",
-                "Turbine",
-                module.defaults.turbine_load_milli as f32 / 10.0,
-                Color::srgb(0.34, 0.74, 0.94),
-            ),
-            editor_light(
-                module,
-                "RRS",
-                "Default Stability",
-                "Nominal",
-                Color::srgb(0.34, 0.78, 0.46),
-            ),
-            editor_light(
-                module,
-                "RRP",
-                "Startup Output",
-                "Derived in encounter",
-                Color::srgb(0.86, 0.74, 0.30),
-            ),
-        ],
+        ModuleKind::Reactor => editor_reactor_readouts(module),
         ModuleKind::Turret => vec![
             editor_light(
                 module,
@@ -352,16 +323,59 @@ pub(super) fn editor_station_readouts(module: &ShipModule) -> Vec<EditorReadout>
     }
 }
 
-fn editor_bar(
+fn editor_reactor_readouts(module: &ShipModule) -> Vec<EditorReadout> {
+    let reaction = module.defaults.reaction_rate_milli as f32 / 1000.0;
+    let turbine = module.defaults.turbine_load_milli as f32 / 1000.0;
+    let heat = (reaction * 4.8 - turbine * 2.2).max(0.0);
+    let power_output = (reaction * 3.0 + turbine * 9.0).min(12.0);
+
+    vec![
+        editor_bar_with_value(
+            module,
+            "RRF",
+            "Reaction",
+            format!("{:.0}%", reaction * 100.0),
+            reaction * 100.0,
+            Color::srgb(0.94, 0.42, 0.24),
+        ),
+        editor_bar_with_value(
+            module,
+            "RRT",
+            "Turbine",
+            format!("{:.0}%", turbine * 100.0),
+            turbine * 100.0,
+            Color::srgb(0.34, 0.74, 0.94),
+        ),
+        editor_bar_with_value(
+            module,
+            "RRH",
+            "Heat",
+            format!("{heat:.1}"),
+            heat / 16.0 * 100.0,
+            Color::srgb(0.96, 0.50, 0.24),
+        ),
+        editor_bar_with_value(
+            module,
+            "RRP",
+            "Output",
+            format!("{power_output:.1}"),
+            power_output / 20.0 * 100.0,
+            Color::srgb(0.86, 0.74, 0.30),
+        ),
+    ]
+}
+
+fn editor_bar_with_value(
     module: &ShipModule,
     register: &str,
     label: &str,
+    value: String,
     percent: f32,
     color: Color,
 ) -> EditorReadout {
     EditorReadout {
         label: format!("{register}{}  {label}", module.effective_channel()),
-        value: format!("{:.0}%", percent),
+        value,
         visual: EditorReadoutVisual::Bar {
             percent: percent.clamp(0.0, 100.0),
             color,

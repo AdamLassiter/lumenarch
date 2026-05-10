@@ -8,13 +8,14 @@ mod types;
 
 pub use self::{
     arch::{ArchProgram, ArchProgramTemplate},
-    definition::{ShipDefinition, ShipModule},
+    definition::{ShipDefinition, ShipFoundationTile, ShipModule},
     lumen::{LumenProgram, LumenProgramTemplate},
     spec::ModuleSpec,
     types::{
         ModuleDefaultState,
         ModuleKind,
         ModuleVariant,
+        ShipFoundationKind,
         StoredProcessorRecipe,
         StoredResourceKind,
     },

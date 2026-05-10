@@ -9,6 +9,7 @@ use crate::{
             DetectorModule,
             ModuleRuntimeState,
             ProcessorModule,
+            ReactorCommandState,
             RuntimeArchComputer,
             RuntimeShipModule,
             ShipDamageSensorState,
@@ -41,6 +42,7 @@ pub(super) fn build_lumen_snapshot(
         Option<&mut RuntimeArchComputer>,
         Option<&StorageModule>,
         Option<&ProcessorModule>,
+        Option<&ReactorCommandState>,
         Option<&DetectorModule>,
         Option<&DestroyedModule>,
     )>,
@@ -60,6 +62,7 @@ pub(super) fn build_lumen_snapshot(
             _,
             storage,
             processor,
+            _reactor,
             detector,
             destroyed,
         )) = module_query.get(child)
@@ -106,6 +109,7 @@ pub(super) fn build_snapshot(
         Option<&mut RuntimeArchComputer>,
         Option<&StorageModule>,
         Option<&ProcessorModule>,
+        Option<&ReactorCommandState>,
         Option<&DetectorModule>,
         Option<&DestroyedModule>,
     )>,
@@ -114,6 +118,9 @@ pub(super) fn build_snapshot(
     let mut live_modules = 0i32;
     let mut reactor_heat = Fx::from_num(0);
     let mut reactor_instability = Fx::from_num(0);
+    let mut reactor_reaction_rate = Fx::from_num(0);
+    let mut reactor_turbine_load = Fx::from_num(0);
+    let mut reactor_power_output = Fx::from_num(0);
     let mut storage_raw = Fx::from_num(0);
     let mut storage_charge = Fx::from_num(0);
     let mut processor_raw = Fx::from_num(0);
@@ -126,8 +133,18 @@ pub(super) fn build_snapshot(
     let mut logistics_detector: Option<&DetectorModule> = None;
 
     for child in children.iter() {
-        let Ok((_, runtime_module, runtime_state, _, _, storage, processor, detector, destroyed)) =
-            module_query.get(child)
+        let Ok((
+            _,
+            runtime_module,
+            runtime_state,
+            _,
+            _,
+            storage,
+            processor,
+            reactor,
+            detector,
+            destroyed,
+        )) = module_query.get(child)
         else {
             continue;
         };
@@ -140,6 +157,11 @@ pub(super) fn build_snapshot(
             ModuleKind::Reactor => {
                 reactor_heat = reactor_heat.max(runtime_state.current_heat);
                 reactor_instability = reactor_instability.max(runtime_state.electrical_instability);
+                if let Some(reactor) = reactor {
+                    reactor_reaction_rate = reactor_reaction_rate.max(reactor.reaction_rate);
+                    reactor_turbine_load = reactor_turbine_load.max(reactor.turbine_load);
+                    reactor_power_output = reactor_power_output.max(reactor.power_output);
+                }
             }
             ModuleKind::Cargo | ModuleKind::Airlock => {
                 if let Some(storage) = storage {
@@ -187,8 +209,11 @@ pub(super) fn build_snapshot(
         } else {
             Fx::from_num(0)
         },
+        reactor_reaction_rate,
+        reactor_turbine_load,
         reactor_heat,
         reactor_instability,
+        reactor_power_output,
         storage_raw_salvage: storage_raw,
         storage_repair_charge: storage_charge,
         processor_raw_salvage: processor_raw,

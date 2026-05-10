@@ -108,5 +108,6 @@ pub(crate) fn resource_kind_label(kind: ResourceKind) -> &'static str {
         ResourceKind::RepairCharge => "repair charge",
         ResourceKind::Fuel => "fuel",
         ResourceKind::Ammunition => "ammunition",
+        ResourceKind::Oxygen => "oxygen",
     }
 }

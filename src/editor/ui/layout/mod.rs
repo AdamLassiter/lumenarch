@@ -5,8 +5,15 @@ mod toolbox;
 use bevy::prelude::*;
 pub(crate) use station_panel::cleanup_editor_entities;
 use station_panel::{enemy_entry_label, station_actions, station_button_default_label};
-pub(crate) use status_updates::{update_editor_module_overlay, update_editor_status_text};
+pub(crate) use status_updates::{
+    sync_editor_toolbox_layer_sections,
+    update_editor_module_overlay,
+    update_editor_status_text,
+};
 use toolbox::{
+    foundation_toolbox_groups,
+    spawn_foundation_button_grid,
+    spawn_layer_button,
     spawn_select_action_button,
     spawn_tool_mode_button,
     spawn_variant_button_grid,
@@ -28,15 +35,18 @@ use crate::{
     UI_PANEL_RADIUS,
     UI_TITLE_FONT_SIZE,
     state::{
+        ControlsHelpPanel,
         EditingCleanup,
         EditorAutoHullButton,
         EditorBuildSection,
         EditorCopySelectionButton,
         EditorDeleteSelectionButton,
+        EditorLayer,
         EditorMissionReportButton,
         EditorMissionReportButtonText,
         EditorMissionReportText,
         EditorMode,
+        EditorOverlayBuildSection,
         EditorPasteSelectionButton,
         EditorPlacementBlocker,
         EditorRoot,
@@ -53,6 +63,7 @@ use crate::{
         EditorToolboxScrollViewport,
         EditorToolboxTooltipText,
         EditorUiState,
+        EditorUnderlayBuildSection,
         EnemyEditorState,
         EnemyNewButton,
         EnemyNextButton,
@@ -170,6 +181,29 @@ pub(crate) fn spawn_editor_ui(
                     });
 
                 toolbox
+                    .spawn(Node {
+                        width: Val::Percent(100.0),
+                        column_gap: Val::Px(8.0),
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        spawn_layer_button(
+                            row,
+                            "Underlay",
+                            EditorLayer::Underlay,
+                            tool_state.active_layer,
+                            &mono_font,
+                        );
+                        spawn_layer_button(
+                            row,
+                            "Overlay",
+                            EditorLayer::Overlay,
+                            tool_state.active_layer,
+                            &mono_font,
+                        );
+                    });
+
+                toolbox
                     .spawn((
                         Node {
                             width: Val::Percent(100.0),
@@ -210,27 +244,83 @@ pub(crate) fn spawn_editor_ui(
                                         EditorBuildSection,
                                     ))
                                     .with_children(|build| {
-                                        for (title, entries) in toolbox_groups() {
-                                            build.spawn((
-                                                Text::new(title),
-                                                TextFont {
-                                                    font: mono_font.clone(),
-                                                    font_size: 15.0,
+                                        build
+                                            .spawn((
+                                                Node {
+                                                    display: if tool_state.active_layer
+                                                        == EditorLayer::Underlay
+                                                    {
+                                                        Display::Flex
+                                                    } else {
+                                                        Display::None
+                                                    },
+                                                    flex_direction: FlexDirection::Column,
+                                                    row_gap: Val::Px(14.0),
                                                     ..default()
                                                 },
-                                                TextColor(Color::srgb(0.74, 0.80, 0.88)),
-                                            ));
-                                            spawn_variant_button_grid(
-                                                build,
-                                                &asset_server,
-                                                &mono_font,
-                                                editor_session.mode,
-                                                &progression,
-                                                tool_state.selected_kind,
-                                                tool_state.selected_variant,
-                                                entries,
-                                            );
-                                        }
+                                                EditorUnderlayBuildSection,
+                                            ))
+                                            .with_children(|underlay| {
+                                                for (title, entries) in foundation_toolbox_groups() {
+                                                    underlay.spawn((
+                                                        Text::new(title),
+                                                        TextFont {
+                                                            font: mono_font.clone(),
+                                                            font_size: 15.0,
+                                                            ..default()
+                                                        },
+                                                        TextColor(Color::srgb(0.74, 0.80, 0.88)),
+                                                    ));
+                                                    spawn_foundation_button_grid(
+                                                        underlay,
+                                                        &asset_server,
+                                                        &mono_font,
+                                                        tool_state.selected_foundation_kind,
+                                                        entries,
+                                                    );
+                                                }
+                                            });
+
+                                        build
+                                            .spawn((
+                                                Node {
+                                                    display: if tool_state.active_layer
+                                                        == EditorLayer::Overlay
+                                                    {
+                                                        Display::Flex
+                                                    } else {
+                                                        Display::None
+                                                    },
+                                                    flex_direction: FlexDirection::Column,
+                                                    row_gap: Val::Px(14.0),
+                                                    ..default()
+                                                },
+                                                EditorOverlayBuildSection,
+                                            ))
+                                            .with_children(|overlay| {
+                                                for (title, entries) in toolbox_groups() {
+                                                    overlay.spawn((
+                                                        Text::new(title),
+                                                        TextFont {
+                                                            font: mono_font.clone(),
+                                                            font_size: 15.0,
+                                                            ..default()
+                                                        },
+                                                        TextColor(Color::srgb(0.74, 0.80, 0.88)),
+                                                    ));
+                                                    spawn_variant_button_grid(
+                                                        overlay,
+                                                        &asset_server,
+                                                        &mono_font,
+                                                        editor_session.mode,
+                                                        &progression,
+                                                        tool_state.ignore_component_limits,
+                                                        tool_state.selected_kind,
+                                                        tool_state.selected_variant,
+                                                        entries,
+                                                    );
+                                                }
+                                            });
                                     });
 
                                 content
@@ -415,6 +505,7 @@ pub(crate) fn spawn_editor_ui(
                         Text::new(editor_status_line(
                             editor_session.mode,
                             tool_state.tool_mode,
+                            tool_state.active_layer,
                             &enemy_entry_label(
                                 &editor_session,
                                 &enemy_editor_state,
@@ -422,9 +513,11 @@ pub(crate) fn spawn_editor_ui(
                             ),
                             &editor_ship.ship.name,
                             &tool_state.selected_kind,
+                            tool_state.selected_foundation_kind,
                             tool_state.selected_variant,
                             tool_state.selected_rotation,
                             tool_state.selected_channel,
+                            tool_state.ignore_component_limits,
                             editor_ship.ship.modules.len(),
                             progression.scrap,
                             &progression,
@@ -773,6 +866,7 @@ pub(crate) fn spawn_editor_ui(
                     position_type: PositionType::Absolute,
                     left: Val::Px(16.0),
                     bottom: Val::Px(16.0),
+                    display: Display::None,
                     padding: UiRect::all(Val::Px(12.0)),
                     max_width: Val::Px(320.0),
                     border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
@@ -780,13 +874,14 @@ pub(crate) fn spawn_editor_ui(
                 },
                 BackgroundColor(Color::srgba(0.08, 0.10, 0.15, 0.92)),
                 EditorPlacementBlocker,
+                ControlsHelpPanel,
             ))
             .with_children(|panel| {
                 panel.spawn((
                     Text::new(
                         match editor_session.mode {
-                            EditorMode::Player => "Refit Controls\nBuild mode: left drag place, right drag erase\nSelect mode: drag marquee, arrows move group, Ctrl+C / Ctrl+V copy and paste, Delete removes, H runs Auto Hull\nE: inspect hovered component\nQ: close component console\nR: rotate build variant clockwise\nZ / X: previous / next variant\nT: repair one damaged selected build variant\nC / V: channel - / + in build mode\nScroll over toolbox: browse parts\nScroll over grid: zoom\nMiddle drag: pan view\nF5 save ship  |  F9 reload ship\nTab: return to station",
-                            EditorMode::Enemy => "Enemy Editor Controls\nUnlimited component supply across all variants\nBuild mode: left drag place, right drag erase\nSelect mode: drag marquee, arrows move group, Ctrl+C / Ctrl+V copy and paste, Delete removes, H runs Auto Hull\nE: inspect hovered component\nQ: close component console\nR: rotate build variant clockwise\nZ / X: previous / next variant\nC / V: channel - / + in build mode\nScroll over toolbox: browse parts\nScroll over grid: zoom\nMiddle drag: pan view\nF5 save library  |  F9 reload library\n[ / ] cycle entry  |  N new enemy\nTab: return to menu",
+                            EditorMode::Player => "Refit Controls\nBuild mode: left drag place, right drag erase\nSelect mode: drag marquee, arrows move group, Ctrl+C / Ctrl+V copy and paste, Delete removes, H runs Auto Hull\nE: inspect hovered component\nQ: close component console\nR: rotate build variant clockwise\nZ / X: previous / next variant\nT: repair one damaged selected build variant\nC / V: channel - / + in build mode\nF10: ignore component limits\nScroll over toolbox: browse parts\nScroll over grid: zoom\nMiddle drag: pan view\nF5 save ship  |  F9 reload ship\nTab: return to station",
+                            EditorMode::Enemy => "Enemy Editor Controls\nUnlimited component supply across all variants\nBuild mode: left drag place, right drag erase\nSelect mode: drag marquee, arrows move group, Ctrl+C / Ctrl+V copy and paste, Delete removes, H runs Auto Hull\nE: inspect hovered component\nQ: close component console\nR: rotate build variant clockwise\nZ / X: previous / next variant\nC / V: channel - / + in build mode\nF10: ignore component limits\nScroll over toolbox: browse parts\nScroll over grid: zoom\nMiddle drag: pan view\nF5 save library  |  F9 reload library\n[ / ] cycle entry  |  N new enemy\nTab: return to menu",
                         },
                     ),
                     TextFont {

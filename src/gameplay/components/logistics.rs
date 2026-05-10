@@ -17,6 +17,7 @@ pub(crate) enum ResourceKind {
     RepairCharge,
     Fuel,
     Ammunition,
+    Oxygen,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -25,6 +26,7 @@ pub(crate) struct ResourceInventory {
     pub(crate) repair_charge: u32,
     pub(crate) fuel: u32,
     pub(crate) ammunition: u32,
+    pub(crate) oxygen: u32,
 }
 
 impl ResourceInventory {
@@ -34,6 +36,7 @@ impl ResourceInventory {
             ResourceKind::RepairCharge => self.repair_charge,
             ResourceKind::Fuel => self.fuel,
             ResourceKind::Ammunition => self.ammunition,
+            ResourceKind::Oxygen => self.oxygen,
         }
     }
 
@@ -43,6 +46,7 @@ impl ResourceInventory {
             ResourceKind::RepairCharge => self.repair_charge += amount,
             ResourceKind::Fuel => self.fuel += amount,
             ResourceKind::Ammunition => self.ammunition += amount,
+            ResourceKind::Oxygen => self.oxygen += amount,
         }
     }
 
@@ -54,12 +58,13 @@ impl ResourceInventory {
             ResourceKind::RepairCharge => self.repair_charge -= taken,
             ResourceKind::Fuel => self.fuel -= taken,
             ResourceKind::Ammunition => self.ammunition -= taken,
+            ResourceKind::Oxygen => self.oxygen -= taken,
         }
         taken
     }
 
     pub(crate) fn total_units(self) -> u32 {
-        self.raw_salvage + self.repair_charge + self.fuel + self.ammunition
+        self.raw_salvage + self.repair_charge + self.fuel + self.ammunition + self.oxygen
     }
 }
 
@@ -71,6 +76,7 @@ pub(crate) struct StorageModule {
     pub(crate) accepts_fuel: bool,
     pub(crate) accepts_ammunition: bool,
     pub(crate) accepts_general: bool,
+    pub(crate) accepts_oxygen: bool,
 }
 
 impl StorageModule {
@@ -78,6 +84,7 @@ impl StorageModule {
         match kind {
             ResourceKind::Fuel => self.accepts_fuel,
             ResourceKind::Ammunition => self.accepts_ammunition,
+            ResourceKind::Oxygen => self.accepts_oxygen,
             ResourceKind::RawSalvage | ResourceKind::RepairCharge => self.accepts_general,
         }
     }

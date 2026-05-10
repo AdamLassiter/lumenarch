@@ -20,6 +20,10 @@ pub enum ModuleKind {
     Hull,
     HullInnerCorner,
     HullOuterCorner,
+    InteriorWall,
+    JunctionBox,
+    Valve,
+    O2Generator,
 }
 
 impl ModuleKind {
@@ -41,6 +45,10 @@ impl ModuleKind {
             Self::Hull => "hull",
             Self::HullInnerCorner => "hull_inner_corner",
             Self::HullOuterCorner => "hull_outer_corner",
+            Self::InteriorWall => "interior_wall",
+            Self::JunctionBox => "junction_box",
+            Self::Valve => "valve",
+            Self::O2Generator => "o2_generator",
         }
     }
 
@@ -57,6 +65,9 @@ impl ModuleKind {
                 | Self::Airlock
                 | Self::Turret
                 | Self::Shield
+                | Self::JunctionBox
+                | Self::Valve
+                | Self::O2Generator
         )
     }
 }
@@ -100,6 +111,9 @@ pub enum ModuleVariant {
     RadialShield,
     DirectionalShield,
     DroneBay,
+    RawSalvageCrate,
+    RepairChargeRack,
+    O2Canister,
 }
 
 impl ModuleVariant {
@@ -135,6 +149,9 @@ impl ModuleVariant {
             Self::RadialShield => "Radial Shield",
             Self::DirectionalShield => "Directional Shield",
             Self::DroneBay => "Drone Bay",
+            Self::RawSalvageCrate => "Raw Salvage Crate",
+            Self::RepairChargeRack => "Repair Charge Rack",
+            Self::O2Canister => "O2 Canister",
         }
     }
 
@@ -150,6 +167,9 @@ impl ModuleVariant {
             ModuleKind::Turret => Self::LaserTurret,
             ModuleKind::Shield => Self::RadialShield,
             ModuleKind::Airlock => Self::Standard,
+            ModuleKind::JunctionBox => Self::Standard,
+            ModuleKind::Valve => Self::Standard,
+            ModuleKind::O2Generator => Self::Standard,
             _ => Self::Standard,
         }
     }
@@ -175,11 +195,22 @@ impl ModuleVariant {
             ],
             ModuleKind::Processor => &[FabricatorSlow, FabricatorFast],
             ModuleKind::Reactor => &[Fission, Fusion],
-            ModuleKind::Cargo => &[GeneralCargo, FuelTank, AmmoRack],
+            ModuleKind::Cargo => &[
+                GeneralCargo,
+                RawSalvageCrate,
+                RepairChargeRack,
+                FuelTank,
+                AmmoRack,
+                O2Canister,
+            ],
             ModuleKind::Battery => &[BatteryCell, Capacitor],
             ModuleKind::Turret => &[LaserTurret, BallisticTurret],
             ModuleKind::Shield => &[RadialShield, DirectionalShield],
             ModuleKind::Airlock => &[Standard, DroneBay],
+            ModuleKind::JunctionBox
+            | ModuleKind::Valve
+            | ModuleKind::O2Generator
+            | ModuleKind::InteriorWall => &[Standard],
             _ => &[Standard],
         }
     }
@@ -210,6 +241,7 @@ pub enum StoredResourceKind {
     RepairCharge,
     Fuel,
     Ammunition,
+    Oxygen,
 }
 
 impl StoredResourceKind {
@@ -218,7 +250,8 @@ impl StoredResourceKind {
             Self::RawSalvage => Self::RepairCharge,
             Self::RepairCharge => Self::Fuel,
             Self::Fuel => Self::Ammunition,
-            Self::Ammunition => Self::RawSalvage,
+            Self::Ammunition => Self::Oxygen,
+            Self::Oxygen => Self::RawSalvage,
         }
     }
 
@@ -228,7 +261,76 @@ impl StoredResourceKind {
             Self::RepairCharge => "Repair Charge",
             Self::Fuel => "Fuel",
             Self::Ammunition => "Ammunition",
+            Self::Oxygen => "Oxygen",
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ShipFoundationKind {
+    Floor,
+    Hull,
+    HullInnerCorner,
+    HullOuterCorner,
+    Wire,
+    OxygenDuct,
+    PipeRawSalvage,
+    PipeRepairCharge,
+    PipeFuel,
+    PipeAmmunition,
+    PipeOxygen,
+}
+
+impl ShipFoundationKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Floor => "floor",
+            Self::Hull => "hull",
+            Self::HullInnerCorner => "hull_inner_corner",
+            Self::HullOuterCorner => "hull_outer_corner",
+            Self::Wire => "wire",
+            Self::OxygenDuct => "duct_oxygen",
+            Self::PipeRawSalvage => "pipe_raw_salvage",
+            Self::PipeRepairCharge => "pipe_repair_charge",
+            Self::PipeFuel => "pipe_fuel",
+            Self::PipeAmmunition => "pipe_ammunition",
+            Self::PipeOxygen => "pipe_oxygen",
+        }
+    }
+
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::Floor => "Floor",
+            Self::Hull => "Hull Edge",
+            Self::HullInnerCorner => "Hull Inner Corner",
+            Self::HullOuterCorner => "Hull Outer Corner",
+            Self::Wire => "Power Wire",
+            Self::OxygenDuct => "O2 Duct",
+            Self::PipeRawSalvage => "Raw Salvage Pipe",
+            Self::PipeRepairCharge => "Repair Charge Pipe",
+            Self::PipeFuel => "Fuel Pipe",
+            Self::PipeAmmunition => "Ammunition Pipe",
+            Self::PipeOxygen => "Oxygen Pipe",
+        }
+    }
+
+    pub fn is_route(self) -> bool {
+        matches!(
+            self,
+            Self::Wire
+                | Self::OxygenDuct
+                | Self::PipeRawSalvage
+                | Self::PipeRepairCharge
+                | Self::PipeFuel
+                | Self::PipeAmmunition
+                | Self::PipeOxygen
+        )
+    }
+}
+
+impl Default for ShipFoundationKind {
+    fn default() -> Self {
+        Self::Floor
     }
 }
 

@@ -9,6 +9,7 @@ use super::{
     ModuleKind,
     ModuleSpec,
     ModuleVariant,
+    ShipFoundationKind,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,9 +91,42 @@ impl ShipModule {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShipFoundationTile {
+    pub id: u64,
+    pub kind: ShipFoundationKind,
+    pub grid_x: i32,
+    pub grid_y: i32,
+    pub rotation_quadrants: u8,
+}
+
+impl ShipFoundationTile {
+    pub fn new(
+        id: u64,
+        kind: ShipFoundationKind,
+        grid_x: i32,
+        grid_y: i32,
+        rotation_quadrants: u8,
+    ) -> Self {
+        Self {
+            id,
+            kind,
+            grid_x,
+            grid_y,
+            rotation_quadrants: rotation_quadrants % 4,
+        }
+    }
+
+    pub fn display_name(&self) -> &'static str {
+        self.kind.display_name()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ShipDefinition {
     pub name: String,
+    #[serde(default)]
+    pub foundation_tiles: Vec<ShipFoundationTile>,
     pub modules: Vec<ShipModule>,
 }
 
@@ -101,8 +135,52 @@ impl ShipDefinition {
     pub fn empty(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
+            foundation_tiles: Vec::new(),
             modules: Vec::new(),
         }
+    }
+
+    pub fn core_only(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            foundation_tiles: vec![ShipFoundationTile::new(
+                1,
+                ShipFoundationKind::Floor,
+                0,
+                0,
+                0,
+            )],
+            modules: vec![ShipModule::new(1, ModuleKind::Core, 0, 0, 0)],
+        }
+    }
+
+    pub fn foundation_at(&self, grid_x: i32, grid_y: i32) -> Option<&ShipFoundationTile> {
+        self.foundation_tiles
+            .iter()
+            .find(|tile| tile.grid_x == grid_x && tile.grid_y == grid_y)
+    }
+
+    pub fn foundation_at_mut(
+        &mut self,
+        grid_x: i32,
+        grid_y: i32,
+    ) -> Option<&mut ShipFoundationTile> {
+        self.foundation_tiles
+            .iter_mut()
+            .find(|tile| tile.grid_x == grid_x && tile.grid_y == grid_y)
+    }
+
+    pub fn replace_foundation_tile(&mut self, tile: ShipFoundationTile) {
+        if let Some(existing) = self.foundation_at_mut(tile.grid_x, tile.grid_y) {
+            *existing = tile;
+        } else {
+            self.foundation_tiles.push(tile);
+        }
+    }
+
+    pub fn remove_foundation_at(&mut self, grid_x: i32, grid_y: i32) {
+        self.foundation_tiles
+            .retain(|tile| !(tile.grid_x == grid_x && tile.grid_y == grid_y));
     }
 
     pub fn module_at(&self, grid_x: i32, grid_y: i32) -> Option<&ShipModule> {
@@ -131,19 +209,27 @@ impl ShipDefinition {
     }
 
     pub fn bounds(&self) -> Option<(i32, i32, i32, i32)> {
-        let mut modules = self.modules.iter();
-        let first = modules.next()?;
+        let mut points = self
+            .modules
+            .iter()
+            .map(|module| (module.grid_x, module.grid_y))
+            .chain(
+                self.foundation_tiles
+                    .iter()
+                    .map(|tile| (tile.grid_x, tile.grid_y)),
+            );
+        let first = points.next()?;
 
-        let mut min_x = first.grid_x;
-        let mut max_x = first.grid_x;
-        let mut min_y = first.grid_y;
-        let mut max_y = first.grid_y;
+        let mut min_x = first.0;
+        let mut max_x = first.0;
+        let mut min_y = first.1;
+        let mut max_y = first.1;
 
-        for module in modules {
-            min_x = min_x.min(module.grid_x);
-            max_x = max_x.max(module.grid_x);
-            min_y = min_y.min(module.grid_y);
-            max_y = max_y.max(module.grid_y);
+        for (grid_x, grid_y) in points {
+            min_x = min_x.min(grid_x);
+            max_x = max_x.max(grid_x);
+            min_y = min_y.min(grid_y);
+            max_y = max_y.max(grid_y);
         }
 
         Some((min_x, max_x, min_y, max_y))
@@ -153,6 +239,15 @@ impl ShipDefinition {
         self.modules
             .iter()
             .map(|module| module.id)
+            .max()
+            .unwrap_or(0)
+            + 1
+    }
+
+    pub fn next_foundation_id(&self) -> u64 {
+        self.foundation_tiles
+            .iter()
+            .map(|tile| tile.id)
             .max()
             .unwrap_or(0)
             + 1
@@ -197,8 +292,6 @@ impl ShipDefinition {
     }
 
     pub fn validate_required_modules(&self) -> bool {
-        self.has_module_kind(ModuleKind::Core)
-            && self.has_module_kind(ModuleKind::Cockpit)
-            && self.fits_core_capacity()
+        self.has_module_kind(ModuleKind::Core) && self.fits_core_capacity()
     }
 }

@@ -234,6 +234,7 @@ mod tests {
             &mut ship,
             &mut progression,
             EditorMode::Player,
+            false,
             &mut selection_state,
             (4, 5),
         );
