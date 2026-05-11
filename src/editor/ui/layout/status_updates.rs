@@ -21,10 +21,12 @@ use crate::{
     state::{
         ArchEditorState,
         EditorBuildSection,
+        EditorComponentsBuildSection,
+        EditorHullBuildSection,
         EditorLayer,
+        EditorLogisticsBuildSection,
         EditorMissionReportButtonText,
         EditorMissionReportText,
-        EditorOverlayBuildSection,
         EditorSelectSection,
         EditorSelectionState,
         EditorSelectionSummaryText,
@@ -35,7 +37,6 @@ use crate::{
         EditorToolState,
         EditorToolboxTooltipText,
         EditorUiState,
-        EditorUnderlayBuildSection,
         EnemyEditorState,
         EnemyShipLibraryState,
         GameplayStationPanel,
@@ -61,6 +62,7 @@ use crate::{
     },
 };
 
+/// Refreshes editor HUD text and section visibility so the current tool, ship state, and selection stay legible.
 pub(crate) fn update_editor_status_text(
     editor_ship: Res<EditorShip>,
     editor_session: Res<EditorSessionState>,
@@ -180,24 +182,25 @@ pub(crate) fn update_editor_status_text(
     }
 }
 
+/// Shows only the active build layer section so logistics, hull, and component palettes do not compete visually.
+///
+/// SAFETY: Each toolbox section has its own marker component, and `ParamSet` ensures the three mutable node
+/// queries are accessed one at a time.
 pub(crate) fn sync_editor_toolbox_layer_sections(
     tool_state: Res<EditorToolState>,
-    mut underlay_sections: Query<&mut Node, With<EditorUnderlayBuildSection>>,
-    mut overlay_sections: Query<
-        &mut Node,
-        (
-            With<EditorOverlayBuildSection>,
-            Without<EditorUnderlayBuildSection>,
-        ),
-    >,
+    mut section_queries: ParamSet<(
+        Query<'_, '_, &'static mut Node, With<EditorLogisticsBuildSection>>,
+        Query<'_, '_, &'static mut Node, With<EditorHullBuildSection>>,
+        Query<'_, '_, &'static mut Node, With<EditorComponentsBuildSection>>,
+    )>,
 ) {
     if !tool_state.is_changed() {
         return;
     }
 
-    for mut node in &mut underlay_sections {
+    for mut node in &mut section_queries.p0() {
         node.display = if tool_state.tool_mode == EditorToolMode::Build
-            && tool_state.active_layer == EditorLayer::Underlay
+            && tool_state.active_layer == EditorLayer::Logistics
         {
             Display::Flex
         } else {
@@ -205,9 +208,19 @@ pub(crate) fn sync_editor_toolbox_layer_sections(
         };
     }
 
-    for mut node in &mut overlay_sections {
+    for mut node in &mut section_queries.p1() {
         node.display = if tool_state.tool_mode == EditorToolMode::Build
-            && tool_state.active_layer == EditorLayer::Overlay
+            && tool_state.active_layer == EditorLayer::Hull
+        {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+
+    for mut node in &mut section_queries.p2() {
+        node.display = if tool_state.tool_mode == EditorToolMode::Build
+            && tool_state.active_layer == EditorLayer::Components
         {
             Display::Flex
         } else {
@@ -216,6 +229,7 @@ pub(crate) fn sync_editor_toolbox_layer_sections(
     }
 }
 
+/// Syncs the editor-side station console overlay so module defaults and program text stay editable in context.
 pub(crate) fn update_editor_module_overlay(
     editor_ship: Res<EditorShip>,
     arch_editor_state: Res<ArchEditorState>,

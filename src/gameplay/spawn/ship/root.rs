@@ -6,6 +6,7 @@ use ggrs::PlayerHandle;
 use super::{
     interior::{build_atmosphere_tiles, build_interior_nodes},
     modules::spawn_runtime_module,
+    visuals::{ship_visual_center, spawn_foundation_visual},
 };
 use crate::{
     balance::BalanceConfig,
@@ -41,6 +42,7 @@ use crate::{
             PlayerShip,
             PlayerShipAssignment,
             PlayerSuit,
+            RuntimeFoundationVisual,
             ShipArchCommandState,
             ShipAtmosphereState,
             ShipAutomationMode,
@@ -150,6 +152,38 @@ fn accumulate_ship_variant_totals(ship: &ShipDefinition) -> ShipVariantTotals {
     totals
 }
 
+fn spawn_foundation_layer_visuals(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    ship: &ShipDefinition,
+    center_x: f32,
+    center_y: f32,
+) -> Vec<Entity> {
+    ship.foundation_tiles
+        .iter()
+        .chain(ship.hull_tiles.iter())
+        .map(|tile| {
+            spawn_foundation_visual(
+                commands,
+                asset_server,
+                ship,
+                tile,
+                center_x,
+                center_y,
+                (
+                    PlayingCleanup,
+                    RuntimeFoundationVisual {
+                        grid_x: tile.grid_x,
+                        grid_y: tile.grid_y,
+                        kind: tile.kind,
+                    },
+                ),
+            )
+        })
+        .collect()
+}
+
+/// Spawns the player's runtime ship so authored layouts become a live simulated vessel in encounters.
 pub(crate) fn spawn_runtime_ship(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -204,9 +238,7 @@ pub(crate) fn spawn_runtime_ship(
             .max(Fx::from_num(totals.turret_count.max(1))),
         balance,
     );
-    let (min_x, max_x, min_y, max_y) = ship.bounds().unwrap_or((0, 0, 0, 0));
-    let center_x = (min_x + max_x) as f32 * 0.5;
-    let center_y = (min_y + max_y) as f32 * 0.5;
+    let (center_x, center_y) = ship_visual_center(ship).unwrap_or((0.0, 0.0));
     let center_x_fixed = Fx::from_num(center_x);
     let center_y_fixed = Fx::from_num(center_y);
     let inertia_radius = ship
@@ -345,27 +377,27 @@ pub(crate) fn spawn_runtime_ship(
             local_position: FixedVec2::zero(),
         });
 
-    let child_entities: Vec<_> = ship
-        .modules
-        .iter()
-        .map(|module| {
-            spawn_runtime_module(
-                commands,
-                asset_server,
-                meshes,
-                reactor_materials,
-                engine_materials,
-                module,
-                balance,
-                center_x,
-                center_y,
-                center_x_fixed,
-                center_y_fixed,
-                wear_penalty,
-                false,
-            )
-        })
-        .collect();
+    let child_entities: Vec<_> =
+        spawn_foundation_layer_visuals(commands, asset_server, ship, center_x, center_y)
+            .into_iter()
+            .chain(ship.modules.iter().map(|module| {
+                spawn_runtime_module(
+                    commands,
+                    asset_server,
+                    meshes,
+                    reactor_materials,
+                    engine_materials,
+                    module,
+                    balance,
+                    center_x,
+                    center_y,
+                    center_x_fixed,
+                    center_y_fixed,
+                    wear_penalty,
+                    false,
+                )
+            }))
+            .collect();
 
     let mut spawn_nodes = interior_nodes.clone();
     spawn_nodes.sort_by_key(|node| {
@@ -611,9 +643,7 @@ pub(crate) fn spawn_hostile_ship(
             .max(Fx::from_num(totals.turret_count.max(1))),
         balance,
     );
-    let (min_x, max_x, min_y, max_y) = ship.bounds().unwrap_or((0, 0, 0, 0));
-    let center_x = (min_x + max_x) as f32 * 0.5;
-    let center_y = (min_y + max_y) as f32 * 0.5;
+    let (center_x, center_y) = ship_visual_center(ship).unwrap_or((0.0, 0.0));
     let center_x_fixed = Fx::from_num(center_x);
     let center_y_fixed = Fx::from_num(center_y);
     let inertia_radius = ship
@@ -698,27 +728,27 @@ pub(crate) fn spawn_hostile_ship(
         commands.entity(root_entity).insert(encounter_identity);
     }
 
-    let child_entities: Vec<_> = ship
-        .modules
-        .iter()
-        .map(|module| {
-            spawn_runtime_module(
-                commands,
-                asset_server,
-                meshes,
-                reactor_materials,
-                engine_materials,
-                module,
-                balance,
-                center_x,
-                center_y,
-                center_x_fixed,
-                center_y_fixed,
-                0,
-                true,
-            )
-        })
-        .collect();
+    let child_entities: Vec<_> =
+        spawn_foundation_layer_visuals(commands, asset_server, ship, center_x, center_y)
+            .into_iter()
+            .chain(ship.modules.iter().map(|module| {
+                spawn_runtime_module(
+                    commands,
+                    asset_server,
+                    meshes,
+                    reactor_materials,
+                    engine_materials,
+                    module,
+                    balance,
+                    center_x,
+                    center_y,
+                    center_x_fixed,
+                    center_y_fixed,
+                    0,
+                    true,
+                )
+            }))
+            .collect();
 
     commands
         .entity(root_entity)

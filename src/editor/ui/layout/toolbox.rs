@@ -26,8 +26,8 @@ use crate::{
     },
 };
 
-const TOOLBOX_GROUP_FOUNDATION: &[ShipFoundationKind] = &[
-    ShipFoundationKind::Floor,
+const TOOLBOX_GROUP_FOUNDATION: &[ShipFoundationKind] = &[ShipFoundationKind::Floor];
+const TOOLBOX_GROUP_HULL: &[ShipFoundationKind] = &[
     ShipFoundationKind::Hull,
     ShipFoundationKind::HullInnerCorner,
     ShipFoundationKind::HullOuterCorner,
@@ -41,6 +41,13 @@ const TOOLBOX_GROUP_ROUTES: &[ShipFoundationKind] = &[
     ShipFoundationKind::PipeAmmunition,
     ShipFoundationKind::PipeOxygen,
 ];
+const TOOLBOX_GROUP_HULL_FIXTURES: &[(ModuleKind, ModuleVariant)] = &[
+    (ModuleKind::Airlock, ModuleVariant::Standard),
+    (ModuleKind::Airlock, ModuleVariant::DroneBay),
+    (ModuleKind::Engine, ModuleVariant::Standard),
+    (ModuleKind::Turret, ModuleVariant::LaserTurret),
+    (ModuleKind::Turret, ModuleVariant::BallisticTurret),
+];
 const TOOLBOX_GROUP_COMMAND: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Core, ModuleVariant::BasicCore),
     (ModuleKind::Core, ModuleVariant::ExpandedCore),
@@ -48,18 +55,13 @@ const TOOLBOX_GROUP_COMMAND: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Cockpit, ModuleVariant::AdvancedHelm),
     (ModuleKind::Computer, ModuleVariant::Standard),
 ];
-const TOOLBOX_GROUP_LEGACY_STRUCTURE: &[(ModuleKind, ModuleVariant)] = &[
-    (ModuleKind::Interior, ModuleVariant::Standard),
-    (ModuleKind::Hull, ModuleVariant::Standard),
-    (ModuleKind::HullInnerCorner, ModuleVariant::Standard),
-    (ModuleKind::HullOuterCorner, ModuleVariant::Standard),
-];
+const TOOLBOX_GROUP_LEGACY_STRUCTURE: &[(ModuleKind, ModuleVariant)] =
+    &[(ModuleKind::Interior, ModuleVariant::Standard)];
 const TOOLBOX_GROUP_POWER: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Reactor, ModuleVariant::Fission),
     (ModuleKind::Reactor, ModuleVariant::Fusion),
     (ModuleKind::Battery, ModuleVariant::BatteryCell),
     (ModuleKind::Battery, ModuleVariant::Capacitor),
-    (ModuleKind::Engine, ModuleVariant::Standard),
 ];
 const TOOLBOX_GROUP_LOGISTICS: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Processor, ModuleVariant::FabricatorSlow),
@@ -70,8 +72,6 @@ const TOOLBOX_GROUP_LOGISTICS: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Cargo, ModuleVariant::FuelTank),
     (ModuleKind::Cargo, ModuleVariant::AmmoRack),
     (ModuleKind::Cargo, ModuleVariant::O2Canister),
-    (ModuleKind::Airlock, ModuleVariant::Standard),
-    (ModuleKind::Airlock, ModuleVariant::DroneBay),
 ];
 const TOOLBOX_GROUP_ENGINEERING: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::JunctionBox, ModuleVariant::Standard),
@@ -94,13 +94,12 @@ const TOOLBOX_GROUP_AUTOMATION: &[(ModuleKind, ModuleVariant)] = &[
     (ModuleKind::Detector, ModuleVariant::LogisticsBeacon),
 ];
 const TOOLBOX_GROUP_COMBAT: &[(ModuleKind, ModuleVariant)] = &[
-    (ModuleKind::Turret, ModuleVariant::LaserTurret),
-    (ModuleKind::Turret, ModuleVariant::BallisticTurret),
     (ModuleKind::Shield, ModuleVariant::RadialShield),
     (ModuleKind::Shield, ModuleVariant::DirectionalShield),
 ];
 
-pub(super) fn toolbox_groups() -> [(&'static str, &'static [(ModuleKind, ModuleVariant)]); 7] {
+pub(super) fn component_toolbox_groups()
+-> [(&'static str, &'static [(ModuleKind, ModuleVariant)]); 7] {
     [
         ("Command", TOOLBOX_GROUP_COMMAND),
         ("Legacy Structure", TOOLBOX_GROUP_LEGACY_STRUCTURE),
@@ -112,11 +111,26 @@ pub(super) fn toolbox_groups() -> [(&'static str, &'static [(ModuleKind, ModuleV
     ]
 }
 
-pub(super) fn foundation_toolbox_groups() -> [(&'static str, &'static [ShipFoundationKind]); 2] {
+pub(super) fn logistics_toolbox_groups() -> [(&'static str, &'static [ShipFoundationKind]); 2] {
     [
-        ("Foundation", TOOLBOX_GROUP_FOUNDATION),
+        ("Deck", TOOLBOX_GROUP_FOUNDATION),
         ("Routes", TOOLBOX_GROUP_ROUTES),
     ]
+}
+
+pub(super) fn hull_toolbox_groups() -> [(&'static str, HullToolboxGroup); 2] {
+    [
+        ("Hull", HullToolboxGroup::Foundations(TOOLBOX_GROUP_HULL)),
+        (
+            "Exterior Fixtures",
+            HullToolboxGroup::Modules(TOOLBOX_GROUP_HULL_FIXTURES),
+        ),
+    ]
+}
+
+pub(super) enum HullToolboxGroup {
+    Foundations(&'static [ShipFoundationKind]),
+    Modules(&'static [(ModuleKind, ModuleVariant)]),
 }
 
 pub(super) fn spawn_layer_button(
@@ -130,7 +144,7 @@ pub(super) fn spawn_layer_button(
         .spawn((
             Button,
             Node {
-                width: Val::Percent(50.0),
+                width: Val::Percent(33.33),
                 height: Val::Px(32.0),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,

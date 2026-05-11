@@ -20,6 +20,7 @@ use crate::{
     netcode::{self, LumenGgrsConfig},
 };
 
+/// Starts time-based repair and extraction work once players commit to a hold interaction.
 pub(crate) fn begin_held_interactions(
     mut events: MessageReader<BeginHeldInteraction>,
     mut player_query: Query<&mut HeldInteraction, With<ShipboardPlayer>>,
@@ -35,6 +36,7 @@ pub(crate) fn begin_held_interactions(
     }
 }
 
+/// Finishes held interactions when their timer completes so repairs and extraction actually resolve.
 pub(crate) fn complete_held_interactions(
     time: Res<Time>,
     session_inputs: Option<Res<PlayerInputs<LumenGgrsConfig>>>,

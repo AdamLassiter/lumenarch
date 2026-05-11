@@ -127,6 +127,8 @@ pub struct ShipDefinition {
     pub name: String,
     #[serde(default)]
     pub foundation_tiles: Vec<ShipFoundationTile>,
+    #[serde(default)]
+    pub hull_tiles: Vec<ShipFoundationTile>,
     pub modules: Vec<ShipModule>,
 }
 
@@ -136,6 +138,7 @@ impl ShipDefinition {
         Self {
             name: name.into(),
             foundation_tiles: Vec::new(),
+            hull_tiles: Vec::new(),
             modules: Vec::new(),
         }
     }
@@ -150,17 +153,18 @@ impl ShipDefinition {
                 0,
                 0,
             )],
+            hull_tiles: Vec::new(),
             modules: vec![ShipModule::new(1, ModuleKind::Core, 0, 0, 0)],
         }
     }
 
-    pub fn foundation_at(&self, grid_x: i32, grid_y: i32) -> Option<&ShipFoundationTile> {
+    pub fn logistics_at(&self, grid_x: i32, grid_y: i32) -> Option<&ShipFoundationTile> {
         self.foundation_tiles
             .iter()
             .find(|tile| tile.grid_x == grid_x && tile.grid_y == grid_y)
     }
 
-    pub fn foundation_at_mut(
+    pub fn logistics_at_mut(
         &mut self,
         grid_x: i32,
         grid_y: i32,
@@ -170,17 +174,62 @@ impl ShipDefinition {
             .find(|tile| tile.grid_x == grid_x && tile.grid_y == grid_y)
     }
 
-    pub fn replace_foundation_tile(&mut self, tile: ShipFoundationTile) {
-        if let Some(existing) = self.foundation_at_mut(tile.grid_x, tile.grid_y) {
+    pub fn replace_logistics_tile(&mut self, tile: ShipFoundationTile) {
+        if let Some(existing) = self.logistics_at_mut(tile.grid_x, tile.grid_y) {
             *existing = tile;
         } else {
             self.foundation_tiles.push(tile);
         }
     }
 
-    pub fn remove_foundation_at(&mut self, grid_x: i32, grid_y: i32) {
+    pub fn remove_logistics_at(&mut self, grid_x: i32, grid_y: i32) {
         self.foundation_tiles
             .retain(|tile| !(tile.grid_x == grid_x && tile.grid_y == grid_y));
+    }
+
+    pub fn hull_at(&self, grid_x: i32, grid_y: i32) -> Option<&ShipFoundationTile> {
+        self.hull_tiles
+            .iter()
+            .find(|tile| tile.grid_x == grid_x && tile.grid_y == grid_y)
+    }
+
+    pub fn hull_at_mut(&mut self, grid_x: i32, grid_y: i32) -> Option<&mut ShipFoundationTile> {
+        self.hull_tiles
+            .iter_mut()
+            .find(|tile| tile.grid_x == grid_x && tile.grid_y == grid_y)
+    }
+
+    pub fn replace_hull_tile(&mut self, tile: ShipFoundationTile) {
+        if let Some(existing) = self.hull_at_mut(tile.grid_x, tile.grid_y) {
+            *existing = tile;
+        } else {
+            self.hull_tiles.push(tile);
+        }
+    }
+
+    pub fn remove_hull_at(&mut self, grid_x: i32, grid_y: i32) {
+        self.hull_tiles
+            .retain(|tile| !(tile.grid_x == grid_x && tile.grid_y == grid_y));
+    }
+
+    pub fn foundation_at(&self, grid_x: i32, grid_y: i32) -> Option<&ShipFoundationTile> {
+        self.logistics_at(grid_x, grid_y)
+    }
+
+    pub fn foundation_at_mut(
+        &mut self,
+        grid_x: i32,
+        grid_y: i32,
+    ) -> Option<&mut ShipFoundationTile> {
+        self.logistics_at_mut(grid_x, grid_y)
+    }
+
+    pub fn replace_foundation_tile(&mut self, tile: ShipFoundationTile) {
+        self.replace_logistics_tile(tile);
+    }
+
+    pub fn remove_foundation_at(&mut self, grid_x: i32, grid_y: i32) {
+        self.remove_logistics_at(grid_x, grid_y);
     }
 
     pub fn module_at(&self, grid_x: i32, grid_y: i32) -> Option<&ShipModule> {
@@ -217,6 +266,11 @@ impl ShipDefinition {
                 self.foundation_tiles
                     .iter()
                     .map(|tile| (tile.grid_x, tile.grid_y)),
+            )
+            .chain(
+                self.hull_tiles
+                    .iter()
+                    .map(|tile| (tile.grid_x, tile.grid_y)),
             );
         let first = points.next()?;
 
@@ -247,6 +301,7 @@ impl ShipDefinition {
     pub fn next_foundation_id(&self) -> u64 {
         self.foundation_tiles
             .iter()
+            .chain(self.hull_tiles.iter())
             .map(|tile| tile.id)
             .max()
             .unwrap_or(0)

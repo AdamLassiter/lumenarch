@@ -1,5 +1,3 @@
-use bevy::prelude::*;
-
 use super::{FixedVec2, Fx, fx_ratio};
 use crate::{
     TILE_SIZE,
@@ -7,14 +5,6 @@ use crate::{
     gameplay::components::{ShipMovementModel, ShipPowerModel, ShipPowerState},
     ship::{ModuleKind, ModuleSpec, ModuleVariant, ShipModule},
 };
-
-pub(crate) fn module_local_translation(module: &ShipModule, center_x: f32, center_y: f32) -> Vec3 {
-    Vec3::new(
-        (module.grid_x as f32 - center_x) * TILE_SIZE,
-        -((module.grid_y as f32) - center_y) * TILE_SIZE,
-        1.0,
-    )
-}
 
 pub(crate) fn module_local_position(module: &ShipModule, center_x: Fx, center_y: Fx) -> FixedVec2 {
     FixedVec2::new(

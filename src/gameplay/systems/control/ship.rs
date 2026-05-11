@@ -11,6 +11,7 @@ use crate::{
     ship::arch::ArchProgram,
 };
 
+/// Converts cockpit, turret, reactor, and station inputs into module-level command state changes.
 pub(crate) fn update_station_command_input(
     time: Res<Time>,
     balance: Res<BalanceConfig>,
@@ -313,6 +314,7 @@ pub(crate) fn update_station_command_input(
     }
 }
 
+/// Applies requested thrust and turning inputs to the player ship's control state for simulation.
 pub(crate) fn apply_player_ship_controls(
     balance: Res<BalanceConfig>,
     time: Res<Time>,
@@ -403,6 +405,7 @@ pub(crate) fn apply_player_ship_controls(
     linear_velocity.value = linear_velocity.value.clamp_length(movement_model.max_speed);
 }
 
+/// Integrates player ship velocity and rotation so control intent becomes actual ship motion.
 pub(crate) fn integrate_player_ship_motion(
     time: Res<Time>,
     player_ship_query: Single<

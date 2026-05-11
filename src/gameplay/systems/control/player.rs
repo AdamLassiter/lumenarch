@@ -4,6 +4,7 @@ use crate::{
     ship::ModuleVariant,
 };
 
+/// Moves an interior player into cockpit control when they toggle into a focused station.
 pub(crate) fn toggle_shipboard_control_mode(
     decoded_commands: Res<netcode::DecodedPlayerCommands>,
     mission_query: Single<&MissionState, (With<PlayerShip>, With<ShipRoot>)>,
@@ -17,7 +18,7 @@ pub(crate) fn toggle_shipboard_control_mode(
         ),
         With<PlayerShipAssignment>,
     >,
-    module_query: Query<(Entity, &RuntimeShipModule, &ChildOf)>,
+    module_query: Query<(Entity, &RuntimeShipModule, Option<&ChildOf>)>,
 ) {
     let mission_state = mission_query.into_inner();
     if mission_state.failed || mission_state.completed {
@@ -35,20 +36,18 @@ pub(crate) fn toggle_shipboard_control_mode(
             continue;
         }
         if control_state.mode == ShipControlMode::Interior {
-            if current_station.kind != ModuleKind::Cockpit {
-                continue;
-            }
-            let Some(active_ship) = (match motion.frame {
+            let active_ship = match motion.frame {
                 PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
                 PlayerReferenceFrame::World => None,
-            }) else {
-                continue;
             };
             if let Some((entity, runtime_module, _)) =
                 module_query.iter().find(|(_, runtime_module, parent)| {
-                    parent.get() == active_ship
-                        && runtime_module.module_id == current_station.module_id
-                        && runtime_module.kind == ModuleKind::Cockpit
+                    runtime_module.kind == ModuleKind::Cockpit
+                        && active_ship.is_none_or(|ship_entity| {
+                            parent.is_none_or(|parent| parent.get() == ship_entity)
+                        })
+                        && (current_station.kind != ModuleKind::Cockpit
+                            || runtime_module.module_id == current_station.module_id)
                 })
             {
                 super::focus_station(
@@ -59,11 +58,19 @@ pub(crate) fn toggle_shipboard_control_mode(
                     StationFamily::Cockpit,
                     ShipControlMode::Cockpit,
                 );
+            } else {
+                control_state.mode = ShipControlMode::Cockpit;
+                control_state.focus_mode = StationFocusMode::Focused;
+                control_state.focused_entity = None;
+                control_state.focused_module_id = Some(current_station.module_id);
+                control_state.focused_kind = Some(ModuleKind::Cockpit);
+                control_state.focused_family = Some(StationFamily::Cockpit);
             }
         }
     }
 }
 
+/// Returns a focused player from a station back to free interior movement.
 pub(crate) fn exit_focused_station(
     decoded_commands: Res<netcode::DecodedPlayerCommands>,
     mut ship_query: Query<(
@@ -93,6 +100,7 @@ pub(crate) fn exit_focused_station(
     }
 }
 
+/// Reparents player motion between ship-local and world space so boarding and EVA stay coherent.
 pub(crate) fn update_player_reference_frame(
     ship_query: Query<
         (
@@ -162,6 +170,7 @@ pub(crate) fn update_player_reference_frame(
     }
 }
 
+/// Integrates player walking and EVA movement while respecting ship collision and atmosphere rules.
 pub(crate) fn move_shipboard_player(
     time: Res<Time>,
     balance: Res<BalanceConfig>,
@@ -307,6 +316,7 @@ pub(crate) fn move_shipboard_player(
     }
 }
 
+/// Projects gameplay motion back onto player sprites so movement is visible in the encounter view.
 pub(crate) fn sync_shipboard_player_visual(
     ship_query: Single<&ShipboardControlState, With<ObservedLocalPlayerMarker>>,
     mut player_query: Query<
@@ -364,6 +374,7 @@ pub(crate) fn sync_shipboard_player_visual(
     }
 }
 
+/// Keeps crew nameplates attached to their owners so players remain easy to identify in motion.
 pub(crate) fn sync_crew_name_labels(
     camera_query: Single<&GlobalTransform, (With<Camera2d>, With<MainCamera>)>,
     player_query: Query<
@@ -405,6 +416,7 @@ pub(crate) fn sync_crew_name_labels(
     }
 }
 
+/// Reparents player scene nodes when their reference frame changes so transforms stay stable.
 pub(crate) fn sync_player_reference_frame_parenting(
     mut commands: Commands,
     player_query: Single<
@@ -429,6 +441,7 @@ pub(crate) fn sync_player_reference_frame_parenting(
     }
 }
 
+/// Updates the currently occupied station metadata so interaction and HUD systems know player focus.
 pub(crate) fn update_current_station(
     balance: Res<BalanceConfig>,
     ship_query: Query<(Entity, &SimPosition, &SimRotation), With<ShipRoot>>,
@@ -462,11 +475,13 @@ pub(crate) fn update_current_station(
 
         let mut nearest = None;
         let mut nearest_distance_sq = None;
+        let mut saw_ship_module = false;
         let max_distance_sq = helpers::fixed_square(Fx::from_num(balance.player.interact_radius));
         for (runtime_module, parent) in &module_query {
             if parent.get() != active_ship {
                 continue;
             }
+            saw_ship_module = true;
             let world_position =
                 ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians);
             let distance_sq = motion.world_position.distance_sq(world_position);
@@ -479,6 +494,10 @@ pub(crate) fn update_current_station(
             }
         }
 
+        if !saw_ship_module {
+            continue;
+        }
+
         if let Some((module_id, kind)) = nearest {
             station.module_id = module_id;
             station.kind = kind;
@@ -489,6 +508,7 @@ pub(crate) fn update_current_station(
     }
 }
 
+/// Handles quick cargo pickup and drop-off at the player's current position for shipboard logistics.
 pub(crate) fn handle_player_cargo_interaction(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,

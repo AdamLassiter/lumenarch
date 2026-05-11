@@ -10,6 +10,7 @@ use crate::{
     },
 };
 
+/// Fires player-controlled weapons so cockpit and turret inputs turn into outgoing projectiles.
 pub(crate) fn fire_player_weapons(
     mut commands: Commands,
     balance: Res<BalanceConfig>,

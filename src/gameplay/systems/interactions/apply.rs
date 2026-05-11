@@ -29,6 +29,7 @@ use crate::gameplay::{
     helpers::Fx,
 };
 
+/// Applies queued interaction messages to modules so player intent changes game state deterministically.
 pub(crate) fn apply_module_interactions(
     mut instant_events: MessageReader<InteractWithModule>,
     mut complete_events: MessageReader<CompleteHeldInteraction>,

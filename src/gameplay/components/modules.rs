@@ -18,6 +18,13 @@ pub(crate) struct RuntimeShipModule {
     pub(crate) local_position: FixedVec2,
 }
 
+#[derive(Component, Clone, Copy)]
+pub(crate) struct RuntimeFoundationVisual {
+    pub(crate) grid_x: i32,
+    pub(crate) grid_y: i32,
+    pub(crate) kind: crate::ship::ShipFoundationKind,
+}
+
 #[derive(Component)]
 pub(crate) struct HostileShipModule;
 

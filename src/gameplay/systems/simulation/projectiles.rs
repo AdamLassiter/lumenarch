@@ -33,6 +33,7 @@ use crate::{
     ship::ModuleKind,
 };
 
+/// Advances projectile motion and lifetime so shots travel through the arena predictably.
 pub(crate) fn advance_projectiles(
     mut commands: Commands,
     time: Res<Time>,
@@ -51,6 +52,7 @@ pub(crate) fn advance_projectiles(
     }
 }
 
+/// Applies projectile impacts to ships and scenery so fired shots have gameplay consequences.
 pub(crate) fn handle_projectile_hits(
     mut commands: Commands,
     balance: Res<BalanceConfig>,

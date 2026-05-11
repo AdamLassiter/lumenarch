@@ -1,7 +1,6 @@
-use std::f32::consts::FRAC_PI_2;
-
 use bevy::prelude::*;
 
+use super::visuals::module_visual_z;
 use crate::{
     TILE_SIZE,
     balance::BalanceConfig,
@@ -48,14 +47,7 @@ use crate::{
             WeaponModule,
         },
         effects::{EngineFlameMaterial, ReactorGlowMaterial},
-        helpers::{
-            FixedVec2,
-            Fx,
-            module_integrity,
-            module_local_position,
-            module_local_translation,
-            sprite_path_for_kind,
-        },
+        helpers::{FixedVec2, Fx, module_integrity, module_local_position, sprite_path_for_kind},
     },
     ship::{
         ModuleKind,
@@ -70,6 +62,7 @@ use crate::{
     state::PlayingCleanup,
 };
 
+/// Spawns one runtime module entity with its visuals, state, and role-specific components for encounter play.
 pub(crate) fn spawn_runtime_module(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -92,8 +85,14 @@ pub(crate) fn spawn_runtime_module(
     let mut entity = commands.spawn((
         Sprite::from_image(asset_server.load(sprite_path_for_kind(&module.kind, module.variant))),
         Transform {
-            translation: module_local_translation(module, center_x, center_y),
-            rotation: Quat::from_rotation_z(-(module.rotation_quadrants as f32) * FRAC_PI_2),
+            translation: Vec3::new(
+                (module.grid_x as f32 - center_x) * TILE_SIZE,
+                -((module.grid_y as f32) - center_y) * TILE_SIZE,
+                module_visual_z(module.kind),
+            ),
+            rotation: Quat::from_rotation_z(
+                -(module.rotation_quadrants as f32) * std::f32::consts::FRAC_PI_2,
+            ),
             ..default()
         },
         RuntimeShipModule {

@@ -24,6 +24,7 @@ use crate::{
     ship::ModuleKind,
 };
 
+/// Finds the nearest valid module interaction for each player so contextual prompts feel immediate.
 pub(crate) fn detect_nearby_interactions(
     ship_query: Query<Option<&HostileShip>, With<ShipRoot>>,
     module_query: Query<(

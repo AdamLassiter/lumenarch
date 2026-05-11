@@ -17,6 +17,7 @@ use crate::{
     },
 };
 
+/// Moves focus into the clicked lobby textbox so keyboard editing goes to the intended field.
 pub(crate) fn focus_textbox_on_click(
     mut interaction_query: Query<
         (&Interaction, &TextBoxRoot),
@@ -33,6 +34,7 @@ pub(crate) fn focus_textbox_on_click(
     }
 }
 
+/// Applies keyboard text editing to the focused lobby field so session setup stays in-game.
 pub(crate) fn edit_lobby_textboxes(
     mut keyboard_events: MessageReader<KeyboardInput>,
     keys: Res<ButtonInput<KeyCode>>,
@@ -147,6 +149,7 @@ pub(crate) fn edit_lobby_textboxes(
     }
 }
 
+/// Rebuilds textbox text and caret visuals so the lobby editor stays in sync with state.
 pub(crate) fn update_lobby_textboxes(
     config: Res<netcode::SessionConfig>,
     local_profile: Res<LocalPlayerProfile>,

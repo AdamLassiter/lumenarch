@@ -65,7 +65,6 @@ pub(crate) use math::{
 pub(crate) use ship::{
     module_integrity,
     module_local_position,
-    module_local_translation,
     ship_movement_model_with_effective,
     ship_power_model_with_effective,
     update_ship_power_state,

@@ -64,6 +64,7 @@ pub(crate) struct LogisticsEndpointSnapshot {
     pub(crate) destroyed: bool,
 }
 
+/// Leaves salvage collection to boarding-cargo flow so shipboard recovery stays in one mechanic.
 pub(crate) fn collect_salvage(
     _commands: Commands,
     _balance: Res<BalanceConfig>,
@@ -85,6 +86,7 @@ pub(crate) fn collect_salvage(
     // Salvage recovery is handled through the boarding-era carried-cargo loop.
 }
 
+/// Advances manipulator transfers so logistics-capable modules can move resources between endpoints.
 pub(crate) fn run_logistics_transfers(
     time: Res<Time>,
     balance: Res<BalanceConfig>,
@@ -116,6 +118,7 @@ pub(crate) fn run_logistics_transfers(
         Option<&DestroyedModule>,
     )>,
 ) {
+    // SAFETY: Endpoint discovery is read-only in `p0`, and actual inventory mutation happens later in `p1`.
     let dt = fx_from_time_delta(&time);
     let (arch_commands, mut mission_state) = ship_query.into_inner();
     let logistics_mode = arch_commands.logistics_enabled;
@@ -291,6 +294,7 @@ pub(crate) fn run_logistics_transfers(
     }
 }
 
+/// Ticks processor modules so fabrication recipes progress, stall, or complete based on inventory and power.
 pub(crate) fn run_processors(
     time: Res<Time>,
     ship_query: Single<(&ShipPowerState, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,

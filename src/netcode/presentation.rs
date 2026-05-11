@@ -19,6 +19,7 @@ use crate::state::{
     SectorState,
 };
 
+/// Advances rollback frame bookkeeping so presentation can detect rewinds and log sync checkpoints.
 pub(crate) fn advance_rollback_state(
     frame: Res<RollbackFrameCount>,
     mut rollback_state: ResMut<RollbackGameState>,
@@ -47,6 +48,7 @@ pub(crate) fn advance_rollback_state(
     }
 }
 
+/// Mirrors authoritative rollback resources into frontend presentation state so UI reflects live game data.
 pub(crate) fn sync_presentation_from_rollback(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
@@ -85,6 +87,7 @@ pub(crate) fn sync_presentation_from_rollback(
     }
 }
 
+/// Tracks which session phase the frontend should currently present so scene swapping stays deterministic.
 pub(crate) fn sync_active_presentation_phase(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
@@ -112,6 +115,7 @@ pub(crate) fn sync_active_presentation_phase(
     }
 }
 
+/// Forces the player editor mode on when rollback enters refit so the correct editor UI opens.
 pub(crate) fn sync_player_editor_mode(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
@@ -217,6 +221,7 @@ pub(crate) fn session_not_presents_encounter(
     !session_presents_encounter(frontend_mode, rollback_state)
 }
 
+/// Keeps the cached local handle aligned with GGRS local-player assignment for input and ownership lookups.
 pub(crate) fn sync_local_player_handle(
     local_players: Res<LocalPlayers>,
     mut local_handle: ResMut<LocalPlayerHandle>,

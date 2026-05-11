@@ -30,6 +30,7 @@ use crate::{
             PlayerSuit,
             ReactorCommandState,
             ReactorGlowOverlay,
+            RuntimeFoundationVisual,
             RuntimeShipModule,
             ShipControlState,
             ShipPowerState,
@@ -48,6 +49,7 @@ use crate::{
 };
 
 /// Draws contextual tactical overlays for the currently focused station or module.
+/// Draws debug-only tactical overlays around the focused module so tuning field and manipulator ranges is easier.
 pub(crate) fn draw_debug_overlay(
     hud_mode: Res<GameplayInfoPanelMode>,
     player_ship_query: Single<(&SimPosition, &SimRotation), (With<PlayerShip>, With<ShipRoot>)>,
@@ -159,27 +161,64 @@ pub(crate) fn draw_debug_overlay(
 }
 
 /// Tints or hides module sprites to reflect heat, instability, disablement, and destruction.
+/// Tints destroyed or impaired ship visuals so players can read damage state directly from the scene.
 pub(crate) fn update_destroyed_module_visuals(
     balance: Res<BalanceConfig>,
-    mut module_query: Query<
-        (
-            &RuntimeShipModule,
-            &Integrity,
-            &ModuleRuntimeState,
-            Option<&DestroyedModule>,
-            &mut Sprite,
-            &mut Visibility,
-        ),
-        Or<(Changed<Integrity>, Changed<ModuleRuntimeState>)>,
-    >,
+    mut visuals: ParamSet<(
+        Query<'_, '_, (&'static RuntimeFoundationVisual, &'static mut Sprite)>,
+        Query<
+            '_,
+            '_,
+            (
+                &'static RuntimeShipModule,
+                &'static Integrity,
+                &'static ModuleRuntimeState,
+                Option<&'static DestroyedModule>,
+                &'static mut Sprite,
+                &'static mut Visibility,
+            ),
+        >,
+    )>,
 ) {
+    // SAFETY: Foundation visuals and runtime module sprites are distinct entity sets updated in separate ParamSet branches.
+    let logistics_support_cells = visuals
+        .p0()
+        .iter()
+        .filter_map(|(tile, _)| {
+            (!matches!(
+                tile.kind,
+                crate::ship::ShipFoundationKind::Hull
+                    | crate::ship::ShipFoundationKind::HullInnerCorner
+                    | crate::ship::ShipFoundationKind::HullOuterCorner
+            ))
+            .then_some((tile.grid_x, tile.grid_y))
+        })
+        .collect::<Vec<_>>();
+    let mut logistics_ghost_cells = Vec::new();
+
     for (runtime_module, integrity, runtime_state, destroyed, mut sprite, mut visibility) in
-        &mut module_query
+        &mut visuals.p1()
     {
         let condition = module_condition(integrity, runtime_state, destroyed.is_some(), &balance);
         if condition == ModuleCondition::Destroyed {
-            sprite.color = Color::srgba(0.28, 0.08, 0.08, 0.12);
-            *visibility = Visibility::Hidden;
+            let is_hull_fixture = matches!(
+                runtime_module.kind,
+                ModuleKind::Airlock | ModuleKind::Engine | ModuleKind::Turret
+            );
+            if is_hull_fixture {
+                let has_logistics_support = logistics_support_cells
+                    .contains(&(runtime_module.grid_x, runtime_module.grid_y));
+                if has_logistics_support {
+                    logistics_ghost_cells.push((runtime_module.grid_x, runtime_module.grid_y));
+                    *visibility = Visibility::Hidden;
+                } else {
+                    sprite.color = Color::srgba(0.92, 0.70, 0.54, 0.28);
+                    *visibility = Visibility::Visible;
+                }
+            } else {
+                sprite.color = Color::srgba(0.66, 0.74, 0.82, 0.24);
+                *visibility = Visibility::Visible;
+            }
             continue;
         }
 
@@ -216,6 +255,23 @@ pub(crate) fn update_destroyed_module_visuals(
                 ModuleCondition::Disabled => Color::srgb(0.88, 0.48, 0.32),
                 ModuleCondition::Destroyed => Color::WHITE,
             };
+        }
+    }
+
+    for (tile, mut sprite) in &mut visuals.p0() {
+        if matches!(
+            tile.kind,
+            crate::ship::ShipFoundationKind::Hull
+                | crate::ship::ShipFoundationKind::HullInnerCorner
+                | crate::ship::ShipFoundationKind::HullOuterCorner
+        ) {
+            sprite.color = Color::WHITE;
+            continue;
+        }
+        if logistics_ghost_cells.contains(&(tile.grid_x, tile.grid_y)) {
+            sprite.color = Color::srgba(0.72, 0.80, 0.88, 0.26);
+        } else {
+            sprite.color = Color::WHITE;
         }
     }
 }
@@ -339,43 +395,36 @@ pub(crate) fn sync_module_work_effect_visuals(
         (&PlayerMotionState, &EquippedSuit, &HeldInteraction),
         With<ShipboardPlayer>,
     >,
-    mut work_effect_query: Query<
-        (&ChildOf, &mut Sprite, &mut Visibility, &mut Transform),
-        (
+    mut work_visuals: ParamSet<(
+        Query<
+            '_,
+            '_,
+            (
+                &'static ChildOf,
+                &'static mut Sprite,
+                &'static mut Visibility,
+                &'static mut Transform,
+            ),
             With<ModuleWorkEffect>,
-            Without<ReactorGlowOverlay>,
-            Without<EngineFlameOverlay>,
-            Without<ModuleWorkProgressRoot>,
-            Without<ModuleWorkProgressFill>,
-            Without<EvaThrusterOverlay>,
-        ),
-    >,
-    mut work_root_query: Query<
-        (&ChildOf, &mut Visibility),
-        (
-            With<ModuleWorkProgressRoot>,
-            Without<ReactorGlowOverlay>,
-            Without<EngineFlameOverlay>,
-            Without<ModuleWorkEffect>,
-            Without<ModuleWorkProgressFill>,
-            Without<EvaThrusterOverlay>,
-        ),
-    >,
-    mut work_fill_query: Query<
-        (&ChildOf, &mut Sprite, &mut Visibility, &mut Transform),
-        (
+        >,
+        Query<'_, '_, (&'static ChildOf, &'static mut Visibility), With<ModuleWorkProgressRoot>>,
+        Query<
+            '_,
+            '_,
+            (
+                &'static ChildOf,
+                &'static mut Sprite,
+                &'static mut Visibility,
+                &'static mut Transform,
+            ),
             With<ModuleWorkProgressFill>,
-            Without<ReactorGlowOverlay>,
-            Without<EngineFlameOverlay>,
-            Without<ModuleWorkEffect>,
-            Without<ModuleWorkProgressRoot>,
-            Without<EvaThrusterOverlay>,
-        ),
-    >,
+        >,
+    )>,
 ) {
+    // SAFETY: Work spark, root, and fill entities carry distinct marker components and are spawned as separate children.
     let active_work = collect_active_work(&player_query);
 
-    for (parent, mut sprite, mut visibility, mut transform) in &mut work_effect_query {
+    for (parent, mut sprite, mut visibility, mut transform) in &mut work_visuals.p0() {
         let Some((kind, progress)) = active_work.get(&parent.get()).copied() else {
             *visibility = Visibility::Hidden;
             continue;
@@ -393,7 +442,7 @@ pub(crate) fn sync_module_work_effect_visuals(
         transform.scale = Vec3::splat(0.85 + progress.to_num::<f32>() * 0.4);
     }
 
-    for (parent, mut visibility) in &mut work_root_query {
+    for (parent, mut visibility) in &mut work_visuals.p1() {
         *visibility = if active_work.contains_key(&parent.get()) {
             Visibility::Visible
         } else {
@@ -401,7 +450,7 @@ pub(crate) fn sync_module_work_effect_visuals(
         };
     }
 
-    for (parent, mut sprite, mut visibility, mut transform) in &mut work_fill_query {
+    for (parent, mut sprite, mut visibility, mut transform) in &mut work_visuals.p2() {
         let Some((kind, progress)) = active_work.get(&parent.get()).copied() else {
             *visibility = Visibility::Hidden;
             continue;
@@ -487,6 +536,7 @@ fn collect_active_work(
 }
 
 /// Applies parallax offsets to the combat backdrop based on the camera position.
+/// Applies a small camera-relative parallax drift to backdrop layers so the arena feels deeper in motion.
 pub(crate) fn sync_backdrop_parallax(
     camera_query: Single<&Transform, With<Camera2d>>,
     mut backdrop_query: Query<(&ArenaBackdropLayer, &mut Transform), Without<Camera2d>>,

@@ -19,6 +19,7 @@ use crate::{
     state::{EncounterBackdrop, EncounterSpec, PlayingCleanup},
 };
 
+/// Assembles the encounter arena backdrop, walls, and static threats so combat starts with a complete playspace.
 pub(crate) fn spawn_test_arena(
     commands: &mut Commands,
     balance: &BalanceConfig,

@@ -20,6 +20,7 @@ use crate::{
     stations::{self, StationCatalogResource},
 };
 
+/// Initializes campaign-facing docked state from progression and station data when docking begins.
 pub(crate) fn initialize_campaign_state(
     status: Res<netcode::SessionStatus>,
     rollback_state: Res<netcode::RollbackGameState>,
@@ -156,6 +157,7 @@ pub(crate) fn initialize_campaign_state(
     }
 }
 
+/// Persists docked campaign selections back into resources so station browsing survives updates.
 pub(crate) fn persist_campaign_state(
     campaign_load_state: Res<CampaignLoadState>,
     progression: Res<Progression>,

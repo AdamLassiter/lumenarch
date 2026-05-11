@@ -41,6 +41,7 @@ use crate::{
     },
 };
 
+/// Collects focused-module inspection text so F2-style diagnostics expose useful live state.
 pub(crate) fn inspection_text(
     current_module: Option<(
         Entity,
@@ -460,6 +461,7 @@ fn signed_fx(value: Fx) -> String {
     format!("{:+.1}", value.to_num::<f32>())
 }
 
+/// Aggregates actionable encounter issues so the HUD can surface urgent ship problems first.
 pub(crate) fn collect_alert_issues(
     module_query: &Query<
         (
@@ -534,6 +536,7 @@ pub(crate) fn collect_alert_issues(
         .collect()
 }
 
+/// Builds the concise alert panel text so players can triage threats without opening a station.
 pub(crate) fn alerts_text(
     player_fields: &PlayerFieldState,
     nearby: &NearbyInteraction,

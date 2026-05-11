@@ -1,6 +1,7 @@
 use super::{alerts, *};
 use crate::gameplay::components::DetectorModule;
 
+/// Cycles the encounter info panel mode so players can switch between summaries and inspection views.
 pub(crate) fn toggle_gameplay_info_panel(
     keys: Res<ButtonInput<KeyCode>>,
     mut hud_mode: ResMut<GameplayInfoPanelMode>,
@@ -164,6 +165,7 @@ pub(crate) struct GameplayHudUiQueries<'w, 's> {
     >,
 }
 
+/// Rebuilds the encounter HUD text, bars, and blackout state from current combat and player state.
 pub(crate) fn update_gameplay_status_text(
     balance: Res<BalanceConfig>,
     hud_mode: Res<GameplayInfoPanelMode>,

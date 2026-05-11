@@ -102,6 +102,7 @@ pub(crate) struct LumenSnapshot {
     pub(crate) low_power: bool,
 }
 
+/// Executes ARCH and LUMEN automation programs so ship commands can react to live sensor state.
 pub(crate) fn run_arch_automation(
     time: Res<Time>,
     ship_query: Single<
@@ -369,6 +370,7 @@ pub(crate) fn build_lumen_snapshot(
     )
 }
 
+/// Fades recent automation action feedback so command HUD messages feel timely without lingering forever.
 pub(crate) fn tick_recent_action_feedback(
     time: Res<Time>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,

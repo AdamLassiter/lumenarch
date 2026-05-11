@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
+    editor::helpers::normalize_editor_ship_layers,
     netcode,
     ship::{
         ModuleKind,
@@ -25,6 +26,7 @@ use crate::{
     },
 };
 
+/// Loads and normalizes the active ship into editor state so refit sessions always start from a clean baseline.
 pub(crate) fn initialize_editor_ship(
     status: Res<netcode::SessionStatus>,
     rollback_state: Res<netcode::RollbackGameState>,
@@ -103,8 +105,10 @@ pub(crate) fn initialize_editor_ship(
         }
     }
 
+    normalize_editor_ship_layers(&mut editor_ship.ship);
+
     tool_state.tool_mode = EditorToolMode::Build;
-    tool_state.active_layer = EditorLayer::Underlay;
+    tool_state.active_layer = EditorLayer::Logistics;
     tool_state.selected_foundation_kind = crate::ship::ShipFoundationKind::Floor;
     tool_state.selected_kind = ModuleKind::Core;
     tool_state.selected_variant = ModuleVariant::default_for_kind(ModuleKind::Core);

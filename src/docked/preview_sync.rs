@@ -4,10 +4,11 @@ use super::{
     DockedPreviewRoot,
     DockedPreviewSignature,
     DockedRoot,
-    preview_helpers::{docked_preview_signature, spawn_docked_ship_preview},
+    preview_helpers::{docked_preview_ship, docked_preview_signature, spawn_docked_ship_preview},
 };
-use crate::{TOOLBOX_WIDTH, state::EditorShip};
+use crate::{TOOLBOX_WIDTH, netcode, state::EditorShip};
 
+/// Removes docked UI entities when the frontend leaves the docked presentation.
 pub(crate) fn cleanup_docked_ui(
     mut commands: Commands,
     query: Query<Entity, With<DockedRoot>>,
@@ -21,13 +22,15 @@ pub(crate) fn cleanup_docked_ui(
     }
 }
 
+/// Keeps the docked ship preview matched to the latest authored or active ship layout.
 pub(crate) fn sync_docked_ship_preview(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     editor_ship: Res<EditorShip>,
+    status: Res<netcode::SessionStatus>,
     existing_query: Query<(Entity, &DockedPreviewSignature), With<DockedPreviewRoot>>,
 ) {
-    let ship = editor_ship.ship.clone();
+    let ship = docked_preview_ship(&editor_ship, &status);
     let ship_signature = docked_preview_signature(&ship);
 
     let existing = existing_query.iter().collect::<Vec<_>>();
@@ -47,6 +50,7 @@ pub(crate) fn sync_docked_ship_preview(
     spawn_docked_ship_preview(&mut commands, &asset_server, ship, ship_signature);
 }
 
+/// Adds a gentle idle rotation to the docked ship preview so the refit screen feels alive.
 pub(crate) fn rotate_docked_ship_preview(
     time: Res<Time>,
     mut query: Query<&mut Transform, With<DockedPreviewRoot>>,
@@ -61,10 +65,12 @@ pub(crate) fn rotate_docked_ship_preview(
     }
 }
 
+/// Reports whether the docked UI still needs to be spawned.
 pub(crate) fn docked_ui_missing(query: Query<Entity, With<DockedRoot>>) -> bool {
     query.is_empty()
 }
 
+/// Reports whether the docked UI is already present in the world.
 pub(crate) fn docked_ui_present(query: Query<Entity, With<DockedRoot>>) -> bool {
     !query.is_empty()
 }

@@ -8,3 +8,4 @@ pub(crate) use scene::{
     runtime_scene_present,
     spawn_runtime_scene,
 };
+pub(crate) use ship::{ship_visual_center, spawn_ship_layer_visuals};

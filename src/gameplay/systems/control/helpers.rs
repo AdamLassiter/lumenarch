@@ -146,7 +146,7 @@ pub(crate) fn ship_collision_tiles(
                 .get(&tile.module_id)
                 .copied()
                 .unwrap_or((false, false));
-            let solid = is_hull_kind(tile.kind) && !destroyed;
+            let solid = shipboard_tile_is_solid(tile.kind, destroyed, airlock_open);
             let opening = tile.exterior_edges != 0 && (destroyed || airlock_open);
             ShipCollisionTile {
                 center: tile.local_position,
@@ -247,4 +247,39 @@ fn is_hull_kind(kind: ModuleKind) -> bool {
         kind,
         ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner
     )
+}
+
+fn shipboard_tile_is_solid(kind: ModuleKind, destroyed: bool, airlock_open: bool) -> bool {
+    if destroyed {
+        return false;
+    }
+    if is_hull_kind(kind) {
+        return true;
+    }
+    match kind {
+        ModuleKind::Airlock => !airlock_open,
+        ModuleKind::Engine | ModuleKind::Turret => true,
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::shipboard_tile_is_solid;
+    use crate::ship::ModuleKind;
+
+    #[test]
+    fn hull_fixtures_block_shipboard_motion_like_hull() {
+        assert!(shipboard_tile_is_solid(ModuleKind::Engine, false, false));
+        assert!(shipboard_tile_is_solid(ModuleKind::Turret, false, false));
+        assert!(shipboard_tile_is_solid(ModuleKind::Airlock, false, false));
+        assert!(!shipboard_tile_is_solid(ModuleKind::Airlock, false, true));
+    }
+
+    #[test]
+    fn destroyed_hull_fixtures_do_not_remain_solid() {
+        assert!(!shipboard_tile_is_solid(ModuleKind::Engine, true, false));
+        assert!(!shipboard_tile_is_solid(ModuleKind::Turret, true, false));
+        assert!(!shipboard_tile_is_solid(ModuleKind::Airlock, true, false));
+    }
 }

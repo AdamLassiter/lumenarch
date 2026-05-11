@@ -16,6 +16,7 @@ use crate::{
     },
 };
 
+/// Pans and zooms the route map so players can inspect larger sectors without losing context.
 pub(crate) fn pan_and_zoom_sector_map(
     window: Single<&Window, With<PrimaryWindow>>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
@@ -44,6 +45,7 @@ pub(crate) fn pan_and_zoom_sector_map(
     }
 }
 
+/// Handles sector-node clicks so the host can inspect and queue reachable encounter destinations.
 pub(crate) fn sector_node_button_system(
     mut interaction_query: Query<
         (&Interaction, &SectorNodeButton, &mut BackgroundColor),
@@ -95,6 +97,7 @@ pub(crate) fn sector_node_button_system(
     }
 }
 
+/// Applies launch and return button presses so sector-map navigation turns into rollback meta commands.
 pub(crate) fn sector_navigation_button_system(
     mut interaction_query: Query<
         (

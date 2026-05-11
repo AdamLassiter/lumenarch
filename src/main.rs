@@ -359,6 +359,7 @@ fn add_shared_update_systems(app: &mut App) {
     .add_systems(Update, docked::persist_campaign_state);
 }
 
+/// Shows the controls help panel only while Alt is held so the HUD stays quiet until needed.
 fn sync_controls_help_panel_visibility(
     keys: Res<ButtonInput<KeyCode>>,
     mut panels: Query<&mut Node, With<state::ControlsHelpPanel>>,
@@ -642,10 +643,12 @@ fn add_encounter_presentation_systems(app: &mut App) {
     );
 }
 
+/// Spawns the shared camera used by UI, editors, and encounter presentation layers.
 fn setup_camera(mut commands: Commands) {
     commands.spawn((Camera2d, MainCamera));
 }
 
+/// Lets interactive builds quit quickly from the keyboard during development and testing.
 fn exit_on_escape(keys: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
     if keys.just_pressed(KeyCode::Escape) {
         exit.write(AppExit::Success);

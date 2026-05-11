@@ -3,6 +3,7 @@ mod input;
 mod render;
 mod ui;
 
+pub(crate) use helpers::normalize_editor_ship_layers;
 pub(crate) use input::{
     edit_program_text_editor,
     editor_station_panel_button_system,

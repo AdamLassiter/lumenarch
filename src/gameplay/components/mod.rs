@@ -94,6 +94,7 @@ pub(crate) use modules::{
     ReactorCommandState,
     ReactorGlowOverlay,
     RuntimeArchComputer,
+    RuntimeFoundationVisual,
     RuntimeShipModule,
     ShieldCommandState,
     StorageCommandState,

@@ -18,6 +18,7 @@ use crate::{
     netcode::{self, LumenGgrsConfig},
 };
 
+/// Converts local interaction input into begin/complete messages so shipboard actions stay rollback-safe.
 pub(crate) fn run_shipboard_interaction_input(
     balance: Res<BalanceConfig>,
     session_inputs: Option<Res<PlayerInputs<LumenGgrsConfig>>>,

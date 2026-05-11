@@ -38,6 +38,7 @@ use crate::{
     stations::{self, StationCatalogResource},
 };
 
+/// Packages local keyboard, mouse, and queued UI commands into the deterministic input stream for rollback.
 pub(crate) fn read_local_inputs(
     mut commands: Commands,
     keyboard_input: Option<Res<ButtonInput<KeyCode>>>,
@@ -97,6 +98,7 @@ pub(crate) fn read_local_inputs(
     commands.insert_resource(LocalInputs::<LumenGgrsConfig>(inputs));
 }
 
+/// Decodes raw per-handle input packets into gameplay-friendly commands for rollback simulation systems.
 pub(crate) fn decode_player_inputs(
     player_inputs: Option<Res<PlayerInputs<LumenGgrsConfig>>>,
     mut decoded: ResMut<DecodedPlayerCommands>,
@@ -141,6 +143,7 @@ pub(crate) fn decode_player_inputs(
     }
 }
 
+/// Returns the active local player's latest raw packet so non-rollback presentation can inspect it.
 pub(crate) fn local_player_input(
     players: Option<Res<PlayerInputs<LumenGgrsConfig>>>,
     local_handle: Option<Res<LocalPlayerHandle>>,
@@ -164,6 +167,7 @@ pub(crate) fn rollback_phase_is_encounter(rollback_state: Res<RollbackGameState>
     rollback_state.phase == RollbackPhase::Encounter
 }
 
+/// Applies host-only meta commands so navigation and session flow changes stay authoritative.
 pub(crate) fn apply_host_meta_ops(
     decoded: Res<DecodedPlayerCommands>,
     mut rollback_state: ResMut<RollbackGameState>,

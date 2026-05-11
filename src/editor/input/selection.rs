@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
+    editor::helpers::{foundation_supports_module, is_hull_foundation_kind, is_hull_module_kind},
     ship::{ModuleKind, ModuleVariant, ShipDefinition, ShipFoundationTile, ShipModule},
     state::{
         EditorMode,
@@ -71,6 +72,15 @@ pub(super) fn move_selected_group(
     for module in &selected {
         let next_x = module.grid_x + dx;
         let next_y = module.grid_y + dy;
+        if is_hull_module_kind(module.kind)
+            || !foundation_supports_module(
+                ship.logistics_at(next_x, next_y).map(|tile| tile.kind),
+                ship.hull_at(next_x, next_y).map(|tile| tile.kind),
+                module.kind,
+            )
+        {
+            return false;
+        }
         if let Some(blocker) = ship.module_at(next_x, next_y)
             && !selection_state.selected_module_ids.contains(&blocker.id)
         {
@@ -99,6 +109,7 @@ pub(super) fn move_selected_foundation_group(
     let selected = ship
         .foundation_tiles
         .iter()
+        .chain(ship.hull_tiles.iter())
         .filter(|tile| selection_state.selected_foundation_ids.contains(&tile.id))
         .cloned()
         .collect::<Vec<_>>();
@@ -106,22 +117,54 @@ pub(super) fn move_selected_foundation_group(
         return false;
     }
     for tile in &selected {
+        if ship.module_at(tile.grid_x, tile.grid_y).is_some() {
+            return false;
+        }
         let next_x = tile.grid_x + dx;
         let next_y = tile.grid_y + dy;
-        if let Some(blocker) = ship.foundation_at(next_x, next_y)
+        if is_hull_foundation_kind(tile.kind) {
+            if let Some(blocker) = ship.hull_at(next_x, next_y)
+                && !selection_state
+                    .selected_foundation_ids
+                    .contains(&blocker.id)
+            {
+                return false;
+            }
+        } else if let Some(blocker) = ship.logistics_at(next_x, next_y)
             && !selection_state
                 .selected_foundation_ids
                 .contains(&blocker.id)
         {
             return false;
         }
+        if let Some(module) = ship.module_at(next_x, next_y)
+            && !foundation_supports_module(
+                if is_hull_foundation_kind(tile.kind) {
+                    ship.logistics_at(next_x, next_y)
+                        .map(|existing| existing.kind)
+                } else {
+                    Some(tile.kind)
+                },
+                if is_hull_foundation_kind(tile.kind) {
+                    Some(tile.kind)
+                } else {
+                    ship.hull_at(next_x, next_y).map(|existing| existing.kind)
+                },
+                module.kind,
+            )
+        {
+            return false;
+        }
     }
     for tile in &selected {
-        if let Some(target) = ship
-            .foundation_tiles
-            .iter_mut()
-            .find(|entry| entry.id == tile.id)
-        {
+        let target = if is_hull_foundation_kind(tile.kind) {
+            ship.hull_tiles.iter_mut().find(|entry| entry.id == tile.id)
+        } else {
+            ship.foundation_tiles
+                .iter_mut()
+                .find(|entry| entry.id == tile.id)
+        };
+        if let Some(target) = target {
             target.grid_x += dx;
             target.grid_y += dy;
         }
@@ -138,8 +181,18 @@ pub(super) fn delete_selected_group(
 ) -> bool {
     if !selection_state.selected_foundation_ids.is_empty() {
         let selected = selection_state.selected_foundation_ids.clone();
+        if ship
+            .foundation_tiles
+            .iter()
+            .chain(ship.hull_tiles.iter())
+            .filter(|tile| selected.contains(&tile.id))
+            .any(|tile| ship.module_at(tile.grid_x, tile.grid_y).is_some())
+        {
+            return false;
+        }
         ship.foundation_tiles
             .retain(|tile| !selected.contains(&tile.id));
+        ship.hull_tiles.retain(|tile| !selected.contains(&tile.id));
         selection_state.selected_foundation_ids.clear();
         return true;
     }
@@ -199,6 +252,16 @@ pub(super) fn paste_clipboard_group(
         if ship.module_at(*grid_x, *grid_y).is_some() {
             return false;
         }
+    }
+    if planned.iter().any(|(module, grid_x, grid_y)| {
+        is_hull_module_kind(module.kind)
+            || !foundation_supports_module(
+                ship.logistics_at(*grid_x, *grid_y).map(|tile| tile.kind),
+                ship.hull_at(*grid_x, *grid_y).map(|tile| tile.kind),
+                module.kind,
+            )
+    }) {
+        return false;
     }
 
     if mode == EditorMode::Player && !ignore_component_limits {
@@ -268,10 +331,34 @@ pub(super) fn paste_foundation_clipboard_group(
         })
         .collect::<Vec<_>>();
 
-    for (_, grid_x, grid_y) in &planned {
-        if ship.foundation_at(*grid_x, *grid_y).is_some() {
+    for (tile, grid_x, grid_y) in &planned {
+        if is_hull_foundation_kind(tile.kind) {
+            if ship.hull_at(*grid_x, *grid_y).is_some() {
+                return false;
+            }
+        } else if ship.logistics_at(*grid_x, *grid_y).is_some() {
             return false;
         }
+    }
+    if planned.iter().any(|(tile, grid_x, grid_y)| {
+        ship.module_at(*grid_x, *grid_y).is_some_and(|module| {
+            !foundation_supports_module(
+                if is_hull_foundation_kind(tile.kind) {
+                    ship.logistics_at(*grid_x, *grid_y)
+                        .map(|existing| existing.kind)
+                } else {
+                    Some(tile.kind)
+                },
+                if is_hull_foundation_kind(tile.kind) {
+                    Some(tile.kind)
+                } else {
+                    ship.hull_at(*grid_x, *grid_y).map(|existing| existing.kind)
+                },
+                module.kind,
+            )
+        })
+    }) {
+        return false;
     }
 
     selection_state.selected_foundation_ids.clear();
@@ -285,7 +372,11 @@ pub(super) fn paste_foundation_clipboard_group(
             tile.rotation_quadrants,
         );
         let new_id = next.id;
-        ship.replace_foundation_tile(next);
+        if is_hull_foundation_kind(next.kind) {
+            ship.replace_hull_tile(next);
+        } else {
+            ship.replace_logistics_tile(next);
+        }
         selection_state.selected_foundation_ids.push(new_id);
     }
     true

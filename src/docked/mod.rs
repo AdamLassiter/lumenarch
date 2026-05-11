@@ -70,7 +70,7 @@ use super::{
 #[derive(Component)]
 pub(crate) struct DockedPreviewRoot;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 struct DockedPreviewTile;
 
 #[derive(Component)]
@@ -140,6 +140,7 @@ impl DockedActionVisibility {
     }
 }
 
+/// Spawns the docked station UI so the player can refit, resupply, and browse station content.
 pub(crate) fn spawn_docked_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -398,6 +399,7 @@ pub(crate) fn spawn_docked_ui(
         });
 }
 
+/// Handles docked-station button presses and turns them into surface changes or session actions.
 pub(crate) fn docked_button_system(
     mut interaction_query: Query<
         (
@@ -580,6 +582,7 @@ pub(crate) fn docked_button_system(
     }
 }
 
+/// Refreshes the docked summary text so station, ship, and campaign status stay readable.
 pub(crate) fn update_docked_status_text(
     docked_state: Res<DockedState>,
     progression: Res<Progression>,
@@ -608,6 +611,7 @@ pub(crate) fn update_docked_status_text(
     }
 }
 
+/// Swaps docked surface content and action visibility to match the currently selected station tab.
 pub(crate) fn update_docked_surface_ui(
     docked_state: Res<DockedState>,
     progression: Res<Progression>,

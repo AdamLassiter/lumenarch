@@ -27,7 +27,7 @@ use crate::{
     },
 };
 
-/// Keeps the editor's text buffer pointed at the currently selected computer module.
+/// Keeps the program editor pointed at the selected computer so the visible draft matches the active module.
 pub(crate) fn sync_program_text_editor_state(
     editor_ship: Res<EditorShip>,
     arch_editor_state: Res<ArchEditorState>,
@@ -82,7 +82,7 @@ pub(crate) fn sync_program_text_editor_state(
     }
 }
 
-/// Focuses or blurs the in-editor program textbox when the player clicks it.
+/// Focuses the program textbox on click so subsequent keyboard input edits the current automation draft.
 pub(crate) fn focus_program_text_editor_on_click(
     mut interaction_query: Query<
         (
@@ -94,7 +94,7 @@ pub(crate) fn focus_program_text_editor_on_click(
     >,
     mut program_editor_state: ResMut<ProgramTextEditorState>,
 ) {
-    for (interaction, textbox, action_button) in &mut interaction_query {
+    for (interaction, textbox, _action_button) in &mut interaction_query {
         if *interaction != Interaction::Pressed {
             continue;
         }
@@ -104,13 +104,11 @@ pub(crate) fn focus_program_text_editor_on_click(
             {
                 program_editor_state.cursor_index = program_editor_state.draft_text.chars().count();
             }
-        } else if action_button.is_some() {
-            program_editor_state.focused = false;
         }
     }
 }
 
-/// Applies keyboard editing to the focused program draft textbox.
+/// Applies keyboard editing to the focused program draft so ARCH and LUMEN code can be authored in place.
 pub(crate) fn edit_program_text_editor(
     mut keyboard_events: MessageReader<KeyboardInput>,
     keys: Res<ButtonInput<KeyCode>>,
@@ -159,8 +157,7 @@ pub(crate) fn edit_program_text_editor(
                 program_editor_state.draft_text.clear();
                 program_editor_state.cursor_index = 0;
                 program_editor_state.select_all = false;
-                program_editor_state.dirty = true;
-                program_editor_state.status_line = "Draft edited".to_string();
+                mark_program_draft_changed(&mut program_editor_state);
             }
             Key::Character(chars)
                 if ctrl_pressed
@@ -186,7 +183,7 @@ pub(crate) fn edit_program_text_editor(
     }
 }
 
-/// Handles the program editor's validate/apply/revert language controls.
+/// Handles program editor action buttons so players can validate, switch language, apply, or revert drafts.
 pub(crate) fn program_editor_action_button_system(
     mut interaction_query: Query<
         (
@@ -322,8 +319,7 @@ fn backspace_program_text(state: &mut ProgramTextEditorState) {
         state.draft_text.clear();
         state.cursor_index = 0;
         state.select_all = false;
-        state.dirty = true;
-        state.status_line = "Draft edited".to_string();
+        mark_program_draft_changed(state);
         return;
     }
     if state.cursor_index == 0 {
@@ -333,8 +329,7 @@ fn backspace_program_text(state: &mut ProgramTextEditorState) {
     let end = char_to_byte_index(&state.draft_text, state.cursor_index);
     state.draft_text.replace_range(start..end, "");
     state.cursor_index -= 1;
-    state.dirty = true;
-    state.status_line = "Draft edited".to_string();
+    mark_program_draft_changed(state);
 }
 
 fn delete_program_text(state: &mut ProgramTextEditorState) {
@@ -342,8 +337,7 @@ fn delete_program_text(state: &mut ProgramTextEditorState) {
         state.draft_text.clear();
         state.cursor_index = 0;
         state.select_all = false;
-        state.dirty = true;
-        state.status_line = "Draft edited".to_string();
+        mark_program_draft_changed(state);
         return;
     }
     let len = state.draft_text.chars().count();
@@ -353,8 +347,7 @@ fn delete_program_text(state: &mut ProgramTextEditorState) {
     let start = char_to_byte_index(&state.draft_text, state.cursor_index);
     let end = char_to_byte_index(&state.draft_text, state.cursor_index + 1);
     state.draft_text.replace_range(start..end, "");
-    state.dirty = true;
-    state.status_line = "Draft edited".to_string();
+    mark_program_draft_changed(state);
 }
 
 fn insert_program_text(state: &mut ProgramTextEditorState, inserted_text: &str) {
@@ -388,8 +381,13 @@ fn insert_program_text(state: &mut ProgramTextEditorState, inserted_text: &str) 
     let byte_index = char_to_byte_index(&state.draft_text, cursor);
     state.draft_text.insert_str(byte_index, &sanitized);
     state.cursor_index = cursor + sanitized.chars().count();
+    mark_program_draft_changed(state);
+}
+
+fn mark_program_draft_changed(state: &mut ProgramTextEditorState) {
     state.dirty = true;
     state.status_line = "Draft edited".to_string();
+    validate_program_draft(state);
 }
 
 fn validate_program_draft(state: &mut ProgramTextEditorState) {
@@ -550,4 +548,43 @@ fn char_to_byte_index(text: &str, char_index: usize) -> usize {
         .nth(char_index)
         .map(|(index, _)| index)
         .unwrap_or(text.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{backspace_program_text, validate_program_draft};
+    use crate::state::{ProgramTextEditorState, ProgrammingLanguageMode};
+
+    #[test]
+    fn invalid_arch_draft_reports_diagnostics_after_edit() {
+        let mut state = ProgramTextEditorState {
+            language: ProgrammingLanguageMode::Arch,
+            draft_text: "MOV WTF0 1".to_string(),
+            cursor_index: "MOV WTF0 1".chars().count(),
+            focused: true,
+            ..Default::default()
+        };
+
+        backspace_program_text(&mut state);
+
+        assert!(state.dirty);
+        assert!(
+            !state.diagnostics.is_empty(),
+            "expected invalid draft to surface diagnostics"
+        );
+    }
+
+    #[test]
+    fn explicit_check_marks_invalid_arch_draft() {
+        let mut state = ProgramTextEditorState {
+            language: ProgrammingLanguageMode::Arch,
+            draft_text: "MOV WTF0".to_string(),
+            ..Default::default()
+        };
+
+        validate_program_draft(&mut state);
+
+        assert!(state.status_line.starts_with("ARCH invalid"));
+        assert!(!state.diagnostics.is_empty());
+    }
 }

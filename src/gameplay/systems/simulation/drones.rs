@@ -33,6 +33,7 @@ pub(super) struct DroneTransferPlan {
     pub(super) target_module_id: u64,
     pub(super) resource_kind: ResourceKind,
 }
+/// Keeps drone entities matched to each drone bay so station state always has visible workers.
 pub(crate) fn sync_drone_station_population(
     mut commands: Commands,
     balance: Res<BalanceConfig>,
@@ -117,6 +118,7 @@ pub(crate) fn sync_drone_station_population(
     let _ = balance;
 }
 
+/// Runs drone logistics planning and movement so drone bays provide autonomous cargo handling.
 pub(crate) fn run_drone_logistics(
     time: Res<Time>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
@@ -148,6 +150,7 @@ pub(crate) fn run_drone_logistics(
     )>,
     mut drone_query: Query<(Entity, &mut DroneUnit, &mut Transform, &mut Sprite)>,
 ) {
+    // SAFETY: Logistics endpoint planning reads snapshots through `p0`, while cargo mutation happens later through `p1`.
     let dt = fx_from_time_delta(&time);
     let mut mission_state = mission_query.into_inner();
     let endpoints = {

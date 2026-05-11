@@ -35,6 +35,7 @@ impl StationPanelDisplay {
     }
 }
 
+/// Turns station panel button presses into queued control actions for the currently focused station.
 pub(crate) fn station_panel_button_system(
     mut interaction_query: Query<
         (
@@ -70,6 +71,7 @@ pub(crate) fn station_panel_button_system(
     }
 }
 
+/// Shows or hides the station panel shell so only valid focused-station interactions present UI.
 pub(crate) fn station_panel_display(
     control_mode: &ShipboardControlState,
     mission_state: &MissionState,
@@ -447,6 +449,7 @@ pub(crate) fn station_panel_display(
     }
 }
 
+/// Fills the station panel with context-specific readouts and controls for the focused module.
 pub(crate) fn station_panel_content(
     control_mode: &ShipboardControlState,
     mission_state: &MissionState,

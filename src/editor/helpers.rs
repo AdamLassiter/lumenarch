@@ -6,7 +6,14 @@ use super::super::{
     state::{EditorMode, EditorPlacementBlocker, EditorToolboxPanel, LastMissionReport},
 };
 use crate::{
-    ship::{ModuleKind, ModuleSpec, ModuleVariant, ShipDefinition, ShipFoundationKind},
+    ship::{
+        ModuleKind,
+        ModuleSpec,
+        ModuleVariant,
+        ShipDefinition,
+        ShipFoundationKind,
+        ShipFoundationTile,
+    },
     state::{EditorLayer, EditorSelectionState, EditorToolMode, Progression},
 };
 
@@ -52,14 +59,11 @@ pub(crate) fn editor_status_line(
             EditorToolMode::Select => "Select",
         },
         match active_layer {
-            EditorLayer::Underlay => "Underlay",
-            EditorLayer::Overlay => "Overlay",
+            EditorLayer::Logistics => "Logistics",
+            EditorLayer::Hull => "Hull",
+            EditorLayer::Components => "Components",
         },
-        if matches!(active_layer, EditorLayer::Underlay) {
-            selected_foundation_kind.display_name().to_string()
-        } else {
-            selected_kind.to_string()
-        },
+        editor_selected_build_label(active_layer, *selected_kind, selected_foundation_kind),
         selected_variant.display_name(),
         selected_channel,
         selection_summary(editor_ship, selection_state),
@@ -153,6 +157,7 @@ pub(crate) fn selection_summary(
             editor_ship
                 .foundation_tiles
                 .iter()
+                .chain(editor_ship.hull_tiles.iter())
                 .filter(|tile| selection_state.selected_foundation_ids.contains(&tile.id))
                 .map(|tile| tile.display_name().to_string()),
         );
@@ -209,7 +214,8 @@ pub(crate) fn module_family_label(kind: ModuleKind) -> &'static str {
         ModuleKind::Core => "Core systems",
         ModuleKind::Cockpit | ModuleKind::Computer => "Control and compute",
         ModuleKind::Detector => "Automation and sensors",
-        ModuleKind::Processor | ModuleKind::Cargo | ModuleKind::Airlock => "Logistics and utility",
+        ModuleKind::Processor | ModuleKind::Cargo => "Logistics and utility",
+        ModuleKind::Airlock => "Exterior access",
         ModuleKind::Reactor | ModuleKind::Battery => "Power systems",
         ModuleKind::Engine => "Propulsion",
         ModuleKind::Turret | ModuleKind::Shield => "Combat systems",
@@ -217,6 +223,24 @@ pub(crate) fn module_family_label(kind: ModuleKind) -> &'static str {
         ModuleKind::JunctionBox | ModuleKind::Valve | ModuleKind::O2Generator => {
             "Engineering control"
         }
+    }
+}
+
+pub(crate) fn editor_selected_build_label(
+    active_layer: EditorLayer,
+    selected_kind: ModuleKind,
+    selected_foundation_kind: ShipFoundationKind,
+) -> String {
+    match active_layer {
+        EditorLayer::Logistics => selected_foundation_kind.display_name().to_string(),
+        EditorLayer::Hull => {
+            if module_belongs_to_hull_layer(selected_kind) {
+                selected_kind.to_string()
+            } else {
+                selected_foundation_kind.display_name().to_string()
+            }
+        }
+        EditorLayer::Components => selected_kind.to_string(),
     }
 }
 
@@ -234,6 +258,186 @@ pub(crate) fn foundation_family_label(kind: ShipFoundationKind) -> &'static str 
         | ShipFoundationKind::PipeAmmunition
         | ShipFoundationKind::PipeOxygen => "Resource pipes",
     }
+}
+
+pub(crate) fn is_hull_module_kind(kind: ModuleKind) -> bool {
+    matches!(
+        kind,
+        ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner
+    )
+}
+
+pub(crate) fn is_hull_foundation_kind(kind: ShipFoundationKind) -> bool {
+    matches!(
+        kind,
+        ShipFoundationKind::Hull
+            | ShipFoundationKind::HullInnerCorner
+            | ShipFoundationKind::HullOuterCorner
+    )
+}
+
+pub(crate) fn hull_foundation_kind_for_module(kind: ModuleKind) -> Option<ShipFoundationKind> {
+    match kind {
+        ModuleKind::Hull => Some(ShipFoundationKind::Hull),
+        ModuleKind::HullInnerCorner => Some(ShipFoundationKind::HullInnerCorner),
+        ModuleKind::HullOuterCorner => Some(ShipFoundationKind::HullOuterCorner),
+        _ => None,
+    }
+}
+
+pub(crate) fn module_requires_hull_foundation(kind: ModuleKind) -> bool {
+    matches!(
+        kind,
+        ModuleKind::Airlock | ModuleKind::Engine | ModuleKind::Turret
+    )
+}
+
+pub(crate) fn module_belongs_to_hull_layer(kind: ModuleKind) -> bool {
+    module_requires_hull_foundation(kind)
+}
+
+pub(crate) fn module_belongs_to_components_layer(kind: ModuleKind) -> bool {
+    !is_hull_module_kind(kind) && !module_belongs_to_hull_layer(kind)
+}
+
+pub(crate) fn logistics_supports_component(foundation_kind: ShipFoundationKind) -> bool {
+    !is_hull_foundation_kind(foundation_kind)
+}
+
+pub(crate) fn logistics_tile_must_be_enclosed(kind: ShipFoundationKind) -> bool {
+    kind == ShipFoundationKind::Floor
+}
+
+pub(crate) fn foundation_supports_module(
+    logistics_kind: Option<ShipFoundationKind>,
+    hull_kind: Option<ShipFoundationKind>,
+    module_kind: ModuleKind,
+) -> bool {
+    if is_hull_module_kind(module_kind) {
+        return false;
+    }
+    if module_requires_hull_foundation(module_kind) {
+        return hull_kind.is_some_and(is_hull_foundation_kind);
+    }
+    logistics_kind.is_some_and(logistics_supports_component)
+}
+
+pub(crate) fn normalize_editor_ship_layers(ship: &mut ShipDefinition) -> bool {
+    let mut changed = false;
+    let mut next_foundation_id = ship.next_foundation_id();
+    let legacy_hull_modules = ship
+        .modules
+        .iter()
+        .filter_map(|module| {
+            hull_foundation_kind_for_module(module.kind).map(|foundation_kind| {
+                let tile = ShipFoundationTile::new(
+                    next_foundation_id,
+                    foundation_kind,
+                    module.grid_x,
+                    module.grid_y,
+                    module.rotation_quadrants,
+                );
+                next_foundation_id += 1;
+                (module.id, tile)
+            })
+        })
+        .collect::<Vec<_>>();
+
+    if !legacy_hull_modules.is_empty() {
+        for (_, tile) in &legacy_hull_modules {
+            ship.replace_hull_tile(tile.clone());
+        }
+        let legacy_ids = legacy_hull_modules
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect::<std::collections::HashSet<_>>();
+        ship.modules
+            .retain(|module| !legacy_ids.contains(&module.id));
+        changed = true;
+    }
+
+    let legacy_hull_foundations = ship
+        .foundation_tiles
+        .iter()
+        .filter(|tile| is_hull_foundation_kind(tile.kind))
+        .cloned()
+        .collect::<Vec<_>>();
+    if !legacy_hull_foundations.is_empty() {
+        for tile in &legacy_hull_foundations {
+            ship.replace_hull_tile(tile.clone());
+        }
+        ship.foundation_tiles
+            .retain(|tile| !is_hull_foundation_kind(tile.kind));
+        changed = true;
+    }
+
+    let missing_foundations = ship
+        .modules
+        .iter()
+        .filter_map(|module| {
+            if module_requires_hull_foundation(module.kind) {
+                ship.hull_at(module.grid_x, module.grid_y)
+                    .is_none()
+                    .then(|| {
+                        let tile = ShipFoundationTile::new(
+                            next_foundation_id,
+                            ShipFoundationKind::Hull,
+                            module.grid_x,
+                            module.grid_y,
+                            module.rotation_quadrants,
+                        );
+                        next_foundation_id += 1;
+                        (true, tile)
+                    })
+            } else {
+                ship.logistics_at(module.grid_x, module.grid_y)
+                    .is_none()
+                    .then(|| {
+                        let tile = ShipFoundationTile::new(
+                            next_foundation_id,
+                            ShipFoundationKind::Floor,
+                            module.grid_x,
+                            module.grid_y,
+                            module.rotation_quadrants,
+                        );
+                        next_foundation_id += 1;
+                        (false, tile)
+                    })
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if !missing_foundations.is_empty() {
+        for (is_hull, tile) in missing_foundations {
+            if is_hull {
+                ship.replace_hull_tile(tile);
+            } else {
+                ship.replace_logistics_tile(tile);
+            }
+        }
+        changed = true;
+    }
+
+    let exterior_modules = ship
+        .modules
+        .iter()
+        .filter(|module| module_requires_hull_foundation(module.kind))
+        .map(|module| (module.grid_x, module.grid_y, module.rotation_quadrants))
+        .collect::<Vec<_>>();
+    for (grid_x, grid_y, rotation_quadrants) in exterior_modules {
+        let Some(tile) = ship.hull_at_mut(grid_x, grid_y) else {
+            continue;
+        };
+        if !is_hull_foundation_kind(tile.kind) {
+            continue;
+        }
+        if tile.rotation_quadrants != rotation_quadrants {
+            tile.rotation_quadrants = rotation_quadrants;
+            changed = true;
+        }
+    }
+
+    changed
 }
 
 pub(crate) fn cursor_grid_position(

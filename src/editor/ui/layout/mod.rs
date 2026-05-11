@@ -11,13 +11,15 @@ pub(crate) use status_updates::{
     update_editor_status_text,
 };
 use toolbox::{
-    foundation_toolbox_groups,
+    HullToolboxGroup,
+    component_toolbox_groups,
+    hull_toolbox_groups,
+    logistics_toolbox_groups,
     spawn_foundation_button_grid,
     spawn_layer_button,
     spawn_select_action_button,
     spawn_tool_mode_button,
     spawn_variant_button_grid,
-    toolbox_groups,
 };
 
 use super::super::helpers::{
@@ -39,14 +41,16 @@ use crate::{
         EditingCleanup,
         EditorAutoHullButton,
         EditorBuildSection,
+        EditorComponentsBuildSection,
         EditorCopySelectionButton,
         EditorDeleteSelectionButton,
+        EditorHullBuildSection,
         EditorLayer,
+        EditorLogisticsBuildSection,
         EditorMissionReportButton,
         EditorMissionReportButtonText,
         EditorMissionReportText,
         EditorMode,
-        EditorOverlayBuildSection,
         EditorPasteSelectionButton,
         EditorPlacementBlocker,
         EditorRoot,
@@ -63,7 +67,6 @@ use crate::{
         EditorToolboxScrollViewport,
         EditorToolboxTooltipText,
         EditorUiState,
-        EditorUnderlayBuildSection,
         EnemyEditorState,
         EnemyNewButton,
         EnemyNextButton,
@@ -91,14 +94,17 @@ use crate::{
     },
 };
 
+/// Reports whether the editor UI is absent so spawn chains only run when the workspace is not already open.
 pub(crate) fn editor_ui_missing(query: Query<Entity, With<EditorRoot>>) -> bool {
     query.is_empty()
 }
 
+/// Reports whether the editor UI is present so cleanup and transition logic can be gated safely.
 pub(crate) fn editor_ui_present(query: Query<Entity, With<EditorRoot>>) -> bool {
     !query.is_empty()
 }
 
+/// Spawns the full editor UI shell so ship authoring, inspection, and tooling have a persistent workspace.
 pub(crate) fn spawn_editor_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -189,15 +195,22 @@ pub(crate) fn spawn_editor_ui(
                     .with_children(|row| {
                         spawn_layer_button(
                             row,
-                            "Underlay",
-                            EditorLayer::Underlay,
+                            "Logistics",
+                            EditorLayer::Logistics,
                             tool_state.active_layer,
                             &mono_font,
                         );
                         spawn_layer_button(
                             row,
-                            "Overlay",
-                            EditorLayer::Overlay,
+                            "Hull",
+                            EditorLayer::Hull,
+                            tool_state.active_layer,
+                            &mono_font,
+                        );
+                        spawn_layer_button(
+                            row,
+                            "Components",
+                            EditorLayer::Components,
                             tool_state.active_layer,
                             &mono_font,
                         );
@@ -248,7 +261,7 @@ pub(crate) fn spawn_editor_ui(
                                             .spawn((
                                                 Node {
                                                     display: if tool_state.active_layer
-                                                        == EditorLayer::Underlay
+                                                        == EditorLayer::Logistics
                                                     {
                                                         Display::Flex
                                                     } else {
@@ -258,11 +271,11 @@ pub(crate) fn spawn_editor_ui(
                                                     row_gap: Val::Px(14.0),
                                                     ..default()
                                                 },
-                                                EditorUnderlayBuildSection,
+                                                EditorLogisticsBuildSection,
                                             ))
-                                            .with_children(|underlay| {
-                                                for (title, entries) in foundation_toolbox_groups() {
-                                                    underlay.spawn((
+                                            .with_children(|logistics| {
+                                                for (title, entries) in logistics_toolbox_groups() {
+                                                    logistics.spawn((
                                                         Text::new(title),
                                                         TextFont {
                                                             font: mono_font.clone(),
@@ -272,7 +285,7 @@ pub(crate) fn spawn_editor_ui(
                                                         TextColor(Color::srgb(0.74, 0.80, 0.88)),
                                                     ));
                                                     spawn_foundation_button_grid(
-                                                        underlay,
+                                                        logistics,
                                                         &asset_server,
                                                         &mono_font,
                                                         tool_state.selected_foundation_kind,
@@ -285,7 +298,7 @@ pub(crate) fn spawn_editor_ui(
                                             .spawn((
                                                 Node {
                                                     display: if tool_state.active_layer
-                                                        == EditorLayer::Overlay
+                                                        == EditorLayer::Hull
                                                     {
                                                         Display::Flex
                                                     } else {
@@ -295,11 +308,65 @@ pub(crate) fn spawn_editor_ui(
                                                     row_gap: Val::Px(14.0),
                                                     ..default()
                                                 },
-                                                EditorOverlayBuildSection,
+                                                EditorHullBuildSection,
                                             ))
-                                            .with_children(|overlay| {
-                                                for (title, entries) in toolbox_groups() {
-                                                    overlay.spawn((
+                                            .with_children(|hull| {
+                                                for (title, group) in hull_toolbox_groups() {
+                                                    hull.spawn((
+                                                        Text::new(title),
+                                                        TextFont {
+                                                            font: mono_font.clone(),
+                                                            font_size: 15.0,
+                                                            ..default()
+                                                        },
+                                                        TextColor(Color::srgb(0.74, 0.80, 0.88)),
+                                                    ));
+                                                    match group {
+                                                        HullToolboxGroup::Foundations(entries) => {
+                                                            spawn_foundation_button_grid(
+                                                                hull,
+                                                                &asset_server,
+                                                                &mono_font,
+                                                                tool_state.selected_foundation_kind,
+                                                                entries,
+                                                            );
+                                                        }
+                                                        HullToolboxGroup::Modules(entries) => {
+                                                            spawn_variant_button_grid(
+                                                                hull,
+                                                                &asset_server,
+                                                                &mono_font,
+                                                                editor_session.mode,
+                                                                &progression,
+                                                                tool_state.ignore_component_limits,
+                                                                tool_state.selected_kind,
+                                                                tool_state.selected_variant,
+                                                                entries,
+                                                            );
+                                                        }
+                                                    }
+                                                }
+                                            });
+
+                                        build
+                                            .spawn((
+                                                Node {
+                                                    display: if tool_state.active_layer
+                                                        == EditorLayer::Components
+                                                    {
+                                                        Display::Flex
+                                                    } else {
+                                                        Display::None
+                                                    },
+                                                    flex_direction: FlexDirection::Column,
+                                                    row_gap: Val::Px(14.0),
+                                                    ..default()
+                                                },
+                                                EditorComponentsBuildSection,
+                                            ))
+                                            .with_children(|components| {
+                                                for (title, entries) in component_toolbox_groups() {
+                                                    components.spawn((
                                                         Text::new(title),
                                                         TextFont {
                                                             font: mono_font.clone(),
@@ -309,7 +376,7 @@ pub(crate) fn spawn_editor_ui(
                                                         TextColor(Color::srgb(0.74, 0.80, 0.88)),
                                                     ));
                                                     spawn_variant_button_grid(
-                                                        overlay,
+                                                        components,
                                                         &asset_server,
                                                         &mono_font,
                                                         editor_session.mode,

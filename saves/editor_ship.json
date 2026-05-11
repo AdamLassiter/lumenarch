@@ -31,35 +31,35 @@
     },
     {
       "id": 7,
-      "kind": "Wire",
+      "kind": "Floor",
       "grid_x": 1,
       "grid_y": -1,
       "rotation_quadrants": 0
     },
     {
       "id": 8,
-      "kind": "Floor",
+      "kind": "Wire",
       "grid_x": 1,
       "grid_y": -2,
       "rotation_quadrants": 0
     },
     {
       "id": 9,
-      "kind": "Floor",
+      "kind": "Wire",
       "grid_x": -1,
       "grid_y": -2,
       "rotation_quadrants": 0
     },
     {
       "id": 10,
-      "kind": "Floor",
+      "kind": "Wire",
       "grid_x": 0,
       "grid_y": -2,
       "rotation_quadrants": 0
     },
     {
       "id": 11,
-      "kind": "Wire",
+      "kind": "Floor",
       "grid_x": -1,
       "grid_y": -1,
       "rotation_quadrants": 0
@@ -128,20 +128,6 @@
       "rotation_quadrants": 0
     },
     {
-      "id": 23,
-      "kind": "Wire",
-      "grid_x": -2,
-      "grid_y": -1,
-      "rotation_quadrants": 0
-    },
-    {
-      "id": 24,
-      "kind": "Wire",
-      "grid_x": 2,
-      "grid_y": -1,
-      "rotation_quadrants": 0
-    },
-    {
       "id": 25,
       "kind": "Floor",
       "grid_x": -1,
@@ -161,40 +147,200 @@
       "grid_x": -1,
       "grid_y": 0,
       "rotation_quadrants": 0
+    },
+    {
+      "id": 73,
+      "kind": "Wire",
+      "grid_x": 1,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 74,
+      "kind": "Wire",
+      "grid_x": -1,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    }
+  ],
+  "hull_tiles": [
+    {
+      "id": 29,
+      "kind": "Hull",
+      "grid_x": -1,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 31,
+      "kind": "Hull",
+      "grid_x": 1,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 47,
+      "kind": "Hull",
+      "grid_x": -1,
+      "grid_y": 5,
+      "rotation_quadrants": 2
+    },
+    {
+      "id": 48,
+      "kind": "Hull",
+      "grid_x": 1,
+      "grid_y": 5,
+      "rotation_quadrants": 2
+    },
+    {
+      "id": 50,
+      "kind": "Hull",
+      "grid_x": 2,
+      "grid_y": 0,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 54,
+      "kind": "HullOuterCorner",
+      "grid_x": -2,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 55,
+      "kind": "Hull",
+      "grid_x": 0,
+      "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 56,
+      "kind": "HullOuterCorner",
+      "grid_x": 2,
+      "grid_y": -3,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 57,
+      "kind": "Hull",
+      "grid_x": -2,
+      "grid_y": -2,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 58,
+      "kind": "Hull",
+      "grid_x": 2,
+      "grid_y": -2,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 59,
+      "kind": "Hull",
+      "grid_x": -2,
+      "grid_y": -1,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 60,
+      "kind": "Hull",
+      "grid_x": 2,
+      "grid_y": -1,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 61,
+      "kind": "Hull",
+      "grid_x": -2,
+      "grid_y": 0,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 62,
+      "kind": "Hull",
+      "grid_x": -2,
+      "grid_y": 1,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 63,
+      "kind": "Hull",
+      "grid_x": 2,
+      "grid_y": 1,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 64,
+      "kind": "Hull",
+      "grid_x": -2,
+      "grid_y": 2,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 65,
+      "kind": "Hull",
+      "grid_x": 2,
+      "grid_y": 2,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 66,
+      "kind": "Hull",
+      "grid_x": -2,
+      "grid_y": 3,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 67,
+      "kind": "Hull",
+      "grid_x": 2,
+      "grid_y": 3,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 68,
+      "kind": "Hull",
+      "grid_x": -2,
+      "grid_y": 4,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 69,
+      "kind": "Hull",
+      "grid_x": 2,
+      "grid_y": 4,
+      "rotation_quadrants": 1
+    },
+    {
+      "id": 70,
+      "kind": "HullOuterCorner",
+      "grid_x": -2,
+      "grid_y": 5,
+      "rotation_quadrants": 3
+    },
+    {
+      "id": 71,
+      "kind": "Hull",
+      "grid_x": 0,
+      "grid_y": 5,
+      "rotation_quadrants": 2
+    },
+    {
+      "id": 72,
+      "kind": "HullOuterCorner",
+      "grid_x": 2,
+      "grid_y": 5,
+      "rotation_quadrants": 2
     }
   ],
   "modules": [
     {
-      "id": 1,
-      "kind": "Core",
-      "variant": "BasicCore",
-      "grid_x": 0,
-      "grid_y": 0,
-      "rotation_quadrants": 0,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
       "id": 2,
-      "kind": "Reactor",
-      "variant": "Fission",
+      "kind": "Engine",
+      "variant": "Standard",
       "grid_x": -1,
-      "grid_y": 4,
-      "rotation_quadrants": 0,
+      "grid_y": 5,
+      "rotation_quadrants": 2,
       "channel": 0,
       "defaults": {
         "reaction_rate_milli": 350,
@@ -214,11 +360,11 @@
     },
     {
       "id": 3,
-      "kind": "Reactor",
-      "variant": "Fission",
+      "kind": "Engine",
+      "variant": "Standard",
       "grid_x": 1,
-      "grid_y": 4,
-      "rotation_quadrants": 0,
+      "grid_y": 5,
+      "rotation_quadrants": 2,
       "channel": 0,
       "defaults": {
         "reaction_rate_milli": 350,
@@ -238,11 +384,11 @@
     },
     {
       "id": 4,
-      "kind": "Battery",
-      "variant": "BatteryCell",
+      "kind": "Reactor",
+      "variant": "Fission",
       "grid_x": -1,
-      "grid_y": 3,
-      "rotation_quadrants": 0,
+      "grid_y": 4,
+      "rotation_quadrants": 2,
       "channel": 0,
       "defaults": {
         "reaction_rate_milli": 350,
@@ -262,11 +408,11 @@
     },
     {
       "id": 5,
-      "kind": "Battery",
-      "variant": "BatteryCell",
+      "kind": "Reactor",
+      "variant": "Fission",
       "grid_x": 1,
-      "grid_y": 3,
-      "rotation_quadrants": 0,
+      "grid_y": 4,
+      "rotation_quadrants": 2,
       "channel": 0,
       "defaults": {
         "reaction_rate_milli": 350,
@@ -286,10 +432,10 @@
     },
     {
       "id": 6,
-      "kind": "Engine",
-      "variant": "Standard",
+      "kind": "Battery",
+      "variant": "BatteryCell",
       "grid_x": -1,
-      "grid_y": 5,
+      "grid_y": 3,
       "rotation_quadrants": 2,
       "channel": 0,
       "defaults": {
@@ -310,10 +456,10 @@
     },
     {
       "id": 7,
-      "kind": "Engine",
-      "variant": "Standard",
+      "kind": "Battery",
+      "variant": "BatteryCell",
       "grid_x": 1,
-      "grid_y": 5,
+      "grid_y": 3,
       "rotation_quadrants": 2,
       "channel": 0,
       "defaults": {
@@ -334,30 +480,6 @@
     },
     {
       "id": 8,
-      "kind": "Cockpit",
-      "variant": "Standard",
-      "grid_x": 0,
-      "grid_y": -1,
-      "rotation_quadrants": 0,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 9,
       "kind": "Computer",
       "variant": "Standard",
       "grid_x": 0,
@@ -568,11 +690,35 @@
       }
     },
     {
-      "id": 10,
-      "kind": "Interior",
+      "id": 9,
+      "kind": "Cockpit",
       "variant": "Standard",
-      "grid_x": -1,
-      "grid_y": -2,
+      "grid_x": 0,
+      "grid_y": -1,
+      "rotation_quadrants": 0,
+      "channel": 0,
+      "defaults": {
+        "reaction_rate_milli": 350,
+        "turbine_load_milli": 300,
+        "storage_allow_intake": true,
+        "airlock_open": false,
+        "manipulator_manual_mode": false,
+        "manipulator_transfer_enabled": false,
+        "manipulator_resource_kind": "RawSalvage",
+        "processor_recipe": "RepairCharge",
+        "processor_enabled": true,
+        "computer_enabled": true,
+        "turret_fire_intent": false
+      },
+      "arch_program": null,
+      "lumen_program": null
+    },
+    {
+      "id": 10,
+      "kind": "Core",
+      "variant": "BasicCore",
+      "grid_x": 0,
+      "grid_y": 0,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -593,10 +739,10 @@
     },
     {
       "id": 11,
-      "kind": "Interior",
-      "variant": "Standard",
-      "grid_x": 0,
-      "grid_y": -2,
+      "kind": "Turret",
+      "variant": "LaserTurret",
+      "grid_x": -1,
+      "grid_y": -3,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -617,10 +763,10 @@
     },
     {
       "id": 12,
-      "kind": "Interior",
-      "variant": "Standard",
+      "kind": "Turret",
+      "variant": "LaserTurret",
       "grid_x": 1,
-      "grid_y": -2,
+      "grid_y": -3,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -643,8 +789,8 @@
       "id": 13,
       "kind": "Interior",
       "variant": "Standard",
-      "grid_x": -1,
-      "grid_y": -1,
+      "grid_x": 0,
+      "grid_y": 4,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -667,8 +813,8 @@
       "id": 14,
       "kind": "Interior",
       "variant": "Standard",
-      "grid_x": 1,
-      "grid_y": -1,
+      "grid_x": 0,
+      "grid_y": 3,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -692,7 +838,7 @@
       "kind": "Interior",
       "variant": "Standard",
       "grid_x": -1,
-      "grid_y": 0,
+      "grid_y": 2,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -715,8 +861,8 @@
       "id": 16,
       "kind": "Interior",
       "variant": "Standard",
-      "grid_x": 1,
-      "grid_y": 0,
+      "grid_x": 0,
+      "grid_y": 2,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -739,8 +885,8 @@
       "id": 17,
       "kind": "Interior",
       "variant": "Standard",
-      "grid_x": -1,
-      "grid_y": 1,
+      "grid_x": 1,
+      "grid_y": 2,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -784,11 +930,35 @@
       "lumen_program": null
     },
     {
+      "id": 19,
+      "kind": "Interior",
+      "variant": "Standard",
+      "grid_x": 1,
+      "grid_y": 0,
+      "rotation_quadrants": 0,
+      "channel": 0,
+      "defaults": {
+        "reaction_rate_milli": 350,
+        "turbine_load_milli": 300,
+        "storage_allow_intake": true,
+        "airlock_open": false,
+        "manipulator_manual_mode": false,
+        "manipulator_transfer_enabled": false,
+        "manipulator_resource_kind": "RawSalvage",
+        "processor_recipe": "RepairCharge",
+        "processor_enabled": true,
+        "computer_enabled": true,
+        "turret_fire_intent": false
+      },
+      "arch_program": null,
+      "lumen_program": null
+    },
+    {
       "id": 20,
       "kind": "Interior",
       "variant": "Standard",
-      "grid_x": -1,
-      "grid_y": 2,
+      "grid_x": 1,
+      "grid_y": -1,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -809,10 +979,10 @@
     },
     {
       "id": 21,
-      "kind": "Shield",
-      "variant": "RadialShield",
-      "grid_x": 0,
-      "grid_y": 2,
+      "kind": "Interior",
+      "variant": "Standard",
+      "grid_x": 1,
+      "grid_y": -2,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -835,8 +1005,8 @@
       "id": 22,
       "kind": "Interior",
       "variant": "Standard",
-      "grid_x": 1,
-      "grid_y": 2,
+      "grid_x": 0,
+      "grid_y": -2,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -856,35 +1026,11 @@
       "lumen_program": null
     },
     {
-      "id": 31,
-      "kind": "Cargo",
-      "variant": "FuelTank",
-      "grid_x": 0,
-      "grid_y": 4,
-      "rotation_quadrants": 2,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 32,
+      "id": 23,
       "kind": "Interior",
       "variant": "Standard",
-      "grid_x": 0,
-      "grid_y": 3,
+      "grid_x": -1,
+      "grid_y": -2,
       "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
@@ -904,180 +1050,12 @@
       "lumen_program": null
     },
     {
-      "id": 33,
-      "kind": "HullOuterCorner",
-      "variant": "Standard",
-      "grid_x": -2,
-      "grid_y": -3,
-      "rotation_quadrants": 0,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 34,
-      "kind": "Hull",
+      "id": 24,
+      "kind": "Interior",
       "variant": "Standard",
       "grid_x": -1,
-      "grid_y": -3,
-      "rotation_quadrants": 0,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 35,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": 0,
-      "grid_y": -3,
-      "rotation_quadrants": 0,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 36,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": 1,
-      "grid_y": -3,
-      "rotation_quadrants": 0,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 37,
-      "kind": "HullOuterCorner",
-      "variant": "Standard",
-      "grid_x": 2,
-      "grid_y": -3,
-      "rotation_quadrants": 1,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 38,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": -2,
-      "grid_y": -2,
-      "rotation_quadrants": 3,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 39,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": 2,
-      "grid_y": -2,
-      "rotation_quadrants": 1,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 40,
-      "kind": "Turret",
-      "variant": "LaserTurret",
-      "grid_x": -2,
       "grid_y": -1,
-      "rotation_quadrants": 3,
+      "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
         "reaction_rate_milli": 350,
@@ -1096,84 +1074,12 @@
       "lumen_program": null
     },
     {
-      "id": 41,
-      "kind": "Turret",
-      "variant": "LaserTurret",
-      "grid_x": 2,
-      "grid_y": -1,
-      "rotation_quadrants": 1,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 42,
-      "kind": "Hull",
+      "id": 25,
+      "kind": "Interior",
       "variant": "Standard",
-      "grid_x": -2,
-      "grid_y": 0,
-      "rotation_quadrants": 3,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 43,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": 2,
-      "grid_y": 0,
-      "rotation_quadrants": 1,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 44,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": -2,
+      "grid_x": -1,
       "grid_y": 1,
-      "rotation_quadrants": 3,
+      "rotation_quadrants": 0,
       "channel": 0,
       "defaults": {
         "reaction_rate_milli": 350,
@@ -1192,228 +1098,36 @@
       "lumen_program": null
     },
     {
-      "id": 45,
+      "id": 26,
+      "kind": "Interior",
+      "variant": "Standard",
+      "grid_x": -1,
+      "grid_y": 0,
+      "rotation_quadrants": 0,
+      "channel": 0,
+      "defaults": {
+        "reaction_rate_milli": 350,
+        "turbine_load_milli": 300,
+        "storage_allow_intake": true,
+        "airlock_open": false,
+        "manipulator_manual_mode": false,
+        "manipulator_transfer_enabled": false,
+        "manipulator_resource_kind": "RawSalvage",
+        "processor_recipe": "RepairCharge",
+        "processor_enabled": true,
+        "computer_enabled": true,
+        "turret_fire_intent": false
+      },
+      "arch_program": null,
+      "lumen_program": null
+    },
+    {
+      "id": 27,
       "kind": "Airlock",
       "variant": "Standard",
       "grid_x": 2,
-      "grid_y": 1,
+      "grid_y": 0,
       "rotation_quadrants": 1,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 46,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": -2,
-      "grid_y": 2,
-      "rotation_quadrants": 3,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 47,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": 2,
-      "grid_y": 2,
-      "rotation_quadrants": 1,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 48,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": 0,
-      "grid_y": 5,
-      "rotation_quadrants": 2,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 49,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": -2,
-      "grid_y": 3,
-      "rotation_quadrants": 3,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 50,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": -2,
-      "grid_y": 4,
-      "rotation_quadrants": 3,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 51,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": 2,
-      "grid_y": 3,
-      "rotation_quadrants": 1,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 52,
-      "kind": "Hull",
-      "variant": "Standard",
-      "grid_x": 2,
-      "grid_y": 4,
-      "rotation_quadrants": 1,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 53,
-      "kind": "HullOuterCorner",
-      "variant": "Standard",
-      "grid_x": -2,
-      "grid_y": 5,
-      "rotation_quadrants": 3,
-      "channel": 0,
-      "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
-        "storage_allow_intake": true,
-        "airlock_open": false,
-        "manipulator_manual_mode": false,
-        "manipulator_transfer_enabled": false,
-        "manipulator_resource_kind": "RawSalvage",
-        "processor_recipe": "RepairCharge",
-        "processor_enabled": true,
-        "computer_enabled": true,
-        "turret_fire_intent": false
-      },
-      "arch_program": null,
-      "lumen_program": null
-    },
-    {
-      "id": 54,
-      "kind": "HullOuterCorner",
-      "variant": "Standard",
-      "grid_x": 2,
-      "grid_y": 5,
-      "rotation_quadrants": 2,
       "channel": 0,
       "defaults": {
         "reaction_rate_milli": 350,

@@ -32,6 +32,7 @@ use crate::{
     },
 };
 
+/// Recomputes ship atmosphere tile oxygen and venting so breaches and open airlocks matter in play.
 pub(crate) fn update_ship_atmosphere(
     time: Res<Time>,
     balance: Res<BalanceConfig>,
@@ -201,6 +202,7 @@ pub(crate) fn update_ship_atmosphere(
     }
 }
 
+/// Samples local oxygen for each player so suffocation warnings and blackout effects track location.
 pub(crate) fn sample_player_atmosphere(
     balance: Res<BalanceConfig>,
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,

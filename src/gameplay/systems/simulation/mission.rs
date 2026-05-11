@@ -37,6 +37,7 @@ use crate::{
     stations::StationCatalogResource,
 };
 
+/// Records encounter telemetry as it happens so post-mission feedback can explain what went wrong.
 pub(crate) fn update_mission_telemetry(
     mission_query: Single<&mut MissionState, (With<PlayerShip>, With<ShipRoot>)>,
     module_query: Query<(
@@ -64,6 +65,7 @@ pub(crate) fn update_mission_telemetry(
     }
 }
 
+/// Advances mission success, failure, and extraction state so encounters end for the right reasons.
 pub(crate) fn update_mission_state(
     balance: Res<BalanceConfig>,
     hostile_query: Query<Entity, With<HostileTarget>>,
@@ -113,6 +115,7 @@ pub(crate) fn update_mission_state(
     }
 }
 
+/// Summarizes current runtime ship condition into mission state for HUD and debrief consumers.
 pub(crate) fn sync_runtime_ship_state(
     balance: Res<BalanceConfig>,
     player_ship_query: Single<
@@ -250,6 +253,7 @@ pub(crate) fn sync_runtime_ship_state(
     }
 }
 
+/// Returns the frontend to docked flow once mission resolution has settled and rewards are ready.
 pub(crate) fn return_after_mission_resolution(
     balance: Res<BalanceConfig>,
     time: Res<Time>,

@@ -22,6 +22,7 @@ use crate::{
     },
 };
 
+/// Builds the lobby interface so players can configure identity and connect to a session.
 pub(crate) fn spawn_lobby_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -198,6 +199,7 @@ pub(crate) fn spawn_lobby_ui(
         });
 }
 
+/// Refreshes lobby text and button labels so the UI mirrors current session and profile state.
 pub(crate) fn update_lobby_status_text(
     status: Res<netcode::SessionStatus>,
     config: Res<netcode::SessionConfig>,
@@ -209,6 +211,7 @@ pub(crate) fn update_lobby_status_text(
         Query<(&mut Text, &mut TextColor), (With<LobbyColorText>, Without<StatusText>)>,
     )>,
 ) {
+    // SAFETY: Each ParamSet branch targets a distinct labeled text role in the lobby UI.
     if !status.is_changed() && !config.is_changed() && !local_profile.is_changed() {
         return;
     }
@@ -232,16 +235,19 @@ pub(crate) fn update_lobby_status_text(
     }
 }
 
+/// Despawns the lobby tree when the frontend leaves the lobby flow.
 pub(crate) fn cleanup_lobby_ui(mut commands: Commands, ui_query: Query<Entity, With<LobbyRoot>>) {
     for entity in &ui_query {
         commands.entity(entity).despawn();
     }
 }
 
+/// Reports whether the lobby UI still needs to be spawned.
 pub(crate) fn lobby_ui_missing(query: Query<Entity, With<LobbyRoot>>) -> bool {
     query.is_empty()
 }
 
+/// Reports whether the lobby UI is already present and can be updated in place.
 pub(crate) fn lobby_ui_present(query: Query<Entity, With<LobbyRoot>>) -> bool {
     !query.is_empty()
 }

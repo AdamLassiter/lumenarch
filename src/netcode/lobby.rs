@@ -80,6 +80,7 @@ struct HostClientConn {
     profile: Option<LocalPlayerProfile>,
 }
 
+/// Pulls lobby thread events into Bevy resources so frontend UI and bootstrap state stay in sync.
 pub(crate) fn poll_lobby_runtime_events(
     mut lobby_runtime: ResMut<LobbyRuntime>,
     mut status: ResMut<SessionStatus>,
@@ -190,6 +191,7 @@ pub(crate) fn shutdown_lobby_runtime(lobby_runtime: &mut LobbyRuntime) {
     lobby_runtime.event_rx = None;
 }
 
+/// Pushes profile edits into the lobby runtime so peers see updated names, roles, and colors promptly.
 pub(crate) fn sync_lobby_profile_changes(
     local_profile: Res<LocalPlayerProfile>,
     status: Res<SessionStatus>,

@@ -20,33 +20,43 @@ pub(crate) const MAP_CENTER_Y: f32 = 230.0;
 pub(crate) const MAP_NODE_WIDTH: f32 = 170.0;
 pub(crate) const MAP_NODE_HEIGHT: f32 = 52.0;
 
+/// Projects sector nodes and link dashes into the current map view so route planning reflects zoom and pan.
+///
+/// SAFETY: Node-border widgets and link-dash widgets use distinct marker components and are updated through
+/// separate `ParamSet` entries, so their mutable UI access is sequenced rather than aliased.
 pub(crate) fn sync_sector_map_layout(
     sector_state: Res<SectorState>,
     view_state: Res<SectorMapViewState>,
-    mut node_query: Query<
-        (
-            &SectorNodeButton,
-            &mut Node,
-            &mut BackgroundColor,
-            &mut BorderColor,
-        ),
-        (With<SectorMapNodeBorder>, Without<SectorMapLinkDash>),
-    >,
-    mut dash_query: Query<
-        (
-            &SectorMapLinkDash,
-            &mut Node,
-            &mut Transform,
-            &mut BackgroundColor,
-        ),
-        Without<SectorMapNodeBorder>,
-    >,
+    mut map_queries: ParamSet<(
+        Query<
+            '_,
+            '_,
+            (
+                &'static SectorNodeButton,
+                &'static mut Node,
+                &'static mut BackgroundColor,
+                &'static mut BorderColor,
+            ),
+            With<SectorMapNodeBorder>,
+        >,
+        Query<
+            '_,
+            '_,
+            (
+                &'static SectorMapLinkDash,
+                &'static mut Node,
+                &'static mut Transform,
+                &'static mut BackgroundColor,
+            ),
+            With<SectorMapLinkDash>,
+        >,
+    )>,
 ) {
     if !sector_state.is_changed() && !view_state.is_changed() {
         return;
     }
 
-    for (button, mut node_style, mut background, mut border) in &mut node_query {
+    for (button, mut node_style, mut background, mut border) in &mut map_queries.p0() {
         let Some(node) = sector_state.node(button.node_id) else {
             continue;
         };
@@ -68,7 +78,7 @@ pub(crate) fn sync_sector_map_layout(
         .current_node()
         .map(|node| node.position)
         .unwrap_or([0.0, 0.0]);
-    for (dash, mut node, mut transform, mut background) in &mut dash_query {
+    for (dash, mut node, mut transform, mut background) in &mut map_queries.p1() {
         let reachable = sector_state.is_reachable(dash.target_node_id);
         if let Some(target_node) = sector_state.node(dash.target_node_id) {
             let (next_node, next_transform) = projected_link_dash(
@@ -90,19 +100,25 @@ pub(crate) fn sync_sector_map_layout(
     }
 }
 
+/// Refreshes the sector status/detail text so the side panel always matches the current selection.
+///
+/// SAFETY: Status and detail labels are distinct UI roles with separate marker components, and `ParamSet`
+/// guarantees we only mutably access one query at a time.
 pub(crate) fn update_sector_map_text(
     sector_state: Res<SectorState>,
-    mut status_query: Query<&mut Text, (With<SectorMapStatusText>, Without<SectorMapDetailText>)>,
-    mut detail_query: Query<&mut Text, (With<SectorMapDetailText>, Without<SectorMapStatusText>)>,
+    mut text_queries: ParamSet<(
+        Query<'_, '_, &'static mut Text, With<SectorMapStatusText>>,
+        Query<'_, '_, &'static mut Text, With<SectorMapDetailText>>,
+    )>,
 ) {
     if !sector_state.is_changed() {
         return;
     }
 
-    for mut text in &mut status_query {
+    for mut text in &mut text_queries.p0() {
         **text = sector_status_text(&sector_state);
     }
-    for mut text in &mut detail_query {
+    for mut text in &mut text_queries.p1() {
         **text = sector_detail_text(&sector_state);
     }
 }

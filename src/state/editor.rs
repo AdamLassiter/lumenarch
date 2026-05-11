@@ -102,8 +102,9 @@ pub(crate) enum EditorToolMode {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum EditorLayer {
     #[default]
-    Underlay,
-    Overlay,
+    Logistics,
+    Hull,
+    Components,
 }
 
 #[derive(Resource)]
@@ -122,7 +123,7 @@ impl Default for EditorToolState {
     fn default() -> Self {
         Self {
             tool_mode: EditorToolMode::Build,
-            active_layer: EditorLayer::Underlay,
+            active_layer: EditorLayer::Logistics,
             selected_foundation_kind: ShipFoundationKind::Floor,
             selected_kind: ModuleKind::Hull,
             selected_variant: ModuleVariant::default_for_kind(ModuleKind::Hull),
@@ -242,10 +243,13 @@ pub(crate) struct EditorToolModeButtonText;
 pub(crate) struct EditorBuildSection;
 
 #[derive(Component)]
-pub(crate) struct EditorUnderlayBuildSection;
+pub(crate) struct EditorLogisticsBuildSection;
 
 #[derive(Component)]
-pub(crate) struct EditorOverlayBuildSection;
+pub(crate) struct EditorHullBuildSection;
+
+#[derive(Component)]
+pub(crate) struct EditorComponentsBuildSection;
 
 #[derive(Component)]
 pub(crate) struct EditorSelectSection;

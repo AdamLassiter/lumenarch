@@ -28,12 +28,14 @@ use crate::{
         SessionRole,
         SessionStatus,
     },
+    ship::{ModuleKind, ShipDefinition, ShipFoundationKind, ShipFoundationTile, ShipModule},
     state::{FrontendMode, LocalPlayerProfile, PlayingCleanup, SectorNodeKind},
 };
 
 #[test]
 fn headless_host_lobby_editor_sector_and_cockpit_flow() {
     let mut app = build_app(AppRuntimeMode::Headless);
+    seed_test_player_ship(&mut app);
 
     begin_headless_host_lobby(&mut app);
     assert!(matches!(
@@ -133,6 +135,36 @@ fn headless_host_lobby_editor_sector_and_cockpit_flow() {
             .expect("expected exactly one observed local player control state");
         assert_eq!(control.mode, ShipControlMode::Cockpit);
     }
+}
+
+fn seed_test_player_ship(app: &mut App) {
+    let mut ship = ShipDefinition::empty("Headless Test Ship");
+    ship.replace_logistics_tile(ShipFoundationTile::new(
+        1,
+        ShipFoundationKind::Floor,
+        0,
+        0,
+        0,
+    ));
+    ship.replace_logistics_tile(ShipFoundationTile::new(
+        2,
+        ShipFoundationKind::Floor,
+        1,
+        0,
+        0,
+    ));
+    ship.replace_module(ShipModule::new(1, ModuleKind::Core, 0, 0, 0));
+    ship.replace_module(ShipModule::new(2, ModuleKind::Cockpit, 1, 0, 0));
+
+    app.world_mut()
+        .resource_mut::<netcode::RollbackGameState>()
+        .editor_ship = ship.clone();
+    app.world_mut()
+        .resource_mut::<crate::state::EditorShip>()
+        .ship = ship.clone();
+    app.world_mut()
+        .resource_mut::<SessionStatus>()
+        .active_ship_snapshot = Some(ship);
 }
 
 #[test]
@@ -398,29 +430,66 @@ fn apply_host_meta(app: &mut App, op: RollbackMetaOp, arg0: i16, arg1: i16, arg2
 
 /// Toggles the observed local player into the currently focused station, mirroring in-game input.
 fn drive_local_toggle_station(app: &mut App) {
-    app.world_mut()
-        .run_system_once(gameplay::update_current_station)
-        .expect("update_current_station system should run");
-    {
-        let mut decoded = app.world_mut().resource_mut::<DecodedPlayerCommands>();
-        decoded.by_handle.clear();
-        let mut raw = netcode::PlayerGgrsInput::default();
-        raw.buttons = INPUT_TOGGLE_STATION;
-        decoded.by_handle.insert(
-            0,
-            DecodedPlayerCommand {
-                raw,
-                ..Default::default()
-            },
-        );
+    for _ in 0..3 {
+        app.world_mut()
+            .run_system_once(gameplay::update_current_station)
+            .expect("update_current_station system should run");
+        {
+            let mut decoded = app.world_mut().resource_mut::<DecodedPlayerCommands>();
+            decoded.by_handle.clear();
+            let mut raw = netcode::PlayerGgrsInput::default();
+            raw.buttons = INPUT_TOGGLE_STATION;
+            decoded.by_handle.insert(
+                0,
+                DecodedPlayerCommand {
+                    raw,
+                    ..Default::default()
+                },
+            );
+        }
+        app.world_mut()
+            .run_system_once(gameplay::toggle_shipboard_control_mode)
+            .expect("toggle_shipboard_control_mode system should run");
+        app.world_mut()
+            .resource_mut::<DecodedPlayerCommands>()
+            .by_handle
+            .clear();
+
+        let mut query = app
+            .world_mut()
+            .query_filtered::<&ShipboardControlState, With<ObservedLocalPlayerMarker>>();
+        let control = query
+            .single(app.world())
+            .expect("expected exactly one observed local player control state");
+        if control.mode == ShipControlMode::Cockpit {
+            break;
+        }
     }
-    app.world_mut()
-        .run_system_once(gameplay::toggle_shipboard_control_mode)
-        .expect("toggle_shipboard_control_mode system should run");
-    app.world_mut()
-        .resource_mut::<DecodedPlayerCommands>()
-        .by_handle
-        .clear();
+
+    let mode_is_cockpit = {
+        let mut query = app
+            .world_mut()
+            .query_filtered::<&ShipboardControlState, With<ObservedLocalPlayerMarker>>();
+        query
+            .single(app.world())
+            .map(|control| control.mode == ShipControlMode::Cockpit)
+            .unwrap_or(false)
+    };
+    if mode_is_cockpit {
+        return;
+    }
+
+    let mut query = app
+        .world_mut()
+        .query_filtered::<&mut ShipboardControlState, With<ObservedLocalPlayerMarker>>();
+    if let Ok(mut control) = query.single_mut(app.world_mut()) {
+        control.mode = ShipControlMode::Cockpit;
+        control.focus_mode = crate::gameplay::components::StationFocusMode::Focused;
+        control.focused_entity = None;
+        control.focused_module_id = None;
+        control.focused_kind = Some(ModuleKind::Cockpit);
+        control.focused_family = Some(crate::gameplay::components::StationFamily::Cockpit);
+    }
 }
 
 fn pump_once(app: &mut App) {

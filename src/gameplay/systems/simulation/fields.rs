@@ -37,6 +37,7 @@ use crate::{
     ship::{ModuleKind, ModuleVariant},
 };
 
+/// Samples ship-wide heat and electrical fields so modules feel the consequences of nearby systems.
 pub(crate) fn sample_ship_fields(
     balance: Res<BalanceConfig>,
     mut module_query: Query<(
@@ -179,6 +180,7 @@ pub(crate) fn sample_ship_fields(
     }
 }
 
+/// Converts sampled field pressure into runtime disablement, wear, and attention state per module.
 pub(crate) fn update_module_runtime_state(
     time: Res<Time>,
     balance: Res<BalanceConfig>,
@@ -353,6 +355,7 @@ pub(crate) fn update_module_runtime_state(
     }
 }
 
+/// Applies heat, shock, and oxygen fallout to players so hazardous ships are dangerous to inhabit.
 pub(crate) fn apply_player_environmental_effects(
     time: Res<Time>,
     balance: Res<BalanceConfig>,

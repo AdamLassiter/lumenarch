@@ -31,6 +31,7 @@ use crate::{
     },
 };
 
+/// Spawns the sector map screen so route planning, launch, and return controls have their own presentation.
 pub(crate) fn spawn_sector_map_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -257,6 +258,7 @@ pub(crate) fn spawn_sector_map_ui(
         });
 }
 
+/// Tears down the sector map UI when the player leaves route planning so stale controls do not linger.
 pub(crate) fn cleanup_sector_map_ui(
     mut commands: Commands,
     query: Query<Entity, With<SectorMapRoot>>,
@@ -266,10 +268,12 @@ pub(crate) fn cleanup_sector_map_ui(
     }
 }
 
+/// Reports whether the sector map UI is absent so spawn logic can be gated cleanly.
 pub(crate) fn sector_map_ui_missing(query: Query<Entity, With<SectorMapRoot>>) -> bool {
     query.is_empty()
 }
 
+/// Reports whether the sector map UI is present so cleanup logic only runs when needed.
 pub(crate) fn sector_map_ui_present(query: Query<Entity, With<SectorMapRoot>>) -> bool {
     !query.is_empty()
 }

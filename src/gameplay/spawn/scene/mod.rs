@@ -29,6 +29,7 @@ use crate::{
     stations::StationCatalogResource,
 };
 
+/// Builds the full encounter presentation scene so the current mission becomes a playable combat space.
 pub(crate) fn spawn_runtime_scene(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -277,6 +278,7 @@ pub(crate) fn spawn_runtime_scene(
     }
 }
 
+/// Logs one summary per encounter generation so missing hostiles or bad scene assembly is easy to spot.
 pub(crate) fn log_runtime_hostile_scene_summary(
     rollback_state: Res<netcode::RollbackGameState>,
     hostile_root_query: Query<Entity, (With<HostileShip>, With<ShipRoot>)>,
@@ -315,6 +317,7 @@ pub(crate) fn log_runtime_hostile_scene_summary(
     *last_logged_scene_generation = Some(rollback_state.scene_generation);
 }
 
+/// Despawns encounter presentation roots when leaving combat so the next scene starts from a clean slate.
 pub(crate) fn cleanup_runtime_entities(
     mut commands: Commands,
     mut player_handle_map: ResMut<netcode::PlayerHandleMap>,
@@ -336,12 +339,14 @@ pub(crate) fn cleanup_runtime_entities(
     }
 }
 
+/// Reports whether the encounter scene is absent so session presentation can spawn it on demand.
 pub(crate) fn runtime_scene_missing(
     query: Query<Entity, With<super::super::super::state::PlayingCleanup>>,
 ) -> bool {
     query.is_empty()
 }
 
+/// Reports whether the encounter scene is present so cleanup only runs against live runtime entities.
 pub(crate) fn runtime_scene_present(
     query: Query<Entity, With<super::super::super::state::PlayingCleanup>>,
 ) -> bool {

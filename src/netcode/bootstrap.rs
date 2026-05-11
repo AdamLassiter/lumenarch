@@ -154,6 +154,7 @@ pub(crate) fn request_lobby_session_start(
     status.phase = SessionPhase::Starting;
 }
 
+/// Finalizes a pending lobby start into a live rollback session so the frontend can enter gameplay.
 pub(crate) fn finalize_pending_session_bootstrap(
     mut commands: Commands,
     mut bootstrap: ResMut<SessionBootstrapConfig>,

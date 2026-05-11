@@ -460,6 +460,7 @@ pub(super) fn format_program_textbox(
     display
 }
 
+/// Removes editor-only UI entities when leaving the editor so the next workspace starts fresh.
 pub(crate) fn cleanup_editor_entities(
     mut commands: Commands,
     query: Query<Entity, With<EditingCleanup>>,

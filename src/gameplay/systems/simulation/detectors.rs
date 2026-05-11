@@ -24,6 +24,7 @@ use crate::gameplay::{
 };
 
 /// Updates detector and monitor modules so ARCH can read live ship, crew, and threat cues.
+/// Updates detector module outputs so automation and HUD systems can sense nearby threats and damage.
 pub(crate) fn update_detector_modules(
     time: Res<Time>,
     ship_query: Single<

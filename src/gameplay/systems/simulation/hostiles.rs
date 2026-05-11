@@ -52,6 +52,7 @@ use crate::{
     ship::ModuleKind,
 };
 
+/// Mirrors hostile ship runtime data into aggregate combat state so AI and UI read one coherent snapshot.
 pub(crate) fn sync_hostile_ship_state(
     balance: Res<BalanceConfig>,
     mut hostile_query: Query<
@@ -159,6 +160,7 @@ pub(crate) fn sync_hostile_ship_state(
     }
 }
 
+/// Advances hostile control intent so enemy ships pursue, strafe, and manage their systems.
 pub(crate) fn drive_hostile_ships(
     time: Res<Time>,
     balance: Res<BalanceConfig>,
@@ -298,6 +300,7 @@ pub(crate) fn drive_hostile_ships(
     }
 }
 
+/// Integrates hostile ship velocities so AI steering becomes actual movement in the arena.
 pub(crate) fn integrate_hostile_ship_motion(
     time: Res<Time>,
     mut hostile_query: Query<
@@ -325,6 +328,7 @@ pub(crate) fn integrate_hostile_ship_motion(
     }
 }
 
+/// Fires module-based hostile weapons when their control state and cooldowns allow it.
 pub(crate) fn fire_hostile_ship_weapons(
     mut commands: Commands,
     balance: Res<BalanceConfig>,
@@ -437,6 +441,7 @@ pub(crate) fn fire_hostile_ship_weapons(
     }
 }
 
+/// Fires arena hostile platforms so environmental enemies contribute pressure during encounters.
 pub(crate) fn fire_hostile_targets(
     mut commands: Commands,
     time: Res<Time>,
@@ -481,6 +486,7 @@ pub(crate) fn fire_hostile_targets(
     }
 }
 
+/// Rotates hostile turret tops toward their chosen aim so enemy fire reads clearly in the scene.
 pub(crate) fn aim_hostile_turrets(
     player_ship_query: Single<&SimPosition, (With<PlayerShip>, With<ShipRoot>)>,
     mut hostile_query: Query<

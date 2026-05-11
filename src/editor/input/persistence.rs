@@ -1,3 +1,4 @@
+/// Saves the current editor ship on demand so manual refit changes can be persisted immediately.
 pub(crate) fn save_editor_ship_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     editor_ship: Res<EditorShip>,
@@ -69,6 +70,7 @@ pub(crate) fn save_editor_ship_shortcut(
     }
 }
 
+/// Pans and zooms the editor camera so large ships remain comfortable to inspect and edit.
 pub(crate) fn pan_and_zoom_editor_view(
     mut mouse_wheel: MessageReader<MouseWheel>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,
@@ -136,6 +138,7 @@ pub(crate) fn pan_and_zoom_editor_view(
     projection.scale = view_state.zoom;
 }
 
+/// Reloads the saved editor ship so refit authors can discard or revisit stored layouts quickly.
 pub(crate) fn load_editor_ship_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     editor_session: Res<EditorSessionState>,
@@ -199,6 +202,7 @@ pub(crate) fn load_editor_ship_shortcut(
     }
 }
 
+/// Persists editor ship changes back to the appropriate save target as the authored layout evolves.
 pub(crate) fn persist_editor_ship(
     editor_ship: Res<EditorShip>,
     editor_session: Res<EditorSessionState>,

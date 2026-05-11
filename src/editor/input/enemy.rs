@@ -17,6 +17,7 @@ use crate::{
     },
 };
 
+/// Handles enemy-library browser buttons so debug authors can step between, create, and load hostile ship entries.
 pub(crate) fn enemy_library_button_system(
     mut interaction_query: Query<
         (
@@ -84,6 +85,7 @@ pub(crate) fn enemy_library_button_system(
     }
 }
 
+/// Mirrors enemy-library navigation onto the keyboard so hostile ship iteration stays quick while editing.
 pub(crate) fn enemy_library_keyboard_shortcuts(
     keys: Res<ButtonInput<KeyCode>>,
     editor_session: Res<EditorSessionState>,

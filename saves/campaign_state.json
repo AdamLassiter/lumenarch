@@ -2,7 +2,7 @@
   "progression": {
     "scrap": 31,
     "hull_wear": 0,
-    "jump_count": 254,
+    "jump_count": 292,
     "stored_components": [
       {
         "kind": "Hull",
@@ -15,6 +15,72 @@
         "variant": "Standard",
         "ready": 0,
         "damaged": 0
+      },
+      {
+        "kind": "Airlock",
+        "variant": "Standard",
+        "ready": 1,
+        "damaged": 0
+      },
+      {
+        "kind": "Computer",
+        "variant": "Standard",
+        "ready": 1,
+        "damaged": 0
+      },
+      {
+        "kind": "Core",
+        "variant": "BasicCore",
+        "ready": 1,
+        "damaged": 0
+      },
+      {
+        "kind": "Reactor",
+        "variant": "Fission",
+        "ready": 2,
+        "damaged": 0
+      },
+      {
+        "kind": "Battery",
+        "variant": "BatteryCell",
+        "ready": 2,
+        "damaged": 0
+      },
+      {
+        "kind": "Engine",
+        "variant": "Standard",
+        "ready": 0,
+        "damaged": 0
+      },
+      {
+        "kind": "Cockpit",
+        "variant": "Standard",
+        "ready": 1,
+        "damaged": 0
+      },
+      {
+        "kind": "Interior",
+        "variant": "Standard",
+        "ready": 0,
+        "damaged": 0
+      },
+      {
+        "kind": "Shield",
+        "variant": "RadialShield",
+        "ready": 1,
+        "damaged": 0
+      },
+      {
+        "kind": "Cargo",
+        "variant": "FuelTank",
+        "ready": 1,
+        "damaged": 0
+      },
+      {
+        "kind": "Turret",
+        "variant": "LaserTurret",
+        "ready": 2,
+        "damaged": 0
       }
     ],
     "known_station_ids": [],
@@ -26,8 +92,8 @@
   "sector": {
     "seed": 66790,
     "current_node_id": 0,
-    "selected_node_id": 6,
-    "active_encounter_node_id": 6,
+    "selected_node_id": 1,
+    "active_encounter_node_id": 1,
     "nodes": [
       {
         "id": 0,

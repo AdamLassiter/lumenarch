@@ -35,6 +35,7 @@ use crate::{
     },
 };
 
+/// Spawns the runtime encounter HUD so combat, stations, and ship status all have on-screen readouts.
 pub(crate) fn spawn_runtime_hud(
     commands: &mut Commands,
     asset_server: &AssetServer,

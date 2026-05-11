@@ -32,6 +32,7 @@ use super::{
     },
 };
 
+/// Processes lobby button presses so joining, hosting, role changes, and debug entry all share one UI path.
 pub(crate) fn lobby_button_system(
     mut commands: Commands,
     mut interaction_query: Query<
@@ -127,6 +128,7 @@ pub(crate) fn lobby_button_system(
     }
 }
 
+/// Mirrors key lobby actions onto the keyboard so session setup stays fast during iteration.
 pub(crate) fn lobby_keyboard_shortcuts(
     keys: Res<ButtonInput<KeyCode>>,
     config: Res<netcode::SessionConfig>,

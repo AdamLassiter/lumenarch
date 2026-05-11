@@ -94,6 +94,7 @@ struct ShieldCollisionDamage {
     damage: Fx,
 }
 
+/// Resolves ship-to-ship impacts so collisions create motion response, damage, and telemetry.
 pub(crate) fn handle_ship_collisions(
     mut commands: Commands,
     balance: Res<BalanceConfig>,

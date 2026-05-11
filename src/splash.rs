@@ -2,14 +2,17 @@ use bevy::prelude::*;
 
 use crate::state::{SplashRoot, SplashScreenState};
 
+/// Returns whether the splash screen should currently exist in the UI world.
 pub(crate) fn splash_active(splash_state: Res<SplashScreenState>) -> bool {
     splash_state.active
 }
 
+/// Returns whether splash UI entities should be cleaned up because the splash is done.
 pub(crate) fn splash_inactive(splash_state: Res<SplashScreenState>) -> bool {
     !splash_state.active
 }
 
+/// Spawns the splash image layer so the game has a branded backdrop during early frontend flow.
 pub(crate) fn spawn_splash_ui(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -45,6 +48,7 @@ pub(crate) fn spawn_splash_ui(
         });
 }
 
+/// Removes splash entities once the app has moved on to normal frontend presentation.
 pub(crate) fn cleanup_splash_ui(
     mut commands: Commands,
     query: Query<Entity, With<SplashRoot>>,
@@ -59,6 +63,7 @@ pub(crate) fn cleanup_splash_ui(
     }
 }
 
+/// Advances the splash timer so time-based transitions can react to it elsewhere.
 pub(crate) fn tick_splash_screen(time: Res<Time>, mut splash_state: ResMut<SplashScreenState>) {
     if !splash_state.active {
         return;
@@ -67,6 +72,7 @@ pub(crate) fn tick_splash_screen(time: Res<Time>, mut splash_state: ResMut<Splas
     splash_state.remaining_seconds = (splash_state.remaining_seconds - time.delta_secs()).max(0.0);
 }
 
+/// Dismisses the splash when the session reaches the docked game flow.
 pub(crate) fn dismiss_splash_screen(mut splash_state: ResMut<SplashScreenState>) {
     if splash_state.active {
         splash_state.active = false;
