@@ -10,16 +10,20 @@ use crate::{
             DestroyedModule,
             EquippedSuit,
             HostileShip,
+            InfrastructureRouteKind,
             MissionState,
             PlayerFieldState,
             PlayerHandleComponent,
             PlayerMotionState,
             PlayerReferenceFrame,
             PlayerShip,
+            ResourceKind,
             RuntimeShipModule,
             ShipAtmosphereState,
+            ShipInfrastructureState,
             ShipRoot,
             ShipboardPlayer,
+            StorageModule,
         },
         helpers::{
             FixedVec2,
@@ -52,6 +56,8 @@ pub(crate) fn update_ship_atmosphere(
         Option<&AirlockCommandState>,
         Option<&DestroyedModule>,
     )>,
+    infrastructure_query: Query<&ShipInfrastructureState, With<ShipRoot>>,
+    mut storage_query: Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
 ) {
     let dt = fx_from_time_delta(&time);
     let mut mission_state = mission_query.into_inner();
@@ -163,6 +169,18 @@ pub(crate) fn update_ship_atmosphere(
             next_levels[index] = next_levels[index].clamp(Fx::from_num(0), max_oxygen);
         }
 
+        if let Ok(infrastructure) = infrastructure_query.get(ship_entity) {
+            replenish_ducted_oxygen(
+                ship_entity,
+                infrastructure,
+                &mut storage_query,
+                &atmosphere_state.tiles,
+                &mut next_levels,
+                max_oxygen,
+                dt,
+            );
+        }
+
         let mut oxygen_sum = Fx::from_num(0);
         let mut oxygen_min = max_oxygen;
         for (index, tile) in atmosphere_state.tiles.iter_mut().enumerate() {
@@ -200,6 +218,81 @@ pub(crate) fn update_ship_atmosphere(
             mission_state.hostile_decompression_events += 1;
         }
     }
+}
+
+fn replenish_ducted_oxygen(
+    ship_entity: Entity,
+    infrastructure: &ShipInfrastructureState,
+    storage_query: &mut Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
+    tiles: &[crate::gameplay::components::ShipAtmosphereTile],
+    next_levels: &mut [Fx],
+    max_oxygen: Fx,
+    dt: Fx,
+) {
+    for network in infrastructure
+        .networks
+        .iter()
+        .filter(|network| network.kind == Some(InfrastructureRouteKind::OxygenDuct))
+    {
+        let tile_coords: HashMap<_, _> = network
+            .tiles
+            .iter()
+            .copied()
+            .map(|coord| (coord, ()))
+            .collect();
+        let target_indices: Vec<_> = tiles
+            .iter()
+            .enumerate()
+            .filter_map(|(index, tile)| {
+                tile_coords
+                    .contains_key(&(tile.grid_x, tile.grid_y))
+                    .then_some(index)
+            })
+            .collect();
+        if target_indices.is_empty()
+            || target_indices
+                .iter()
+                .all(|index| next_levels[*index] >= max_oxygen)
+            || remove_oxygen_from_attached_storage(
+                ship_entity,
+                infrastructure,
+                network.id,
+                storage_query,
+            ) == 0
+        {
+            continue;
+        }
+        let refill = Fx::from_num(2) * dt;
+        for index in target_indices {
+            next_levels[index] = (next_levels[index] + refill).min(max_oxygen);
+        }
+    }
+}
+
+fn remove_oxygen_from_attached_storage(
+    ship_entity: Entity,
+    infrastructure: &ShipInfrastructureState,
+    duct_network_id: u32,
+    storage_query: &mut Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
+) -> u32 {
+    let Some(network) = infrastructure.network(duct_network_id) else {
+        return 0;
+    };
+    for module_id in &network.attached_modules {
+        for (runtime_module, parent, mut storage) in &mut *storage_query {
+            if parent.get() != ship_entity
+                || runtime_module.module_id != *module_id
+                || !storage.accepts(ResourceKind::Oxygen)
+            {
+                continue;
+            }
+            let taken = storage.inventory.remove(ResourceKind::Oxygen, 1);
+            if taken > 0 {
+                return taken;
+            }
+        }
+    }
+    0
 }
 
 /// Samples local oxygen for each player so suffocation warnings and blackout effects track location.

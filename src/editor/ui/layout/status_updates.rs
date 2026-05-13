@@ -93,6 +93,8 @@ pub(crate) fn update_editor_status_text(
         Query<&'static mut Node, With<EditorSelectSection>>,
     )>,
 ) {
+    // SAFETY: Each branch targets a different editor UI marker or explicitly excludes overlapping markers;
+    // `ParamSet` sequences mutable access so no text/node entity can be borrowed by two branches at once.
     if !editor_ship.is_changed()
         && !tool_state.is_changed()
         && !selection_state.is_changed()
@@ -385,6 +387,8 @@ pub(crate) fn update_editor_module_overlay(
         ),
     >,
 ) {
+    // SAFETY: Program editor text, station readout labels, and station readout values use disjoint markers
+    // and the `ParamSet` branches are consumed one at a time, preventing double mutable UI access.
     for mut panel_node in &mut panel_query {
         panel_node.display = if arch_editor_state.panel_open {
             Display::Flex

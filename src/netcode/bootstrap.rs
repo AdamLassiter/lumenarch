@@ -42,6 +42,7 @@ pub(crate) struct ParsedSessionDescriptor {
     pub(crate) local_handle: PlayerHandle,
 }
 
+/// Starts a lobby/rollback connection attempt so UI actions can prepare the deterministic session.
 pub(crate) fn begin_session_attempt(
     config: &SessionConfig,
     local_profile: &LocalPlayerProfile,
@@ -118,6 +119,7 @@ pub(crate) fn begin_session_attempt(
     }
 }
 
+/// Requests that the host lobby thread broadcast a start-session event to all connected peers.
 pub(crate) fn request_lobby_session_start(
     status: &mut SessionStatus,
     bootstrap: &SessionBootstrapConfig,

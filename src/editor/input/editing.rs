@@ -939,6 +939,9 @@ pub(crate) fn editor_station_panel_button_system(
                     StationPanelButtonAction::LogisticsToggleAirlock => {
                         module.defaults.airlock_open = !module.defaults.airlock_open;
                     }
+                    StationPanelButtonAction::InfrastructureToggleBlocker => {
+                        // Runtime-only until blocker defaults are persisted in ship prefab data.
+                    }
                     StationPanelButtonAction::LogisticsToggleManipulator => {
                         module.defaults.manipulator_transfer_enabled =
                             !module.defaults.manipulator_transfer_enabled;

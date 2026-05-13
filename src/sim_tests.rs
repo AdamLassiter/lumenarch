@@ -12,18 +12,31 @@ use crate::{
     build_app,
     gameplay::{
         self,
-        components::{ObservedLocalPlayerMarker, ShipControlMode, ShipboardControlState},
+        components::{
+            ObservedLocalPlayerMarker,
+            ShipControlMode,
+            ShipboardControlState,
+            StationFamily,
+            StationFocusMode,
+        },
     },
     netcode::{
         self,
         DecodedPlayerCommand,
         DecodedPlayerCommands,
-        INPUT_TOGGLE_STATION,
         LobbyPlayerInfo,
         LobbySnapshot,
+        LocalPlayerHandle,
+        LumenGgrsConfig,
+        ObservedLocalPlayer,
+        PendingLocalMetaCommand,
+        PendingLocalStationCommand,
         PendingMetaCommand,
+        RollbackGameState,
         RollbackMetaOp,
         RollbackPhase,
+        SessionBootstrapConfig,
+        SessionConfig,
         SessionPhase,
         SessionRole,
         SessionStatus,
@@ -77,7 +90,7 @@ fn headless_host_lobby_editor_sector_and_cockpit_flow() {
     );
 
     let calibration_ring_id = {
-        let rollback = app.world().resource::<netcode::RollbackGameState>();
+        let rollback = app.world().resource::<RollbackGameState>();
         rollback
             .sector
             .nodes
@@ -95,7 +108,7 @@ fn headless_host_lobby_editor_sector_and_cockpit_flow() {
         0,
     );
     {
-        let rollback = app.world().resource::<netcode::RollbackGameState>();
+        let rollback = app.world().resource::<RollbackGameState>();
         assert_eq!(rollback.sector.selected_node_id, Some(calibration_ring_id));
     }
 
@@ -108,9 +121,7 @@ fn headless_host_lobby_editor_sector_and_cockpit_flow() {
     );
     wait_until(
         &mut app,
-        |app| {
-            app.world().resource::<netcode::RollbackGameState>().phase == RollbackPhase::Encounter
-        },
+        |app| app.world().resource::<RollbackGameState>().phase == RollbackPhase::Encounter,
         "encounter phase entered",
     );
 
@@ -125,7 +136,7 @@ fn headless_host_lobby_editor_sector_and_cockpit_flow() {
         "runtime encounter scene spawned",
     );
 
-    drive_local_toggle_station(&mut app);
+    enter_cockpit_for_flow_test(&mut app);
     {
         let mut query = app
             .world_mut()
@@ -157,7 +168,7 @@ fn seed_test_player_ship(app: &mut App) {
     ship.replace_module(ShipModule::new(2, ModuleKind::Cockpit, 1, 0, 0));
 
     app.world_mut()
-        .resource_mut::<netcode::RollbackGameState>()
+        .resource_mut::<RollbackGameState>()
         .editor_ship = ship.clone();
     app.world_mut()
         .resource_mut::<crate::state::EditorShip>()
@@ -176,7 +187,7 @@ fn launching_after_reselect_uses_the_latest_sector_node() {
     apply_host_meta(&mut app, RollbackMetaOp::OpenSectorMap, 0, 0, 0);
 
     let (first_node_id, second_node_id, second_node_label) = {
-        let rollback = app.world().resource::<netcode::RollbackGameState>();
+        let rollback = app.world().resource::<RollbackGameState>();
         let launchable: Vec<_> = rollback
             .sector
             .nodes
@@ -217,9 +228,7 @@ fn launching_after_reselect_uses_the_latest_sector_node() {
 
     wait_until(
         &mut app,
-        |app| {
-            app.world().resource::<netcode::RollbackGameState>().phase == RollbackPhase::Encounter
-        },
+        |app| app.world().resource::<RollbackGameState>().phase == RollbackPhase::Encounter,
         "encounter phase entered after reselection",
     );
 
@@ -242,7 +251,7 @@ fn repeated_encounter_cycles_cleanup_runtime_entities() {
     apply_host_meta(&mut app, RollbackMetaOp::OpenSectorMap, 0, 0, 0);
 
     let node_id = {
-        let rollback = app.world().resource::<netcode::RollbackGameState>();
+        let rollback = app.world().resource::<RollbackGameState>();
         rollback
             .sector
             .nodes
@@ -271,10 +280,7 @@ fn repeated_encounter_cycles_cleanup_runtime_entities() {
 
         wait_until(
             &mut app,
-            |app| {
-                app.world().resource::<netcode::RollbackGameState>().phase
-                    == RollbackPhase::Encounter
-            },
+            |app| app.world().resource::<RollbackGameState>().phase == RollbackPhase::Encounter,
             "encounter phase entered",
         );
         wait_until(
@@ -292,9 +298,7 @@ fn repeated_encounter_cycles_cleanup_runtime_entities() {
         apply_host_meta(&mut app, RollbackMetaOp::ReturnToDock, 0, 0, 0);
         wait_until(
             &mut app,
-            |app| {
-                app.world().resource::<netcode::RollbackGameState>().phase == RollbackPhase::Docked
-            },
+            |app| app.world().resource::<RollbackGameState>().phase == RollbackPhase::Docked,
             "return to docked phase",
         );
         wait_until(
@@ -310,14 +314,12 @@ fn begin_headless_host_lobby(app: &mut App) {
     let host_addr = DEFAULT_HOST_ADDR
         .parse()
         .expect("default host addr should parse");
-    let session_config = app.world().resource::<netcode::SessionConfig>().clone();
+    let session_config = app.world().resource::<SessionConfig>().clone();
     let local_profile = app.world().resource::<LocalPlayerProfile>().clone();
     let initial_state = netcode::load_initial_rollback_state();
 
     {
-        let mut bootstrap = app
-            .world_mut()
-            .resource_mut::<netcode::SessionBootstrapConfig>();
+        let mut bootstrap = app.world_mut().resource_mut::<SessionBootstrapConfig>();
         bootstrap.pending_start = false;
         bootstrap.role = SessionRole::Host;
         bootstrap.local_bind_addr = host_addr;
@@ -349,11 +351,8 @@ fn begin_headless_host_lobby(app: &mut App) {
 
 /// Starts a single-player synctest session that exercises the normal rollback presentation flow.
 fn start_headless_host_session(app: &mut App) {
-    let bootstrap = app
-        .world()
-        .resource::<netcode::SessionBootstrapConfig>()
-        .clone();
-    let sync_test = SessionBuilder::<netcode::LumenGgrsConfig>::new()
+    let bootstrap = app.world().resource::<SessionBootstrapConfig>().clone();
+    let sync_test = SessionBuilder::<LumenGgrsConfig>::new()
         .with_num_players(1)
         .expect("synctest should accept one player")
         .with_max_prediction_window(bootstrap.check_distance + 2)
@@ -377,18 +376,12 @@ fn start_headless_host_session(app: &mut App) {
         status.local_player_handles = vec![0];
         status.active_ship_snapshot = Some(bootstrap.initial_state.editor_ship.clone());
     }
-    *app.world_mut().resource_mut::<netcode::RollbackGameState>() = bootstrap.initial_state;
+    *app.world_mut().resource_mut::<RollbackGameState>() = bootstrap.initial_state;
+    app.world_mut().resource_mut::<LocalPlayerHandle>().0 = Some(0);
+    app.world_mut().resource_mut::<ObservedLocalPlayer>().handle = Some(0);
+    app.world_mut().resource_mut::<PendingLocalMetaCommand>().0 = None;
     app.world_mut()
-        .resource_mut::<netcode::LocalPlayerHandle>()
-        .0 = Some(0);
-    app.world_mut()
-        .resource_mut::<netcode::ObservedLocalPlayer>()
-        .handle = Some(0);
-    app.world_mut()
-        .resource_mut::<netcode::PendingLocalMetaCommand>()
-        .0 = None;
-    app.world_mut()
-        .resource_mut::<netcode::PendingLocalStationCommand>()
+        .resource_mut::<PendingLocalStationCommand>()
         .0 = None;
     app.world_mut()
         .resource_mut::<DecodedPlayerCommands>()
@@ -428,67 +421,17 @@ fn apply_host_meta(app: &mut App, op: RollbackMetaOp, arg0: i16, arg1: i16, arg2
     app.update();
 }
 
-/// Toggles the observed local player into the currently focused station, mirroring in-game input.
-fn drive_local_toggle_station(app: &mut App) {
-    for _ in 0..3 {
-        app.world_mut()
-            .run_system_once(gameplay::update_current_station)
-            .expect("update_current_station system should run");
-        {
-            let mut decoded = app.world_mut().resource_mut::<DecodedPlayerCommands>();
-            decoded.by_handle.clear();
-            let mut raw = netcode::PlayerGgrsInput::default();
-            raw.buttons = INPUT_TOGGLE_STATION;
-            decoded.by_handle.insert(
-                0,
-                DecodedPlayerCommand {
-                    raw,
-                    ..Default::default()
-                },
-            );
-        }
-        app.world_mut()
-            .run_system_once(gameplay::toggle_shipboard_control_mode)
-            .expect("toggle_shipboard_control_mode system should run");
-        app.world_mut()
-            .resource_mut::<DecodedPlayerCommands>()
-            .by_handle
-            .clear();
-
-        let mut query = app
-            .world_mut()
-            .query_filtered::<&ShipboardControlState, With<ObservedLocalPlayerMarker>>();
-        let control = query
-            .single(app.world())
-            .expect("expected exactly one observed local player control state");
-        if control.mode == ShipControlMode::Cockpit {
-            break;
-        }
-    }
-
-    let mode_is_cockpit = {
-        let mut query = app
-            .world_mut()
-            .query_filtered::<&ShipboardControlState, With<ObservedLocalPlayerMarker>>();
-        query
-            .single(app.world())
-            .map(|control| control.mode == ShipControlMode::Cockpit)
-            .unwrap_or(false)
-    };
-    if mode_is_cockpit {
-        return;
-    }
-
+fn enter_cockpit_for_flow_test(app: &mut App) {
     let mut query = app
         .world_mut()
         .query_filtered::<&mut ShipboardControlState, With<ObservedLocalPlayerMarker>>();
     if let Ok(mut control) = query.single_mut(app.world_mut()) {
         control.mode = ShipControlMode::Cockpit;
-        control.focus_mode = crate::gameplay::components::StationFocusMode::Focused;
+        control.focus_mode = StationFocusMode::Focused;
         control.focused_entity = None;
         control.focused_module_id = None;
         control.focused_kind = Some(ModuleKind::Cockpit);
-        control.focused_family = Some(crate::gameplay::components::StationFamily::Cockpit);
+        control.focused_family = Some(StationFamily::Cockpit);
     }
 }
 

@@ -150,7 +150,8 @@ pub(crate) fn run_drone_logistics(
     )>,
     mut drone_query: Query<(Entity, &mut DroneUnit, &mut Transform, &mut Sprite)>,
 ) {
-    // SAFETY: Logistics endpoint planning reads snapshots through `p0`, while cargo mutation happens later through `p1`.
+    // SAFETY: Logistics endpoint planning reads snapshots through `p0`, while cargo mutation happens later
+    // through `p1`; the read branch is dropped before mutable endpoint access, avoiding double-mutability.
     let dt = fx_from_time_delta(&time);
     let mut mission_state = mission_query.into_inner();
     let endpoints = {

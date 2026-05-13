@@ -1,5 +1,6 @@
 use super::*;
 
+/// Turns the encounter return button into a host meta command so aborting stays rollback-authoritative.
 pub(crate) fn return_button_system(
     mut interaction_query: Query<
         (&Interaction, &mut BackgroundColor),
@@ -36,6 +37,7 @@ pub(crate) fn return_button_system(
     }
 }
 
+/// Mirrors the encounter return action onto Tab so testing and emergency retreats are quick.
 pub(crate) fn return_keyboard_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     status: Res<netcode::SessionStatus>,
@@ -54,6 +56,7 @@ pub(crate) fn return_keyboard_shortcut(
     }
 }
 
+/// Smoothly follows the local player's active ship/station context so the encounter camera stays readable.
 pub(crate) fn camera_follow_player_ship(
     time: Res<Time>,
     balance: Res<BalanceConfig>,

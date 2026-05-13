@@ -16,7 +16,6 @@ pub(crate) use control::{
     sync_crew_name_labels,
     sync_player_reference_frame_parenting,
     sync_shipboard_player_visual,
-    toggle_shipboard_control_mode,
     update_current_station,
     update_player_reference_frame,
     update_station_command_input,
@@ -41,6 +40,7 @@ pub(crate) use simulation::{
     handle_projectile_hits,
     handle_ship_collisions,
     integrate_hostile_ship_motion,
+    rebuild_infrastructure_networks,
     return_after_mission_resolution,
     run_arch_automation,
     run_drone_logistics,
@@ -62,6 +62,7 @@ pub(crate) use simulation::{
     update_mission_state,
     update_mission_telemetry,
     update_module_runtime_state,
+    update_routed_ship_power,
     update_ship_atmosphere,
 };
 pub(crate) use ui::{

@@ -140,6 +140,8 @@ pub(crate) fn handle_ship_collisions(
         (With<PlayerShip>, With<ShipRoot>),
     >,
 ) {
+    // SAFETY: The ship and module `ParamSet`s split snapshot reads from later mutation; each read query is
+    // dropped before its matching mutable branch is used, so movement and damage updates cannot alias.
     let module_read_query = module_queries.p0();
     let mut ships: Vec<_> = ship_queries
         .p0()

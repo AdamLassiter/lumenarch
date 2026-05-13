@@ -19,7 +19,6 @@ use super::{
     INPUT_RIGHT,
     INPUT_SPACE_EDGE,
     INPUT_TOGGLE_DEBUG,
-    INPUT_TOGGLE_STATION,
     INPUT_UP,
     LocalPlayerHandle,
     LumenGgrsConfig,
@@ -163,6 +162,7 @@ pub(crate) fn local_player_input(
         .unwrap_or_default()
 }
 
+/// Run condition that keeps rollback gameplay systems dormant outside encounters.
 pub(crate) fn rollback_phase_is_encounter(rollback_state: Res<RollbackGameState>) -> bool {
     rollback_state.phase == RollbackPhase::Encounter
 }
@@ -381,9 +381,6 @@ fn input_from_hardware(
     }
     if keys.pressed(KeyCode::KeyE) {
         input.buttons |= INPUT_INTERACT;
-    }
-    if keys.just_pressed(KeyCode::KeyE) {
-        input.buttons |= INPUT_TOGGLE_STATION;
     }
     if keys.just_pressed(KeyCode::KeyQ) || keys.just_pressed(KeyCode::Escape) {
         input.buttons |= INPUT_EXIT_STATION;

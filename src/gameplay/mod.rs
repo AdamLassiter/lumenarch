@@ -36,6 +36,7 @@ pub(crate) use systems::{
     integrate_hostile_ship_motion,
     integrate_player_ship_motion,
     move_shipboard_player,
+    rebuild_infrastructure_networks,
     return_after_mission_resolution,
     return_button_system,
     return_keyboard_shortcut,
@@ -60,7 +61,6 @@ pub(crate) use systems::{
     sync_shipboard_player_visual,
     tick_recent_action_feedback,
     toggle_gameplay_info_panel,
-    toggle_shipboard_control_mode,
     update_current_station,
     update_destroyed_module_visuals,
     update_detector_modules,
@@ -69,6 +69,7 @@ pub(crate) use systems::{
     update_mission_telemetry,
     update_module_runtime_state,
     update_player_reference_frame,
+    update_routed_ship_power,
     update_ship_atmosphere,
     update_station_command_input,
 };

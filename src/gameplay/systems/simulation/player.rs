@@ -20,6 +20,7 @@ pub(crate) fn fire_player_weapons(
             &SimPosition,
             &SimRotation,
             &ShipPowerState,
+            &ShipInfrastructureState,
             &ShipArchCommandState,
             &mut ShipWeaponState,
         ),
@@ -36,10 +37,17 @@ pub(crate) fn fire_player_weapons(
         ),
         With<WeaponModule>,
     >,
-    mut storage_query: Query<(&ChildOf, &mut StorageModule)>,
+    mut storage_query: Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
 ) {
-    let (children, ship_position, ship_rotation, power_state, arch_commands, mut weapon_state) =
-        player_ship_query.into_inner();
+    let (
+        children,
+        ship_position,
+        ship_rotation,
+        power_state,
+        infrastructure,
+        arch_commands,
+        mut weapon_state,
+    ) = player_ship_query.into_inner();
 
     let fire_requested = (arch_commands.turret_auto_fire && !arch_commands.turret_fire_hold)
         || weapon_query
@@ -80,6 +88,8 @@ pub(crate) fn fire_player_weapons(
                 children,
                 ResourceKind::Ammunition,
                 weapon_stats.ammo_per_shot.max(1),
+                Some(infrastructure),
+                Some(weapon_module.module_id),
             )
         {
             continue;

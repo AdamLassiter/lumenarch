@@ -32,6 +32,7 @@ pub(crate) enum StationPanelButtonAction {
     LogisticsCycleManipulatorTarget { direction: i32 },
     LogisticsCycleResource,
     LogisticsToggleProcessor,
+    InfrastructureToggleBlocker,
     ComputerToggleEnabled,
     ComputerCycleTemplate,
 }

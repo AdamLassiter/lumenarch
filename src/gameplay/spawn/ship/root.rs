@@ -52,6 +52,7 @@ use crate::{
             ShipDamageSensorState,
             ShipEncounterIdentity,
             ShipInertiaField,
+            ShipInfrastructureState,
             ShipInteriorMap,
             ShipInteriorNode,
             ShipMovementModel,
@@ -292,6 +293,10 @@ pub(crate) fn spawn_runtime_ship(
                 engines_powered: totals.engine_count > 0,
             },
             power_model,
+            ShipInfrastructureState {
+                strict_routing: true,
+                ..Default::default()
+            },
             ShipControlState::default(),
             ShipDamageSensorState::default(),
             ShipWeaponState {
@@ -709,6 +714,10 @@ pub(crate) fn spawn_hostile_ship(
                 engines_powered: totals.engine_count > 0,
             },
             power_model,
+            ShipInfrastructureState {
+                strict_routing: true,
+                ..Default::default()
+            },
             ShipControlState::default(),
             ShipWeaponState {
                 turret_count: totals.turret_count,

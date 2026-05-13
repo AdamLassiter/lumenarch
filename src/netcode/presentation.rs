@@ -132,28 +132,34 @@ pub(crate) fn sync_player_editor_mode(
     }
 }
 
+/// Run condition that gates systems to the active deterministic session frontend.
 pub(crate) fn frontend_mode_is_session(frontend_mode: Res<State<FrontendMode>>) -> bool {
     *frontend_mode.get() == FrontendMode::Session
 }
 
+/// Run condition that gates lobby UI and input systems to the lobby frontend.
 pub(crate) fn frontend_mode_is_lobby(frontend_mode: Res<State<FrontendMode>>) -> bool {
     *frontend_mode.get() == FrontendMode::Lobby
 }
 
+/// Run condition that gates enemy-editor systems to the standalone debug editor frontend.
 pub(crate) fn frontend_mode_is_debug_enemy_editor(frontend_mode: Res<State<FrontendMode>>) -> bool {
     *frontend_mode.get() == FrontendMode::DebugEnemyEditor
 }
 
+/// Run condition that removes lobby UI once the frontend leaves the lobby.
 pub(crate) fn frontend_mode_is_not_lobby(frontend_mode: Res<State<FrontendMode>>) -> bool {
     *frontend_mode.get() != FrontendMode::Lobby
 }
 
+/// Run condition that suppresses session editor UI while the debug enemy editor owns the screen.
 pub(crate) fn frontend_mode_is_not_debug_enemy_editor(
     frontend_mode: Res<State<FrontendMode>>,
 ) -> bool {
     *frontend_mode.get() != FrontendMode::DebugEnemyEditor
 }
 
+/// Run condition that presents docked station UI only while rollback is in the docked phase.
 pub(crate) fn session_presents_docked(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
@@ -161,6 +167,7 @@ pub(crate) fn session_presents_docked(
     *frontend_mode.get() == FrontendMode::Session && rollback_state.phase == RollbackPhase::Docked
 }
 
+/// Run condition that tears down docked UI when rollback leaves the docked phase.
 pub(crate) fn session_not_presents_docked(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
@@ -168,6 +175,7 @@ pub(crate) fn session_not_presents_docked(
     !session_presents_docked(frontend_mode, rollback_state)
 }
 
+/// Run condition that presents the sector map only during rollback navigation.
 pub(crate) fn session_presents_sector_map(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
@@ -176,6 +184,7 @@ pub(crate) fn session_presents_sector_map(
         && rollback_state.phase == RollbackPhase::SectorMap
 }
 
+/// Run condition that tears down sector-map UI outside rollback navigation.
 pub(crate) fn session_not_presents_sector_map(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
@@ -183,6 +192,7 @@ pub(crate) fn session_not_presents_sector_map(
     !session_presents_sector_map(frontend_mode, rollback_state)
 }
 
+/// Run condition that opens the player refit editor during rollback editing.
 pub(crate) fn session_presents_player_editor(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
@@ -190,6 +200,7 @@ pub(crate) fn session_presents_player_editor(
     *frontend_mode.get() == FrontendMode::Session && rollback_state.phase == RollbackPhase::Editing
 }
 
+/// Run condition that hides player-editor-only systems outside rollback editing.
 pub(crate) fn session_not_presents_player_editor(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
@@ -197,6 +208,7 @@ pub(crate) fn session_not_presents_player_editor(
     !session_presents_player_editor(frontend_mode, rollback_state)
 }
 
+/// Run condition that removes editor UI unless either editor frontend currently owns it.
 pub(crate) fn editor_ui_should_not_be_present(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
@@ -206,6 +218,7 @@ pub(crate) fn editor_ui_should_not_be_present(
             && rollback_state.phase == RollbackPhase::Editing)
 }
 
+/// Run condition that presents encounter systems only while rollback is simulating combat/exploration.
 pub(crate) fn session_presents_encounter(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,
@@ -214,6 +227,7 @@ pub(crate) fn session_presents_encounter(
         && rollback_state.phase == RollbackPhase::Encounter
 }
 
+/// Run condition that tears down encounter presentation once rollback exits the encounter.
 pub(crate) fn session_not_presents_encounter(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,

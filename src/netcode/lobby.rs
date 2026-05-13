@@ -155,6 +155,7 @@ pub(crate) fn poll_lobby_runtime_events(
     }
 }
 
+/// Spawns the background TCP lobby thread so peers can exchange profiles before rollback starts.
 pub(crate) fn start_lobby_runtime(
     descriptor: &ParsedSessionDescriptor,
     profile: &LocalPlayerProfile,
@@ -184,6 +185,7 @@ pub(crate) fn start_lobby_runtime(
     })
 }
 
+/// Stops the background lobby thread so stale networking state cannot leak between sessions.
 pub(crate) fn shutdown_lobby_runtime(lobby_runtime: &mut LobbyRuntime) {
     if let Some(control_tx) = lobby_runtime.control_tx.take() {
         let _ = control_tx.send(LobbyControlCommand::Shutdown);

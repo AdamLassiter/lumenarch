@@ -110,6 +110,14 @@ pub(super) fn pending_station_command(
                 arg0: 0,
             })
         }
+        StationPanelButtonAction::InfrastructureToggleBlocker
+            if control_state.mode == ShipControlMode::Logistics =>
+        {
+            Some(netcode::PendingStationCommand {
+                op: netcode::StationControlOp::InfrastructureToggleBlocker,
+                arg0: 0,
+            })
+        }
         StationPanelButtonAction::ComputerToggleEnabled
             if control_state.mode == ShipControlMode::Computer =>
         {
@@ -159,6 +167,7 @@ pub(crate) fn station_action_visible(
             | StationPanelButtonAction::LogisticsCycleManipulatorTarget { .. }
             | StationPanelButtonAction::LogisticsCycleResource => flags.manipulator,
             StationPanelButtonAction::LogisticsToggleProcessor => flags.processor || flags.drone,
+            StationPanelButtonAction::InfrastructureToggleBlocker => flags.blocker,
             _ => false,
         },
         ShipControlMode::Computer => matches!(
@@ -227,6 +236,7 @@ pub(crate) fn station_button_label(
                 "Toggle Processor".to_string()
             }
         }
+        StationPanelButtonAction::InfrastructureToggleBlocker => "Open / Close".to_string(),
         StationPanelButtonAction::ComputerToggleEnabled => "Enable / Disable".to_string(),
         StationPanelButtonAction::ComputerCycleTemplate => "Cycle Template".to_string(),
     }

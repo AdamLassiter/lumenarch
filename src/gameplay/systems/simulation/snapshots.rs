@@ -7,15 +7,18 @@ use crate::{
             DestroyedModule,
             DetectorKind,
             DetectorModule,
+            JunctionCommandState,
             ModuleRuntimeState,
             ProcessorModule,
             ReactorCommandState,
             RuntimeArchComputer,
             RuntimeShipModule,
             ShipDamageSensorState,
+            ShipInfrastructureState,
             ShipPowerState,
             ShipWeaponState,
             StorageModule,
+            ValveCommandState,
         },
         helpers::Fx,
         systems::simulation::arch::{
@@ -100,6 +103,7 @@ pub(super) fn build_snapshot(
     ship_power_state: &ShipPowerState,
     ship_weapon_state: &ShipWeaponState,
     damage_state: &ShipDamageSensorState,
+    infrastructure_state: &ShipInfrastructureState,
     threat_present: bool,
     module_query: &Query<(
         Entity,
@@ -111,6 +115,13 @@ pub(super) fn build_snapshot(
         Option<&ProcessorModule>,
         Option<&ReactorCommandState>,
         Option<&DetectorModule>,
+        Option<&DestroyedModule>,
+    )>,
+    blocker_query: &Query<(
+        Entity,
+        &RuntimeShipModule,
+        Option<&JunctionCommandState>,
+        Option<&ValveCommandState>,
         Option<&DestroyedModule>,
     )>,
 ) -> ArchSnapshot {
@@ -131,6 +142,14 @@ pub(super) fn build_snapshot(
     let mut power_detector: Option<&DetectorModule> = None;
     let mut heat_detector: Option<&DetectorModule> = None;
     let mut logistics_detector: Option<&DetectorModule> = None;
+    let mut junction_open = Fx::from_num(0);
+    let mut junction_powered = Fx::from_num(0);
+    let mut junction_supply = Fx::from_num(0);
+    let mut junction_demand = Fx::from_num(0);
+    let mut valve_open = Fx::from_num(0);
+    let mut valve_powered = Fx::from_num(0);
+    let mut valve_supply = Fx::from_num(0);
+    let mut valve_demand = Fx::from_num(0);
 
     for child in children.iter() {
         let Ok((
@@ -188,6 +207,51 @@ pub(super) fn build_snapshot(
                     if slot.is_none_or(|current| detector.tier >= current.tier) {
                         *slot = Some(detector);
                     }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    for child in children.iter() {
+        let Ok((_, runtime_module, junction, valve, destroyed)) = blocker_query.get(child) else {
+            continue;
+        };
+        if destroyed.is_some() {
+            continue;
+        }
+        match runtime_module.kind {
+            ModuleKind::JunctionBox if junction.is_some() && junction_supply == Fx::from_num(0) => {
+                let status = infrastructure_state.status_for_module(runtime_module.module_id);
+                junction_open = bool_fx(junction.is_some_and(|state| state.open));
+                junction_powered = bool_fx(
+                    status.is_some_and(|status| status.powered)
+                        || infrastructure_state.module_powered(runtime_module.module_id),
+                );
+                if let Some(network_id) = status.and_then(|status| status.power_network)
+                    && let Some(network) = infrastructure_state.network(network_id)
+                {
+                    junction_supply = network.supply;
+                    junction_demand = network.demand;
+                }
+            }
+            ModuleKind::Valve if valve.is_some() && valve_supply == Fx::from_num(0) => {
+                let status = infrastructure_state.status_for_module(runtime_module.module_id);
+                valve_open = bool_fx(valve.is_some_and(|state| state.open));
+                valve_powered = bool_fx(
+                    status.is_some_and(|status| status.powered)
+                        || infrastructure_state.module_powered(runtime_module.module_id),
+                );
+                let network_id = status.and_then(|status| {
+                    status
+                        .duct_network
+                        .or_else(|| status.resource_networks.first().map(|(_, id)| *id))
+                });
+                if let Some(network_id) = network_id
+                    && let Some(network) = infrastructure_state.network(network_id)
+                {
+                    valve_supply = network.supply;
+                    valve_demand = network.demand;
                 }
             }
             _ => {}
@@ -259,5 +323,13 @@ pub(super) fn build_snapshot(
         logistics_dir_x: detector_axis(logistics_detector, |detector| detector.direction.x),
         logistics_dir_y: detector_axis(logistics_detector, |detector| detector.direction.y),
         logistics_severity: detector_metric(logistics_detector, |detector| detector.magnitude),
+        junction_open,
+        junction_powered,
+        junction_supply,
+        junction_demand,
+        valve_open,
+        valve_powered,
+        valve_supply,
+        valve_demand,
     }
 }

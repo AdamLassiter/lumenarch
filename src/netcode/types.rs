@@ -23,7 +23,6 @@ pub(crate) const INPUT_INTERACT: u16 = 1 << 4;
 pub(crate) const INPUT_DROP: u16 = 1 << 5;
 pub(crate) const INPUT_PICKUP: u16 = 1 << 6;
 pub(crate) const INPUT_FIRE: u16 = 1 << 7;
-pub(crate) const INPUT_TOGGLE_STATION: u16 = 1 << 8;
 pub(crate) const INPUT_EXIT_STATION: u16 = 1 << 9;
 pub(crate) const INPUT_SPACE_EDGE: u16 = 1 << 10;
 pub(crate) const INPUT_TOGGLE_DEBUG: u16 = 1 << 11;
@@ -67,6 +66,7 @@ pub(crate) enum StationControlOp {
     LogisticsToggleProcessor = 12,
     ComputerToggleEnabled = 13,
     ComputerCycleTemplate = 14,
+    InfrastructureToggleBlocker = 15,
 }
 
 #[repr(C)]
@@ -124,6 +124,7 @@ impl PlayerGgrsInput {
             12 => StationControlOp::LogisticsToggleProcessor,
             13 => StationControlOp::ComputerToggleEnabled,
             14 => StationControlOp::ComputerCycleTemplate,
+            15 => StationControlOp::InfrastructureToggleBlocker,
             _ => StationControlOp::None,
         }
     }

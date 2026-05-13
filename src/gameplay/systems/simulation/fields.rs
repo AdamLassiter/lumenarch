@@ -20,6 +20,7 @@ use crate::{
             ResourceKind,
             RuntimeShipModule,
             ShieldCommandState,
+            ShipInfrastructureState,
             ShipRoot,
             ShipboardPlayer,
             StorageModule,
@@ -195,6 +196,7 @@ pub(crate) fn update_module_runtime_state(
         Option<&DestroyedModule>,
     )>,
     mut storage_query: Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
+    infrastructure_query: Query<&ShipInfrastructureState, With<ShipRoot>>,
 ) {
     let dt = fx_from_time_delta(&time);
 
@@ -229,21 +231,17 @@ pub(crate) fn update_module_runtime_state(
         let mut reactor_heat_bonus = Fx::from_num(0);
         if let Some(mut reactor_state) = reactor_state {
             if reactor_state.fuel_remaining < Fx::from_num(balance.reactor.starting_fuel * 0.25) {
-                for (storage_runtime, storage_parent, mut storage) in &mut storage_query {
-                    if storage_parent.get() != parent.get()
-                        || !storage.accepts_fuel
-                        || local_field_distance(
-                            runtime_module.local_position,
-                            storage_runtime.local_position,
-                        ) > Fx::from_num(64)
-                    {
-                        continue;
-                    }
-                    if storage.inventory.remove(ResourceKind::Fuel, 1) > 0 {
-                        reactor_state.fuel_remaining +=
-                            Fx::from_num(balance.reactor.starting_fuel * 0.5);
-                        break;
-                    }
+                if let Ok(infrastructure) = infrastructure_query.get(parent.get())
+                    && remove_connected_resource(
+                        ResourceKind::Fuel,
+                        runtime_module.module_id,
+                        parent.get(),
+                        infrastructure,
+                        &mut storage_query,
+                    ) > 0
+                {
+                    reactor_state.fuel_remaining +=
+                        Fx::from_num(balance.reactor.starting_fuel * 0.5);
                 }
             }
             let warmup_threshold = Fx::from_num(balance.reactor.warmup_threshold);
@@ -352,7 +350,42 @@ pub(crate) fn update_module_runtime_state(
             >= Fx::from_num(balance.fields.disabled_heat_threshold)
             || runtime_state.electrical_instability
                 >= Fx::from_num(balance.fields.disabled_electrical_threshold);
+        if let Ok(infrastructure) = infrastructure_query.get(parent.get())
+            && let Some(status) = infrastructure.status_for_module(runtime_module.module_id)
+            && status.power_required
+            && !status.powered
+        {
+            runtime_state.is_disabled = true;
+            runtime_state.needs_attention = true;
+        }
     }
+}
+
+fn remove_connected_resource(
+    resource: ResourceKind,
+    module_id: u64,
+    ship_entity: Entity,
+    infrastructure: &ShipInfrastructureState,
+    storage_query: &mut Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
+) -> u32 {
+    let Some(network_id) = infrastructure.module_resource_network(module_id, resource) else {
+        return 0;
+    };
+    for (storage_runtime, storage_parent, mut storage) in storage_query {
+        if storage_parent.get() != ship_entity || !storage.accepts(resource) {
+            continue;
+        }
+        if infrastructure.module_resource_network(storage_runtime.module_id, resource)
+            != Some(network_id)
+        {
+            continue;
+        }
+        let taken = storage.inventory.remove(resource, 1);
+        if taken > 0 {
+            return taken;
+        }
+    }
+    0
 }
 
 /// Applies heat, shock, and oxygen fallout to players so hazardous ships are dangerous to inhabit.

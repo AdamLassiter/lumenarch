@@ -33,6 +33,8 @@ pub(crate) fn update_station_command_input(
         Option<&mut ManipulatorCommandState>,
         Option<&mut ProcessorCommandState>,
         Option<&mut AirlockCommandState>,
+        Option<&mut JunctionCommandState>,
+        Option<&mut ValveCommandState>,
         Option<&mut DroneStationCommandState>,
         Option<&mut RuntimeArchComputer>,
     )>,
@@ -97,7 +99,7 @@ pub(crate) fn update_station_command_input(
                 if !claimed_entities.insert(focused_entity) {
                     continue;
                 }
-                let Ok((_, _, turret_state, _, _, _, _, _, _, _)) =
+                let Ok((_, _, turret_state, _, _, _, _, _, _, _, _, _)) =
                     module_query.get_mut(focused_entity)
                 else {
                     continue;
@@ -134,7 +136,7 @@ pub(crate) fn update_station_command_input(
                 if !claimed_entities.insert(focused_entity) {
                     continue;
                 }
-                let Ok((_, _, _, reactor_state, _, _, _, _, _, _)) =
+                let Ok((_, _, _, reactor_state, _, _, _, _, _, _, _, _)) =
                     module_query.get_mut(focused_entity)
                 else {
                     continue;
@@ -190,6 +192,8 @@ pub(crate) fn update_station_command_input(
                     manipulator_cmd,
                     processor_cmd,
                     airlock_state,
+                    junction_cmd,
+                    valve_cmd,
                     drone_station_cmd,
                     _,
                 )) = module_query.get_mut(focused_entity)
@@ -282,6 +286,16 @@ pub(crate) fn update_station_command_input(
                         };
                     }
                 }
+                if command.raw.pressed(INPUT_SPACE_EDGE)
+                    || command.station.op == StationControlOp::InfrastructureToggleBlocker
+                {
+                    if let Some(mut junction_cmd) = junction_cmd {
+                        junction_cmd.open = !junction_cmd.open;
+                    }
+                    if let Some(mut valve_cmd) = valve_cmd {
+                        valve_cmd.open = !valve_cmd.open;
+                    }
+                }
             }
             ShipControlMode::Computer => {
                 let Some(focused_entity) = control_state.focused_entity else {
@@ -290,7 +304,7 @@ pub(crate) fn update_station_command_input(
                 if !claimed_entities.insert(focused_entity) {
                     continue;
                 }
-                let Ok((_, _, _, _, _, _, _, _, _, arch_runtime)) =
+                let Ok((_, _, _, _, _, _, _, _, _, _, _, arch_runtime)) =
                     module_query.get_mut(focused_entity)
                 else {
                     continue;

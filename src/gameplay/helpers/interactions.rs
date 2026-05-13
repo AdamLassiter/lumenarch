@@ -30,7 +30,7 @@ pub(crate) fn interaction_for_module(
     if kind == ModuleKind::Cockpit {
         return Some(InteractionKind::Cockpit);
     }
-    if kind == ModuleKind::Cargo {
+    if kind == ModuleKind::Cargo || kind == ModuleKind::O2Generator {
         return Some(InteractionKind::Storage);
     }
     if kind == ModuleKind::Airlock {
@@ -44,6 +44,9 @@ pub(crate) fn interaction_for_module(
     }
     if kind == ModuleKind::Turret {
         return Some(InteractionKind::Turret);
+    }
+    if matches!(kind, ModuleKind::JunctionBox | ModuleKind::Valve) {
+        return Some(InteractionKind::Manipulator);
     }
     if kind == ModuleKind::Engine && (runtime_state.is_disabled || runtime_state.needs_attention) {
         return Some(InteractionKind::Engine);

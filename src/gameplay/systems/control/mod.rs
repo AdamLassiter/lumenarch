@@ -16,6 +16,7 @@ use super::super::{
         DestroyedModule,
         EquippedSuit,
         InternalPosition,
+        JunctionCommandState,
         LinearVelocity,
         LooseCargo,
         ManipulatorCommandState,
@@ -53,6 +54,7 @@ use super::super::{
         StorageCommandState,
         StorageModule,
         TurretCommandState,
+        ValveCommandState,
     },
     helpers::{
         FixedVec2,
@@ -91,7 +93,6 @@ pub(crate) use player::{
     sync_crew_name_labels,
     sync_player_reference_frame_parenting,
     sync_shipboard_player_visual,
-    toggle_shipboard_control_mode,
     update_current_station,
     update_player_reference_frame,
 };

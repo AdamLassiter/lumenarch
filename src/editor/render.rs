@@ -275,7 +275,8 @@ pub(crate) fn sync_toolbox_visuals(
         Query<'_, '_, (&'static ToolboxFoundationButtonText, &'static mut Text)>,
     )>,
 ) {
-    // SAFETY: Variant, foundation, mode, and layer widgets are spawned with distinct marker components.
+    // SAFETY: Variant, foundation, mode, layer, and label widgets are spawned with distinct marker components;
+    // each `ParamSet` branch is accessed in sequence, so no entity is mutably borrowed through two queries at once.
     if !tool_state.is_changed() && !progression.is_changed() && !editor_session.is_changed() {
         return;
     }

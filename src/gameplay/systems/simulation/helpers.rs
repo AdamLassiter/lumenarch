@@ -12,6 +12,7 @@ use crate::{
             SalvagePickup,
             SalvageWreck,
             ShieldCommandState,
+            ShipInfrastructureState,
             SimPosition,
             StorageModule,
         },
@@ -44,16 +45,27 @@ pub(crate) fn spawn_hostile_salvage(
 }
 
 pub(crate) fn consume_ship_resource(
-    storage_query: &mut Query<(&ChildOf, &mut StorageModule)>,
+    storage_query: &mut Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
     children: &Children,
     resource_kind: ResourceKind,
     amount: u32,
+    infrastructure: Option<&ShipInfrastructureState>,
+    consumer_module_id: Option<u64>,
 ) -> bool {
+    let required_network = consumer_module_id
+        .and_then(|module_id| infrastructure?.module_resource_network(module_id, resource_kind));
     for child in children.iter() {
-        let Ok((_parent, mut storage)) = storage_query.get_mut(child) else {
+        let Ok((runtime_module, _parent, mut storage)) = storage_query.get_mut(child) else {
             continue;
         };
         if !storage.accepts(resource_kind) {
+            continue;
+        }
+        if let Some(required_network) = required_network
+            && infrastructure.and_then(|infrastructure| {
+                infrastructure.module_resource_network(runtime_module.module_id, resource_kind)
+            }) != Some(required_network)
+        {
             continue;
         }
         if storage.inventory.remove(resource_kind, amount) >= amount {

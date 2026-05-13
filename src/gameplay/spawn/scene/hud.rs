@@ -267,6 +267,7 @@ fn spawn_station_panel(
         StationPanelButtonAction::LogisticsCycleManipulatorTarget { direction: 1 },
         StationPanelButtonAction::LogisticsCycleResource,
         StationPanelButtonAction::LogisticsToggleProcessor,
+        StationPanelButtonAction::InfrastructureToggleBlocker,
         StationPanelButtonAction::ComputerToggleEnabled,
         StationPanelButtonAction::ComputerCycleTemplate,
     ];
@@ -537,6 +538,7 @@ fn station_button_default_label(action: StationPanelButtonAction) -> &'static st
         StationPanelButtonAction::LogisticsCycleManipulatorTarget { .. } => "Next Target",
         StationPanelButtonAction::LogisticsCycleResource => "Cycle Resource",
         StationPanelButtonAction::LogisticsToggleProcessor => "Processor",
+        StationPanelButtonAction::InfrastructureToggleBlocker => "Open/Close",
         StationPanelButtonAction::ComputerToggleEnabled => "Enable/Disable",
         StationPanelButtonAction::ComputerCycleTemplate => "Cycle Template",
     }

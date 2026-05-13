@@ -211,7 +211,8 @@ pub(crate) fn update_lobby_status_text(
         Query<(&mut Text, &mut TextColor), (With<LobbyColorText>, Without<StatusText>)>,
     )>,
 ) {
-    // SAFETY: Each ParamSet branch targets a distinct labeled text role in the lobby UI.
+    // SAFETY: Each `ParamSet` branch targets a distinct labeled text role in the lobby UI, and branches
+    // are iterated sequentially so no text entity is mutably accessed through two queries at once.
     if !status.is_changed() && !config.is_changed() && !local_profile.is_changed() {
         return;
     }

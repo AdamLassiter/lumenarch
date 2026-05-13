@@ -6,6 +6,7 @@ mod drones;
 mod fields;
 mod helpers;
 mod hostiles;
+mod infrastructure;
 mod logistics;
 mod mission;
 mod player;
@@ -31,6 +32,7 @@ pub(crate) use hostiles::{
     integrate_hostile_ship_motion,
     sync_hostile_ship_state,
 };
+pub(crate) use infrastructure::{rebuild_infrastructure_networks, update_routed_ship_power};
 pub(crate) use logistics::{
     collect_salvage,
     run_drone_logistics,

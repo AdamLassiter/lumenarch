@@ -180,7 +180,8 @@ pub(crate) fn update_destroyed_module_visuals(
         >,
     )>,
 ) {
-    // SAFETY: Foundation visuals and runtime module sprites are distinct entity sets updated in separate ParamSet branches.
+    // SAFETY: Foundation visuals and runtime module sprites are distinct entity sets updated in separate
+    // `ParamSet` branches, and the read branch is consumed before mutable module sprite access.
     let logistics_support_cells = visuals
         .p0()
         .iter()
@@ -421,7 +422,8 @@ pub(crate) fn sync_module_work_effect_visuals(
         >,
     )>,
 ) {
-    // SAFETY: Work spark, root, and fill entities carry distinct marker components and are spawned as separate children.
+    // SAFETY: Work spark, root, and fill entities carry distinct marker components and are spawned as
+    // separate children; each `ParamSet` branch mutates only one visual role at a time.
     let active_work = collect_active_work(&player_query);
 
     for (parent, mut sprite, mut visibility, mut transform) in &mut work_visuals.p0() {

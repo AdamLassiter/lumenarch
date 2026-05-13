@@ -108,6 +108,7 @@ pub(crate) fn station_panel_display(
     >,
     focused_station_context: &str,
     _arch_summary: &summary::ArchSummary,
+    infrastructure_state: &ShipInfrastructureState,
 ) -> StationPanelDisplay {
     let Some(focused_entity) = control_mode.focused_entity else {
         return StationPanelDisplay::empty("Station Console");
@@ -142,6 +143,10 @@ pub(crate) fn station_panel_display(
         processor: processor.is_some(),
         airlock: airlock_state.is_some(),
         drone: drone_station.is_some(),
+        blocker: matches!(
+            runtime_module.kind,
+            ModuleKind::JunctionBox | ModuleKind::Valve
+        ),
     };
 
     let title = if runtime_module.kind.supports_channel() {
@@ -183,7 +188,7 @@ pub(crate) fn station_panel_display(
         };
     }
 
-    let readouts = if let Some(reactor) = reactor {
+    let mut readouts = if let Some(reactor) = reactor {
         vec![
             readout_bar(
                 register_readout_label(runtime_module, "RRF", "Reaction"),
@@ -319,6 +324,10 @@ pub(crate) fn station_panel_display(
         || manipulator.is_some()
         || processor.is_some()
         || airlock_state.is_some()
+        || matches!(
+            runtime_module.kind,
+            ModuleKind::JunctionBox | ModuleKind::Valve
+        )
     {
         logistics_readouts(
             storage,
@@ -441,6 +450,8 @@ pub(crate) fn station_panel_display(
         ]
     };
 
+    readouts.push(infrastructure_readout(runtime_module, infrastructure_state));
+
     StationPanelDisplay {
         title,
         active_station_kind: Some(runtime_module.kind),
@@ -485,6 +496,7 @@ pub(crate) fn station_panel_content(
     >,
     focused_station_context: &str,
     arch_summary: &summary::ArchSummary,
+    infrastructure_state: &ShipInfrastructureState,
 ) -> (String, String, Option<ModuleKind>, summary::StationFlags) {
     let Some(focused_entity) = control_mode.focused_entity else {
         return (
@@ -539,6 +551,10 @@ pub(crate) fn station_panel_content(
         processor: processor.is_some(),
         airlock: airlock_state.is_some(),
         drone: drone_station.is_some(),
+        blocker: matches!(
+            runtime_module.kind,
+            ModuleKind::JunctionBox | ModuleKind::Valve
+        ),
     };
 
     if destroyed.is_some() {
@@ -562,10 +578,12 @@ pub(crate) fn station_panel_content(
         _ => format!("{} Console", module_display_name(runtime_module.kind)),
     };
 
+    let infrastructure_line = infrastructure_state.route_status_label(runtime_module.module_id);
     let body = if let Some(reactor) = reactor {
         format!(
-            "Context: {}\nReaction Rate: {}%\nTurbine Load: {}%\nPower Output: {}\nFuel Remaining: {}\nCore Heat: {}\nInstability: {}\nUse the buttons below or W/S + A/D.\nRecent: {}",
+            "Context: {}\n{}\nReaction Rate: {}%\nTurbine Load: {}%\nPower Output: {}\nFuel Remaining: {}\nCore Heat: {}\nInstability: {}\nUse the buttons below or W/S + A/D.\nRecent: {}",
             focused_station_context,
+            infrastructure_line,
             format_fx0(reactor.reaction_rate * Fx::from_num(100)),
             format_fx0(reactor.turbine_load * Fx::from_num(100)),
             format_fx1(reactor.power_output),
@@ -576,8 +594,9 @@ pub(crate) fn station_panel_content(
         )
     } else if let Some(turret) = turret {
         format!(
-            "Context: {}\nDesired Angle: {}\nActual Angle: {}\nFire Gate: {}\nCooldown: {}\nThreat State: {}\nUse buttons or mouse / A,D while manned.",
+            "Context: {}\n{}\nDesired Angle: {}\nActual Angle: {}\nFire Gate: {}\nCooldown: {}\nThreat State: {}\nUse buttons or mouse / A,D while manned.",
             focused_station_context,
+            infrastructure_line,
             format_fx1(turret.desired_angle),
             format_fx1(turret.actual_angle),
             if turret.fire_intent { "open" } else { "hold" },
@@ -586,8 +605,9 @@ pub(crate) fn station_panel_content(
         )
     } else if let Some(storage) = storage {
         format!(
-            "Context: {}\nStorage Fill: {}/{}\nRaw Salvage: {}\nRepair Charge: {}\nIntake: {}\nAirlock Seal: {}\nManipulator: {}\nCargo can be moved with panel buttons or F/G.",
+            "Context: {}\n{}\nStorage Fill: {}/{}\nRaw Salvage: {}\nRepair Charge: {}\nIntake: {}\nAirlock Seal: {}\nManipulator: {}\nCargo can be moved with panel buttons or F/G.",
             focused_station_context,
+            infrastructure_line,
             storage.inventory.total_units(),
             storage.capacity,
             storage.inventory.raw_salvage,
@@ -613,8 +633,9 @@ pub(crate) fn station_panel_content(
             Fx::from_num(0)
         };
         format!(
-            "Context: {}\nRecipe: {}\nEnabled: {}\nProgress: {}%\nHeld Raw: {}\nHeld Charge: {}\nState: {}\nFabrication output feeds the ship through logistics.",
+            "Context: {}\n{}\nRecipe: {}\nEnabled: {}\nProgress: {}%\nHeld Raw: {}\nHeld Charge: {}\nState: {}\nFabrication output feeds the ship through logistics.",
             focused_station_context,
+            infrastructure_line,
             processor_command
                 .map(|command| command.selected_recipe.as_str())
                 .unwrap_or("Repair Charge"),
@@ -630,8 +651,9 @@ pub(crate) fn station_panel_content(
         )
     } else if let Some(drone_station) = drone_station {
         format!(
-            "Context: {}\nDrone mode: {}\nActive drones: {} / {}\nIdle drones: {}\nQueued tasks: {}\nPower draw: {}\nStatus: {}\nDrones extend logistics beyond adjacency and return to station when idle.",
+            "Context: {}\n{}\nDrone mode: {}\nActive drones: {} / {}\nIdle drones: {}\nQueued tasks: {}\nPower draw: {}\nStatus: {}\nDrones extend logistics beyond adjacency and return to station when idle.",
             focused_station_context,
+            infrastructure_line,
             drone_station_command
                 .map(|command| command.selected_task.as_str())
                 .unwrap_or("Logistics"),
@@ -644,8 +666,9 @@ pub(crate) fn station_panel_content(
         )
     } else if let Some(computer) = computer {
         format!(
-            "Context: {}\nProgram: {}\nOnline: {}\nExec: {}\nWrites: {}\nInvalid/Halt: {}\nUse buttons here, then refine logic in the refit editor.",
+            "Context: {}\n{}\nProgram: {}\nOnline: {}\nExec: {}\nWrites: {}\nInvalid/Halt: {}\nUse buttons here, then refine logic in the refit editor.",
             focused_station_context,
+            infrastructure_line,
             computer.program.name,
             if computer.enabled { "yes" } else { "no" },
             arch_summary.exec_summary,
@@ -654,8 +677,9 @@ pub(crate) fn station_panel_content(
         )
     } else {
         format!(
-            "Context: {}\nModule: {}\nCondition: {:?}\nHeat: {}\nElectrical: {}\nNeeds Attention: {}",
+            "Context: {}\n{}\nModule: {}\nCondition: {:?}\nHeat: {}\nElectrical: {}\nNeeds Attention: {}",
             focused_station_context,
+            infrastructure_line,
             module_display_name(runtime_module.kind),
             module_condition(integrity, runtime_state, false, &BalanceConfig::default()),
             format_fx1(runtime_state.current_heat),
@@ -669,4 +693,28 @@ pub(crate) fn station_panel_content(
     };
 
     (title, body, Some(runtime_module.kind), flags)
+}
+
+fn infrastructure_readout(
+    runtime_module: &RuntimeShipModule,
+    infrastructure_state: &ShipInfrastructureState,
+) -> StationPanelReadout {
+    let Some(status) = infrastructure_state.status_for_module(runtime_module.module_id) else {
+        return readout_light("Infrastructure", "unrouted", Color::srgb(0.90, 0.48, 0.18));
+    };
+    let value = status.blocked_reason.clone().unwrap_or_else(|| {
+        if status.powered {
+            "online".to_string()
+        } else if status.power_required {
+            "no wired power".to_string()
+        } else {
+            "passive".to_string()
+        }
+    });
+    let color = if status.blocked_reason.is_some() || (status.power_required && !status.powered) {
+        Color::srgb(0.90, 0.34, 0.28)
+    } else {
+        Color::srgb(0.34, 0.78, 0.46)
+    };
+    readout_light("Infrastructure", &value, color)
 }

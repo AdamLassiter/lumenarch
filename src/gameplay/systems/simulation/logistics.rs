@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ecs::relationship::Relationship, prelude::*};
 
 pub(crate) use super::drones::{run_drone_logistics, sync_drone_station_population};
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
             SalvagePickup,
             SalvageWreck,
             ShipArchCommandState,
-            ShipPowerState,
+            ShipInfrastructureState,
             ShipRoot,
             SimPosition,
             StorageModule,
@@ -118,7 +118,8 @@ pub(crate) fn run_logistics_transfers(
         Option<&DestroyedModule>,
     )>,
 ) {
-    // SAFETY: Endpoint discovery is read-only in `p0`, and actual inventory mutation happens later in `p1`.
+    // SAFETY: Endpoint discovery is read-only in `p0`, and actual inventory mutation happens later in `p1`;
+    // the `ParamSet` branches are not held simultaneously, so storage/processor mutation cannot alias.
     let dt = fx_from_time_delta(&time);
     let (arch_commands, mut mission_state) = ship_query.into_inner();
     let logistics_mode = arch_commands.logistics_enabled;
@@ -297,19 +298,24 @@ pub(crate) fn run_logistics_transfers(
 /// Ticks processor modules so fabrication recipes progress, stall, or complete based on inventory and power.
 pub(crate) fn run_processors(
     time: Res<Time>,
-    ship_query: Single<(&ShipPowerState, &mut MissionState), (With<PlayerShip>, With<ShipRoot>)>,
+    ship_query: Single<
+        (&ShipInfrastructureState, &mut MissionState),
+        (With<PlayerShip>, With<ShipRoot>),
+    >,
     mut processor_query: Query<(
         &RuntimeShipModule,
+        &ChildOf,
         &ModuleRuntimeState,
         &mut ProcessorModule,
         Option<&ProcessorCommandState>,
         Option<&DestroyedModule>,
     )>,
+    mut storage_query: Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
 ) {
     let dt = fx_from_time_delta(&time);
-    let (power_state, mut mission_state) = ship_query.into_inner();
+    let (infrastructure, mut mission_state) = ship_query.into_inner();
 
-    for (runtime_module, runtime_state, mut processor, command_state, destroyed) in
+    for (runtime_module, parent, runtime_state, mut processor, command_state, destroyed) in
         &mut processor_query
     {
         if destroyed.is_some() || runtime_state.is_disabled {
@@ -340,16 +346,36 @@ pub(crate) fn run_processors(
             mission_state.logistics_bottleneck = Some("processor output blocked".to_string());
             continue;
         }
+        while processor.inventory.raw_salvage < processor.input_required
+            && pull_connected_storage_resource(
+                infrastructure,
+                &mut storage_query,
+                parent.get(),
+                runtime_module.module_id,
+                ResourceKind::RawSalvage,
+            ) > 0
+        {
+            processor.inventory.add(ResourceKind::RawSalvage, 1);
+        }
         if processor.inventory.raw_salvage < processor.input_required {
             processor.active = false;
             processor.progress = Fx::from_num(0);
-            processor.blocked_reason = Some("waiting for raw salvage".to_string());
+            processor.blocked_reason = Some(
+                if infrastructure
+                    .module_resource_network(runtime_module.module_id, ResourceKind::RawSalvage)
+                    .is_some()
+                {
+                    "waiting for raw salvage".to_string()
+                } else {
+                    "no compatible resource".to_string()
+                },
+            );
             continue;
         }
-        if power_state.surplus <= Fx::from_num(0) && power_state.stored_energy <= Fx::from_num(1) {
+        if !infrastructure.module_powered(runtime_module.module_id) {
             processor.active = false;
             processor.progress = Fx::from_num(0);
-            processor.blocked_reason = Some("insufficient power".to_string());
+            processor.blocked_reason = Some("no wired power".to_string());
             mission_state.logistics_bottleneck = Some("processor starved for power".to_string());
             continue;
         }
@@ -371,7 +397,19 @@ pub(crate) fn run_processors(
             processor.blocked_reason = Some("input lost before cycle complete".to_string());
             continue;
         }
-        processor.inventory.add(output_kind, output_amount);
+        let mut pushed = 0;
+        for _ in 0..output_amount {
+            pushed += push_connected_storage_resource(
+                infrastructure,
+                &mut storage_query,
+                parent.get(),
+                runtime_module.module_id,
+                output_kind,
+            );
+        }
+        if pushed < output_amount {
+            processor.inventory.add(output_kind, output_amount - pushed);
+        }
         if output_kind == ResourceKind::RepairCharge {
             mission_state.processed_repair_charge += output_amount;
         }
@@ -383,6 +421,61 @@ pub(crate) fn run_processors(
         ));
         mission_state.recent_action_timer = Fx::from_num(1.8);
     }
+}
+
+fn pull_connected_storage_resource(
+    infrastructure: &ShipInfrastructureState,
+    storage_query: &mut Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
+    ship_entity: Entity,
+    module_id: u64,
+    resource: ResourceKind,
+) -> u32 {
+    let Some(network_id) = infrastructure.module_resource_network(module_id, resource) else {
+        return 0;
+    };
+    for (storage_runtime, storage_parent, mut storage) in storage_query {
+        if storage_parent.get() != ship_entity || !storage.accepts(resource) {
+            continue;
+        }
+        if infrastructure.module_resource_network(storage_runtime.module_id, resource)
+            != Some(network_id)
+        {
+            continue;
+        }
+        let taken = storage.inventory.remove(resource, 1);
+        if taken > 0 {
+            return taken;
+        }
+    }
+    0
+}
+
+fn push_connected_storage_resource(
+    infrastructure: &ShipInfrastructureState,
+    storage_query: &mut Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
+    ship_entity: Entity,
+    module_id: u64,
+    resource: ResourceKind,
+) -> u32 {
+    let Some(network_id) = infrastructure.module_resource_network(module_id, resource) else {
+        return 0;
+    };
+    for (storage_runtime, storage_parent, mut storage) in storage_query {
+        if storage_parent.get() != ship_entity || !storage.accepts(resource) {
+            continue;
+        }
+        if infrastructure.module_resource_network(storage_runtime.module_id, resource)
+            != Some(network_id)
+        {
+            continue;
+        }
+        if storage.inventory.total_units() >= storage.capacity {
+            continue;
+        }
+        storage.inventory.add(resource, 1);
+        return 1;
+    }
+    0
 }
 
 pub(crate) fn collect_endpoint_snapshots(

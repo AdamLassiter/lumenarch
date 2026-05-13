@@ -43,6 +43,7 @@ use crate::{
             ShipAutomationState,
             ShipControlMode,
             ShipControlState,
+            ShipInfrastructureState,
             ShipMovementModel,
             ShipPowerModel,
             ShipPowerState,

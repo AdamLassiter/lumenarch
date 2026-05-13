@@ -10,6 +10,7 @@ use crate::{
             DestroyedModule,
             DetectorModule,
             HostileTarget,
+            JunctionCommandState,
             LumenExecutionResult,
             MissionState,
             ModuleRuntimeState,
@@ -22,10 +23,12 @@ use crate::{
             ShipAutomationMode,
             ShipAutomationState,
             ShipDamageSensorState,
+            ShipInfrastructureState,
             ShipPowerState,
             ShipRoot,
             ShipWeaponState,
             StorageModule,
+            ValveCommandState,
         },
         helpers::{Fx, fx_from_time_delta},
         systems::simulation::snapshots,
@@ -78,6 +81,14 @@ pub(crate) struct ArchSnapshot {
     pub(crate) logistics_dir_x: Fx,
     pub(crate) logistics_dir_y: Fx,
     pub(crate) logistics_severity: Fx,
+    pub(crate) junction_open: Fx,
+    pub(crate) junction_powered: Fx,
+    pub(crate) junction_supply: Fx,
+    pub(crate) junction_demand: Fx,
+    pub(crate) valve_open: Fx,
+    pub(crate) valve_powered: Fx,
+    pub(crate) valve_supply: Fx,
+    pub(crate) valve_demand: Fx,
 }
 
 #[derive(Default)]
@@ -88,6 +99,8 @@ pub(crate) struct PendingArchCommands {
     pub(crate) turret_assist: bool,
     pub(crate) turret_auto_fire: bool,
     pub(crate) turret_fire_hold: bool,
+    pub(crate) junction_open: Option<bool>,
+    pub(crate) valve_open: Option<bool>,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -111,6 +124,7 @@ pub(crate) fn run_arch_automation(
             &ShipPowerState,
             &ShipWeaponState,
             &ShipDamageSensorState,
+            &ShipInfrastructureState,
             &mut ShipArchCommandState,
             &mut ShipAutomationState,
             &mut MissionState,
@@ -130,13 +144,31 @@ pub(crate) fn run_arch_automation(
         Option<&DetectorModule>,
         Option<&DestroyedModule>,
     )>,
+    mut blocker_queries: ParamSet<(
+        Query<(
+            Entity,
+            &RuntimeShipModule,
+            Option<&JunctionCommandState>,
+            Option<&ValveCommandState>,
+            Option<&DestroyedModule>,
+        )>,
+        Query<(
+            &RuntimeShipModule,
+            Option<&mut JunctionCommandState>,
+            Option<&mut ValveCommandState>,
+            Option<&DestroyedModule>,
+        )>,
+    )>,
 ) {
+    // SAFETY: Blocker readback uses `p0` to build ARCH snapshots, then command application uses `p1`;
+    // the immutable blocker query is dropped before mutable command state access, avoiding aliased borrows.
     let dt = fx_from_time_delta(&time);
     let (
         children,
         ship_power_state,
         ship_weapon_state,
         damage_state,
+        infrastructure_state,
         mut command_state,
         mut automation_state,
         mut mission_state,
@@ -155,8 +187,10 @@ pub(crate) fn run_arch_automation(
         ship_power_state,
         ship_weapon_state,
         damage_state,
+        infrastructure_state,
         !hostile_query.is_empty(),
         &module_query,
+        &blocker_queries.p0(),
     );
     let lumen_snapshot = build_lumen_snapshot(
         children,
@@ -233,6 +267,12 @@ pub(crate) fn run_arch_automation(
         }
         aggregate.turret_assist |= outputs.turret_assist;
         aggregate.turret_auto_fire |= outputs.turret_auto_fire;
+        if outputs.junction_open.is_some() {
+            aggregate.junction_open = outputs.junction_open;
+        }
+        if outputs.valve_open.is_some() {
+            aggregate.valve_open = outputs.valve_open;
+        }
         if result.halted_reason.is_some() {
             automation_state.invalid_executions += 1;
         }
@@ -288,12 +328,22 @@ pub(crate) fn run_arch_automation(
     command_state.turret_assist_enabled = aggregate.turret_assist;
     command_state.turret_auto_fire = aggregate.turret_auto_fire;
     command_state.turret_fire_hold = aggregate.turret_fire_hold;
+    command_state.junction_open = aggregate.junction_open;
+    command_state.valve_open = aggregate.valve_open;
+
+    apply_blocker_arch_commands(
+        aggregate.junction_open,
+        aggregate.valve_open,
+        &mut blocker_queries.p1(),
+    );
 
     automation_state.active = aggregate.reactor_bias > Fx::from_num(0)
         || aggregate.logistics_enabled
         || aggregate.turret_assist
         || aggregate.turret_auto_fire
-        || aggregate.turret_fire_hold;
+        || aggregate.turret_fire_hold
+        || aggregate.junction_open.is_some()
+        || aggregate.valve_open.is_some();
     if aggregate.reactor_bias > Fx::from_num(0) {
         automation_state.output_scale = Fx::from_num(0.72);
     }
@@ -391,6 +441,7 @@ pub(crate) fn build_snapshot(
     ship_power_state: &ShipPowerState,
     ship_weapon_state: &ShipWeaponState,
     damage_state: &ShipDamageSensorState,
+    infrastructure_state: &ShipInfrastructureState,
     threat_present: bool,
     module_query: &Query<(
         Entity,
@@ -404,15 +455,54 @@ pub(crate) fn build_snapshot(
         Option<&DetectorModule>,
         Option<&DestroyedModule>,
     )>,
+    blocker_query: &Query<(
+        Entity,
+        &RuntimeShipModule,
+        Option<&JunctionCommandState>,
+        Option<&ValveCommandState>,
+        Option<&DestroyedModule>,
+    )>,
 ) -> ArchSnapshot {
     snapshots::build_snapshot(
         children,
         ship_power_state,
         ship_weapon_state,
         damage_state,
+        infrastructure_state,
         threat_present,
         module_query,
+        blocker_query,
     )
+}
+
+fn apply_blocker_arch_commands(
+    junction_open: Option<bool>,
+    valve_open: Option<bool>,
+    blocker_query: &mut Query<(
+        &RuntimeShipModule,
+        Option<&mut JunctionCommandState>,
+        Option<&mut ValveCommandState>,
+        Option<&DestroyedModule>,
+    )>,
+) {
+    if junction_open.is_none() && valve_open.is_none() {
+        return;
+    }
+    for (runtime_module, junction, valve, destroyed) in blocker_query.iter_mut() {
+        if destroyed.is_some() {
+            continue;
+        }
+        if matches!(runtime_module.kind, ModuleKind::JunctionBox) {
+            if let (Some(open), Some(mut junction)) = (junction_open, junction) {
+                junction.open = open;
+            }
+        }
+        if matches!(runtime_module.kind, ModuleKind::Valve) {
+            if let (Some(open), Some(mut valve)) = (valve_open, valve) {
+                valve.open = open;
+            }
+        }
+    }
 }
 
 pub(crate) fn bool_fx(value: bool) -> Fx {
@@ -886,6 +976,14 @@ fn read_register(
         ArchRegister::DetectLogisticsDirX => snapshot.logistics_dir_x,
         ArchRegister::DetectLogisticsDirY => snapshot.logistics_dir_y,
         ArchRegister::DetectLogisticsSeverity => snapshot.logistics_severity,
+        ArchRegister::JunctionOpen => snapshot.junction_open,
+        ArchRegister::JunctionPowered => snapshot.junction_powered,
+        ArchRegister::JunctionSupply => snapshot.junction_supply,
+        ArchRegister::JunctionDemand => snapshot.junction_demand,
+        ArchRegister::ValveOpen => snapshot.valve_open,
+        ArchRegister::ValvePowered => snapshot.valve_powered,
+        ArchRegister::ValveSupply => snapshot.valve_supply,
+        ArchRegister::ValveDemand => snapshot.valve_demand,
         ArchRegister::CmdReactorBias => commands.reactor_bias,
         ArchRegister::CmdLogisticsEnable => Fx::from_num(i32::from(commands.logistics_enabled)),
         ArchRegister::CmdLogisticsPreference => Fx::from_num(match commands.logistics_preference {
@@ -894,6 +992,10 @@ fn read_register(
         }),
         ArchRegister::CmdTurretAssist => Fx::from_num(i32::from(commands.turret_assist)),
         ArchRegister::CmdTurretAutoFire => Fx::from_num(i32::from(commands.turret_auto_fire)),
+        ArchRegister::CmdJunctionOpen => {
+            Fx::from_num(i32::from(commands.junction_open.unwrap_or(false)))
+        }
+        ArchRegister::CmdValveOpen => Fx::from_num(i32::from(commands.valve_open.unwrap_or(false))),
     }
 }
 
@@ -965,6 +1067,30 @@ fn write_register(
                     "on"
                 } else {
                     "off"
+                }
+            ));
+        }
+        ArchRegister::CmdJunctionOpen => {
+            commands.junction_open = Some(value > Fx::from_num(0));
+            writes.push(format!(
+                "{} <- {}",
+                register.as_str(),
+                if commands.junction_open == Some(true) {
+                    "open"
+                } else {
+                    "closed"
+                }
+            ));
+        }
+        ArchRegister::CmdValveOpen => {
+            commands.valve_open = Some(value > Fx::from_num(0));
+            writes.push(format!(
+                "{} <- {}",
+                register.as_str(),
+                if commands.valve_open == Some(true) {
+                    "open"
+                } else {
+                    "closed"
                 }
             ));
         }

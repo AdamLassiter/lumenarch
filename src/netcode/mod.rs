@@ -57,7 +57,6 @@ pub(crate) use types::{
     INPUT_RIGHT,
     INPUT_SPACE_EDGE,
     INPUT_TOGGLE_DEBUG,
-    INPUT_TOGGLE_STATION,
     INPUT_UP,
     LobbyPlayerInfo,
     LobbySnapshot,

@@ -179,6 +179,7 @@ pub(crate) fn update_gameplay_status_text(
             &ShipMovementModel,
             &ShipPowerState,
             &ShipPowerModel,
+            &ShipInfrastructureState,
             &ShipWeaponState,
             &MissionState,
             &ShipAtmosphereState,
@@ -207,6 +208,8 @@ pub(crate) fn update_gameplay_status_text(
     checksum_history: Res<netcode::ChecksumHistory>,
     mut hud_ui: GameplayHudUiQueries,
 ) {
+    // SAFETY: HUD `ParamSet`s split text roles, bar fills, station buttons, readouts, and overlay nodes
+    // into distinct marker-driven branches that are accessed sequentially, avoiding double mutable UI borrows.
     let (
         ship_position,
         children,
@@ -216,6 +219,7 @@ pub(crate) fn update_gameplay_status_text(
         _movement_model,
         power_state,
         power_model,
+        infrastructure_state,
         weapon_state,
         mission_state,
         atmosphere_state,
@@ -292,6 +296,7 @@ pub(crate) fn update_gameplay_status_text(
         &status_world.drone_query,
         focused_station_context,
         &arch_summary,
+        infrastructure_state,
     );
     let station_display = station_panel::station_panel_display(
         control_mode,
@@ -304,12 +309,12 @@ pub(crate) fn update_gameplay_status_text(
         &status_world.drone_query,
         focused_station_context,
         &arch_summary,
+        infrastructure_state,
     );
-    let current_module = status_world.module_query.iter().find(
-        |(_, runtime_module, _, _, _, _, _, _, _, _, _, _, _, _, _)| {
-            runtime_module.module_id == current_station.module_id
-        },
-    );
+    let current_module = status_world
+        .module_query
+        .iter()
+        .find(|(_, runtime_module, ..)| runtime_module.module_id == current_station.module_id);
     let mut issues = alerts::collect_alert_issues(&status_world.module_query, &balance);
     issues.sort_by_key(|issue| std::cmp::Reverse(issue.0));
     issues.truncate(3);

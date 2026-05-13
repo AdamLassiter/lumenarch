@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 
-use super::super::helpers::{FixedVec2, Fx};
+use super::{
+    super::helpers::{FixedVec2, Fx},
+    ResourceKind,
+};
 use crate::ship::ModuleKind;
 
 #[derive(Component, Clone)]
@@ -35,6 +38,138 @@ pub(crate) struct ShipPowerState {
     pub(crate) engine_power_ratio: Fx,
     pub(crate) weapons_powered: bool,
     pub(crate) engines_powered: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum InfrastructureRouteKind {
+    Power,
+    OxygenDuct,
+    Resource(ResourceKind),
+}
+
+impl InfrastructureRouteKind {
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Power => "power",
+            Self::OxygenDuct => "oxygen duct",
+            Self::Resource(ResourceKind::RawSalvage) => "raw salvage",
+            Self::Resource(ResourceKind::RepairCharge) => "repair charge",
+            Self::Resource(ResourceKind::Fuel) => "fuel",
+            Self::Resource(ResourceKind::Ammunition) => "ammunition",
+            Self::Resource(ResourceKind::Oxygen) => "oxygen resource",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct InfrastructureNetworkSummary {
+    pub(crate) id: u32,
+    pub(crate) kind: Option<InfrastructureRouteKind>,
+    pub(crate) tile_count: u32,
+    pub(crate) tiles: Vec<(i32, i32)>,
+    pub(crate) attached_modules: Vec<u64>,
+    pub(crate) supply: Fx,
+    pub(crate) demand: Fx,
+    pub(crate) reserve: Fx,
+    pub(crate) flow: Fx,
+    pub(crate) blockers: u32,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ModuleInfrastructureStatus {
+    pub(crate) module_id: u64,
+    pub(crate) kind: ModuleKind,
+    pub(crate) power_network: Option<u32>,
+    pub(crate) duct_network: Option<u32>,
+    pub(crate) resource_networks: Vec<(ResourceKind, u32)>,
+    pub(crate) powered: bool,
+    pub(crate) power_required: bool,
+    pub(crate) blocked_reason: Option<String>,
+}
+
+impl ModuleInfrastructureStatus {
+    pub(crate) fn network_for_resource(&self, resource: ResourceKind) -> Option<u32> {
+        self.resource_networks
+            .iter()
+            .find_map(|(kind, network_id)| (*kind == resource).then_some(*network_id))
+    }
+}
+
+#[derive(Component, Clone, Debug, Default)]
+pub(crate) struct ShipInfrastructureState {
+    pub(crate) networks: Vec<InfrastructureNetworkSummary>,
+    pub(crate) module_statuses: Vec<ModuleInfrastructureStatus>,
+    pub(crate) strict_routing: bool,
+}
+
+impl ShipInfrastructureState {
+    pub(crate) fn status_for_module(&self, module_id: u64) -> Option<&ModuleInfrastructureStatus> {
+        self.module_statuses
+            .iter()
+            .find(|status| status.module_id == module_id)
+    }
+
+    pub(crate) fn network(&self, id: u32) -> Option<&InfrastructureNetworkSummary> {
+        self.networks.iter().find(|network| network.id == id)
+    }
+
+    pub(crate) fn module_powered(&self, module_id: u64) -> bool {
+        self.status_for_module(module_id)
+            .map(|status| status.powered)
+            .unwrap_or(false)
+    }
+
+    pub(crate) fn module_resource_network(
+        &self,
+        module_id: u64,
+        resource: ResourceKind,
+    ) -> Option<u32> {
+        self.status_for_module(module_id)
+            .and_then(|status| status.network_for_resource(resource))
+    }
+
+    pub(crate) fn route_status_label(&self, module_id: u64) -> String {
+        let Some(status) = self.status_for_module(module_id) else {
+            return "Infrastructure: no routed network".to_string();
+        };
+        let power = status
+            .power_network
+            .map(|id| format!("P{id}"))
+            .unwrap_or_else(|| "P-".to_string());
+        let resources = if status.resource_networks.is_empty() {
+            "R-".to_string()
+        } else {
+            status
+                .resource_networks
+                .iter()
+                .map(|(kind, id)| format!("{}:{id}", resource_label(*kind)))
+                .collect::<Vec<_>>()
+                .join(",")
+        };
+        let duct = status
+            .duct_network
+            .map(|id| format!("O2D{id}"))
+            .unwrap_or_else(|| "O2D-".to_string());
+        let state = status
+            .blocked_reason
+            .as_deref()
+            .unwrap_or(if status.powered {
+                "online"
+            } else {
+                "unpowered"
+            });
+        format!("Infrastructure: {power} {duct} {resources} [{state}]")
+    }
+}
+
+fn resource_label(kind: ResourceKind) -> &'static str {
+    match kind {
+        ResourceKind::RawSalvage => "raw",
+        ResourceKind::RepairCharge => "repair",
+        ResourceKind::Fuel => "fuel",
+        ResourceKind::Ammunition => "ammo",
+        ResourceKind::Oxygen => "oxygen",
+    }
 }
 
 #[derive(Component, Default, Clone)]
@@ -90,6 +225,8 @@ pub(crate) struct ShipArchCommandState {
     pub(crate) turret_assist_enabled: bool,
     pub(crate) turret_auto_fire: bool,
     pub(crate) turret_fire_hold: bool,
+    pub(crate) junction_open: Option<bool>,
+    pub(crate) valve_open: Option<bool>,
 }
 
 #[derive(Component, Clone)]
@@ -120,6 +257,8 @@ impl Default for ShipArchCommandState {
             turret_assist_enabled: false,
             turret_auto_fire: false,
             turret_fire_hold: false,
+            junction_open: None,
+            valve_open: None,
         }
     }
 }

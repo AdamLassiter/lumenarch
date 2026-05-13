@@ -47,6 +47,16 @@ pub(crate) struct PowerConsumer {
 }
 
 #[derive(Component, Clone)]
+pub(crate) struct JunctionCommandState {
+    pub(crate) open: bool,
+}
+
+#[derive(Component, Clone)]
+pub(crate) struct ValveCommandState {
+    pub(crate) open: bool,
+}
+
+#[derive(Component, Clone)]
 pub(crate) struct EngineModule {
     pub(crate) thrust_multiplier: Fx,
 }

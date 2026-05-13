@@ -20,6 +20,7 @@ use crate::{
             HostileShipModule,
             Integrity,
             Interactable,
+            JunctionCommandState,
             LumenExecutionResult,
             ManipulatorCommandState,
             ManipulatorModule,
@@ -44,6 +45,7 @@ use crate::{
             StorageModule,
             TurretCommandState,
             TurretTopSprite,
+            ValveCommandState,
             WeaponModule,
         },
         effects::{EngineFlameMaterial, ReactorGlowMaterial},
@@ -407,6 +409,15 @@ pub(crate) fn spawn_runtime_module(
                     allow_intake: module.defaults.storage_allow_intake,
                 },
             ));
+        }
+        ModuleKind::JunctionBox => {
+            entity.insert((
+                PowerConsumer { draw: 1 },
+                JunctionCommandState { open: true },
+            ));
+        }
+        ModuleKind::Valve => {
+            entity.insert((PowerConsumer { draw: 1 }, ValveCommandState { open: true }));
         }
         _ => {
             entity.with_children(|parent| {

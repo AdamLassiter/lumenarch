@@ -20,6 +20,7 @@ use crate::{
             ProjectileFaction,
             ResourceKind,
             RuntimeShipModule,
+            ShipInfrastructureState,
             ShipMovementModel,
             ShipPowerModel,
             ShipPowerState,
@@ -340,6 +341,7 @@ pub(crate) fn fire_hostile_ship_weapons(
             &SimPosition,
             &SimRotation,
             &ShipPowerState,
+            &ShipInfrastructureState,
             &mut ShipWeaponState,
         ),
         (With<HostileShip>, With<ShipRoot>, With<HostileTarget>),
@@ -355,15 +357,22 @@ pub(crate) fn fire_hostile_ship_weapons(
         ),
         With<WeaponModule>,
     >,
-    mut storage_query: Query<(&ChildOf, &mut StorageModule)>,
+    mut storage_query: Query<(&RuntimeShipModule, &ChildOf, &mut StorageModule)>,
 ) {
     let mission_state = mission_query.into_inner();
     if mission_state.failed || mission_state.completed {
         return;
     }
 
-    for (ship_entity, children, ship_position, ship_rotation, power_state, mut weapon_state) in
-        &mut hostile_query
+    for (
+        ship_entity,
+        children,
+        ship_position,
+        ship_rotation,
+        power_state,
+        infrastructure,
+        mut weapon_state,
+    ) in &mut hostile_query
     {
         if !power_state.weapons_powered
             || weapon_state.turret_count == 0
@@ -393,6 +402,8 @@ pub(crate) fn fire_hostile_ship_weapons(
                     children,
                     ResourceKind::Ammunition,
                     weapon_stats.ammo_per_shot.max(1),
+                    Some(infrastructure),
+                    Some(weapon_module.module_id),
                 )
             {
                 continue;

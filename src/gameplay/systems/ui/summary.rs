@@ -14,6 +14,7 @@ pub(crate) struct StationFlags {
     pub(crate) processor: bool,
     pub(crate) airlock: bool,
     pub(crate) drone: bool,
+    pub(crate) blocker: bool,
 }
 
 pub(crate) fn build_top_banner(

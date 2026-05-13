@@ -51,11 +51,21 @@ pub enum ArchRegister {
     DetectLogisticsDirX,
     DetectLogisticsDirY,
     DetectLogisticsSeverity,
+    JunctionOpen,
+    JunctionPowered,
+    JunctionSupply,
+    JunctionDemand,
+    ValveOpen,
+    ValvePowered,
+    ValveSupply,
+    ValveDemand,
     CmdReactorBias,
     CmdLogisticsEnable,
     CmdLogisticsPreference,
     CmdTurretAssist,
     CmdTurretAutoFire,
+    CmdJunctionOpen,
+    CmdValveOpen,
 }
 
 impl ArchRegister {
@@ -104,11 +114,21 @@ impl ArchRegister {
             Self::DetectLogisticsDirX => "DLX1",
             Self::DetectLogisticsDirY => "DLY1",
             Self::DetectLogisticsSeverity => "DLI0",
+            Self::JunctionOpen => "JBO0",
+            Self::JunctionPowered => "JBP0",
+            Self::JunctionSupply => "JBS0",
+            Self::JunctionDemand => "JBD0",
+            Self::ValveOpen => "VLO0",
+            Self::ValvePowered => "VLP0",
+            Self::ValveSupply => "VLS0",
+            Self::ValveDemand => "VLD0",
             Self::CmdReactorBias => "RRC0",
             Self::CmdLogisticsEnable => "LMC0",
             Self::CmdLogisticsPreference => "LMP0",
             Self::CmdTurretAssist => "WTA0",
             Self::CmdTurretAutoFire => "WTF0",
+            Self::CmdJunctionOpen => "JBC0",
+            Self::CmdValveOpen => "VLC0",
         }
     }
 
@@ -124,6 +144,8 @@ impl ArchRegister {
                 | Self::CmdLogisticsPreference
                 | Self::CmdTurretAssist
                 | Self::CmdTurretAutoFire
+                | Self::CmdJunctionOpen
+                | Self::CmdValveOpen
         )
     }
 }
@@ -848,6 +870,14 @@ fn parse_arch_register(token: &str, line: usize) -> Result<ArchRegister, ArchPar
         "DLX1" => Ok(ArchRegister::DetectLogisticsDirX),
         "DLY1" => Ok(ArchRegister::DetectLogisticsDirY),
         "DLI0" => Ok(ArchRegister::DetectLogisticsSeverity),
+        "JBO0" => Ok(ArchRegister::JunctionOpen),
+        "JBP0" => Ok(ArchRegister::JunctionPowered),
+        "JBS0" => Ok(ArchRegister::JunctionSupply),
+        "JBD0" => Ok(ArchRegister::JunctionDemand),
+        "VLO0" => Ok(ArchRegister::ValveOpen),
+        "VLP0" => Ok(ArchRegister::ValvePowered),
+        "VLS0" => Ok(ArchRegister::ValveSupply),
+        "VLD0" => Ok(ArchRegister::ValveDemand),
         "RRC0" | "RRC1" | "RRC2" | "RRC3" | "RRC4" | "RRC5" | "RRC6" | "RRC7" | "RRC8" | "RRC9" => {
             Ok(ArchRegister::CmdReactorBias)
         }
@@ -859,6 +889,8 @@ fn parse_arch_register(token: &str, line: usize) -> Result<ArchRegister, ArchPar
         "WTF0" | "WTF1" | "WTF2" | "WTF3" | "WTF4" | "WTF5" | "WTF6" | "WTF7" | "WTF8" | "WTF9" => {
             Ok(ArchRegister::CmdTurretAutoFire)
         }
+        "JBC0" => Ok(ArchRegister::CmdJunctionOpen),
+        "VLC0" => Ok(ArchRegister::CmdValveOpen),
         _ => Err(ArchParseDiagnostic {
             line,
             message: format!("unknown ARCH register '{token}'"),

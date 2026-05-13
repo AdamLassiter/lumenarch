@@ -218,6 +218,8 @@ fn register_rollback_state(app: &mut App) {
         .rollback_component_with_clone::<gameplay::components::RuntimeArchComputer>()
         .rollback_component_with_clone::<gameplay::components::TurretCommandState>()
         .rollback_component_with_clone::<gameplay::components::ReactorCommandState>()
+        .rollback_component_with_clone::<gameplay::components::JunctionCommandState>()
+        .rollback_component_with_clone::<gameplay::components::ValveCommandState>()
         .rollback_component_with_clone::<gameplay::components::StorageCommandState>()
         .rollback_component_with_clone::<gameplay::components::AirlockCommandState>()
         .rollback_component_with_clone::<gameplay::components::ManipulatorCommandState>()
@@ -228,6 +230,7 @@ fn register_rollback_state(app: &mut App) {
         .rollback_component_with_clone::<gameplay::components::ShipMovementModel>()
         .rollback_component_with_clone::<gameplay::components::ShipPowerModel>()
         .rollback_component_with_clone::<gameplay::components::ShipPowerState>()
+        .rollback_component_with_clone::<gameplay::components::ShipInfrastructureState>()
         .rollback_component_with_clone::<gameplay::components::ShipControlState>()
         .rollback_component_with_clone::<gameplay::components::ShipWeaponState>()
         .rollback_component_with_clone::<gameplay::components::ShipAutomationState>()
@@ -282,7 +285,6 @@ fn add_rollback_systems(app: &mut App) {
                 .chain()
                 .ambiguous_with_all(),
             (
-                gameplay::toggle_shipboard_control_mode,
                 gameplay::exit_focused_station,
                 gameplay::update_player_reference_frame,
                 gameplay::update_ship_atmosphere,
@@ -301,9 +303,12 @@ fn add_rollback_systems(app: &mut App) {
                 .run_if(netcode::rollback_phase_is_encounter)
                 .ambiguous_with_all(),
             (
+                gameplay::rebuild_infrastructure_networks,
                 gameplay::sample_ship_fields,
                 gameplay::apply_player_environmental_effects,
                 gameplay::update_module_runtime_state,
+                gameplay::rebuild_infrastructure_networks,
+                gameplay::update_routed_ship_power,
                 gameplay::update_detector_modules,
                 gameplay::run_arch_automation,
                 gameplay::run_logistics_transfers,
@@ -644,11 +649,13 @@ fn add_encounter_presentation_systems(app: &mut App) {
 }
 
 /// Spawns the shared camera used by UI, editors, and encounter presentation layers.
+/// Spawns the primary 2D camera so interactive builds have a world and UI viewport.
 fn setup_camera(mut commands: Commands) {
     commands.spawn((Camera2d, MainCamera));
 }
 
 /// Lets interactive builds quit quickly from the keyboard during development and testing.
+/// Exits the app from interactive builds so local testing has a quick escape hatch.
 fn exit_on_escape(keys: Res<ButtonInput<KeyCode>>, mut exit: MessageWriter<AppExit>) {
     if keys.just_pressed(KeyCode::Escape) {
         exit.write(AppExit::Success);

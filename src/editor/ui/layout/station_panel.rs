@@ -549,6 +549,7 @@ pub(super) fn station_button_default_label(action: StationPanelButtonAction) -> 
         StationPanelButtonAction::LogisticsCycleManipulatorTarget { .. } => "Next Target",
         StationPanelButtonAction::LogisticsCycleResource => "Cycle Resource",
         StationPanelButtonAction::LogisticsToggleProcessor => "Toggle Processor",
+        StationPanelButtonAction::InfrastructureToggleBlocker => "Open / Close",
         StationPanelButtonAction::ComputerToggleEnabled => "Enable / Disable",
         StationPanelButtonAction::ComputerCycleTemplate => "Cycle Template",
     }
