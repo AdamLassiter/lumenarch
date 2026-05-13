@@ -492,15 +492,15 @@ fn apply_blocker_arch_commands(
         if destroyed.is_some() {
             continue;
         }
-        if matches!(runtime_module.kind, ModuleKind::JunctionBox) {
-            if let (Some(open), Some(mut junction)) = (junction_open, junction) {
-                junction.open = open;
-            }
+        if matches!(runtime_module.kind, ModuleKind::JunctionBox)
+            && let (Some(open), Some(mut junction)) = (junction_open, junction)
+        {
+            junction.open = open;
         }
-        if matches!(runtime_module.kind, ModuleKind::Valve) {
-            if let (Some(open), Some(mut valve)) = (valve_open, valve) {
-                valve.open = open;
-            }
+        if matches!(runtime_module.kind, ModuleKind::Valve)
+            && let (Some(open), Some(mut valve)) = (valve_open, valve)
+        {
+            valve.open = open;
         }
     }
 }
