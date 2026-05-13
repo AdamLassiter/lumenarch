@@ -4,37 +4,32 @@
 
 LUMEN//ARCH is a top-down multiplayer 2D sci-fi systems game about building a patchwork ship, surviving inside it, and gradually moving from direct hands-on control to guided autonomy.
 
-## Technical Stack
+## Project Constraints
 
-* Rust latest (currently 1.95) and Bevy latest (currently 0.18) - this is 'greenfield' and new features are a nice convenience
-* Rollback netcode through `bevy_ggrs` and `ggrs` - the game simulation is deterministic except player input
-* Fixed-point math through `cordic` and `fixed` - keep game simulations consistent on different systems without floating-point math concerns
-* UI presentation is not subject to rollback as it is purely a client-side concern, but the states that may drive it across multiple connected clients should be handled with rollback in mind.
+* Rust 2024, Bevy 0.18, `bevy_ggrs`/`ggrs`, `cordic`, and `fixed`.
+* Rollback simulation must remain deterministic. Gameplay state that affects clients belongs in rollback-aware resources/components; pure presentation UI can stay client-side.
+* Simulation math should use fixed-point helpers/types. Keep `f32`/Bevy transform work at presentation boundaries unless the surrounding code already does otherwise.
+* Ship infrastructure is physical and strict: power, oxygen ducts, and typed resource pipes should not silently fall back to global pools.
+* Ship systems should expose ARCH-readable/writeable registers when they add meaningful automation or monitoring surface.
 
 ## Documentation and Notes
 
-* The [docs](docs/src) directory contains high-level descriptions for the direction of the game
-* The [notes](notes) directory contains implementation details for vertical slices as they have been implemented, along with associated TODO lists
-  * New vertical slices should be documented here, and TODO files updated once tasks have been completed
+* [docs](docs/src) contains high-level game direction.
+* [notes](notes) records vertical slices and TODOs. Add/update notes when implementing a new slice.
 
-## Code Style and Cross-cutting Concerns
+## Code Organization
 
-* Source files should rarely exceed 1000 lines - this might indicate a refactor is due
-  * Flat-and-wide is the preferred style
-    * Top-level modules generally covering different high-level states the game can be in
-    * Components, one-shot spawing and runtime systems are the next heirarchy to consider splitting refactors over (see [gameplay](src/gameplay) for an example)
-* Use of `ParamSet<(...)>` in queries is convenient compared to large sets of `Without<T>` labels, but use of these should be considered comparable to `RefCell` or dubious `.unwrap()` calls and warrants `// SAFETY ...` comments for mutability guarantees
+* Prefer flat, state-oriented modules like `gameplay`, `docked`, `sector_map`, `lobby`, and `editor`.
+* Keep component definitions, one-shot spawning, runtime systems, and UI presentation separated when a file grows large.
+* Every registered Bevy system/run condition should have a function-level comment explaining what it does and why it exists in the schedule.
+* Any `ParamSet<(...)>` use must include a nearby `SAFETY:` comment explaining why the branches cannot double-mutably access the same entity/component.
 
 ## Testing
 
-* [sim-tests.rs](src/sim_tests.rs) leverage the deterministic nature of the game and can test for larger
-
-## Gameplay Implementation
-
-* 'Components' on the ship should expose read/write or readonly 'registers' for the 'ARCH' computer system in-game to interact with
-  * This enables the player to automate and monitor ship systems
+* [sim_tests.rs](src/sim_tests.rs) uses the deterministic app flow for larger session/regression coverage.
+* Use focused unit tests for deterministic graph/planner/parser behavior where possible.
 
 ## Extra Tools
 
-* The usual suite of `cargo check`, `cargo fmt` and `cargo test` are available but not required for every small change
-* `cargo bevy-check` can be used to check for Bevy B0001 and B0002 error candidates and will provide diagnostics on possible fixes
+* `cargo fmt` and `cargo test` are the default verification path.
+* `cargo bevy-check` can help diagnose Bevy B0001/B0002 query conflicts.
