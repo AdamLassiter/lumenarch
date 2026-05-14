@@ -45,7 +45,6 @@ use crate::{
             ship_movement_model_with_effective,
             ship_power_model_with_effective,
             spawn_projectile_entity,
-            update_ship_power_state,
             wrap_radians,
         },
         systems::simulation::helpers::consume_ship_resource,
@@ -177,8 +176,7 @@ pub(crate) fn drive_hostile_ships(
             &mut LinearVelocity,
             &mut AngularVelocity,
             &ShipMovementModel,
-            &ShipPowerModel,
-            &mut ShipPowerState,
+            &ShipPowerState,
             &mut ShipWeaponState,
         ),
         (With<HostileShip>, With<ShipRoot>, With<HostileTarget>),
@@ -211,8 +209,7 @@ pub(crate) fn drive_hostile_ships(
         mut linear_velocity,
         mut angular_velocity,
         movement_model,
-        power_model,
-        mut power_state,
+        power_state,
         mut weapon_state,
     ) in &mut hostile_query
     {
@@ -247,19 +244,6 @@ pub(crate) fn drive_hostile_ships(
 
         weapon_state.cooldown_remaining =
             (weapon_state.cooldown_remaining - dt).max(Fx::from_num(0));
-        update_ship_power_state(
-            dt,
-            throttle,
-            turn_input,
-            if wants_fire {
-                Fx::from_num(1)
-            } else {
-                Fx::from_num(0)
-            },
-            power_model,
-            &mut power_state,
-        );
-
         let effective_turn_input = turn_input * power_state.engine_power_ratio;
         if effective_turn_input.abs() > Fx::from_num(0.01) && power_state.engines_powered {
             angular_velocity.radians_per_second = effective_turn_input * movement_model.turn_speed;

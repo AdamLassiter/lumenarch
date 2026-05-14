@@ -291,7 +291,7 @@ pub(crate) fn summarize_arch(
 pub(crate) fn controls_help_text(mode: ShipControlMode) -> String {
     match mode {
         ShipControlMode::Interior => {
-            "Walk / EVA\nWASD move or thrust\nE enter station / work\nF pick up, equip suit, or deposit\nG drop carried item\nQ or Esc leave station\nF3 diagnostics  |  Tab station hub".to_string()
+            "Walk / EVA\nWASD move or thrust\nE enter station / work\nF pick up, equip suit, or deposit\nG drop carried item\nQ or Esc leave station\nTab station hub".to_string()
         }
         ShipControlMode::Cockpit => {
             "Helm\nW/S throttle  |  A/D steer\nMouse can also drive helm\nUse on-panel controls for coarse trim\nQ or Esc leave cockpit".to_string()

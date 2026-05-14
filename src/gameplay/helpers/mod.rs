@@ -67,7 +67,6 @@ pub(crate) use ship::{
     module_local_position,
     ship_movement_model_with_effective,
     ship_power_model_with_effective,
-    update_ship_power_state,
 };
 pub(crate) use status::{
     danger_level,

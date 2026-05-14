@@ -26,6 +26,8 @@ pub enum ArchRegister {
     ProcessorRepairCharge,
     TurretReady,
     TurretCooldown,
+    TurretDesiredAngle,
+    TurretActualAngle,
     DetectLifeFriendly,
     DetectLifeHostile,
     DetectLifeDirX,
@@ -89,6 +91,8 @@ impl ArchRegister {
             Self::ProcessorRepairCharge => "LPR1",
             Self::TurretReady => "WTR0",
             Self::TurretCooldown => "WTC0",
+            Self::TurretDesiredAngle => "WTD0",
+            Self::TurretActualAngle => "WAC0",
             Self::DetectLifeFriendly => "DLF0",
             Self::DetectLifeHostile => "DLH0",
             Self::DetectLifeDirX => "DLX0",
@@ -844,6 +848,12 @@ fn parse_arch_register(token: &str, line: usize) -> Result<ArchRegister, ArchPar
         }
         "WTC0" | "WTC1" | "WTC2" | "WTC3" | "WTC4" | "WTC5" | "WTC6" | "WTC7" | "WTC8" | "WTC9" => {
             Ok(ArchRegister::TurretCooldown)
+        }
+        "WTD0" | "WTD1" | "WTD2" | "WTD3" | "WTD4" | "WTD5" | "WTD6" | "WTD7" | "WTD8" | "WTD9" => {
+            Ok(ArchRegister::TurretDesiredAngle)
+        }
+        "WAC0" | "WAC1" | "WAC2" | "WAC3" | "WAC4" | "WAC5" | "WAC6" | "WAC7" | "WAC8" | "WAC9" => {
+            Ok(ArchRegister::TurretActualAngle)
         }
         "DLF0" => Ok(ArchRegister::DetectLifeFriendly),
         "DLH0" => Ok(ArchRegister::DetectLifeHostile),

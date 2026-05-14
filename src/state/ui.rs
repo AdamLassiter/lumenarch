@@ -7,6 +7,7 @@ pub(crate) enum GameplayInfoPanelMode {
     FocusedModule,
     Alerts,
     StationConsole,
+    Tubes,
 }
 
 #[derive(Component)]

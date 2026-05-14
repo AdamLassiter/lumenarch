@@ -18,6 +18,7 @@ use crate::{
             ShipPowerState,
             ShipWeaponState,
             StorageModule,
+            TurretCommandState,
             ValveCommandState,
         },
         helpers::Fx,
@@ -47,6 +48,7 @@ pub(super) fn build_lumen_snapshot(
         Option<&ProcessorModule>,
         Option<&ReactorCommandState>,
         Option<&DetectorModule>,
+        Option<&TurretCommandState>,
         Option<&DestroyedModule>,
     )>,
 ) -> LumenSnapshot {
@@ -67,6 +69,7 @@ pub(super) fn build_lumen_snapshot(
             processor,
             _reactor,
             detector,
+            _turret,
             destroyed,
         )) = module_query.get(child)
         else {
@@ -115,6 +118,7 @@ pub(super) fn build_snapshot(
         Option<&ProcessorModule>,
         Option<&ReactorCommandState>,
         Option<&DetectorModule>,
+        Option<&TurretCommandState>,
         Option<&DestroyedModule>,
     )>,
     blocker_query: &Query<(
@@ -136,6 +140,9 @@ pub(super) fn build_snapshot(
     let mut storage_charge = Fx::from_num(0);
     let mut processor_raw = Fx::from_num(0);
     let mut processor_charge = Fx::from_num(0);
+    let mut turret_desired_angle = Fx::from_num(0);
+    let mut turret_actual_angle = Fx::from_num(0);
+    let mut turret_angle_sampled = false;
     let mut life_detector: Option<&DetectorModule> = None;
     let mut ship_detector: Option<&DetectorModule> = None;
     let mut damage_detector: Option<&DetectorModule> = None;
@@ -162,6 +169,7 @@ pub(super) fn build_snapshot(
             processor,
             reactor,
             detector,
+            turret,
             destroyed,
         )) = module_query.get(child)
         else {
@@ -207,6 +215,13 @@ pub(super) fn build_snapshot(
                     if slot.is_none_or(|current| detector.tier >= current.tier) {
                         *slot = Some(detector);
                     }
+                }
+            }
+            ModuleKind::Turret if !turret_angle_sampled => {
+                if let Some(turret) = turret {
+                    turret_desired_angle = turret.desired_angle;
+                    turret_actual_angle = turret.actual_angle;
+                    turret_angle_sampled = true;
                 }
             }
             _ => {}
@@ -288,6 +303,8 @@ pub(super) fn build_snapshot(
             Fx::from_num(0)
         },
         turret_cooldown: ship_weapon_state.cooldown_remaining.max(Fx::from_num(0)),
+        turret_desired_angle,
+        turret_actual_angle,
         life_friendly_present: bool_fx(life_detector.is_some_and(|detector| detector.detected)),
         life_hostile_present: bool_fx(
             life_detector.is_some_and(|detector| detector.secondary_detected),

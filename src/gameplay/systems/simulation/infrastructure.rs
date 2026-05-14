@@ -3,36 +3,38 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use bevy::{ecs::relationship::Relationship, prelude::*};
 
 use crate::{
-    gameplay::components::{
-        DestroyedModule,
-        InfrastructureNetworkSummary,
-        InfrastructureRouteKind,
-        Integrity,
-        JunctionCommandState,
-        ModuleInfrastructureStatus,
-        PowerConsumer,
-        PowerProducer,
-        ProcessorModule,
-        ReactorCommandState,
-        ResourceKind,
-        RuntimeFoundationVisual,
-        RuntimeShipModule,
-        ShipInfrastructureState,
-        ShipPowerModel,
-        ShipPowerState,
-        ShipRoot,
-        StorageModule,
-        ValveCommandState,
-        WeaponModule,
+    gameplay::{
+        components::{
+            DestroyedModule,
+            InfrastructureNetworkSummary,
+            InfrastructureRouteKind,
+            Integrity,
+            JunctionCommandState,
+            ModuleInfrastructureStatus,
+            PowerConsumer,
+            PowerProducer,
+            ProcessorModule,
+            ReactorCommandState,
+            ResourceKind,
+            RuntimeFoundationVisual,
+            RuntimeShipModule,
+            ShipInfrastructureState,
+            ShipPowerModel,
+            ShipPowerState,
+            ShipRoot,
+            StorageModule,
+            ValveCommandState,
+            WeaponModule,
+        },
+        helpers::{Fx, fx_from_time_delta},
     },
-    ship::{ModuleKind, ModuleVariant, ShipFoundationKind},
+    ship::{ModuleKind, ShipFoundationKind},
 };
 
 #[derive(Clone)]
 struct ModuleSnapshot {
     module_id: u64,
     kind: ModuleKind,
-    variant: ModuleVariant,
     grid_x: i32,
     grid_y: i32,
     power_draw: Option<i32>,
@@ -61,7 +63,7 @@ struct StorageSnapshot {
 
 /// Rebuilds deterministic ship infrastructure graphs from route tiles and module placement.
 pub(crate) fn rebuild_infrastructure_networks(
-    mut ship_query: Query<(Entity, &mut ShipInfrastructureState), With<ShipRoot>>,
+    mut ship_query: Query<(Entity, &mut ShipInfrastructureState, &ShipPowerModel), With<ShipRoot>>,
     foundation_query: Query<(&RuntimeFoundationVisual, &ChildOf)>,
     module_query: Query<(
         &RuntimeShipModule,
@@ -78,7 +80,13 @@ pub(crate) fn rebuild_infrastructure_networks(
         Option<&ValveCommandState>,
     )>,
 ) {
-    for (ship_entity, mut infrastructure) in &mut ship_query {
+    for (ship_entity, mut infrastructure, power_model) in &mut ship_query {
+        let previous_reserve_by_network: BTreeMap<u32, Fx> = infrastructure
+            .networks
+            .iter()
+            .filter(|network| network.kind == Some(InfrastructureRouteKind::Power))
+            .map(|network| (network.id, network.reserve))
+            .collect();
         let route_tiles: BTreeMap<(i32, i32), InfrastructureRouteKind> = foundation_query
             .iter()
             .filter(|(_, parent)| parent.get() == ship_entity)
@@ -108,7 +116,6 @@ pub(crate) fn rebuild_infrastructure_networks(
                 )| ModuleSnapshot {
                     module_id: runtime.module_id,
                     kind: runtime.kind,
-                    variant: runtime.variant,
                     grid_x: runtime.grid_x,
                     grid_y: runtime.grid_y,
                     power_draw: consumer
@@ -137,27 +144,58 @@ pub(crate) fn rebuild_infrastructure_networks(
             )
             .collect();
 
-        *infrastructure =
-            build_infrastructure_state(route_tiles, modules, infrastructure.strict_routing);
+        *infrastructure = build_infrastructure_state(
+            route_tiles,
+            modules,
+            infrastructure.strict_routing,
+            &previous_reserve_by_network,
+            power_model.battery_capacity,
+        );
     }
 }
 
 /// Aggregates routed power into the legacy ship-level power summary used by HUD/control code.
 pub(crate) fn update_routed_ship_power(
+    time: Res<Time>,
     mut ship_query: Query<(
-        &ShipInfrastructureState,
+        &mut ShipInfrastructureState,
         &ShipPowerModel,
         &mut ShipPowerState,
     )>,
 ) {
-    for (infrastructure, power_model, mut power_state) in &mut ship_query {
-        let mut generation = crate::gameplay::helpers::Fx::from_num(0);
-        let mut draw = crate::gameplay::helpers::Fx::from_num(0);
-        let mut reserve = crate::gameplay::helpers::Fx::from_num(0);
-        for network in &infrastructure.networks {
+    let dt = fx_from_time_delta(&time);
+    for (mut infrastructure, power_model, mut power_state) in &mut ship_query {
+        let _active_system_draw_capacity =
+            power_model.engine_draw + power_model.weapon_draw + power_model.shield_draw;
+        let mut generation = Fx::from_num(0);
+        let mut draw = Fx::from_num(0);
+        let mut reserve = Fx::from_num(0);
+        let total_reserve_capacity = infrastructure
+            .networks
+            .iter()
+            .filter(|network| network.kind == Some(InfrastructureRouteKind::Power))
+            .map(|network| network.reserve_capacity)
+            .fold(Fx::from_num(0), |total, capacity| total + capacity);
+        for network in &mut infrastructure.networks {
             if network.kind != Some(InfrastructureRouteKind::Power) {
                 continue;
             }
+            let reserve_share = if total_reserve_capacity > Fx::from_num(0) {
+                network.reserve_capacity / total_reserve_capacity
+            } else {
+                Fx::from_num(0)
+            };
+            let net_power = network.supply - network.demand;
+            if net_power >= Fx::from_num(0) {
+                let charge_delta =
+                    (net_power * dt).min(power_model.battery_charge_rate * reserve_share * dt);
+                network.reserve = (network.reserve + charge_delta).min(network.reserve_capacity);
+            } else {
+                let discharge_delta = ((-net_power) * dt)
+                    .min(power_model.battery_discharge_rate * reserve_share * dt);
+                network.reserve = (network.reserve - discharge_delta).max(Fx::from_num(0));
+            }
+            network.flow = network.supply.min(network.demand);
             generation += network.supply;
             draw += network.demand.min(network.supply + network.reserve);
             reserve += network.reserve;
@@ -166,6 +204,37 @@ pub(crate) fn update_routed_ship_power(
         power_state.draw = draw;
         power_state.surplus = generation - draw;
         power_state.stored_energy = reserve.min(power_model.battery_capacity);
+
+        let network_power: BTreeMap<u32, bool> = infrastructure
+            .networks
+            .iter()
+            .filter(|network| network.kind == Some(InfrastructureRouteKind::Power))
+            .map(|network| {
+                (
+                    network.id,
+                    network.supply + network.reserve >= network.demand
+                        && network.supply + network.reserve > Fx::from_num(0),
+                )
+            })
+            .collect();
+        for status in &mut infrastructure.module_statuses {
+            if !status.power_required {
+                status.powered = true;
+                status.blocked_reason = None;
+                continue;
+            }
+            status.powered = status
+                .power_network
+                .and_then(|id| network_power.get(&id).copied())
+                .unwrap_or(false);
+            status.blocked_reason = (!status.powered).then(|| {
+                if status.power_network.is_some() {
+                    "insufficient generation".to_string()
+                } else {
+                    "no wired power".to_string()
+                }
+            });
+        }
         power_state.engines_powered = infrastructure
             .module_statuses
             .iter()
@@ -175,9 +244,9 @@ pub(crate) fn update_routed_ship_power(
             .iter()
             .any(|status| status.kind == ModuleKind::Turret && status.powered);
         power_state.engine_power_ratio = if power_state.engines_powered {
-            crate::gameplay::helpers::Fx::from_num(1)
+            Fx::from_num(1)
         } else {
-            crate::gameplay::helpers::Fx::from_num(0)
+            Fx::from_num(0)
         };
     }
 }
@@ -186,6 +255,8 @@ fn build_infrastructure_state(
     route_tiles: BTreeMap<(i32, i32), InfrastructureRouteKind>,
     modules: Vec<ModuleSnapshot>,
     strict_routing: bool,
+    previous_reserve_by_network: &BTreeMap<u32, Fx>,
+    ship_battery_capacity: Fx,
 ) -> ShipInfrastructureState {
     let mut blocked_tiles_by_kind: BTreeMap<InfrastructureRouteKind, BTreeSet<(i32, i32)>> =
         BTreeMap::new();
@@ -270,6 +341,7 @@ fn build_infrastructure_state(
                 supply: crate::gameplay::helpers::Fx::from_num(0),
                 demand: crate::gameplay::helpers::Fx::from_num(0),
                 reserve: crate::gameplay::helpers::Fx::from_num(0),
+                reserve_capacity: crate::gameplay::helpers::Fx::from_num(0),
                 flow: crate::gameplay::helpers::Fx::from_num(0),
                 blockers: blocked_tiles.len() as u32,
             });
@@ -311,7 +383,7 @@ fn build_infrastructure_state(
             if let Some(output) = module.reactor_output {
                 network.supply += output;
             } else if let Some(output) = module.producer_output {
-                network.reserve += crate::gameplay::helpers::Fx::from_num(output);
+                network.reserve_capacity += crate::gameplay::helpers::Fx::from_num(output);
             }
             if let Some(draw) = module.power_draw {
                 network.demand += crate::gameplay::helpers::Fx::from_num(draw);
@@ -332,8 +404,31 @@ fn build_infrastructure_state(
         });
     }
 
+    let total_reserve_units = networks
+        .iter()
+        .filter(|network| network.kind == Some(InfrastructureRouteKind::Power))
+        .map(|network| network.reserve_capacity)
+        .fold(Fx::from_num(0), |total, capacity| total + capacity);
+
     for network in &mut networks {
         network.attached_modules.sort();
+        if network.kind == Some(InfrastructureRouteKind::Power)
+            && total_reserve_units > Fx::from_num(0)
+        {
+            network.reserve_capacity =
+                ship_battery_capacity * network.reserve_capacity / total_reserve_units;
+        }
+        network.reserve = if network.kind == Some(InfrastructureRouteKind::Power)
+            && network.reserve_capacity > Fx::from_num(0)
+        {
+            previous_reserve_by_network
+                .get(&network.id)
+                .copied()
+                .unwrap_or(network.reserve_capacity)
+                .clamp(Fx::from_num(0), network.reserve_capacity)
+        } else {
+            Fx::from_num(0)
+        };
         network.flow = network.supply.min(network.demand);
     }
 

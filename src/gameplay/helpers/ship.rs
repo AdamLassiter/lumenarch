@@ -2,7 +2,7 @@ use super::{FixedVec2, Fx, fx_ratio};
 use crate::{
     TILE_SIZE,
     balance::BalanceConfig,
-    gameplay::components::{ShipMovementModel, ShipPowerModel, ShipPowerState},
+    gameplay::components::{ShipMovementModel, ShipPowerModel},
     ship::{ModuleKind, ModuleSpec, ModuleVariant, ShipModule},
 };
 
@@ -79,83 +79,4 @@ pub(crate) fn ship_power_model_with_effective(
             * Fx::from_num(balance.ship.weapon_draw_per_turret),
         shield_draw: Fx::from_num(0),
     }
-}
-
-fn power_draw_for_requested_systems(
-    power_model: &ShipPowerModel,
-    throttle_demand: Fx,
-    turn_input: Fx,
-    weapon_demand: Fx,
-) -> (Fx, Fx, Fx) {
-    let throttle = throttle_demand.clamp(Fx::from_num(0), Fx::from_num(1));
-    let steering_fraction =
-        turn_input.abs().clamp(Fx::from_num(0), Fx::from_num(1)) * fx_ratio(2, 5);
-    let engine_requested = power_model.engine_draw * throttle.max(steering_fraction);
-    let weapon_requested =
-        power_model.weapon_draw * weapon_demand.clamp(Fx::from_num(0), Fx::from_num(1));
-
-    (power_model.passive_draw, weapon_requested, engine_requested)
-}
-
-pub(crate) fn update_ship_power_state(
-    dt: Fx,
-    throttle_demand: Fx,
-    turn_input: Fx,
-    weapon_demand: Fx,
-    power_model: &ShipPowerModel,
-    power_state: &mut ShipPowerState,
-) {
-    let (passive_draw, weapon_draw, engine_draw) =
-        power_draw_for_requested_systems(power_model, throttle_demand, turn_input, weapon_demand);
-    let requested_draw = passive_draw + weapon_draw + engine_draw;
-    let mut effective_draw = requested_draw;
-    let mut engine_power_ratio = if engine_draw > Fx::from_num(0) {
-        Fx::from_num(1)
-    } else {
-        Fx::from_num(0)
-    };
-
-    let safe_dt = if dt > fx_ratio(1, 1000) {
-        dt
-    } else {
-        fx_ratio(1, 1000)
-    };
-    let discharge_limit = (power_model.battery_discharge_rate * safe_dt).max(Fx::from_num(0));
-    let available_energy = power_model.reactor_output + discharge_limit / safe_dt;
-
-    let weapons_powered = if effective_draw > available_energy {
-        effective_draw -= weapon_draw;
-        false
-    } else {
-        weapon_draw > Fx::from_num(0)
-    };
-
-    if effective_draw > available_energy {
-        let baseline_draw = effective_draw - engine_draw;
-        let remaining_for_engines = (available_energy - baseline_draw).max(Fx::from_num(0));
-        if engine_draw > Fx::from_num(0) {
-            engine_power_ratio =
-                (remaining_for_engines / engine_draw).clamp(Fx::from_num(0), Fx::from_num(1));
-            effective_draw = baseline_draw + engine_draw * engine_power_ratio;
-        } else {
-            engine_power_ratio = Fx::from_num(0);
-        }
-    }
-
-    let net_power = power_model.reactor_output - effective_draw;
-    let charge_delta = if net_power >= Fx::from_num(0) {
-        (net_power * dt).min(power_model.battery_charge_rate * dt)
-    } else {
-        (net_power * dt).max(-power_model.battery_discharge_rate * dt)
-    };
-    let new_stored_energy = (power_state.stored_energy + charge_delta)
-        .clamp(Fx::from_num(0), power_model.battery_capacity);
-
-    power_state.stored_energy = new_stored_energy;
-    power_state.generation = power_model.reactor_output;
-    power_state.draw = effective_draw;
-    power_state.surplus = net_power;
-    power_state.engine_power_ratio = engine_power_ratio;
-    power_state.weapons_powered = weapons_powered;
-    power_state.engines_powered = engine_power_ratio > Fx::from_num(0);
 }

@@ -312,6 +312,41 @@ impl ShipDefinition {
         self.modules.iter().any(|module| module.kind == kind)
     }
 
+    pub fn module_channel(&self, module_id: u64) -> Option<u8> {
+        self.modules
+            .iter()
+            .find(|module| module.id == module_id)
+            .map(ShipModule::effective_channel)
+    }
+
+    pub fn set_module_channel(&mut self, module_id: u64, channel: u8) -> bool {
+        let Some(module) = self
+            .modules
+            .iter_mut()
+            .find(|module| module.id == module_id)
+        else {
+            return false;
+        };
+        if !module.kind.supports_channel() {
+            return false;
+        }
+        module.channel = channel % 10;
+        true
+    }
+
+    pub fn modules_by_channel(
+        &self,
+        kind: ModuleKind,
+        channel: u8,
+    ) -> impl Iterator<Item = &ShipModule> {
+        let channel = channel % 10;
+        self.modules.iter().filter(move |module| {
+            module.kind == kind
+                && module.kind.supports_channel()
+                && module.effective_channel() == channel
+        })
+    }
+
     pub fn normalize_variants(&mut self) {
         for module in &mut self.modules {
             module.variant = module.variant.normalize_for_kind(module.kind);

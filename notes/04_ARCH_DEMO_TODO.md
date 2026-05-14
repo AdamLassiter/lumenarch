@@ -237,7 +237,7 @@ Give ARCH one combat-adjacent responsibility grounded in the same turret command
 
 Tasks:
 
-- [ ] Expose turret actual vs desired state through registers.
+- [x] Expose turret actual vs desired state through registers.
 - [x] Allow program output to influence turret desired angle or fire policy.
 - [x] Ensure this support helps but does not replace the player.
 - [x] Tune the encounter so the value is visible.
@@ -248,8 +248,8 @@ Definition of done:
 
 Implementation notes:
 
-* this first slice ships fire-policy support rather than full desired-angle control
-* turret aiming should be upgraded in 05 so ARCH and manual turret control can share the same hardpoint-local command surface
+* this slice now exposes turret desired and actual angle as read registers (`WTD0`, `WAC0`)
+* this first slice still ships fire-policy support rather than writable desired-angle aiming
 
 ## Phase 10 — Encounter And Reporting
 
@@ -278,8 +278,8 @@ Reduce the intimidation factor of first-time scripting.
 
 Tasks:
 
-- [ ] Add short inline descriptions for the first register set.
-- [ ] Add starter-program explanations.
+- [x] Add short inline descriptions for the first register set.
+- [x] Add starter-program explanations.
 - [x] Improve diagnostics for:
   - invalid register access
   - no-op writes
@@ -295,6 +295,7 @@ Implementation notes:
 * this phase is partially complete
 * runtime diagnostics and mission reporting are in place
 * editor-side explanatory copy can be expanded once 05 component panels establish the final shared terminology
+* component panels and editor/runtime program views now show register names, source previews, execution status, and template names
 
 ## Immediate Next Task For 04
 

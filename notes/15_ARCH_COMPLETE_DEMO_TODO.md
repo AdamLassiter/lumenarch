@@ -73,14 +73,14 @@ Make channels real saved ship/module state rather than spec-only meaning.
 
 ### Tasks
 
-- [ ] Add explicit per-module channel data to ship definitions for channel-capable components.
-- [ ] Add save/load and migration behavior for existing ships.
-- [ ] Add enemy ship support using the same model.
-- [ ] Decide defaults for newly placed modules by kind.
-- [ ] Add helpers for:
-  - [ ] reading a module channel
-  - [ ] mutating a module channel
-  - [ ] enumerating modules by channel/family
+- [x] Add explicit per-module channel data to ship definitions for channel-capable components.
+- [x] Add save/load and migration behavior for existing ships.
+- [x] Add enemy ship support using the same model.
+- [x] Decide defaults for newly placed modules by kind.
+- [x] Add helpers for:
+  - [x] reading a module channel
+  - [x] mutating a module channel
+  - [x] enumerating modules by channel/family
 
 Definition of done:
 
@@ -96,10 +96,10 @@ Expose channels to players wherever components are configured or operated.
 
 ### Tasks
 
-- [ ] Add channel controls to the player ship editor.
-- [ ] Add channel display and change controls to component runtime UIs.
+- [x] Add channel controls to the player ship editor.
+- [x] Add channel display and change controls to component runtime UIs.
 - [ ] Surface channel warnings where multiple relevant modules share a channel.
-- [ ] Keep enemy editor on unlimited supply while still using the same channel data model.
+- [x] Keep enemy editor on unlimited supply while still using the same channel data model.
 - [ ] Make sure runtime channel changes follow the chosen synchronization rules.
 
 Definition of done:
@@ -116,11 +116,11 @@ Show the real programming surface directly in component UIs.
 
 ### Tasks
 
-- [ ] For each component UI, add register-name labels next to values.
+- [x] For each component UI, add register-name labels next to values.
 - [ ] Distinguish readable and writable registers where useful.
-- [ ] Ensure bar/toggle displays still remain readable and not overloaded.
-- [ ] Add channel display to each relevant panel.
-- [ ] Make focused-module and station-console views reflect the same register naming.
+- [x] Ensure bar/toggle displays still remain readable and not overloaded.
+- [x] Add channel display to each relevant panel.
+- [x] Make focused-module and station-console views reflect the same register naming.
 
 Definition of done:
 
@@ -136,18 +136,18 @@ Upgrade the current textbox system into a bounded multi-line programming editor.
 
 ### Tasks
 
-- [ ] Add a reusable multi-line text buffer resource/state model.
-- [ ] Support:
-  - [ ] cursor movement
-  - [ ] selection basics
-  - [ ] line splitting/joining
-  - [ ] left/right/up/down
-  - [ ] home/end
-  - [ ] backspace/delete
-  - [ ] ctrl-a / ctrl-x / ctrl-c / ctrl-v
-- [ ] Keep a fixed maximum line count in v1.
-- [ ] Add a visible active line/cursor presentation.
-- [ ] Make the editor reusable for both ARCH and LUMEN program text.
+- [x] Add a reusable multi-line text buffer resource/state model.
+- [x] Support:
+  - [x] cursor movement
+  - [x] selection basics
+  - [x] line splitting/joining
+  - [x] left/right/up/down
+  - [x] home/end
+  - [x] backspace/delete
+  - [x] ctrl-a / ctrl-x / ctrl-c / ctrl-v
+- [x] Keep a fixed maximum line count in v1.
+- [x] Add a visible active line/cursor presentation.
+- [x] Make the editor reusable for both ARCH and LUMEN program text.
 
 Definition of done:
 
@@ -163,21 +163,21 @@ Parse real text into ARCH program structures.
 
 ### Tasks
 
-- [ ] Add tokenizer/parser for ARCH source text.
+- [x] Add tokenizer/parser for ARCH source text.
 - [ ] Support:
   - [ ] labels
-  - [ ] comments
-  - [ ] opcodes
-  - [ ] register operands
-  - [ ] immediate literals
+  - [x] comments
+  - [x] opcodes
+  - [x] register operands
+  - [x] immediate literals
 - [ ] Validate:
-  - [ ] opcode existence
-  - [ ] argument counts
-  - [ ] writable destination rules
-  - [ ] known register names
+  - [x] opcode existence
+  - [x] argument counts
+  - [x] writable destination rules
+  - [x] known register names
   - [ ] legal channel suffixes
-  - [ ] control-flow constraints
-- [ ] Produce structured diagnostics with line/column or at least line/token context.
+  - [x] control-flow constraints
+- [x] Produce structured diagnostics with line/column or at least line/token context.
 
 Definition of done:
 
@@ -193,15 +193,15 @@ Give LUMEN the same text-authoring foundation, even if ARCH remains the focus of
 
 ### Tasks
 
-- [ ] Add parser for the current canonical LUMEN text syntax.
-- [ ] Support BUFF/NERF and the currently implemented target/property vocabulary.
+- [x] Add parser for the current canonical LUMEN text syntax.
+- [x] Support BUFF/NERF and the currently implemented target/property vocabulary.
 - [ ] Validate:
-  - [ ] target form
+  - [x] target form
   - [ ] register/property family
   - [ ] channel references
-  - [ ] operand count
-  - [ ] numeric/weight arguments
-- [ ] Produce diagnostics consistent with ARCH diagnostics.
+  - [x] operand count
+  - [x] numeric/weight arguments
+- [x] Produce diagnostics consistent with ARCH diagnostics.
 
 Definition of done:
 
@@ -217,16 +217,16 @@ Prevent invalid draft text from corrupting saved or active programs.
 
 ### Tasks
 
-- [ ] Add per-processor draft text state.
-- [ ] Separate:
-  - [ ] active compiled program
-  - [ ] saved authored source text
-  - [ ] current draft text
-- [ ] Add explicit actions for:
-  - [ ] parse/check
-  - [ ] commit/apply
-  - [ ] revert to active/saved
-- [ ] Ensure failed parse/validation does not replace the active program.
+- [x] Add per-processor draft text state.
+- [x] Separate:
+  - [x] active compiled program
+  - [x] saved authored source text
+  - [x] current draft text
+- [x] Add explicit actions for:
+  - [x] parse/check
+  - [x] commit/apply
+  - [x] revert to active/saved
+- [x] Ensure failed parse/validation does not replace the active program.
 
 Definition of done:
 
@@ -245,12 +245,12 @@ Make interacting with computers/processors a real programming activity in-game.
 - [ ] Add a runtime programming panel for ARCH computers.
 - [ ] Add a runtime programming panel for LUMEN processors.
 - [ ] Show:
-  - [ ] current channel context where relevant
-  - [ ] source text
+  - [x] current channel context where relevant
+  - [x] source text
   - [ ] parse/validation errors
-  - [ ] active program summary
-  - [ ] last runtime halt/error state
-- [ ] Ensure the UI fits the current encounter presentation rules and panel model.
+  - [x] active program summary
+  - [x] last runtime halt/error state
+- [x] Ensure the UI fits the current encounter presentation rules and panel model.
 
 Definition of done:
 
@@ -269,10 +269,10 @@ Make invalid authored programs understandable and actionable.
 - [ ] Define a shared diagnostic model for parser/validator/runtime failures.
 - [ ] Show line-specific error messages in editor and runtime programming panels.
 - [ ] Distinguish:
-  - [ ] parse error
-  - [ ] validation error
-  - [ ] runtime halt/error
-  - [ ] inactive draft vs active program
+  - [x] parse error
+  - [x] validation error
+  - [x] runtime halt/error
+  - [x] inactive draft vs active program
 - [ ] Add logs for invalid program activation attempts without spamming.
 
 Definition of done:
@@ -296,8 +296,8 @@ Close the design gap around how program and channel edits work in synchronized p
   - [ ] runtime ARCH commits
   - [ ] runtime LUMEN commits
 - [ ] Implement the chosen synchronized commit path for any in-session edits that are allowed.
-- [ ] Keep local drafts local until commit.
-- [ ] Ensure presentation/editor resources do not become gameplay authority again.
+- [x] Keep local drafts local until commit.
+- [x] Ensure presentation/editor resources do not become gameplay authority again.
 
 Definition of done:
 
@@ -326,8 +326,8 @@ Definition of done:
 
 ## High-Risk Gaps To Watch
 
-- [ ] Current runtime/editor code still contains structured template-edit assumptions that may fight the text-authoring model.
-- [ ] The existing textbox implementation may need one more abstraction step before it cleanly supports multi-line editing.
+- [x] Current runtime/editor code still contains structured template-edit assumptions that may fight the text-authoring model.
+- [x] The existing textbox implementation may need one more abstraction step before it cleanly supports multi-line editing.
 - [ ] Register naming drift between docs, runtime internals, and UI labels could create player confusion unless normalized early.
 - [ ] Runtime program editing in rollback/multiplayer needs explicit ownership boundaries before implementation, not after.
 - [ ] Channel semantics must be chosen deliberately; forced uniqueness and tactical channel-sharing lead to very different game behavior.

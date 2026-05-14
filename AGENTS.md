@@ -6,7 +6,7 @@ LUMEN//ARCH is a top-down multiplayer 2D sci-fi systems game about building a pa
 
 ## Project Constraints
 
-* Rust 2024, Bevy 0.18, `bevy_ggrs`/`ggrs`, `cordic`, and `fixed`.
+* Rust 2024, Bevy 0.18, `bevy_ggrs`/`ggrs`, `cordic`, `fixed`, and `wgsl`.
 * Rollback simulation must remain deterministic. Gameplay state that affects clients belongs in rollback-aware resources/components; pure presentation UI can stay client-side.
 * Simulation math should use fixed-point helpers/types. Keep `f32`/Bevy transform work at presentation boundaries unless the surrounding code already does otherwise.
 * Ship infrastructure is physical and strict: power, oxygen ducts, and typed resource pipes should not silently fall back to global pools.

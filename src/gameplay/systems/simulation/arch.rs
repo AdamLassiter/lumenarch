@@ -28,6 +28,7 @@ use crate::{
             ShipRoot,
             ShipWeaponState,
             StorageModule,
+            TurretCommandState,
             ValveCommandState,
         },
         helpers::{Fx, fx_from_time_delta},
@@ -56,6 +57,8 @@ pub(crate) struct ArchSnapshot {
     pub(crate) processor_repair_charge: Fx,
     pub(crate) turret_ready: Fx,
     pub(crate) turret_cooldown: Fx,
+    pub(crate) turret_desired_angle: Fx,
+    pub(crate) turret_actual_angle: Fx,
     pub(crate) life_friendly_present: Fx,
     pub(crate) life_hostile_present: Fx,
     pub(crate) life_dir_x: Fx,
@@ -142,6 +145,7 @@ pub(crate) fn run_arch_automation(
         Option<&ProcessorModule>,
         Option<&ReactorCommandState>,
         Option<&DetectorModule>,
+        Option<&TurretCommandState>,
         Option<&DestroyedModule>,
     )>,
     mut blocker_queries: ParamSet<(
@@ -214,6 +218,7 @@ pub(crate) fn run_arch_automation(
             _processor,
             _reactor,
             _detector,
+            _turret,
             destroyed,
         )) = module_query.get_mut(child)
         else {
@@ -369,7 +374,7 @@ pub(crate) fn run_arch_automation(
 
     if aggregate.reactor_bias > Fx::from_num(0) {
         for child in children.iter() {
-            let Ok((_, runtime_module, mut runtime_state, _, _, _, _, _, _, destroyed)) =
+            let Ok((_, runtime_module, mut runtime_state, _, _, _, _, _, _, _, destroyed)) =
                 module_query.get_mut(child)
             else {
                 continue;
@@ -408,6 +413,7 @@ pub(crate) fn build_lumen_snapshot(
         Option<&ProcessorModule>,
         Option<&ReactorCommandState>,
         Option<&DetectorModule>,
+        Option<&TurretCommandState>,
         Option<&DestroyedModule>,
     )>,
 ) -> LumenSnapshot {
@@ -453,6 +459,7 @@ pub(crate) fn build_snapshot(
         Option<&ProcessorModule>,
         Option<&ReactorCommandState>,
         Option<&DetectorModule>,
+        Option<&TurretCommandState>,
         Option<&DestroyedModule>,
     )>,
     blocker_query: &Query<(
@@ -951,6 +958,8 @@ fn read_register(
         ArchRegister::ProcessorRepairCharge => snapshot.processor_repair_charge,
         ArchRegister::TurretReady => snapshot.turret_ready,
         ArchRegister::TurretCooldown => snapshot.turret_cooldown,
+        ArchRegister::TurretDesiredAngle => snapshot.turret_desired_angle,
+        ArchRegister::TurretActualAngle => snapshot.turret_actual_angle,
         ArchRegister::DetectLifeFriendly => snapshot.life_friendly_present,
         ArchRegister::DetectLifeHostile => snapshot.life_hostile_present,
         ArchRegister::DetectLifeDirX => snapshot.life_dir_x,

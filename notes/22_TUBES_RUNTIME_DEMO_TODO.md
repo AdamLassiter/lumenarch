@@ -44,8 +44,8 @@
 
 ## Follow-Up Implementation
 
-- [ ] Add dedicated editor/runtime debug overlays for network ids, disconnected consumers, and closed blockers.
-- [ ] Make battery/capacitor reserve behavior fully per-network and spendable.
+- [x] Add dedicated editor/runtime debug overlays for network ids, disconnected consumers, and closed blockers.
+- [x] Make battery/capacitor reserve behavior fully per-network and spendable.
 - [ ] Route repair workflows through connected repair-charge storage.
 - [ ] Extend ARCH infrastructure access beyond compact first-module/global command registers.
 - [ ] Add scenario coverage for core-only enemies and routed combat-capable player ships.

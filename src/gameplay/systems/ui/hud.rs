@@ -1,5 +1,8 @@
 use super::{alerts, *};
-use crate::gameplay::components::DetectorModule;
+use crate::{
+    gameplay::components::{DetectorModule, ModuleInfrastructureStatus},
+    ship::ModuleKind,
+};
 
 /// Cycles the encounter info panel mode so players can switch between summaries and inspection views.
 pub(crate) fn toggle_gameplay_info_panel(
@@ -7,7 +10,7 @@ pub(crate) fn toggle_gameplay_info_panel(
     mut hud_mode: ResMut<GameplayInfoPanelMode>,
 ) {
     if keys.just_pressed(KeyCode::F1) {
-        *hud_mode = GameplayInfoPanelMode::Overview;
+        *hud_mode = GameplayInfoPanelMode::StationConsole;
     }
     if keys.just_pressed(KeyCode::F2) {
         *hud_mode = GameplayInfoPanelMode::FocusedModule;
@@ -16,7 +19,10 @@ pub(crate) fn toggle_gameplay_info_panel(
         *hud_mode = GameplayInfoPanelMode::Alerts;
     }
     if keys.just_pressed(KeyCode::F4) {
-        *hud_mode = GameplayInfoPanelMode::StationConsole;
+        *hud_mode = GameplayInfoPanelMode::Overview;
+    }
+    if keys.just_pressed(KeyCode::F5) {
+        *hud_mode = GameplayInfoPanelMode::Tubes;
     }
 }
 
@@ -283,7 +289,7 @@ pub(crate) fn update_gameplay_status_text(
         checksum_history.last_value,
     );
     let controls_text = format!(
-        "{}\nF1 ship  |  F2 focus  |  F3 alerts  |  F4 station",
+        "{}\nF1 station  |  F2 focus  |  F3 alerts  |  F4 ship  |  F5 tubes",
         summary::controls_help_text(control_mode.mode)
     );
     let (panel_title, panel_body, _, _) = station_panel::station_panel_content(
@@ -315,6 +321,30 @@ pub(crate) fn update_gameplay_status_text(
         .module_query
         .iter()
         .find(|(_, runtime_module, ..)| runtime_module.module_id == current_station.module_id);
+    let under_player_module = match player_motion.frame {
+        PlayerReferenceFrame::Ship(ship_entity) => {
+            let grid_x = (player_motion.local_position.x / Fx::from_num(32)).to_num::<i32>();
+            let grid_y = (-player_motion.local_position.y / Fx::from_num(32)).to_num::<i32>();
+            status_world
+                .module_query
+                .iter()
+                .find(|(entity, runtime_module, ..)| {
+                    runtime_module.grid_x == grid_x
+                        && runtime_module.grid_y == grid_y
+                        && status_world
+                            .module_parent_query
+                            .get(*entity)
+                            .is_ok_and(|parent| parent.get() == ship_entity)
+                })
+        }
+        PlayerReferenceFrame::World => None,
+    };
+    let tubes_body = tubes_debug_text(
+        infrastructure_state,
+        under_player_module
+            .or(current_module)
+            .map(|(_, runtime_module, ..)| runtime_module),
+    );
     let mut issues = alerts::collect_alert_issues(&status_world.module_query, &balance);
     issues.sort_by_key(|issue| std::cmp::Reverse(issue.0));
     issues.truncate(3);
@@ -323,6 +353,7 @@ pub(crate) fn update_gameplay_status_text(
         GameplayInfoPanelMode::FocusedModule => "Focused Module".to_string(),
         GameplayInfoPanelMode::Alerts => "Alerts".to_string(),
         GameplayInfoPanelMode::StationConsole => panel_title.clone(),
+        GameplayInfoPanelMode::Tubes => "Tubes".to_string(),
     };
     let shared_body = match *hud_mode {
         GameplayInfoPanelMode::Overview => format!("{top_banner}\n\n{compact}"),
@@ -354,6 +385,7 @@ pub(crate) fn update_gameplay_status_text(
             &issues,
         ),
         GameplayInfoPanelMode::StationConsole => panel_body.clone(),
+        GameplayInfoPanelMode::Tubes => tubes_body,
     };
     let show_station_panel = !matches!(
         control_mode.mode,
@@ -581,5 +613,168 @@ pub(crate) fn update_gameplay_status_text(
 
     for mut color in &mut hud_ui.node_queries.p7() {
         *color = BackgroundColor(Color::srgba(0.0, 0.0, 0.0, blackout_alpha.to_num::<f32>()));
+    }
+}
+
+fn tubes_debug_text(
+    infrastructure: &ShipInfrastructureState,
+    current_module: Option<&RuntimeShipModule>,
+) -> String {
+    let mut lines = Vec::new();
+    lines.push(format!(
+        "Networks: {}  Strict routing: {}",
+        infrastructure.networks.len(),
+        if infrastructure.strict_routing {
+            "on"
+        } else {
+            "off"
+        }
+    ));
+
+    if let Some(runtime_module) = current_module {
+        lines.push("Under player:".to_string());
+        lines.extend(tubes_module_lines(infrastructure, runtime_module));
+    } else {
+        lines.push("Under player: no component".to_string());
+    }
+
+    for network in infrastructure.networks.iter().take(10) {
+        let kind = network
+            .kind
+            .map(|kind| kind.label().to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        lines.push(format!(
+            "#{:02} {:<12} tiles={} modules={} supply={} demand={} reserve={} flow={} blockers={}",
+            network.id,
+            kind,
+            network.tile_count,
+            network.attached_modules.len(),
+            format_fx1(network.supply),
+            format_fx1(network.demand),
+            format_fx1(network.reserve),
+            format_fx1(network.flow),
+            network.blockers,
+        ));
+    }
+
+    let blocked = infrastructure
+        .module_statuses
+        .iter()
+        .filter(|status| status.blocked_reason.is_some())
+        .take(8)
+        .map(|status| {
+            format!(
+                "{} {}: {}",
+                module_display_name(status.kind),
+                status.module_id,
+                status.blocked_reason.as_deref().unwrap_or("blocked")
+            )
+        })
+        .collect::<Vec<_>>();
+    if !blocked.is_empty() {
+        lines.push("Blocked consumers:".to_string());
+        lines.extend(blocked);
+    }
+
+    if lines.len() == 1 {
+        lines.push("No routed infrastructure networks found.".to_string());
+    }
+    lines.join("\n")
+}
+
+fn tubes_module_lines(
+    infrastructure: &ShipInfrastructureState,
+    runtime_module: &RuntimeShipModule,
+) -> Vec<String> {
+    let mut lines = Vec::new();
+    let module_name = module_display_name(runtime_module.kind);
+    let Some(status) = infrastructure.status_for_module(runtime_module.module_id) else {
+        lines.push(format!(
+            "{} {} has no infrastructure status",
+            module_name, runtime_module.module_id
+        ));
+        return lines;
+    };
+
+    lines.push(format!(
+        "{} {} at ({}, {}) [{}]",
+        module_name,
+        runtime_module.module_id,
+        runtime_module.grid_x,
+        runtime_module.grid_y,
+        status.blocked_reason.as_deref().unwrap_or("connected")
+    ));
+    if status.power_required {
+        lines.push(format!(
+            "power: {} via {}",
+            if status.powered {
+                "powered"
+            } else {
+                "unpowered"
+            },
+            network_debug_line(infrastructure, status.power_network)
+        ));
+    } else if let Some(network_id) = status.power_network {
+        lines.push(format!(
+            "power route: {}",
+            network_debug_line(infrastructure, Some(network_id))
+        ));
+    }
+    if let Some(network_id) = status.duct_network {
+        lines.push(format!(
+            "O2 duct: {}",
+            network_debug_line(infrastructure, Some(network_id))
+        ));
+    }
+    for (resource, network_id) in &status.resource_networks {
+        lines.push(format!(
+            "{} pipe: {}",
+            resource_kind_label(*resource),
+            network_debug_line(infrastructure, Some(*network_id))
+        ));
+    }
+    lines.push(format!(
+        "role: {}",
+        module_tube_role(runtime_module.kind, status)
+    ));
+    lines
+}
+
+fn network_debug_line(infrastructure: &ShipInfrastructureState, network_id: Option<u32>) -> String {
+    let Some(network_id) = network_id else {
+        return "not connected".to_string();
+    };
+    let Some(network) = infrastructure.network(network_id) else {
+        return format!("#{network_id} missing");
+    };
+    format!(
+        "#{:02} supply={} demand={} reserve={} flow={} attached={}",
+        network.id,
+        format_fx1(network.supply),
+        format_fx1(network.demand),
+        format_fx1(network.reserve),
+        format_fx1(network.flow),
+        network.attached_modules.len(),
+    )
+}
+
+fn module_tube_role(kind: ModuleKind, status: &ModuleInfrastructureStatus) -> String {
+    match kind {
+        ModuleKind::Reactor => "produces power; consumes fuel pipe".to_string(),
+        ModuleKind::Battery => "stores power reserve on its wire network".to_string(),
+        ModuleKind::Turret => "consumes wired power and ammunition pipe".to_string(),
+        ModuleKind::Engine => "consumes wired power".to_string(),
+        ModuleKind::Processor => {
+            "consumes raw salvage; outputs repair/fuel/ammunition by selected recipe".to_string()
+        }
+        ModuleKind::O2Generator => "supplies oxygen to attached O2 infrastructure".to_string(),
+        ModuleKind::Cargo => "storage endpoint for compatible resource pipes".to_string(),
+        ModuleKind::JunctionBox => "power blocker/controller".to_string(),
+        ModuleKind::Valve => "duct/pipe blocker/controller".to_string(),
+        _ if status.power_required => "consumes wired power".to_string(),
+        _ if !status.resource_networks.is_empty() => {
+            "attached to resource infrastructure".to_string()
+        }
+        _ => "no active tube IO".to_string(),
     }
 }

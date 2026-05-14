@@ -71,6 +71,7 @@ pub(crate) struct InfrastructureNetworkSummary {
     pub(crate) supply: Fx,
     pub(crate) demand: Fx,
     pub(crate) reserve: Fx,
+    pub(crate) reserve_capacity: Fx,
     pub(crate) flow: Fx,
     pub(crate) blockers: u32,
 }

@@ -73,7 +73,7 @@
     },
     {
       "id": 15,
-      "kind": "Wire",
+      "kind": "Floor",
       "grid_x": 0,
       "grid_y": 4,
       "rotation_quadrants": 0
@@ -160,6 +160,20 @@
       "kind": "Wire",
       "grid_x": -1,
       "grid_y": -3,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 75,
+      "kind": "Wire",
+      "grid_x": -1,
+      "grid_y": 5,
+      "rotation_quadrants": 0
+    },
+    {
+      "id": 76,
+      "kind": "Wire",
+      "grid_x": 1,
+      "grid_y": 5,
       "rotation_quadrants": 0
     }
   ],

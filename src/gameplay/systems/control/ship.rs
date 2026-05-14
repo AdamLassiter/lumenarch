@@ -338,9 +338,7 @@ pub(crate) fn apply_player_ship_controls(
             &mut LinearVelocity,
             &mut AngularVelocity,
             &ShipMovementModel,
-            &ShipPowerModel,
-            &mut ShipPowerState,
-            &ShipArchCommandState,
+            &ShipPowerState,
             &mut ShipControlState,
             &mut ShipWeaponState,
             &MissionState,
@@ -353,9 +351,7 @@ pub(crate) fn apply_player_ship_controls(
         mut linear_velocity,
         mut angular_velocity,
         movement_model,
-        power_model,
-        mut power_state,
-        arch_commands,
+        power_state,
         mut control_state,
         mut weapon_state,
         mission_state,
@@ -379,21 +375,6 @@ pub(crate) fn apply_player_ship_controls(
         && !mission_state.completed;
     control_state.turn_input = turn_input;
     weapon_state.cooldown_remaining = (weapon_state.cooldown_remaining - dt).max(Fx::from_num(0));
-
-    update_ship_power_state(
-        dt,
-        throttle_demand,
-        turn_input,
-        if control_state.fire_pressed
-            || (arch_commands.turret_auto_fire && !arch_commands.turret_fire_hold)
-        {
-            Fx::from_num(1)
-        } else {
-            Fx::from_num(0)
-        },
-        power_model,
-        &mut power_state,
-    );
 
     let effective_turn_input = turn_input * power_state.engine_power_ratio;
     if effective_turn_input != Fx::from_num(0) && power_state.engines_powered {

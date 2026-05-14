@@ -57,35 +57,35 @@ Implement a two-layer ship engineering model where wiring, ducts, and resource p
 
 ## Phase 4 - Typed Network Graphs
 
-- [ ] Build deterministic adjacency graphs for each infrastructure type.
-- [ ] Use cardinal adjacency for same-type route tiles.
-- [ ] Attach compatible overlay components to the route tile under or adjacent to them.
-- [ ] Treat closed junction boxes and valves as graph blockers.
-- [ ] Treat destroyed or missing route tiles as graph breaks.
-- [ ] Store per-component network membership for UI, simulation, and ARCH reads.
+- [x] Build deterministic adjacency graphs for each infrastructure type.
+- [x] Use cardinal adjacency for same-type route tiles.
+- [x] Attach compatible overlay components to the route tile under or adjacent to them.
+- [x] Treat closed junction boxes and valves as graph blockers.
+- [x] Treat destroyed or missing route tiles as graph breaks.
+- [x] Store per-component network membership for UI, simulation, and ARCH reads.
 - [ ] Add tests for stable graph ids or stable graph summaries across repeated rebuilds.
 
 ## Phase 5 - Wired Power Runtime
 
-- [ ] Replace global ship power availability with per-network power availability.
-- [ ] Let reactors/generators inject power into connected wiring.
-- [ ] Let batteries/capacitors buffer only their connected wiring network.
-- [ ] Let powered consumers draw only from connected powered networks.
-- [ ] Disable consumers with no connected wired power.
-- [ ] Report "no wired power" separately from "insufficient generation."
-- [ ] Update engine, turret, shield, processor, detector, computer, and drone power checks.
-- [ ] Preserve deterministic behavior for rollback.
+- [x] Replace global ship power availability with per-network power availability.
+- [x] Let reactors/generators inject power into connected wiring.
+- [x] Let batteries/capacitors buffer only their connected wiring network.
+- [x] Let powered consumers draw only from connected powered networks.
+- [x] Disable consumers with no connected wired power.
+- [x] Report "no wired power" separately from "insufficient generation."
+- [x] Update engine, turret, shield, processor, detector, computer, and drone power checks.
+- [x] Preserve deterministic behavior for rollback.
 
 ## Phase 6 - Oxygen Duct Runtime
 
 - [x] Add oxygen as a pipeable/stored resource.
 - [x] Add O2 generator behavior that produces oxygen resource.
 - [x] Add O2 canister storage that stores oxygen resource.
-- [ ] Let oxygen ducts consume connected oxygen resource to replenish atmosphere oxygen.
-- [ ] Keep player breathing tied to numeric atmosphere tile oxygen.
-- [ ] Keep leakage and equalization tile based.
-- [ ] Make closed valves stop duct flow.
-- [ ] Add UI/debug readouts for oxygen supply, duct connection, and valve state.
+- [x] Let oxygen ducts consume connected oxygen resource to replenish atmosphere oxygen.
+- [x] Keep player breathing tied to numeric atmosphere tile oxygen.
+- [x] Keep leakage and equalization tile based.
+- [x] Make closed valves stop duct flow.
+- [x] Add UI/debug readouts for oxygen supply, duct connection, and valve state.
 
 ## Phase 7 - Pipeable Resource Runtime
 
@@ -96,19 +96,19 @@ Implement a two-layer ship engineering model where wiring, ducts, and resource p
   - ammunition
   - oxygen
 - [x] Add or update storage variants for each resource family.
-- [ ] Let reactors consume fuel from connected fuel storage or generators.
-- [ ] Let ammunition-using turrets consume ammunition from connected ammo storage.
-- [ ] Let processors consume and output compatible resources through connected pipes.
+- [x] Let reactors consume fuel from connected fuel storage or generators.
+- [x] Let ammunition-using turrets consume ammunition from connected ammo storage.
+- [x] Let processors consume and output compatible resources through connected pipes.
 - [ ] Let repair workflows consume repair charge from connected storage where appropriate.
-- [ ] Keep existing manual/drone/manipulator logistics interoperable with pipe networks.
+- [x] Keep existing manual/drone/manipulator logistics interoperable with pipe networks.
 
 ## Phase 8 - ARCH Integration
 
-- [ ] Add programmable junction box control registers:
+- [x] Add programmable junction box control registers:
   - open/closed state
   - powered network yes/no
   - local supply/demand summary if available
-- [ ] Add programmable valve control registers:
+- [x] Add programmable valve control registers:
   - open/closed state
   - has oxygen/resource supply yes/no
   - local flow/status summary if available
@@ -117,19 +117,19 @@ Implement a two-layer ship engineering model where wiring, ducts, and resource p
 
 ## Phase 9 - UI And Debug Feedback
 
-- [ ] Update component panels to show connected network state.
-- [ ] Show why a component is disabled:
+- [x] Update component panels to show connected network state.
+- [x] Show why a component is disabled:
   - no wired power
   - no compatible resource
   - closed valve/junction
   - insufficient generation/supply
-- [ ] Add editor or runtime debug overlays for:
+- [x] Add editor or runtime debug overlays for:
   - power networks
   - duct networks
   - pipe networks
   - disconnected consumers
   - closed blockers
-- [ ] Update HUD summaries that currently assume global ship power or oxygen.
+- [x] Update HUD summaries that currently assume global ship power or oxygen.
 
 ## Phase 10 - Scenario Validation
 
@@ -153,15 +153,15 @@ Implement a two-layer ship engineering model where wiring, ducts, and resource p
 - [x] Editor can place an underlay floor/wire/pipe beneath an overlay component in the same cell.
 - [x] Erasing affects only the active layer.
 - [x] Selecting and copying preserves layer identity.
-- [ ] A wired reactor powers connected consumers.
-- [ ] A disconnected consumer is disabled and reports no wired power.
-- [ ] ARCH can close and open a junction box.
-- [ ] Closing a junction changes which consumers receive power.
-- [ ] O2 generator or storage feeds ducts.
-- [ ] Ducts raise tile oxygen.
-- [ ] Closed valves stop oxygen flow.
-- [ ] Reactor fuel, ammunition, raw salvage, repair charge, and oxygen storage only accept compatible resources.
-- [ ] Network graph rebuilds deterministically for rollback.
+- [x] A wired reactor powers connected consumers.
+- [x] A disconnected consumer is disabled and reports no wired power.
+- [x] ARCH can close and open a junction box.
+- [x] Closing a junction changes which consumers receive power.
+- [x] O2 generator or storage feeds ducts.
+- [x] Ducts raise tile oxygen.
+- [x] Closed valves stop oxygen flow.
+- [x] Reactor fuel, ammunition, raw salvage, repair charge, and oxygen storage only accept compatible resources.
+- [x] Network graph rebuilds deterministically for rollback.
 
 ## Test Questions
 

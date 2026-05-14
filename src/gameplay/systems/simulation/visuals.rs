@@ -14,6 +14,7 @@ use crate::{
             EquippedSuit,
             EvaThrusterOverlay,
             HeldInteraction,
+            InfrastructureRouteKind,
             Integrity,
             InteractionKind,
             ManipulatorModule,
@@ -30,9 +31,11 @@ use crate::{
             PlayerSuit,
             ReactorCommandState,
             ReactorGlowOverlay,
+            ResourceKind,
             RuntimeFoundationVisual,
             RuntimeShipModule,
             ShipControlState,
+            ShipInfrastructureState,
             ShipPowerState,
             ShipRoot,
             ShipboardPlayer,
@@ -52,10 +55,24 @@ use crate::{
 /// Draws debug-only tactical overlays around the focused module so tuning field and manipulator ranges is easier.
 pub(crate) fn draw_debug_overlay(
     hud_mode: Res<GameplayInfoPanelMode>,
-    player_ship_query: Single<(&SimPosition, &SimRotation), (With<PlayerShip>, With<ShipRoot>)>,
+    ship_query: Query<
+        (
+            Entity,
+            &SimPosition,
+            &SimRotation,
+            Option<&ShipInfrastructureState>,
+        ),
+        With<ShipRoot>,
+    >,
+    player_ship_query: Single<
+        (Entity, &SimPosition, &SimRotation),
+        (With<PlayerShip>, With<ShipRoot>),
+    >,
     player_query: Single<&CurrentStation, With<ObservedLocalPlayerMarker>>,
+    foundation_query: Query<(&RuntimeFoundationVisual, &ChildOf)>,
     module_query: Query<(
         Entity,
+        &ChildOf,
         &RuntimeShipModule,
         &ModuleFieldEmitter,
         Option<&ManipulatorModule>,
@@ -65,9 +82,14 @@ pub(crate) fn draw_debug_overlay(
     mut turret_top_query: Query<(&ChildOf, &mut Transform), With<TurretTopSprite>>,
     mut gizmos: Gizmos,
 ) {
-    let (ship_position, ship_rotation) = player_ship_query.into_inner();
+    let (player_ship_entity, ship_position, ship_rotation) = player_ship_query.into_inner();
     let current_station = player_query.into_inner();
     update_turret_top_visuals(ship_rotation.radians, &module_query, &mut turret_top_query);
+
+    if *hud_mode == GameplayInfoPanelMode::Tubes {
+        draw_tubes_overlay(&ship_query, &foundation_query, &module_query, &mut gizmos);
+        return;
+    }
 
     if *hud_mode != GameplayInfoPanelMode::FocusedModule {
         return;
@@ -78,7 +100,10 @@ pub(crate) fn draw_debug_overlay(
     let field_radius = TILE_SIZE * 3.5;
     let manipulator_radius = TILE_SIZE * 2.5;
 
-    for (_, runtime_module, emitter, manipulator, _, destroyed) in &module_query {
+    for (_, parent, runtime_module, emitter, manipulator, _, destroyed) in &module_query {
+        if parent.get() != player_ship_entity {
+            continue;
+        }
         if runtime_module.module_id != focused_module_id {
             continue;
         }
@@ -114,9 +139,10 @@ pub(crate) fn draw_debug_overlay(
 
     let module_positions: Vec<_> = module_query
         .iter()
-        .map(|(entity, runtime_module, _, _, _, destroyed)| {
+        .map(|(entity, parent, runtime_module, _, _, _, destroyed)| {
             (
                 entity,
+                parent.get(),
                 runtime_module.module_id,
                 ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians),
                 destroyed.is_some(),
@@ -124,7 +150,10 @@ pub(crate) fn draw_debug_overlay(
         })
         .collect();
 
-    for (_, _, _, manipulator, _, destroyed) in &module_query {
+    for (_, parent, _, _, manipulator, _, destroyed) in &module_query {
+        if parent.get() != player_ship_entity {
+            continue;
+        }
         let Some(manipulator) = manipulator else {
             continue;
         };
@@ -144,12 +173,16 @@ pub(crate) fn draw_debug_overlay(
         };
         let source = module_positions
             .iter()
-            .find(|(_, module_id, _, is_destroyed)| *module_id == source_id && !*is_destroyed)
-            .map(|(_, _, pos, _)| *pos);
+            .find(|(_, parent, module_id, _, is_destroyed)| {
+                *parent == player_ship_entity && *module_id == source_id && !*is_destroyed
+            })
+            .map(|(_, _, _, pos, _)| *pos);
         let target = module_positions
             .iter()
-            .find(|(_, module_id, _, is_destroyed)| *module_id == target_id && !*is_destroyed)
-            .map(|(_, _, pos, _)| *pos);
+            .find(|(_, parent, module_id, _, is_destroyed)| {
+                *parent == player_ship_entity && *module_id == target_id && !*is_destroyed
+            })
+            .map(|(_, _, _, pos, _)| *pos);
         if let (Some(source), Some(target)) = (source, target) {
             gizmos.line_2d(
                 source.to_vec2(),
@@ -158,6 +191,188 @@ pub(crate) fn draw_debug_overlay(
             );
         }
     }
+}
+
+fn draw_tubes_overlay(
+    ship_query: &Query<
+        (
+            Entity,
+            &SimPosition,
+            &SimRotation,
+            Option<&ShipInfrastructureState>,
+        ),
+        With<ShipRoot>,
+    >,
+    foundation_query: &Query<(&RuntimeFoundationVisual, &ChildOf)>,
+    module_query: &Query<(
+        Entity,
+        &ChildOf,
+        &RuntimeShipModule,
+        &ModuleFieldEmitter,
+        Option<&ManipulatorModule>,
+        Option<&TurretCommandState>,
+        Option<&DestroyedModule>,
+    )>,
+    gizmos: &mut Gizmos,
+) {
+    for (ship_entity, ship_position, ship_rotation, infrastructure) in ship_query {
+        let Some(infrastructure) = infrastructure else {
+            continue;
+        };
+        let grid_origin = ship_grid_origin(ship_entity, module_query);
+
+        for network in &infrastructure.networks {
+            let color = network
+                .kind
+                .map(tube_color)
+                .unwrap_or(Color::srgba(0.85, 0.85, 0.85, 0.45));
+            for tile in &network.tiles {
+                let center =
+                    ship_grid_to_world(*tile, grid_origin, ship_position, ship_rotation).to_vec2();
+                gizmos.rect_2d(center, Vec2::splat(TILE_SIZE * 0.72), color);
+
+                for neighbor in [(tile.0 + 1, tile.1), (tile.0, tile.1 + 1)] {
+                    if network.tiles.contains(&neighbor) {
+                        let other =
+                            ship_grid_to_world(neighbor, grid_origin, ship_position, ship_rotation)
+                                .to_vec2();
+                        gizmos.line_2d(center, other, color);
+                    }
+                }
+            }
+        }
+
+        for (foundation, parent) in foundation_query {
+            if parent.get() != ship_entity {
+                continue;
+            }
+            let Some(kind) = infrastructure_route_kind(foundation.kind) else {
+                continue;
+            };
+            let center = ship_grid_to_world(
+                (foundation.grid_x, foundation.grid_y),
+                grid_origin,
+                ship_position,
+                ship_rotation,
+            )
+            .to_vec2();
+            gizmos.circle_2d(center, TILE_SIZE * 0.16, tube_color(kind));
+        }
+
+        for (_, parent, runtime_module, _, _, _, destroyed) in module_query {
+            if parent.get() != ship_entity || destroyed.is_some() {
+                continue;
+            }
+            let Some(status) = infrastructure.status_for_module(runtime_module.module_id) else {
+                continue;
+            };
+            let world =
+                ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians);
+            let color = if status.blocked_reason.is_some() {
+                Color::srgb(0.96, 0.24, 0.18)
+            } else if module_is_producer(runtime_module.kind) {
+                Color::srgb(0.30, 0.95, 0.45)
+            } else if status.power_required || !status.resource_networks.is_empty() {
+                Color::srgb(1.0, 0.74, 0.26)
+            } else {
+                Color::srgba(0.72, 0.80, 0.90, 0.42)
+            };
+            gizmos.circle_2d(world.to_vec2(), TILE_SIZE * 0.34, color);
+        }
+    }
+}
+
+fn ship_grid_origin(
+    ship_entity: Entity,
+    module_query: &Query<(
+        Entity,
+        &ChildOf,
+        &RuntimeShipModule,
+        &ModuleFieldEmitter,
+        Option<&ManipulatorModule>,
+        Option<&TurretCommandState>,
+        Option<&DestroyedModule>,
+    )>,
+) -> crate::gameplay::helpers::FixedVec2 {
+    module_query
+        .iter()
+        .find_map(|(_, parent, runtime_module, _, _, _, _)| {
+            (parent.get() == ship_entity).then(|| {
+                runtime_module.local_position
+                    - crate::gameplay::helpers::FixedVec2::from_num(
+                        runtime_module.grid_x * TILE_SIZE as i32,
+                        -runtime_module.grid_y * TILE_SIZE as i32,
+                    )
+            })
+        })
+        .unwrap_or_else(crate::gameplay::helpers::FixedVec2::zero)
+}
+
+fn ship_grid_to_world(
+    (grid_x, grid_y): (i32, i32),
+    grid_origin: crate::gameplay::helpers::FixedVec2,
+    ship_position: &SimPosition,
+    ship_rotation: &SimRotation,
+) -> crate::gameplay::helpers::FixedVec2 {
+    let local = crate::gameplay::helpers::FixedVec2::from_num(
+        grid_x * TILE_SIZE as i32,
+        -grid_y * TILE_SIZE as i32,
+    );
+    ship_position.value + (grid_origin + local).rotate(ship_rotation.radians)
+}
+
+fn infrastructure_route_kind(
+    kind: crate::ship::ShipFoundationKind,
+) -> Option<InfrastructureRouteKind> {
+    match kind {
+        crate::ship::ShipFoundationKind::Wire => Some(InfrastructureRouteKind::Power),
+        crate::ship::ShipFoundationKind::OxygenDuct => Some(InfrastructureRouteKind::OxygenDuct),
+        crate::ship::ShipFoundationKind::PipeRawSalvage => {
+            Some(InfrastructureRouteKind::Resource(ResourceKind::RawSalvage))
+        }
+        crate::ship::ShipFoundationKind::PipeRepairCharge => Some(
+            InfrastructureRouteKind::Resource(ResourceKind::RepairCharge),
+        ),
+        crate::ship::ShipFoundationKind::PipeFuel => {
+            Some(InfrastructureRouteKind::Resource(ResourceKind::Fuel))
+        }
+        crate::ship::ShipFoundationKind::PipeAmmunition => {
+            Some(InfrastructureRouteKind::Resource(ResourceKind::Ammunition))
+        }
+        crate::ship::ShipFoundationKind::PipeOxygen => {
+            Some(InfrastructureRouteKind::Resource(ResourceKind::Oxygen))
+        }
+        _ => None,
+    }
+}
+
+fn tube_color(kind: InfrastructureRouteKind) -> Color {
+    match kind {
+        InfrastructureRouteKind::Power => Color::srgba(1.0, 0.90, 0.22, 0.72),
+        InfrastructureRouteKind::OxygenDuct => Color::srgba(0.36, 0.78, 1.0, 0.72),
+        InfrastructureRouteKind::Resource(ResourceKind::RawSalvage) => {
+            Color::srgba(0.72, 0.78, 0.86, 0.70)
+        }
+        InfrastructureRouteKind::Resource(ResourceKind::RepairCharge) => {
+            Color::srgba(0.36, 1.0, 0.58, 0.70)
+        }
+        InfrastructureRouteKind::Resource(ResourceKind::Fuel) => {
+            Color::srgba(1.0, 0.48, 0.20, 0.70)
+        }
+        InfrastructureRouteKind::Resource(ResourceKind::Ammunition) => {
+            Color::srgba(0.92, 0.28, 0.24, 0.70)
+        }
+        InfrastructureRouteKind::Resource(ResourceKind::Oxygen) => {
+            Color::srgba(0.48, 0.96, 1.0, 0.70)
+        }
+    }
+}
+
+fn module_is_producer(kind: ModuleKind) -> bool {
+    matches!(
+        kind,
+        ModuleKind::Reactor | ModuleKind::Battery | ModuleKind::Cargo | ModuleKind::O2Generator
+    )
 }
 
 /// Tints or hides module sprites to reflect heat, instability, disablement, and destruction.
@@ -555,6 +770,7 @@ fn update_turret_top_visuals(
     _ship_rotation: Fx,
     module_query: &Query<(
         Entity,
+        &ChildOf,
         &RuntimeShipModule,
         &ModuleFieldEmitter,
         Option<&ManipulatorModule>,
@@ -565,7 +781,7 @@ fn update_turret_top_visuals(
 ) {
     for (parent, mut transform) in turret_top_query.iter_mut() {
         let parent_entity = parent.get();
-        let Ok((_, runtime_module, _, _, turret_state, destroyed)) =
+        let Ok((_, _, runtime_module, _, _, turret_state, destroyed)) =
             module_query.get(parent_entity)
         else {
             continue;
