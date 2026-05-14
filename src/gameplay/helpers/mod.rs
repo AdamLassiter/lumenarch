@@ -65,6 +65,7 @@ pub(crate) use math::{
 pub(crate) use ship::{
     module_integrity,
     module_local_position,
+    ship_grid_from_local_position,
     ship_movement_model_with_effective,
     ship_power_model_with_effective,
 };

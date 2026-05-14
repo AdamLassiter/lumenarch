@@ -19,6 +19,7 @@ use crate::{
             HostileShip,
             HostileTarget,
             Integrity,
+            InternalPosition,
             LinearVelocity,
             ManipulatorCommandState,
             ManipulatorModule,

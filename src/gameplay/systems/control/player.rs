@@ -87,8 +87,9 @@ pub(crate) fn update_player_reference_frame(
                     motion.local_velocity = local_velocity;
                 }
                 internal_position.local_position = local_position;
-                internal_position.grid_x = (local_position.x / Fx::from_num(32)).to_num::<i32>();
-                internal_position.grid_y = (-local_position.y / Fx::from_num(32)).to_num::<i32>();
+                let (grid_x, grid_y) = ship_grid_from_local_position(local_position);
+                internal_position.grid_x = grid_x;
+                internal_position.grid_y = grid_y;
             }
             None => {
                 if let PlayerReferenceFrame::Ship(ship_entity) = previous_frame
@@ -226,8 +227,9 @@ pub(crate) fn move_shipboard_player(
                     motion.facing_radians = angle_from_vector(local_velocity);
                 }
                 position.local_position = motion.local_position;
-                position.grid_x = (motion.local_position.x / Fx::from_num(32)).to_num::<i32>();
-                position.grid_y = (-motion.local_position.y / Fx::from_num(32)).to_num::<i32>();
+                let (grid_x, grid_y) = ship_grid_from_local_position(motion.local_position);
+                position.grid_x = grid_x;
+                position.grid_y = grid_y;
             }
             PlayerReferenceFrame::World => {
                 let eva_multiplier = equipped_suit.suit.eva_speed_multiplier(&balance.player);

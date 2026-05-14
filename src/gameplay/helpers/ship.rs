@@ -13,6 +13,13 @@ pub(crate) fn module_local_position(module: &ShipModule, center_x: Fx, center_y:
     )
 }
 
+pub(crate) fn ship_grid_from_local_position(local_position: FixedVec2) -> (i32, i32) {
+    (
+        (local_position.x / Fx::from_num(TILE_SIZE)).to_num::<i32>(),
+        (-local_position.y / Fx::from_num(TILE_SIZE)).to_num::<i32>(),
+    )
+}
+
 pub(crate) fn module_integrity(kind: ModuleKind, variant: ModuleVariant) -> i32 {
     ModuleSpec::for_module(kind, variant).integrity
 }

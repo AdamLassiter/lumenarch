@@ -64,6 +64,7 @@ use super::super::{
         facing_vector,
         fx_from_time_delta,
         render_translation,
+        ship_grid_from_local_position,
         wrap_radians,
     },
 };

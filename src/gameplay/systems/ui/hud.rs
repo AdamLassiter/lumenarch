@@ -201,6 +201,7 @@ pub(crate) fn update_gameplay_status_text(
             &HeldInteraction,
             &PlayerFieldState,
             &PlayerMotionState,
+            &InternalPosition,
             &CarriedResource,
             &EquippedSuit,
             &PlayerConditionState,
@@ -238,6 +239,7 @@ pub(crate) fn update_gameplay_status_text(
         held_interaction,
         player_fields,
         player_motion,
+        internal_position,
         carried_resource,
         equipped_suit,
         player_condition,
@@ -323,14 +325,12 @@ pub(crate) fn update_gameplay_status_text(
         .find(|(_, runtime_module, ..)| runtime_module.module_id == current_station.module_id);
     let under_player_module = match player_motion.frame {
         PlayerReferenceFrame::Ship(ship_entity) => {
-            let grid_x = (player_motion.local_position.x / Fx::from_num(32)).to_num::<i32>();
-            let grid_y = (-player_motion.local_position.y / Fx::from_num(32)).to_num::<i32>();
             status_world
                 .module_query
                 .iter()
                 .find(|(entity, runtime_module, ..)| {
-                    runtime_module.grid_x == grid_x
-                        && runtime_module.grid_y == grid_y
+                    runtime_module.grid_x == internal_position.grid_x
+                        && runtime_module.grid_y == internal_position.grid_y
                         && status_world
                             .module_parent_query
                             .get(*entity)
@@ -622,7 +622,7 @@ fn tubes_debug_text(
 ) -> String {
     let mut lines = Vec::new();
     lines.push(format!(
-        "Networks: {}  Strict routing: {}",
+        "Networks: {}  |  Strict routing: {}",
         infrastructure.networks.len(),
         if infrastructure.strict_routing {
             "on"
@@ -632,11 +632,19 @@ fn tubes_debug_text(
     ));
 
     if let Some(runtime_module) = current_module {
-        lines.push("Under player:".to_string());
+        lines.push(format!(
+            "Underfoot: {} {} @ {}, {}",
+            module_display_name(runtime_module.kind),
+            runtime_module.module_id,
+            runtime_module.grid_x,
+            runtime_module.grid_y,
+        ));
         lines.extend(tubes_module_lines(infrastructure, runtime_module));
     } else {
-        lines.push("Under player: no component".to_string());
+        lines.push("Underfoot: no component".to_string());
     }
+    lines.push("".to_string());
+    lines.push("Networks".to_string());
 
     for network in infrastructure.networks.iter().take(10) {
         let kind = network
@@ -644,7 +652,7 @@ fn tubes_debug_text(
             .map(|kind| kind.label().to_string())
             .unwrap_or_else(|| "unknown".to_string());
         lines.push(format!(
-            "#{:02} {:<12} tiles={} modules={} supply={} demand={} reserve={} flow={} blockers={}",
+            "#{:02} {}  |  tiles {}  modules {}  supply {}  demand {}  reserve {}  flow {}  blockers {}",
             network.id,
             kind,
             network.tile_count,
@@ -697,16 +705,12 @@ fn tubes_module_lines(
     };
 
     lines.push(format!(
-        "{} {} at ({}, {}) [{}]",
-        module_name,
-        runtime_module.module_id,
-        runtime_module.grid_x,
-        runtime_module.grid_y,
+        "Status: {}",
         status.blocked_reason.as_deref().unwrap_or("connected")
     ));
     if status.power_required {
         lines.push(format!(
-            "power: {} via {}",
+            "Power: {}  |  {}",
             if status.powered {
                 "powered"
             } else {
@@ -716,7 +720,7 @@ fn tubes_module_lines(
         ));
     } else if let Some(network_id) = status.power_network {
         lines.push(format!(
-            "power route: {}",
+            "Power route: {}",
             network_debug_line(infrastructure, Some(network_id))
         ));
     }
@@ -734,7 +738,7 @@ fn tubes_module_lines(
         ));
     }
     lines.push(format!(
-        "role: {}",
+        "Role: {}",
         module_tube_role(runtime_module.kind, status)
     ));
     lines

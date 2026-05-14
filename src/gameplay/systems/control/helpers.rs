@@ -104,10 +104,17 @@ pub(crate) fn anchor_player_to_focused_station(
 }
 
 #[derive(Clone, Copy)]
+pub(crate) enum ShipCollisionShape {
+    Open,
+    FullTile,
+    ExteriorWall,
+}
+
+#[derive(Clone, Copy)]
 pub(crate) struct ShipCollisionTile {
     pub(crate) center: FixedVec2,
     pub(crate) exterior_edges: u8,
-    pub(crate) solid: bool,
+    pub(crate) shape: ShipCollisionShape,
     pub(crate) opening: bool,
 }
 
@@ -146,12 +153,12 @@ pub(crate) fn ship_collision_tiles(
                 .get(&tile.module_id)
                 .copied()
                 .unwrap_or((false, false));
-            let solid = shipboard_tile_is_solid(tile.kind, destroyed, airlock_open);
+            let shape = shipboard_collision_shape(tile.kind, destroyed, airlock_open);
             let opening = tile.exterior_edges != 0 && (destroyed || airlock_open);
             ShipCollisionTile {
                 center: tile.local_position,
                 exterior_edges: tile.exterior_edges,
-                solid,
+                shape,
                 opening,
             }
         })
@@ -184,22 +191,42 @@ fn movement_blocked(
 ) -> bool {
     if collision_tiles
         .iter()
-        .any(|tile| tile.solid && point_overlaps_tile(to, tile.center, collision_radius))
+        .any(|tile| tile.blocks_position(to, collision_radius))
     {
         return true;
     }
 
-    let from_tile = collision_tiles
-        .iter()
-        .find(|tile| !tile.solid && point_inside_tile(from, tile.center));
-    let to_tile = collision_tiles
-        .iter()
-        .find(|tile| !tile.solid && point_inside_tile(to, tile.center));
+    let from_tile = collision_tiles.iter().find(|tile| {
+        !matches!(tile.shape, ShipCollisionShape::FullTile) && point_inside_tile(from, tile.center)
+    });
+    let to_tile = collision_tiles.iter().find(|tile| {
+        !matches!(tile.shape, ShipCollisionShape::FullTile) && point_inside_tile(to, tile.center)
+    });
 
     match (from_tile, to_tile) {
         (None, Some(tile)) => !allows_exterior_crossing(from, tile),
         (Some(tile), None) => !allows_exterior_crossing(to, tile),
         _ => false,
+    }
+}
+
+impl ShipCollisionTile {
+    fn blocks_position(self, point: FixedVec2, radius: Fx) -> bool {
+        match self.shape {
+            ShipCollisionShape::Open => false,
+            ShipCollisionShape::FullTile => point_overlaps_tile(point, self.center, radius),
+            ShipCollisionShape::ExteriorWall => {
+                if self.exterior_edges == 0 || !point_inside_tile(point, self.center) {
+                    return false;
+                }
+                let horizontal_blocked = (self.exterior_edges & (1 << 1) != 0
+                    && point.x > self.center.x)
+                    || (self.exterior_edges & (1 << 3) != 0 && point.x < self.center.x);
+                let vertical_blocked = (self.exterior_edges & 1 != 0 && point.y > self.center.y)
+                    || (self.exterior_edges & (1 << 2) != 0 && point.y < self.center.y);
+                horizontal_blocked || vertical_blocked
+            }
+        }
     }
 }
 
@@ -249,37 +276,98 @@ fn is_hull_kind(kind: ModuleKind) -> bool {
     )
 }
 
-fn shipboard_tile_is_solid(kind: ModuleKind, destroyed: bool, airlock_open: bool) -> bool {
+fn shipboard_collision_shape(
+    kind: ModuleKind,
+    destroyed: bool,
+    airlock_open: bool,
+) -> ShipCollisionShape {
     if destroyed {
-        return false;
+        return ShipCollisionShape::Open;
     }
     if is_hull_kind(kind) {
-        return true;
+        return ShipCollisionShape::FullTile;
     }
     match kind {
-        ModuleKind::Airlock => !airlock_open,
-        ModuleKind::Engine | ModuleKind::Turret => true,
-        _ => false,
+        ModuleKind::Airlock if !airlock_open => ShipCollisionShape::ExteriorWall,
+        ModuleKind::Engine | ModuleKind::Turret => ShipCollisionShape::ExteriorWall,
+        _ => ShipCollisionShape::Open,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::shipboard_tile_is_solid;
+    use super::{
+        FixedVec2,
+        Fx,
+        ShipCollisionShape,
+        ShipCollisionTile,
+        movement_blocked,
+        shipboard_collision_shape,
+    };
     use crate::ship::ModuleKind;
 
     #[test]
     fn hull_fixtures_block_shipboard_motion_like_hull() {
-        assert!(shipboard_tile_is_solid(ModuleKind::Engine, false, false));
-        assert!(shipboard_tile_is_solid(ModuleKind::Turret, false, false));
-        assert!(shipboard_tile_is_solid(ModuleKind::Airlock, false, false));
-        assert!(!shipboard_tile_is_solid(ModuleKind::Airlock, false, true));
+        assert!(matches!(
+            shipboard_collision_shape(ModuleKind::Engine, false, false),
+            ShipCollisionShape::ExteriorWall
+        ));
+        assert!(matches!(
+            shipboard_collision_shape(ModuleKind::Turret, false, false),
+            ShipCollisionShape::ExteriorWall
+        ));
+        assert!(matches!(
+            shipboard_collision_shape(ModuleKind::Airlock, false, false),
+            ShipCollisionShape::ExteriorWall
+        ));
+        assert!(matches!(
+            shipboard_collision_shape(ModuleKind::Airlock, false, true),
+            ShipCollisionShape::Open
+        ));
     }
 
     #[test]
     fn destroyed_hull_fixtures_do_not_remain_solid() {
-        assert!(!shipboard_tile_is_solid(ModuleKind::Engine, true, false));
-        assert!(!shipboard_tile_is_solid(ModuleKind::Turret, true, false));
-        assert!(!shipboard_tile_is_solid(ModuleKind::Airlock, true, false));
+        assert!(matches!(
+            shipboard_collision_shape(ModuleKind::Engine, true, false),
+            ShipCollisionShape::Open
+        ));
+        assert!(matches!(
+            shipboard_collision_shape(ModuleKind::Turret, true, false),
+            ShipCollisionShape::Open
+        ));
+        assert!(matches!(
+            shipboard_collision_shape(ModuleKind::Airlock, true, false),
+            ShipCollisionShape::Open
+        ));
+    }
+
+    #[test]
+    fn hull_fixtures_allow_interior_half_tile_approach() {
+        let tile = ShipCollisionTile {
+            center: FixedVec2::new(Fx::from_num(0), Fx::from_num(0)),
+            exterior_edges: 1,
+            shape: ShipCollisionShape::ExteriorWall,
+            opening: false,
+        };
+        let interior_tile = ShipCollisionTile {
+            center: FixedVec2::new(Fx::from_num(0), Fx::from_num(-32)),
+            exterior_edges: 0,
+            shape: ShipCollisionShape::Open,
+            opening: false,
+        };
+        let radius = Fx::from_num(7);
+        assert!(!movement_blocked(
+            FixedVec2::new(Fx::from_num(0), Fx::from_num(-20)),
+            FixedVec2::new(Fx::from_num(0), Fx::from_num(-1)),
+            &[tile, interior_tile],
+            radius,
+        ));
+        assert!(movement_blocked(
+            FixedVec2::new(Fx::from_num(0), Fx::from_num(-1)),
+            FixedVec2::new(Fx::from_num(0), Fx::from_num(1)),
+            &[tile, interior_tile],
+            radius,
+        ));
     }
 }
