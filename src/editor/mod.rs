@@ -1,9 +1,7 @@
-mod helpers;
 mod input;
 mod render;
 mod ui;
 
-pub(crate) use helpers::normalize_editor_ship_layers;
 pub(crate) use input::{
     edit_program_text_editor,
     editor_station_panel_button_system,
@@ -46,6 +44,8 @@ pub(crate) use ui::{
     update_editor_module_overlay,
     update_editor_status_text,
 };
+
+pub(crate) use crate::helpers::editor::normalize_editor_ship_layers;
 
 pub(crate) const UNAFFORDABLE_BUTTON: bevy::prelude::Color =
     bevy::prelude::Color::srgb(0.22, 0.22, 0.26);

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    editor::helpers::{foundation_supports_module, is_hull_foundation_kind, is_hull_module_kind},
+    helpers::editor::{foundation_supports_module, is_hull_foundation_kind, is_hull_module_kind},
     ship::{ModuleKind, ModuleVariant, ShipDefinition, ShipFoundationTile, ShipModule},
     state::{
         EditorMode,

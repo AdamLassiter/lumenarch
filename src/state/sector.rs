@@ -94,12 +94,14 @@ impl Default for Progression {
 }
 
 impl Progression {
+    #[allow(dead_code)]
     pub(crate) fn knows_station(&self, station_id: &str) -> bool {
         self.known_station_ids
             .iter()
             .any(|known| known == station_id)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn contact_unlocked(&self, contact_id: &str) -> bool {
         self.unlocked_contact_ids
             .iter()

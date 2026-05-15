@@ -2,7 +2,7 @@ use super::{
     station_panel::{StationPanelReadout, StationReadoutVisual},
     *,
 };
-use crate::gameplay::helpers::wrap_radians;
+use crate::helpers::wrap_radians;
 
 pub(super) fn logistics_readouts(
     storage: Option<&StorageModule>,

@@ -1,23 +1,25 @@
-use super::*;
-use crate::gameplay::{
-    components::ResourceInventory,
-    helpers::{WideFx, widen},
+use bevy::{ecs::relationship::Relationship, prelude::*};
+
+use crate::{
+    gameplay::components::{
+        AirlockCommandState,
+        DestroyedModule,
+        InternalPosition,
+        LinearVelocity,
+        PlayerMotionState,
+        PlayerReferenceFrame,
+        ResourceInventory,
+        ResourceKind,
+        RuntimeShipModule,
+        ShipAtmosphereState,
+        ShipRoot,
+        ShipboardControlState,
+        SimPosition,
+        SimRotation,
+    },
+    helpers::{FixedVec2, Fx, ship_tile_contains_point, ship_tile_overlaps_point},
+    ship::ModuleKind,
 };
-
-pub(crate) fn wrap_angle_f32(angle: f32) -> f32 {
-    let mut angle = angle;
-    while angle <= -std::f32::consts::PI {
-        angle += std::f32::consts::TAU;
-    }
-    while angle > std::f32::consts::PI {
-        angle -= std::f32::consts::TAU;
-    }
-    angle
-}
-
-pub(crate) fn fixed_square(value: Fx) -> WideFx {
-    widen(value) * widen(value)
-}
 
 pub(crate) fn nearby_logistics_target_ids(
     focused_module_id: u64,
@@ -197,10 +199,12 @@ fn movement_blocked(
     }
 
     let from_tile = collision_tiles.iter().find(|tile| {
-        !matches!(tile.shape, ShipCollisionShape::FullTile) && point_inside_tile(from, tile.center)
+        !matches!(tile.shape, ShipCollisionShape::FullTile)
+            && ship_tile_contains_point(from, tile.center)
     });
     let to_tile = collision_tiles.iter().find(|tile| {
-        !matches!(tile.shape, ShipCollisionShape::FullTile) && point_inside_tile(to, tile.center)
+        !matches!(tile.shape, ShipCollisionShape::FullTile)
+            && ship_tile_contains_point(to, tile.center)
     });
 
     match (from_tile, to_tile) {
@@ -214,9 +218,9 @@ impl ShipCollisionTile {
     fn blocks_position(self, point: FixedVec2, radius: Fx) -> bool {
         match self.shape {
             ShipCollisionShape::Open => false,
-            ShipCollisionShape::FullTile => point_overlaps_tile(point, self.center, radius),
+            ShipCollisionShape::FullTile => ship_tile_overlaps_point(point, self.center, radius),
             ShipCollisionShape::ExteriorWall => {
-                if self.exterior_edges == 0 || !point_inside_tile(point, self.center) {
+                if self.exterior_edges == 0 || !ship_tile_contains_point(point, self.center) {
                     return false;
                 }
                 let horizontal_blocked = (self.exterior_edges & (1 << 1) != 0
@@ -228,17 +232,6 @@ impl ShipCollisionTile {
             }
         }
     }
-}
-
-fn point_overlaps_tile(point: FixedVec2, tile_center: FixedVec2, radius: Fx) -> bool {
-    let tile_half = Fx::from_num(16);
-    (point.x - tile_center.x).abs() <= tile_half + radius
-        && (point.y - tile_center.y).abs() <= tile_half + radius
-}
-
-fn point_inside_tile(point: FixedVec2, tile_center: FixedVec2) -> bool {
-    let tile_half = Fx::from_num(16);
-    (point.x - tile_center.x).abs() <= tile_half && (point.y - tile_center.y).abs() <= tile_half
 }
 
 fn allows_exterior_crossing(point: FixedVec2, tile: &ShipCollisionTile) -> bool {

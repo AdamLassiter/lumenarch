@@ -1,23 +1,21 @@
 use bevy::{ecs::relationship::Relationship, prelude::*};
 
 use crate::{
-    gameplay::{
-        components::{
-            CarriedItemKind,
-            HostileShipModule,
-            LooseCargo,
-            Projectile,
-            ResourceKind,
-            RuntimeShipModule,
-            SalvagePickup,
-            SalvageWreck,
-            ShieldCommandState,
-            ShipInfrastructureState,
-            SimPosition,
-            StorageModule,
-        },
-        helpers::{FixedVec2, Fx, angle_from_vector, render_translation, wrap_radians},
+    gameplay::components::{
+        CarriedItemKind,
+        HostileShipModule,
+        LooseCargo,
+        Projectile,
+        ResourceKind,
+        RuntimeShipModule,
+        SalvagePickup,
+        SalvageWreck,
+        ShieldCommandState,
+        ShipInfrastructureState,
+        SimPosition,
+        StorageModule,
     },
+    helpers::{FixedVec2, Fx, angle_from_vector, render_translation, wrap_radians},
     state::PlayingCleanup,
 };
 

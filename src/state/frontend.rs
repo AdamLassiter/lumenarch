@@ -36,8 +36,22 @@ impl SplashScreenState {
 }
 
 #[derive(Resource, Default)]
+#[allow(dead_code)]
 pub(crate) struct DebugOverlayState {
     pub(crate) enabled: bool,
+}
+
+#[derive(Resource, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct GraphicsOptions {
+    pub(crate) shaders_enabled: bool,
+}
+
+impl Default for GraphicsOptions {
+    fn default() -> Self {
+        Self {
+            shaders_enabled: true,
+        }
+    }
 }
 
 #[derive(Resource, Clone, Serialize, Deserialize)]
@@ -71,6 +85,7 @@ pub(crate) enum DockedSurface {
 }
 
 impl DockedSurface {
+    #[allow(dead_code)]
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Shipyard => "Shipyard",
@@ -188,6 +203,7 @@ pub(crate) struct TextBoxClipboard {
 pub(crate) enum TextBoxField {
     SessionDescriptor,
     PlayerName,
+    ShipName,
 }
 
 #[derive(Component)]
@@ -273,6 +289,12 @@ pub(crate) struct LobbyCycleRoleButton;
 
 #[derive(Component)]
 pub(crate) struct LobbyCycleColorButton;
+
+#[derive(Component)]
+pub(crate) struct LobbyToggleShadersButton;
+
+#[derive(Component)]
+pub(crate) struct LobbyShadersText;
 
 #[derive(Component)]
 pub(crate) struct DockedStatusText;

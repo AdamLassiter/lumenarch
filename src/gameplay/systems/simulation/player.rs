@@ -6,7 +6,6 @@ use crate::{
     gameplay::{
         components::{ResourceKind, *},
         helpers::*,
-        systems::simulation::helpers::*,
     },
 };
 
@@ -121,6 +120,10 @@ pub(crate) fn fire_player_weapons(
                 Color::srgb(0.98, 0.84, 0.30)
             },
         );
+        commands.entity(child).insert(TurretFlashPulse {
+            remaining: Fx::from_num(0.18),
+            duration: Fx::from_num(0.18),
+        });
         fired_any = true;
         cooldown_after_shot = cooldown_after_shot.max(
             Fx::from_num(balance.combat.player_weapon_cooldown) * weapon_stats.cooldown_multiplier,

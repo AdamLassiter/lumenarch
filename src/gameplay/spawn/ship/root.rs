@@ -185,12 +185,14 @@ fn spawn_foundation_layer_visuals(
 }
 
 /// Spawns the player's runtime ship so authored layouts become a live simulated vessel in encounters.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn spawn_runtime_ship(
     commands: &mut Commands,
     asset_server: &AssetServer,
     meshes: &mut Assets<Mesh>,
     reactor_materials: &mut Assets<ReactorGlowMaterial>,
     engine_materials: &mut Assets<EngineFlameMaterial>,
+    shaders_enabled: bool,
     ship: &ShipDefinition,
     player_handles: &[PlayerHandle],
     local_handle: Option<PlayerHandle>,
@@ -392,6 +394,7 @@ pub(crate) fn spawn_runtime_ship(
                     meshes,
                     reactor_materials,
                     engine_materials,
+                    shaders_enabled,
                     module,
                     balance,
                     center_x,
@@ -605,6 +608,7 @@ pub(crate) fn spawn_hostile_ship(
     meshes: &mut Assets<Mesh>,
     reactor_materials: &mut Assets<ReactorGlowMaterial>,
     engine_materials: &mut Assets<EngineFlameMaterial>,
+    shaders_enabled: bool,
     ship: &ShipDefinition,
     balance: &BalanceConfig,
     spawn_position: FixedVec2,
@@ -747,6 +751,7 @@ pub(crate) fn spawn_hostile_ship(
                     meshes,
                     reactor_materials,
                     engine_materials,
+                    shaders_enabled,
                     module,
                     balance,
                     center_x,

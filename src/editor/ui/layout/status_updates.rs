@@ -11,9 +11,10 @@ use super::station_panel::{
     format_program_textbox,
 };
 use crate::{
-    editor::helpers::{
+    helpers::editor::{
         editor_mission_report_text,
         editor_status_line,
+        enemy_config_references_text,
         selection_summary,
         variant_tooltip_text,
     },
@@ -37,6 +38,7 @@ use crate::{
         EditorToolState,
         EditorToolboxTooltipText,
         EditorUiState,
+        EnemyConfigReferencesText,
         EnemyEditorState,
         EnemyShipLibraryState,
         GameplayStationPanel,
@@ -59,6 +61,7 @@ use crate::{
         ProgramTextEditorState,
         ProgrammingLanguageMode,
         Progression,
+        SectorState,
     },
 };
 
@@ -71,6 +74,7 @@ pub(crate) fn update_editor_status_text(
     selection_state: Res<EditorSelectionState>,
     tool_state: Res<EditorToolState>,
     progression: Res<Progression>,
+    sector_state: Res<SectorState>,
     last_mission_report: Res<LastMissionReport>,
     editor_ui_state: Res<EditorUiState>,
     mut ui_queries: ParamSet<(
@@ -91,6 +95,7 @@ pub(crate) fn update_editor_status_text(
         Query<&'static mut Text, With<EditorToolboxTooltipText>>,
         Query<&'static mut Node, With<EditorBuildSection>>,
         Query<&'static mut Node, With<EditorSelectSection>>,
+        Query<&'static mut Text, With<EnemyConfigReferencesText>>,
     )>,
 ) {
     // SAFETY: Each branch targets a different editor UI marker or explicitly excludes overlapping markers;
@@ -102,6 +107,8 @@ pub(crate) fn update_editor_status_text(
         && !last_mission_report.is_changed()
         && !editor_ui_state.is_changed()
         && !enemy_editor_state.is_changed()
+        && !enemy_library_state.is_changed()
+        && !sector_state.is_changed()
     {
         return;
     }
@@ -181,6 +188,10 @@ pub(crate) fn update_editor_status_text(
         } else {
             Display::None
         };
+    }
+
+    for mut text in &mut ui_queries.p7() {
+        **text = enemy_config_references_text(&sector_state, &enemy_library_state);
     }
 }
 

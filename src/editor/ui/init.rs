@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    editor::helpers::normalize_editor_ship_layers,
+    helpers::editor::normalize_editor_ship_layers,
     netcode,
     ship::{
         ModuleKind,

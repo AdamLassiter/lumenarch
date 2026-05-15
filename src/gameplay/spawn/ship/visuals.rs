@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use crate::{
     TILE_SIZE,
-    gameplay::helpers::sprite_path_for_kind,
+    helpers::{sprite_path_for_foundation_connections, sprite_path_for_kind},
     ship::{ModuleKind, ShipDefinition, ShipFoundationKind, ShipFoundationTile, ShipModule},
 };
 
@@ -12,9 +12,6 @@ fn foundation_sprite_with_connections(
     ship: &ShipDefinition,
     tile: &ShipFoundationTile,
 ) -> (String, u8) {
-    if !tile.kind.is_route() {
-        return (format!("tiles/{}.png", tile.kind.as_str()), 0);
-    }
     let north = ship
         .logistics_at(tile.grid_x, tile.grid_y - 1)
         .is_some_and(|other| other.kind == tile.kind);
@@ -27,53 +24,7 @@ fn foundation_sprite_with_connections(
     let west = ship
         .logistics_at(tile.grid_x - 1, tile.grid_y)
         .is_some_and(|other| other.kind == tile.kind);
-    let count = [north, east, south, west]
-        .into_iter()
-        .filter(|connected| *connected)
-        .count();
-    let base = tile.kind.as_str();
-    match count {
-        4 => (format!("tiles/{base}_cross.png"), 0),
-        3 => {
-            let missing = if !north {
-                2
-            } else if !east {
-                3
-            } else if !south {
-                0
-            } else {
-                1
-            };
-            (format!("tiles/{base}_tee.png"), missing)
-        }
-        2 if (north && south) || (east && west) => {
-            let rotation = if east && west { 1 } else { 0 };
-            (format!("tiles/{base}_straight.png"), rotation)
-        }
-        2 => {
-            let rotation = match (north, east, south, west) {
-                (true, true, false, false) => 0,
-                (false, true, true, false) => 1,
-                (false, false, true, true) => 2,
-                (true, false, false, true) => 3,
-                _ => 0,
-            };
-            (format!("tiles/{base}_corner.png"), rotation)
-        }
-        1 => {
-            let rotation = if east {
-                1
-            } else if south {
-                2
-            } else if west {
-                3
-            } else {
-                0
-            };
-            (format!("tiles/{base}_straight.png"), rotation)
-        }
-        _ => (format!("tiles/{base}_straight.png"), 0),
-    }
+    sprite_path_for_foundation_connections(tile.kind, north, east, south, west)
 }
 
 pub(crate) fn ship_visual_center(ship: &ShipDefinition) -> Option<(f32, f32)> {

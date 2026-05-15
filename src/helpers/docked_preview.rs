@@ -2,9 +2,9 @@ use std::hash::{Hash, Hasher};
 
 use bevy::prelude::*;
 
-use super::{DockedPreviewRoot, DockedPreviewSignature, DockedPreviewTile};
 use crate::{
     TOOLBOX_WIDTH,
+    docked::{DockedPreviewRoot, DockedPreviewSignature, DockedPreviewTile},
     editor::normalize_editor_ship_layers,
     gameplay::{ship_visual_center, spawn_ship_layer_visuals},
     netcode,
@@ -12,7 +12,7 @@ use crate::{
     state::EditorShip,
 };
 
-pub(super) fn spawn_docked_ship_preview(
+pub(crate) fn spawn_docked_ship_preview(
     commands: &mut Commands,
     asset_server: &AssetServer,
     ship: ShipDefinition,
@@ -46,7 +46,7 @@ pub(super) fn spawn_docked_ship_preview(
     commands.entity(root_entity).add_children(&children);
 }
 
-pub(super) fn docked_preview_ship(
+pub(crate) fn docked_preview_ship(
     editor_ship: &EditorShip,
     status: &netcode::SessionStatus,
 ) -> ShipDefinition {
@@ -64,7 +64,7 @@ pub(super) fn docked_preview_ship(
     ship
 }
 
-pub(super) fn docked_preview_signature(ship: &ShipDefinition) -> u128 {
+pub(crate) fn docked_preview_signature(ship: &ShipDefinition) -> u128 {
     let encoded = serde_json::to_vec(ship).unwrap_or_default();
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     encoded.hash(&mut hasher);

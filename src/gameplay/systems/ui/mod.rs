@@ -25,6 +25,7 @@ use crate::{
             ManipulatorModule,
             MissionState,
             ModuleCondition,
+            ModuleInfrastructureStatus,
             ModuleRuntimeState,
             NearbyInteraction,
             ObservedLocalPlayerMarker,
@@ -65,9 +66,9 @@ use crate::{
             mission_return_line,
             mission_status_line,
             module_condition,
+            module_display_name,
             resource_kind_label,
         },
-        systems::shared::module_display_name,
     },
     netcode,
     state::{

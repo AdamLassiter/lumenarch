@@ -4,7 +4,6 @@ mod collisions;
 mod detectors;
 mod drones;
 mod fields;
-mod helpers;
 mod hostiles;
 mod infrastructure;
 mod logistics;
@@ -50,10 +49,17 @@ pub(crate) use player::fire_player_weapons;
 pub(crate) use projectiles::{advance_projectiles, handle_projectile_hits};
 pub(crate) use visuals::{
     draw_debug_overlay,
+    spawn_missing_effect_overlays,
     sync_backdrop_parallax,
+    sync_battery_pulse_visuals,
     sync_engine_flame_visuals,
     sync_eva_thruster_visuals,
+    sync_fabricator_dust_visuals,
+    sync_hazard_effect_visuals,
     sync_module_work_effect_visuals,
     sync_reactor_glow_visuals,
+    sync_service_link_visuals,
+    sync_ship_environment_effect_visuals,
+    sync_turret_flash_visuals,
     update_destroyed_module_visuals,
 };

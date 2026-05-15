@@ -1,12 +1,16 @@
 use bevy::prelude::*;
 
-use super::{
-    DockedPreviewRoot,
-    DockedPreviewSignature,
-    DockedRoot,
-    preview_helpers::{docked_preview_ship, docked_preview_signature, spawn_docked_ship_preview},
+use super::{DockedPreviewRoot, DockedPreviewSignature, DockedRoot};
+use crate::{
+    TOOLBOX_WIDTH,
+    helpers::docked_preview::{
+        docked_preview_ship,
+        docked_preview_signature,
+        spawn_docked_ship_preview,
+    },
+    netcode,
+    state::EditorShip,
 };
-use crate::{TOOLBOX_WIDTH, netcode, state::EditorShip};
 
 /// Removes docked UI entities when the frontend leaves the docked presentation.
 pub(crate) fn cleanup_docked_ui(

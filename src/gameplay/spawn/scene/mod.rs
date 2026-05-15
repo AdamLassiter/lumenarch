@@ -3,7 +3,7 @@ mod hud;
 mod salvage;
 
 use arena::spawn_test_arena;
-use bevy::{log, prelude::*};
+use bevy::{ecs::system::SystemParam, log, prelude::*};
 use hud::spawn_runtime_hud;
 use salvage::spawn_salvage_wreck;
 
@@ -20,22 +20,28 @@ use crate::{
             ShipEncounterIdentity,
             ShipRoot,
         },
-        effects::{EngineFlameMaterial, ReactorGlowMaterial},
+        effects::{EngineFlameMaterial, ReactorGlowMaterial, SpaceBackdropMaterial},
         helpers::{FixedVec2, Fx},
     },
     netcode,
     ship::enemy::EnemyShipEntryValidationStatus,
-    state::{EditorShip, EnemyShipLibraryState, Progression, SectorNodeKind},
+    state::{EditorShip, EnemyShipLibraryState, GraphicsOptions, Progression, SectorNodeKind},
     stations::StationCatalogResource,
 };
+
+#[derive(SystemParam)]
+pub(crate) struct RuntimeEffectAssets<'w> {
+    reactor_materials: ResMut<'w, Assets<ReactorGlowMaterial>>,
+    engine_materials: ResMut<'w, Assets<EngineFlameMaterial>>,
+    backdrop_materials: ResMut<'w, Assets<SpaceBackdropMaterial>>,
+}
 
 /// Builds the full encounter presentation scene so the current mission becomes a playable combat space.
 pub(crate) fn spawn_runtime_scene(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut reactor_materials: ResMut<Assets<ReactorGlowMaterial>>,
-    mut engine_materials: ResMut<Assets<EngineFlameMaterial>>,
+    mut effect_assets: RuntimeEffectAssets,
     editor_ship: Res<EditorShip>,
     progression: Res<Progression>,
     enemy_library_state: Res<EnemyShipLibraryState>,
@@ -46,6 +52,7 @@ pub(crate) fn spawn_runtime_scene(
     mut player_handle_map: ResMut<netcode::PlayerHandleMap>,
     mut observed_local_player: ResMut<netcode::ObservedLocalPlayer>,
     balance: Res<BalanceConfig>,
+    graphics_options: Res<GraphicsOptions>,
 ) {
     player_handle_map.entities.clear();
     observed_local_player.entity = None;
@@ -90,6 +97,9 @@ pub(crate) fn spawn_runtime_scene(
     );
     spawn_test_arena(
         &mut commands,
+        meshes.as_mut(),
+        effect_assets.backdrop_materials.as_mut(),
+        graphics_options.shaders_enabled,
         &balance,
         &active_node.encounter,
         platform_hostile_count,
@@ -142,8 +152,9 @@ pub(crate) fn spawn_runtime_scene(
         &mut commands,
         &asset_server,
         &mut meshes,
-        &mut reactor_materials,
-        &mut engine_materials,
+        effect_assets.reactor_materials.as_mut(),
+        effect_assets.engine_materials.as_mut(),
+        graphics_options.shaders_enabled,
         &editor_ship.ship,
         &(0..session_status.total_players.max(1)).collect::<Vec<_>>(),
         local_handle.0,
@@ -223,8 +234,9 @@ pub(crate) fn spawn_runtime_scene(
             &mut commands,
             &asset_server,
             &mut meshes,
-            &mut reactor_materials,
-            &mut engine_materials,
+            effect_assets.reactor_materials.as_mut(),
+            effect_assets.engine_materials.as_mut(),
+            graphics_options.shaders_enabled,
             &entry.ship,
             &balance,
             spawn_position,

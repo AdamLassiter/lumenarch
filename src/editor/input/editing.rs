@@ -18,7 +18,7 @@ use crate::{
     HOVERED_BUTTON,
     NORMAL_BUTTON,
     PRESSED_BUTTON,
-    editor::helpers::{
+    helpers::editor::{
         cursor_grid_position,
         foundation_family_label,
         foundation_supports_module,
@@ -58,6 +58,7 @@ use crate::{
         EditorToolState,
         EditorUiState,
         EnemyEditorState,
+        FocusedTextBox,
         FrontendMode,
         GameplayStationPanelButton,
         LeaveEditorButton,
@@ -218,11 +219,15 @@ pub(crate) fn leave_editor_button_system(
 /// Provides a keyboard exit path from the editor so navigation matches the UI button behavior.
 pub(crate) fn leave_editor_keyboard_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
+    focused_textbox: Res<FocusedTextBox>,
     editor_session: Res<EditorSessionState>,
     status: Res<netcode::SessionStatus>,
     mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
     mut next_mode: ResMut<NextState<FrontendMode>>,
 ) {
+    if focused_textbox.field.is_some() {
+        return;
+    }
     if editor_session.mode == EditorMode::Player && !netcode::is_host_authority(&status) {
         return;
     }
@@ -272,8 +277,12 @@ pub(crate) fn mission_report_button_system(
 /// Rotates tools and cycles editor build options so common authoring actions stay on the keyboard.
 pub(crate) fn rotate_selected_tool(
     keys: Res<ButtonInput<KeyCode>>,
+    focused_textbox: Res<FocusedTextBox>,
     mut tool_state: ResMut<EditorToolState>,
 ) {
+    if focused_textbox.field.is_some() {
+        return;
+    }
     if keys.just_pressed(KeyCode::KeyL) {
         tool_state.active_layer = match tool_state.active_layer {
             EditorLayer::Logistics => EditorLayer::Hull,
@@ -847,6 +856,7 @@ fn select_modules_in_rect(
 /// Opens and closes module inspection panels from the grid so part configuration stays contextual.
 pub(crate) fn toggle_editor_module_overlay_shortcuts(
     keys: Res<ButtonInput<KeyCode>>,
+    focused_textbox: Res<FocusedTextBox>,
     window: Single<&Window, With<PrimaryWindow>>,
     camera_query: Single<(&Camera, &GlobalTransform)>,
     editor_ship: Res<EditorShip>,
@@ -854,6 +864,9 @@ pub(crate) fn toggle_editor_module_overlay_shortcuts(
     mut selection_state: ResMut<EditorSelectionState>,
     mut arch_editor_state: ResMut<ArchEditorState>,
 ) {
+    if focused_textbox.field.is_some() {
+        return;
+    }
     if keys.just_pressed(KeyCode::KeyQ) {
         arch_editor_state.panel_open = false;
         return;
@@ -1005,11 +1018,15 @@ pub(crate) fn editor_station_panel_button_system(
 /// Repairs the selected player-owned component in refit mode so damaged inventory can be reused.
 pub(crate) fn repair_selected_component_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
+    focused_textbox: Res<FocusedTextBox>,
     editor_session: Res<EditorSessionState>,
     tool_state: Res<EditorToolState>,
     mut progression: ResMut<Progression>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
 ) {
+    if focused_textbox.field.is_some() {
+        return;
+    }
     if editor_session.mode != EditorMode::Player || !keys.just_pressed(KeyCode::KeyT) {
         return;
     }
@@ -1140,6 +1157,7 @@ pub(crate) fn selection_action_button_system(
 /// Provides keyboard shortcuts for moving, copying, pasting, and rebuilding editor selections.
 pub(crate) fn selection_shortcuts(
     keys: Res<ButtonInput<KeyCode>>,
+    focused_textbox: Res<FocusedTextBox>,
     window: Single<&Window, With<PrimaryWindow>>,
     camera_query: Single<(&Camera, &GlobalTransform)>,
     editor_session: Res<EditorSessionState>,
@@ -1151,6 +1169,9 @@ pub(crate) fn selection_shortcuts(
     mut rollback_state: ResMut<netcode::RollbackGameState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
 ) {
+    if focused_textbox.field.is_some() {
+        return;
+    }
     if !netcode::is_host_authority(&status) || tool_state.tool_mode != EditorToolMode::Select {
         return;
     }

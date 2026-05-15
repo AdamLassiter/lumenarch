@@ -71,6 +71,7 @@ pub(crate) fn spawn_runtime_module(
     meshes: &mut Assets<Mesh>,
     reactor_materials: &mut Assets<ReactorGlowMaterial>,
     engine_materials: &mut Assets<EngineFlameMaterial>,
+    shaders_enabled: bool,
     module: &ShipModule,
     balance: &BalanceConfig,
     center_x: f32,
@@ -147,13 +148,15 @@ pub(crate) fn spawn_runtime_module(
                 },
             ));
             entity.with_children(|parent| {
-                parent.spawn((
-                    Mesh2d(meshes.add(Rectangle::new(38.0, 38.0))),
-                    MeshMaterial2d(reactor_materials.add(ReactorGlowMaterial::default())),
-                    Transform::from_xyz(0.0, 0.0, 0.16),
-                    Visibility::Hidden,
-                    ReactorGlowOverlay,
-                ));
+                if shaders_enabled {
+                    parent.spawn((
+                        Mesh2d(meshes.add(Rectangle::new(38.0, 38.0))),
+                        MeshMaterial2d(reactor_materials.add(ReactorGlowMaterial::default())),
+                        Transform::from_xyz(0.0, 0.0, 0.16),
+                        Visibility::Hidden,
+                        ReactorGlowOverlay,
+                    ));
+                }
                 spawn_work_effect_children(parent);
             });
         }
@@ -266,13 +269,15 @@ pub(crate) fn spawn_runtime_module(
                 },
             ));
             entity.with_children(|parent| {
-                parent.spawn((
-                    Mesh2d(meshes.add(Rectangle::new(20.0, 34.0))),
-                    MeshMaterial2d(engine_materials.add(EngineFlameMaterial::default())),
-                    Transform::from_xyz(0.0, 40.0, -0.14),
-                    Visibility::Hidden,
-                    EngineFlameOverlay,
-                ));
+                if shaders_enabled {
+                    parent.spawn((
+                        Mesh2d(meshes.add(Rectangle::new(20.0, 34.0))),
+                        MeshMaterial2d(engine_materials.add(EngineFlameMaterial::default())),
+                        Transform::from_xyz(0.0, 40.0, -0.14),
+                        Visibility::Hidden,
+                        EngineFlameOverlay,
+                    ));
+                }
                 spawn_work_effect_children(parent);
             });
         }
@@ -394,10 +399,9 @@ pub(crate) fn spawn_runtime_module(
                 PowerConsumer { draw: 1 },
                 StorageModule {
                     capacity: spec.storage_capacity.max(4),
-                    inventory: {
-                        let mut inventory = ResourceInventory::default();
-                        inventory.oxygen = spec.storage_capacity.max(4);
-                        inventory
+                    inventory: ResourceInventory {
+                        oxygen: spec.storage_capacity.max(4),
+                        ..default()
                     },
                     damaged_components: Vec::new(),
                     accepts_fuel: false,

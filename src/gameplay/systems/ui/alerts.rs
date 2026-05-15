@@ -30,14 +30,16 @@ use crate::{
         },
         helpers::{
             Fx,
+            condition_severity,
             danger_level,
             format_fx0,
             format_fx1,
+            interaction_label,
             meter_bar,
             module_condition,
             module_condition_label,
+            module_display_name,
         },
-        systems::shared::{condition_severity, interaction_label, module_display_name},
     },
 };
 
@@ -603,7 +605,8 @@ pub(crate) fn alerts_text(
 mod tests {
     use super::*;
     use crate::{
-        gameplay::{components::ShipAutomationMode, helpers::FixedVec2},
+        gameplay::components::ShipAutomationMode,
+        helpers::FixedVec2,
         ship::{ModuleKind, ModuleVariant},
     };
 

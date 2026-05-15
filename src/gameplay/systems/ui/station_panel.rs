@@ -704,11 +704,11 @@ fn infrastructure_readout(
     };
     let value = status.blocked_reason.clone().unwrap_or_else(|| {
         if status.powered {
-            "online".to_string()
+            format!("{} service ports online", connected_service_count(status))
         } else if status.power_required {
             "no wired power".to_string()
         } else {
-            "passive".to_string()
+            format!("{} service ports", connected_service_count(status))
         }
     });
     let color = if status.blocked_reason.is_some() || (status.power_required && !status.powered) {
@@ -717,4 +717,12 @@ fn infrastructure_readout(
         Color::srgb(0.34, 0.78, 0.46)
     };
     readout_light("Infrastructure", &value, color)
+}
+
+fn connected_service_count(status: &ModuleInfrastructureStatus) -> usize {
+    status
+        .service_statuses
+        .iter()
+        .filter(|service| service.network_id.is_some())
+        .count()
 }

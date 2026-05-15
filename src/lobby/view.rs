@@ -7,6 +7,7 @@ use crate::{
     state::{
         DebugEnemyEditorButton,
         FocusedTextBox,
+        GraphicsOptions,
         JoinButton,
         JoinButtonText,
         LobbyColorText,
@@ -14,6 +15,8 @@ use crate::{
         LobbyCycleRoleButton,
         LobbyRoleText,
         LobbyRoot,
+        LobbyShadersText,
+        LobbyToggleShadersButton,
         LocalPlayerProfile,
         StatusText,
         TextBoxField,
@@ -29,6 +32,7 @@ pub(crate) fn spawn_lobby_ui(
     config: Res<netcode::SessionConfig>,
     status: Res<netcode::SessionStatus>,
     local_profile: Res<LocalPlayerProfile>,
+    graphics_options: Res<GraphicsOptions>,
 ) {
     let title_font = asset_server.load("fonts/FiraSans-Bold.ttf");
     let mono_font = asset_server.load("fonts/FiraMono-Medium.ttf");
@@ -137,6 +141,51 @@ pub(crate) fn spawn_lobby_ui(
                         });
 
                     panel
+                        .spawn((Node {
+                            width: Val::Percent(100.0),
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(8.0),
+                            padding: UiRect::top(Val::Px(4.0)),
+                            ..default()
+                        },))
+                        .with_children(|options| {
+                            options.spawn((
+                                Text::new("Options"),
+                                TextFont {
+                                    font: mono_font.clone(),
+                                    font_size: 15.0,
+                                    ..default()
+                                },
+                                TextColor(Color::srgb(0.74, 0.78, 0.86)),
+                            ));
+                            options
+                                .spawn((Node {
+                                    width: Val::Percent(100.0),
+                                    justify_content: JustifyContent::SpaceBetween,
+                                    align_items: AlignItems::Center,
+                                    ..default()
+                                },))
+                                .with_children(|row| {
+                                    row.spawn((
+                                        Text::new(shaders_label(&graphics_options)),
+                                        TextFont {
+                                            font: mono_font.clone(),
+                                            font_size: 18.0,
+                                            ..default()
+                                        },
+                                        TextColor(Color::WHITE),
+                                        LobbyShadersText,
+                                    ));
+                                    cycle_button(
+                                        row,
+                                        "Toggle Shaders",
+                                        &mono_font,
+                                        LobbyToggleShadersButton,
+                                    );
+                                });
+                        });
+
+                    panel
                         .spawn((
                             Button,
                             Node {
@@ -204,16 +253,22 @@ pub(crate) fn update_lobby_status_text(
     status: Res<netcode::SessionStatus>,
     config: Res<netcode::SessionConfig>,
     local_profile: Res<LocalPlayerProfile>,
+    graphics_options: Res<GraphicsOptions>,
     mut text_queries: ParamSet<(
         Query<&mut Text, With<StatusText>>,
         Query<&mut Text, (With<JoinButtonText>, Without<StatusText>)>,
         Query<&mut Text, (With<LobbyRoleText>, Without<StatusText>)>,
         Query<(&mut Text, &mut TextColor), (With<LobbyColorText>, Without<StatusText>)>,
+        Query<&mut Text, (With<LobbyShadersText>, Without<StatusText>)>,
     )>,
 ) {
     // SAFETY: Each `ParamSet` branch targets a distinct labeled text role in the lobby UI, and branches
     // are iterated sequentially so no text entity is mutably accessed through two queries at once.
-    if !status.is_changed() && !config.is_changed() && !local_profile.is_changed() {
+    if !status.is_changed()
+        && !config.is_changed()
+        && !local_profile.is_changed()
+        && !graphics_options.is_changed()
+    {
         return;
     }
 
@@ -234,6 +289,9 @@ pub(crate) fn update_lobby_status_text(
         **text = format!("Avatar Color: {}", color_label(local_profile.color_index));
         color.0 = local_profile.color();
     }
+    for mut text in &mut text_queries.p4() {
+        **text = shaders_label(&graphics_options);
+    }
 }
 
 /// Despawns the lobby tree when the frontend leaves the lobby flow.
@@ -253,7 +311,7 @@ pub(crate) fn lobby_ui_present(query: Query<Entity, With<LobbyRoot>>) -> bool {
     !query.is_empty()
 }
 
-pub(super) fn spawn_textbox(
+pub(crate) fn spawn_textbox(
     parent: &mut ChildSpawnerCommands<'_>,
     field: TextBoxField,
     font: &Handle<Font>,
@@ -285,7 +343,7 @@ pub(super) fn spawn_textbox(
         });
 }
 
-pub(super) fn format_textbox_value(
+pub(crate) fn format_textbox_value(
     value: &str,
     field: TextBoxField,
     focused_textbox: &FocusedTextBox,
@@ -335,6 +393,17 @@ pub(super) fn color_label(index: u8) -> &'static str {
         6 => "Lime",
         _ => "Coral",
     }
+}
+
+pub(super) fn shaders_label(graphics_options: &GraphicsOptions) -> String {
+    format!(
+        "Shaders: {}",
+        if graphics_options.shaders_enabled {
+            "Enabled"
+        } else {
+            "Disabled"
+        }
+    )
 }
 
 pub(super) fn lobby_status_line(status: &netcode::SessionStatus, server_addr: &str) -> String {

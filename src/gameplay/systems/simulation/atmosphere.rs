@@ -26,12 +26,12 @@ use crate::{
             StorageModule,
         },
         helpers::{
-            FixedVec2,
             Fx,
             breach_leak_multiplier,
             decompression_signature,
             fx_from_time_delta,
             recompute_decompression_vectors,
+            ship_tile_contains_point,
         },
     },
 };
@@ -334,7 +334,9 @@ pub(crate) fn sample_player_atmosphere(
         let Some(local_oxygen) = atmosphere_state
             .tiles
             .iter()
-            .filter(|tile| point_inside_tile(player_motion.local_position, tile.local_position))
+            .filter(|tile| {
+                ship_tile_contains_point(player_motion.local_position, tile.local_position)
+            })
             .min_by_key(|tile| {
                 (tile.local_position - player_motion.local_position)
                     .length_sq()
@@ -359,9 +361,4 @@ pub(crate) fn sample_player_atmosphere(
                 .oxygen_critical_threshold(&balance.player);
         mission_state.lowest_player_oxygen = mission_state.lowest_player_oxygen.min(local_oxygen);
     }
-}
-
-fn point_inside_tile(point: FixedVec2, tile_center: FixedVec2) -> bool {
-    let tile_half = Fx::from_num(16);
-    (point.x - tile_center.x).abs() <= tile_half && (point.y - tile_center.y).abs() <= tile_half
 }

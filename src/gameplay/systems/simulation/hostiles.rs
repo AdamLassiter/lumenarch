@@ -36,6 +36,7 @@ use crate::{
             Fx,
             angle_from_vector,
             clamp_position_to_arena,
+            consume_ship_resource,
             damp_scalar,
             damp_vec2,
             facing_vector,
@@ -47,7 +48,6 @@ use crate::{
             spawn_projectile_entity,
             wrap_radians,
         },
-        systems::simulation::helpers::consume_ship_resource,
     },
     ship::ModuleKind,
 };

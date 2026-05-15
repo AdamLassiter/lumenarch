@@ -23,10 +23,14 @@ use crate::{
             SimPosition,
             SimRotation,
         },
-        helpers::{Fx, fixed_radius_sq, fx_from_time_delta, is_inside_arena, render_translation},
-        systems::simulation::helpers::{
+        helpers::{
+            Fx,
             absorb_hostile_shield_hit,
             absorb_player_shield_hit,
+            fixed_radius_sq,
+            fx_from_time_delta,
+            is_inside_arena,
+            render_translation,
             spawn_hostile_salvage,
         },
     },

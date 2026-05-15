@@ -5,12 +5,10 @@ use bevy::{
 use ggrs::PlayerHandle;
 use serde::{Deserialize, Serialize};
 
-use super::{
-    super::helpers::{FixedVec2, Fx},
-    logistics::ResourceKind,
-};
+use super::logistics::ResourceKind;
 use crate::{
     balance::PlayerBalanceConfig,
+    helpers::{FixedVec2, Fx},
     ship::{ModuleKind, ModuleVariant},
     state::PlayerRole,
     stations::FactionId,
@@ -254,6 +252,7 @@ pub(crate) struct ShipInteriorNode {
 }
 
 #[derive(Component, Default, Clone)]
+#[allow(dead_code)]
 pub(crate) struct ShipInteriorMap {
     pub(crate) walkable_nodes: Vec<ShipInteriorNode>,
 }

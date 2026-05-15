@@ -1,12 +1,9 @@
 use std::collections::{HashMap, VecDeque};
 
-use super::{FixedVec2, Fx, narrow_wide_clamped, safe_sqrt_wide};
+use super::{FixedVec2, Fx, WideFx, narrow_wide_clamped, safe_sqrt_wide, ship_tile_contains_point};
 use crate::{
     balance::BalanceConfig,
-    gameplay::{
-        components::{ShipAtmosphereState, ShipAtmosphereTile},
-        helpers::WideFx,
-    },
+    gameplay::components::{ShipAtmosphereState, ShipAtmosphereTile},
 };
 
 const EDGE_TOP: u8 = 1;
@@ -110,7 +107,7 @@ pub(crate) fn sampled_decompression_pull(
         .tiles
         .iter()
         .zip(atmosphere_state.decompression_vectors.iter())
-        .filter(|(tile, _)| point_inside_tile(local_position, tile.local_position))
+        .filter(|(tile, _)| ship_tile_contains_point(local_position, tile.local_position))
         .min_by_key(|(tile, _)| {
             (tile.local_position - local_position)
                 .length_sq()
@@ -150,9 +147,4 @@ fn cardinal_direction_towards(delta: FixedVec2) -> FixedVec2 {
     } else {
         FixedVec2::zero()
     }
-}
-
-fn point_inside_tile(point: FixedVec2, tile_center: FixedVec2) -> bool {
-    let tile_half = Fx::from_num(16);
-    (point.x - tile_center.x).abs() <= tile_half && (point.y - tile_center.y).abs() <= tile_half
 }

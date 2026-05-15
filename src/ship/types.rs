@@ -266,8 +266,9 @@ impl StoredResourceKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ShipFoundationKind {
+    #[default]
     Floor,
     Hull,
     HullInnerCorner,
@@ -325,12 +326,6 @@ impl ShipFoundationKind {
                 | Self::PipeAmmunition
                 | Self::PipeOxygen
         )
-    }
-}
-
-impl Default for ShipFoundationKind {
-    fn default() -> Self {
-        Self::Floor
     }
 }
 

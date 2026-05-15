@@ -7,6 +7,7 @@ pub(crate) mod campaign;
 mod docked;
 mod editor;
 pub(crate) mod gameplay;
+pub(crate) mod helpers;
 mod lobby;
 mod netcode;
 mod sector_map;
@@ -35,6 +36,7 @@ use self::state::{
     EnemyEditorState,
     EnemyShipLibraryState,
     FrontendMode,
+    GraphicsOptions,
     LastMissionReport,
     MainCamera,
     Progression,
@@ -146,6 +148,7 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
     .insert_resource(SectorState::default())
     .insert_resource(CampaignLoadState::default())
     .insert_resource(DebugOverlayState::default())
+    .insert_resource(GraphicsOptions::default())
     .insert_resource(LastMissionReport::default())
     .insert_resource(stations::StationCatalogResource::load_or_default())
     .insert_resource(EditorToolState::default())
@@ -159,6 +162,11 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
     .insert_resource(SectorMapPanState::default())
     .insert_resource(SectorMapViewState::default())
     .insert_resource(SplashScreenState::default());
+}
+
+/// Reports whether shader-backed presentation effects should run for the current session.
+fn shaders_enabled(options: Res<GraphicsOptions>) -> bool {
+    options.shaders_enabled
 }
 
 fn add_core_plugins(app: &mut App, mode: AppRuntimeMode) {
@@ -186,7 +194,8 @@ fn add_core_plugins(app: &mut App, mode: AppRuntimeMode) {
             .init_asset::<bevy::text::Font>()
             .init_asset::<Mesh>()
             .init_asset::<gameplay::effects::EngineFlameMaterial>()
-            .init_asset::<gameplay::effects::ReactorGlowMaterial>();
+            .init_asset::<gameplay::effects::ReactorGlowMaterial>()
+            .init_asset::<gameplay::effects::SpaceBackdropMaterial>();
     }
 
     app.add_plugins(GgrsPlugin::<LumenGgrsConfig>::default());
@@ -552,6 +561,9 @@ fn add_player_editor_ui_fixed_systems(app: &mut App) {
                 editor::toolbox_button_system,
                 editor::selection_action_button_system,
                 editor::mission_report_button_system,
+                lobby::focus_textbox_on_click,
+                lobby::clear_textbox_focus_on_non_textbox_click,
+                lobby::edit_lobby_textboxes,
                 editor::sync_program_text_editor_state,
                 editor::focus_program_text_editor_on_click,
                 editor::edit_program_text_editor,
@@ -569,6 +581,7 @@ fn add_player_editor_ui_fixed_systems(app: &mut App) {
                 editor::update_editor_module_overlay,
                 editor::sync_toolbox_visuals,
                 editor::sync_toolbox_scroll,
+                lobby::update_lobby_textboxes,
                 editor::update_editor_status_text,
             )
                 .run_if(netcode::session_presents_player_editor),
@@ -589,6 +602,9 @@ fn add_debug_enemy_editor_fixed_systems(app: &mut App) {
                 editor::selection_action_button_system,
                 editor::mission_report_button_system,
                 editor::enemy_library_button_system,
+                lobby::focus_textbox_on_click,
+                lobby::clear_textbox_focus_on_non_textbox_click,
+                lobby::edit_lobby_textboxes,
                 editor::sync_program_text_editor_state,
                 editor::focus_program_text_editor_on_click,
                 editor::edit_program_text_editor,
@@ -606,6 +622,7 @@ fn add_debug_enemy_editor_fixed_systems(app: &mut App) {
                 editor::update_editor_module_overlay,
                 editor::sync_toolbox_visuals,
                 editor::sync_toolbox_scroll,
+                lobby::update_lobby_textboxes,
                 editor::update_editor_status_text,
             )
                 .run_if(in_state(FrontendMode::DebugEnemyEditor)),
@@ -627,8 +644,19 @@ fn add_encounter_presentation_systems(app: &mut App) {
                 .run_if(netcode::session_presents_encounter),
             (
                 gameplay::update_destroyed_module_visuals,
-                gameplay::sync_reactor_glow_visuals,
-                gameplay::sync_engine_flame_visuals,
+                gameplay::sync_service_link_visuals,
+                (
+                    gameplay::sync_reactor_glow_visuals,
+                    gameplay::sync_engine_flame_visuals,
+                    gameplay::spawn_missing_effect_overlays,
+                    gameplay::sync_turret_flash_visuals,
+                    gameplay::sync_battery_pulse_visuals,
+                    gameplay::sync_fabricator_dust_visuals,
+                    gameplay::sync_hazard_effect_visuals,
+                    gameplay::sync_ship_environment_effect_visuals,
+                )
+                    .chain()
+                    .run_if(shaders_enabled),
                 gameplay::sync_module_work_effect_visuals,
                 gameplay::sync_eva_thruster_visuals,
                 gameplay::sync_shipboard_player_visual,

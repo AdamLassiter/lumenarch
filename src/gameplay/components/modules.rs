@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 
-use super::{
-    super::helpers::{FixedVec2, Fx},
-    logistics::ResourceKind,
+use super::logistics::ResourceKind;
+use crate::{
+    helpers::{FixedVec2, Fx},
+    ship::{ModuleKind, ModuleVariant, arch::ArchProgram, lumen::LumenProgram},
 };
-use crate::ship::{ModuleKind, ModuleVariant, arch::ArchProgram, lumen::LumenProgram};
 
 #[derive(Component, Clone)]
 pub(crate) struct RuntimeShipModule {
@@ -57,11 +57,13 @@ pub(crate) struct ValveCommandState {
 }
 
 #[derive(Component, Clone)]
+#[allow(dead_code)]
 pub(crate) struct EngineModule {
     pub(crate) thrust_multiplier: Fx,
 }
 
 #[derive(Component, Clone)]
+#[allow(dead_code)]
 pub(crate) struct WeaponModule {
     pub(crate) damage: i32,
     pub(crate) requires_ammo: bool,
@@ -103,6 +105,12 @@ pub(crate) struct RuntimeArchComputer {
 
 #[derive(Component)]
 pub(crate) struct TurretTopSprite;
+
+#[derive(Component, Clone)]
+pub(crate) struct TurretFlashPulse {
+    pub(crate) remaining: Fx,
+    pub(crate) duration: Fx,
+}
 
 #[derive(Component, Clone)]
 pub(crate) struct TurretCommandState {
@@ -280,6 +288,32 @@ pub(crate) struct EngineFlameOverlay;
 pub(crate) struct ModuleWorkEffect;
 
 #[derive(Component)]
+pub(crate) struct TurretFlashOverlay;
+
+#[derive(Component)]
+pub(crate) struct BatteryPulseOverlay;
+
+#[derive(Component)]
+pub(crate) struct FabricatorDustOverlay;
+
+#[derive(Component)]
+pub(crate) struct HeatFlameOverlay;
+
+#[derive(Component)]
+pub(crate) struct ElectricalArcOverlay;
+
+#[derive(Component)]
+pub(crate) struct ServiceLinkOverlay {
+    pub(crate) route_kind: super::ship::InfrastructureRouteKind,
+}
+
+#[derive(Component)]
+pub(crate) struct DecompressionAirLinesOverlay;
+
+#[derive(Component)]
+pub(crate) struct ShipSpeedLinesOverlay;
+
+#[derive(Component)]
 pub(crate) struct ModuleWorkProgressRoot;
 
 #[derive(Component)]
@@ -295,3 +329,6 @@ pub(crate) struct ArenaBackdropLayer {
     pub(crate) depth: f32,
     pub(crate) base_translation: Vec3,
 }
+
+#[derive(Component)]
+pub(crate) struct SpaceBackdropLayer;

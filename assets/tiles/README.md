@@ -63,7 +63,9 @@ Planned 21_TUBES_DEMO engineering-underlay sprites:
   Ammunition pipe route tile for weapon supply.
 * `assets/tiles/pipe_oxygen.png`
   Oxygen resource pipe route tile for moving stored oxygen before it becomes atmosphere.
-* Route tiles may also provide adjacency-selected variants with `_straight`, `_corner`, `_tee`, and `_cross` suffixes. The editor/runtime picks these according to connected cardinal neighbors of the same route type.
+* Route tiles may also provide adjacency-selected variants with `_end`, `_straight`, `_corner`, `_tee`, and `_cross` suffixes. The editor/runtime picks these according to connected cardinal neighbors of the same route type; `_end` is used for exactly one connection, while isolated routes use the base sprite.
+* `assets/tiles/service_link.png`
+  Gameplay-only cosmetic service link drawn dynamically from components to connected service-port route tiles. This is not placeable and has no collision.
 * `assets/tiles/junction_box.png`
   Programmable electrical junction box. It should read as a closeable routing/control component.
 * `assets/tiles/valve.png`

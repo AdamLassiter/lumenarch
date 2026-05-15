@@ -1,12 +1,12 @@
 use bevy::{ecs::hierarchy::ChildSpawnerCommands, prelude::*};
 
-use super::DockedActionVisibility;
 use crate::{
     NORMAL_BUTTON,
     SELECTED_BUTTON,
     UI_BODY_FONT_SIZE,
     UI_BUTTON_RADIUS,
     UI_TITLE_FONT_SIZE,
+    docked::DockedActionVisibility,
     state::{
         DockedState,
         DockedSurface,
@@ -19,7 +19,7 @@ use crate::{
     stations,
 };
 
-pub(super) fn spawn_action_button<T: Bundle + 'static>(
+pub(crate) fn spawn_action_button<T: Bundle + 'static>(
     parent: &mut ChildSpawnerCommands,
     label: &str,
     color: Color,
@@ -59,7 +59,7 @@ pub(super) fn spawn_action_button<T: Bundle + 'static>(
         ));
 }
 
-pub(super) fn spawn_dual_action_row<L: Bundle + 'static, R: Bundle + 'static>(
+pub(crate) fn spawn_dual_action_row<L: Bundle + 'static, R: Bundle + 'static>(
     parent: &mut ChildSpawnerCommands,
     left: (&str, L),
     right: (&str, R),
@@ -118,7 +118,7 @@ fn spawn_half_width_action_button<T: Bundle + 'static>(
         ));
 }
 
-pub(super) fn docked_status_text(
+pub(crate) fn docked_status_text(
     docked_state: &DockedState,
     progression: &Progression,
     editor_ship: &EditorShip,
@@ -156,7 +156,7 @@ pub(super) fn docked_status_text(
     )
 }
 
-pub(super) fn docked_surface_color(selected: DockedSurface, surface: DockedSurface) -> Color {
+pub(crate) fn docked_surface_color(selected: DockedSurface, surface: DockedSurface) -> Color {
     if selected == surface {
         SELECTED_BUTTON
     } else {
@@ -164,7 +164,7 @@ pub(super) fn docked_surface_color(selected: DockedSurface, surface: DockedSurfa
     }
 }
 
-pub(super) fn button_default_color(
+pub(crate) fn button_default_color(
     is_repair: bool,
     is_cycle: bool,
     is_accept: bool,
@@ -183,7 +183,7 @@ pub(super) fn button_default_color(
     }
 }
 
-pub(super) fn docked_help_text(surface: DockedSurface) -> String {
+pub(crate) fn docked_help_text(surface: DockedSurface) -> String {
     match surface {
         DockedSurface::Shipyard => "Dock Controls\nClick a hub surface to move around the station UI\nRefit: open shipyard refit\nRepair: spend scrap to clear hull wear\nSector Map: inspect the local route graph".to_string(),
         DockedSurface::Quartermaster => "Quartermaster Controls\nReview scrap, damaged components, and service availability\nRepair Ship spends scrap immediately when available".to_string(),
@@ -192,7 +192,7 @@ pub(super) fn docked_help_text(surface: DockedSurface) -> String {
     }
 }
 
-pub(super) fn docked_content_text(
+pub(crate) fn docked_content_text(
     station: Option<&stations::StationDefinition>,
     docked_state: &DockedState,
     progression: &Progression,

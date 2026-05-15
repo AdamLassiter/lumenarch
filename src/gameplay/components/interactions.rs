@@ -3,7 +3,7 @@ use bevy::{
     prelude::*,
 };
 
-use super::super::helpers::Fx;
+use crate::helpers::Fx;
 
 #[derive(Component, Default, Clone)]
 pub(crate) struct NearbyInteraction {

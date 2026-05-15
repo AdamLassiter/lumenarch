@@ -1,6 +1,8 @@
 pub(crate) mod components;
 pub(crate) mod effects;
-mod helpers;
+pub(crate) mod helpers {
+    pub(crate) use crate::helpers::*;
+}
 mod spawn;
 mod systems;
 
@@ -47,18 +49,25 @@ pub(crate) use systems::{
     run_shipboard_interaction_input,
     sample_player_atmosphere,
     sample_ship_fields,
+    spawn_missing_effect_overlays,
     station_panel_button_system,
     sync_backdrop_parallax,
+    sync_battery_pulse_visuals,
     sync_crew_name_labels,
     sync_drone_station_population,
     sync_engine_flame_visuals,
     sync_eva_thruster_visuals,
+    sync_fabricator_dust_visuals,
+    sync_hazard_effect_visuals,
     sync_hostile_ship_state,
     sync_module_work_effect_visuals,
     sync_player_reference_frame_parenting,
     sync_reactor_glow_visuals,
     sync_runtime_ship_state,
+    sync_service_link_visuals,
+    sync_ship_environment_effect_visuals,
     sync_shipboard_player_visual,
+    sync_turret_flash_visuals,
     tick_recent_action_feedback,
     toggle_gameplay_info_panel,
     update_current_station,
@@ -75,5 +84,5 @@ pub(crate) use systems::{
 };
 
 const RUNTIME_SHIP_ORIGIN: bevy::prelude::Vec3 = bevy::prelude::Vec3::new(0.0, 0.0, 10.0);
-const ARENA_WIDTH_TILES: i32 = 48;
-const ARENA_HEIGHT_TILES: i32 = 32;
+pub(crate) const ARENA_WIDTH_TILES: i32 = 48;
+pub(crate) const ARENA_HEIGHT_TILES: i32 = 32;

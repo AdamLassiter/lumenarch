@@ -22,12 +22,6 @@ use toolbox::{
     spawn_variant_button_grid,
 };
 
-use super::super::helpers::{
-    editor_mission_report_text,
-    editor_status_line,
-    selection_summary,
-    variant_tooltip_text,
-};
 use crate::{
     NORMAL_BUTTON,
     TOOLBOX_WIDTH,
@@ -36,6 +30,14 @@ use crate::{
     UI_HELP_FONT_SIZE,
     UI_PANEL_RADIUS,
     UI_TITLE_FONT_SIZE,
+    helpers::editor::{
+        editor_mission_report_text,
+        editor_status_line,
+        enemy_config_references_text,
+        selection_summary,
+        variant_tooltip_text,
+    },
+    lobby::spawn_textbox,
     state::{
         ControlsHelpPanel,
         EditingCleanup,
@@ -67,6 +69,7 @@ use crate::{
         EditorToolboxScrollViewport,
         EditorToolboxTooltipText,
         EditorUiState,
+        EnemyConfigReferencesText,
         EnemyEditorState,
         EnemyNewButton,
         EnemyNextButton,
@@ -91,6 +94,8 @@ use crate::{
         ProgramEditorStatusText,
         ProgramEditorTextBox,
         Progression,
+        SectorState,
+        TextBoxField,
     },
 };
 
@@ -115,6 +120,7 @@ pub(crate) fn spawn_editor_ui(
     tool_state: Res<EditorToolState>,
     selection_state: Res<EditorSelectionState>,
     progression: Res<Progression>,
+    sector_state: Res<SectorState>,
     last_mission_report: Res<LastMissionReport>,
     editor_ui_state: Res<EditorUiState>,
 ) {
@@ -183,6 +189,34 @@ pub(crate) fn spawn_editor_ui(
                             EditorToolMode::Select,
                             tool_state.tool_mode,
                             &mono_font,
+                        );
+                    });
+
+                toolbox
+                    .spawn((Node {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(6.0),
+                        ..default()
+                    },))
+                    .with_children(|ship_name| {
+                        ship_name.spawn((
+                            Text::new(match editor_session.mode {
+                                EditorMode::Player => "Ship Name",
+                                EditorMode::Enemy => "Enemy Ship Name",
+                            }),
+                            TextFont {
+                                font: mono_font.clone(),
+                                font_size: 13.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgb(0.74, 0.78, 0.86)),
+                        ));
+                        spawn_textbox(
+                            ship_name,
+                            TextBoxField::ShipName,
+                            &mono_font,
+                            &editor_ship.ship.name,
                         );
                     });
 
@@ -499,6 +533,29 @@ pub(crate) fn spawn_editor_ui(
                                             TextColor(Color::WHITE),
                                         ));
                                     }
+
+                                    content.spawn((
+                                        Node {
+                                            width: Val::Percent(100.0),
+                                            padding: UiRect::all(Val::Px(8.0)),
+                                            border_radius: BorderRadius::all(Val::Px(UI_PANEL_RADIUS)),
+                                            ..default()
+                                        },
+                                        BackgroundColor(Color::srgba(0.12, 0.15, 0.21, 0.86)),
+                                    ))
+                                    .with_child((
+                                        Text::new(enemy_config_references_text(
+                                            &sector_state,
+                                            &enemy_library_state,
+                                        )),
+                                        TextFont {
+                                            font: mono_font.clone(),
+                                            font_size: 12.0,
+                                            ..default()
+                                        },
+                                        TextColor(Color::srgb(0.76, 0.84, 0.92)),
+                                        EnemyConfigReferencesText,
+                                    ));
                                 }
                             });
                     });

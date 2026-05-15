@@ -133,6 +133,7 @@ pub(crate) fn sync_player_editor_mode(
 }
 
 /// Run condition that gates systems to the active deterministic session frontend.
+#[allow(dead_code)]
 pub(crate) fn frontend_mode_is_session(frontend_mode: Res<State<FrontendMode>>) -> bool {
     *frontend_mode.get() == FrontendMode::Session
 }
@@ -153,6 +154,7 @@ pub(crate) fn frontend_mode_is_not_lobby(frontend_mode: Res<State<FrontendMode>>
 }
 
 /// Run condition that suppresses session editor UI while the debug enemy editor owns the screen.
+#[allow(dead_code)]
 pub(crate) fn frontend_mode_is_not_debug_enemy_editor(
     frontend_mode: Res<State<FrontendMode>>,
 ) -> bool {
@@ -201,6 +203,7 @@ pub(crate) fn session_presents_player_editor(
 }
 
 /// Run condition that hides player-editor-only systems outside rollback editing.
+#[allow(dead_code)]
 pub(crate) fn session_not_presents_player_editor(
     frontend_mode: Res<State<FrontendMode>>,
     rollback_state: Res<RollbackGameState>,

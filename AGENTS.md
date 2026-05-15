@@ -19,7 +19,7 @@ LUMEN//ARCH is a top-down multiplayer 2D sci-fi systems game about building a pa
 
 ## Code Organization
 
-* Prefer flat, state-oriented modules like `gameplay`, `docked`, `sector_map`, `lobby`, and `editor`.
+* Prefer flat, state-oriented modules like `gameplay`, `docked`, `sector_map`, `lobby`, `editor` and `helpers`.
 * Keep component definitions, one-shot spawning, runtime systems, and UI presentation separated when a file grows large.
 * Every registered Bevy system/run condition should have a function-level comment explaining what it does and why it exists in the schedule.
 * Any `ParamSet<(...)>` use must include a nearby `SAFETY:` comment explaining why the branches cannot double-mutably access the same entity/component.

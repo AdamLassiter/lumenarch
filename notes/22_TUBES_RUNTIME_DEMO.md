@@ -31,7 +31,7 @@ Added `ShipInfrastructureState` as a ship-level runtime summary containing:
 
 Networks rebuild from runtime foundation tiles with cardinal adjacency only. Same route kinds connect to same route kinds. Missing, destroyed, or blocked route tiles break the graph.
 
-Overlay modules attach to compatible underlay routes at their own cell or cardinally adjacent cells.
+Overlay modules attach through **service ports**: their own grid cell plus the four cardinally adjacent cells. Diagonals do not connect. This keeps one underlay route per cell while allowing multi-resource components, such as powered ammunition turrets, to connect to separate nearby services.
 
 ### Blockers
 

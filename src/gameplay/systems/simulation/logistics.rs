@@ -47,6 +47,7 @@ pub(crate) struct StorageSnapshot {
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 pub(crate) struct ProcessorSnapshot {
     pub(crate) input_required: u32,
     pub(crate) output_amount: u32,
@@ -54,6 +55,7 @@ pub(crate) struct ProcessorSnapshot {
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 pub(crate) struct LogisticsEndpointSnapshot {
     pub(crate) entity: Entity,
     pub(crate) module_id: u64,

@@ -4,12 +4,18 @@ mod view;
 use bevy::{log, prelude::*};
 
 pub(crate) use self::{
-    textbox::{edit_lobby_textboxes, focus_textbox_on_click, update_lobby_textboxes},
+    textbox::{
+        clear_textbox_focus_on_non_textbox_click,
+        edit_lobby_textboxes,
+        focus_textbox_on_click,
+        update_lobby_textboxes,
+    },
     view::{
         cleanup_lobby_ui,
         lobby_ui_missing,
         lobby_ui_present,
         spawn_lobby_ui,
+        spawn_textbox,
         update_lobby_status_text,
     },
 };
@@ -24,9 +30,11 @@ use super::{
         EditorSessionState,
         FocusedTextBox,
         FrontendMode,
+        GraphicsOptions,
         JoinButton,
         LobbyCycleColorButton,
         LobbyCycleRoleButton,
+        LobbyToggleShadersButton,
         LocalPlayerProfile,
         TextBoxRoot,
     },
@@ -43,12 +51,14 @@ pub(crate) fn lobby_button_system(
             Option<&DebugEnemyEditorButton>,
             Option<&LobbyCycleRoleButton>,
             Option<&LobbyCycleColorButton>,
+            Option<&LobbyToggleShadersButton>,
             Option<&TextBoxRoot>,
         ),
         (Changed<Interaction>, With<Button>),
     >,
     config: Res<netcode::SessionConfig>,
     mut local_profile: ResMut<LocalPlayerProfile>,
+    mut graphics_options: ResMut<GraphicsOptions>,
     mut status: ResMut<netcode::SessionStatus>,
     mut bootstrap: ResMut<netcode::SessionBootstrapConfig>,
     mut lobby_runtime: ResMut<netcode::LobbyRuntime>,
@@ -56,8 +66,16 @@ pub(crate) fn lobby_button_system(
     mut focused_textbox: ResMut<FocusedTextBox>,
     mut next_mode: ResMut<NextState<FrontendMode>>,
 ) {
-    for (interaction, mut background, join, debug_enemy, cycle_role, cycle_color, textbox) in
-        &mut interaction_query
+    for (
+        interaction,
+        mut background,
+        join,
+        debug_enemy,
+        cycle_role,
+        cycle_color,
+        toggle_shaders,
+        textbox,
+    ) in &mut interaction_query
     {
         match *interaction {
             Interaction::Pressed => {
@@ -104,6 +122,9 @@ pub(crate) fn lobby_button_system(
                 } else if cycle_color.is_some() {
                     *background = BackgroundColor(PRESSED_BUTTON);
                     local_profile.cycle_color(1);
+                } else if toggle_shaders.is_some() {
+                    *background = BackgroundColor(PRESSED_BUTTON);
+                    graphics_options.shaders_enabled = !graphics_options.shaders_enabled;
                 }
             }
             Interaction::Hovered => {
@@ -118,7 +139,8 @@ pub(crate) fn lobby_button_system(
                     Color::srgba(0.13, 0.17, 0.24, 1.0)
                 } else if join.is_some() {
                     NORMAL_BUTTON
-                } else if cycle_role.is_some() || cycle_color.is_some() {
+                } else if cycle_role.is_some() || cycle_color.is_some() || toggle_shaders.is_some()
+                {
                     Color::srgb(0.24, 0.32, 0.48)
                 } else {
                     Color::srgb(0.46, 0.34, 0.22)

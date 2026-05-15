@@ -14,6 +14,7 @@ use crate::{
         EnemyNextButton,
         EnemyPrevButton,
         EnemyShipLibraryState,
+        FocusedTextBox,
     },
 };
 
@@ -88,12 +89,16 @@ pub(crate) fn enemy_library_button_system(
 /// Mirrors enemy-library navigation onto the keyboard so hostile ship iteration stays quick while editing.
 pub(crate) fn enemy_library_keyboard_shortcuts(
     keys: Res<ButtonInput<KeyCode>>,
+    focused_textbox: Res<FocusedTextBox>,
     editor_session: Res<EditorSessionState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
     mut editor_ship: ResMut<EditorShip>,
     status: Res<netcode::SessionStatus>,
 ) {
+    if focused_textbox.field.is_some() {
+        return;
+    }
     if !netcode::is_host_authority(&status) {
         return;
     }

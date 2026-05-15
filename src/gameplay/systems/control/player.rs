@@ -1,6 +1,7 @@
 use super::*;
 use crate::{
-    gameplay::{components::PlayerConditionState, helpers::sampled_decompression_pull},
+    gameplay::components::PlayerConditionState,
+    helpers::{control as helpers, sampled_decompression_pull},
     ship::ModuleVariant,
 };
 
@@ -66,7 +67,7 @@ pub(crate) fn update_player_reference_frame(
         {
             let offset = motion.world_position - ship_position.value;
             let distance_sq = offset.length_sq();
-            let radius_sq = helpers::fixed_square(inertia_field.radius);
+            let radius_sq = fixed_square(inertia_field.radius);
             if distance_sq <= radius_sq
                 && best_distance_sq.is_none_or(|current| distance_sq < current)
             {
@@ -290,20 +291,13 @@ pub(crate) fn sync_shipboard_player_visual(
                 }
                 ShipControlMode::Interior => equipped_suit.suit.color(),
                 ShipControlMode::Cockpit | ShipControlMode::Turret => {
-                    Color::srgba(0.82, 0.96, 0.62, 0.20)
+                    Color::srgba(0.82, 0.96, 0.62, 0.85)
                 }
                 ShipControlMode::Reactor
                 | ShipControlMode::Logistics
                 | ShipControlMode::Computer => equipped_suit.suit.color(),
             };
-            *visibility = if matches!(
-                control_state.mode,
-                ShipControlMode::Cockpit | ShipControlMode::Turret
-            ) {
-                Visibility::Hidden
-            } else {
-                Visibility::Visible
-            };
+            *visibility = Visibility::Visible;
         } else {
             *visibility = Visibility::Visible;
         }
@@ -412,7 +406,7 @@ pub(crate) fn update_current_station(
         let mut nearest = None;
         let mut nearest_distance_sq = None;
         let mut saw_ship_module = false;
-        let max_distance_sq = helpers::fixed_square(Fx::from_num(balance.player.interact_radius));
+        let max_distance_sq = fixed_square(Fx::from_num(balance.player.interact_radius));
         for (runtime_module, parent) in &module_query {
             if parent.get() != active_ship {
                 continue;
@@ -505,7 +499,7 @@ pub(crate) fn handle_player_cargo_interaction(
     if carried.kind.is_none() {
         for (entity, position, cargo) in &mut loose_cargo_query {
             if motion.world_position.distance_sq(position.value)
-                <= helpers::fixed_square(Fx::from_num(balance.player.cargo_pickup_radius))
+                <= fixed_square(Fx::from_num(balance.player.cargo_pickup_radius))
             {
                 carried.kind = Some(cargo.kind);
                 carried.amount = cargo.amount;

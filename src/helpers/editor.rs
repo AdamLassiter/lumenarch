@@ -1,11 +1,10 @@
+use std::collections::BTreeMap;
+
 use bevy::{prelude::*, ui::UiGlobalTransform};
 
-use super::super::{
+use crate::{
     HALF_TILE_SIZE,
     TILE_SIZE,
-    state::{EditorMode, EditorPlacementBlocker, EditorToolboxPanel, LastMissionReport},
-};
-use crate::{
     ship::{
         ModuleKind,
         ModuleSpec,
@@ -14,7 +13,17 @@ use crate::{
         ShipFoundationKind,
         ShipFoundationTile,
     },
-    state::{EditorLayer, EditorSelectionState, EditorToolMode, Progression},
+    state::{
+        EditorLayer,
+        EditorMode,
+        EditorPlacementBlocker,
+        EditorSelectionState,
+        EditorToolMode,
+        EditorToolboxPanel,
+        LastMissionReport,
+        Progression,
+        SectorState,
+    },
 };
 
 pub(crate) fn editor_status_line(
@@ -133,6 +142,100 @@ pub(crate) fn editor_mission_report_text(last_mission_report: &LastMissionReport
         ),
         _ => "No completed sorties yet.".to_string(),
     }
+}
+
+pub(crate) fn enemy_config_references_text(
+    sector_state: &SectorState,
+    enemy_library_state: &crate::state::EnemyShipLibraryState,
+) -> String {
+    let mut references: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for node in &sector_state.nodes {
+        for enemy_id in &node.encounter.enemy_ship_ids {
+            references
+                .entry(enemy_id.clone())
+                .or_default()
+                .push(format!("{} {}", node.id, node.label));
+        }
+    }
+
+    if references.is_empty() {
+        return "Config Enemy References\nNo enemy ids referenced by sector config.".to_string();
+    }
+
+    let mut lines = vec!["Config Enemy References".to_string()];
+    for (enemy_id, nodes) in references {
+        let library_label = enemy_library_state
+            .library
+            .find_by_id(&enemy_id)
+            .map(|entry| entry.display_name.as_str())
+            .unwrap_or("missing from library");
+        let status = enemy_library_state
+            .entry_statuses
+            .get(&enemy_id)
+            .map(|status| match status {
+                crate::ship::enemy::EnemyShipEntryValidationStatus::Valid => "valid",
+                crate::ship::enemy::EnemyShipEntryValidationStatus::RepairedInMemory => {
+                    "repaired in memory"
+                }
+                crate::ship::enemy::EnemyShipEntryValidationStatus::Invalid => "invalid",
+            })
+            .unwrap_or(
+                if enemy_library_state.library.find_by_id(&enemy_id).is_some() {
+                    "valid"
+                } else {
+                    "missing"
+                },
+            );
+        lines.push(format!(
+            "{enemy_id} - {library_label} [{status}]\n  used by: {}",
+            nodes.join(", ")
+        ));
+    }
+    lines.join("\n")
+}
+
+pub(crate) fn referenced_enemy_id_for_name(
+    ship_name: &str,
+    sector_state: &SectorState,
+    enemy_library_state: &crate::state::EnemyShipLibraryState,
+    selected_index: usize,
+) -> Option<String> {
+    let slug = enemy_reference_slug(ship_name);
+    if slug.is_empty() {
+        return None;
+    }
+    sector_state
+        .nodes
+        .iter()
+        .flat_map(|node| node.encounter.enemy_ship_ids.iter())
+        .find(|enemy_id| {
+            enemy_reference_slug(enemy_id) == slug
+                && enemy_library_state
+                    .library
+                    .entries
+                    .iter()
+                    .enumerate()
+                    .all(|(index, entry)| index == selected_index || entry.id != **enemy_id)
+        })
+        .cloned()
+}
+
+pub(crate) fn enemy_reference_slug(value: &str) -> String {
+    let mut slug = String::new();
+    let mut previous_separator = false;
+    for character in value.chars() {
+        if character.is_ascii_alphanumeric() {
+            slug.push(character.to_ascii_lowercase());
+            previous_separator = false;
+        } else if !previous_separator && !slug.is_empty() {
+            slug.push('_');
+            previous_separator = true;
+        }
+    }
+    if previous_separator {
+        slug.pop();
+    }
+    slug
 }
 
 pub(crate) fn module_kind_cost(kind: ModuleKind, variant: ModuleVariant) -> u32 {
@@ -519,67 +622,4 @@ pub(crate) fn sprite_path_for_kind(kind: &ModuleKind, variant: ModuleVariant) ->
         _ => kind.as_str(),
     };
     format!("tiles/{asset_name}.png")
-}
-
-pub(crate) fn sprite_path_for_foundation(kind: ShipFoundationKind) -> String {
-    format!("tiles/{}.png", kind.as_str())
-}
-
-pub(crate) fn sprite_path_for_foundation_connections(
-    kind: ShipFoundationKind,
-    north: bool,
-    east: bool,
-    south: bool,
-    west: bool,
-) -> (String, u8) {
-    if !kind.is_route() {
-        return (sprite_path_for_foundation(kind), 0);
-    }
-    let count = [north, east, south, west]
-        .into_iter()
-        .filter(|connected| *connected)
-        .count();
-    let base = kind.as_str();
-    match count {
-        4 => (format!("tiles/{base}_cross.png"), 0),
-        3 => {
-            let missing = if !north {
-                2
-            } else if !east {
-                3
-            } else if !south {
-                0
-            } else {
-                1
-            };
-            (format!("tiles/{base}_tee.png"), missing)
-        }
-        2 if (north && south) || (east && west) => {
-            let rotation = if east && west { 1 } else { 0 };
-            (format!("tiles/{base}_straight.png"), rotation)
-        }
-        2 => {
-            let rotation = match (north, east, south, west) {
-                (true, true, false, false) => 0,
-                (false, true, true, false) => 1,
-                (false, false, true, true) => 2,
-                (true, false, false, true) => 3,
-                _ => 0,
-            };
-            (format!("tiles/{base}_corner.png"), rotation)
-        }
-        1 => {
-            let rotation = if east {
-                1
-            } else if south {
-                2
-            } else if west {
-                3
-            } else {
-                0
-            };
-            (format!("tiles/{base}_straight.png"), rotation)
-        }
-        _ => (format!("tiles/{base}_straight.png"), 0),
-    }
 }

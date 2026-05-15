@@ -7,6 +7,7 @@ use crate::{
         ProcessorRecipe,
         ResourceKind,
     },
+    helpers::control as helpers,
     netcode::{INPUT_CYCLE_TEMPLATE, INPUT_SPACE_EDGE, StationControlOp},
     ship::arch::ArchProgram,
 };

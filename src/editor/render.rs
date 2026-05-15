@@ -2,49 +2,49 @@ use std::f32::consts::FRAC_PI_2;
 
 use bevy::{prelude::*, window::PrimaryWindow};
 
-use super::{
-    super::{
-        GRID_COLOR,
-        HALF_TILE_SIZE,
-        NORMAL_BUTTON,
-        SELECTED_BUTTON,
-        TILE_SIZE,
-        state::{
-            EditingCleanup,
-            EditorLayerButton,
-            EditorMode,
-            EditorPlacementBlocker,
-            EditorSelectionState,
-            EditorSessionState,
-            EditorShip,
-            EditorToolModeButton,
-            EditorToolState,
-            EditorToolboxScrollContent,
-            EditorUiState,
-            MainCamera,
-            PreviewTile,
-            Progression,
-            ShipFoundationSprite,
-            ShipTileSprite,
-            ToolboxFoundationButton,
-            ToolboxFoundationButtonText,
-            ToolboxVariantButton,
-            ToolboxVariantButtonText,
-        },
+use super::super::{
+    GRID_COLOR,
+    HALF_TILE_SIZE,
+    NORMAL_BUTTON,
+    SELECTED_BUTTON,
+    TILE_SIZE,
+    state::{
+        EditingCleanup,
+        EditorLayerButton,
+        EditorMode,
+        EditorPlacementBlocker,
+        EditorSelectionState,
+        EditorSessionState,
+        EditorShip,
+        EditorToolModeButton,
+        EditorToolState,
+        EditorToolboxScrollContent,
+        EditorUiState,
+        MainCamera,
+        PreviewTile,
+        Progression,
+        ShipFoundationSprite,
+        ShipTileSprite,
+        ToolboxFoundationButton,
+        ToolboxFoundationButtonText,
+        ToolboxVariantButton,
+        ToolboxVariantButtonText,
     },
+};
+use crate::{
     helpers::{
         cursor_grid_position,
+        editor::sprite_path_for_kind,
         grid_to_world,
         is_cursor_over_editor_ui,
         is_hull_module_kind,
         module_belongs_to_hull_layer,
         sprite_path_for_foundation,
         sprite_path_for_foundation_connections,
-        sprite_path_for_kind,
         variant_inventory_label,
     },
+    state::{EditorLayer, EditorToolMode},
 };
-use crate::state::{EditorLayer, EditorToolMode};
 
 /// Spawns the translucent build preview sprite so placement intent is visible under the cursor.
 pub(crate) fn spawn_preview_tile(

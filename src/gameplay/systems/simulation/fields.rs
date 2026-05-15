@@ -230,19 +230,17 @@ pub(crate) fn update_module_runtime_state(
         runtime_state.last_interaction_age += dt;
         let mut reactor_heat_bonus = Fx::from_num(0);
         if let Some(mut reactor_state) = reactor_state {
-            if reactor_state.fuel_remaining < Fx::from_num(balance.reactor.starting_fuel * 0.25) {
-                if let Ok(infrastructure) = infrastructure_query.get(parent.get())
-                    && remove_connected_resource(
-                        ResourceKind::Fuel,
-                        runtime_module.module_id,
-                        parent.get(),
-                        infrastructure,
-                        &mut storage_query,
-                    ) > 0
-                {
-                    reactor_state.fuel_remaining +=
-                        Fx::from_num(balance.reactor.starting_fuel * 0.5);
-                }
+            if reactor_state.fuel_remaining < Fx::from_num(balance.reactor.starting_fuel * 0.25)
+                && let Ok(infrastructure) = infrastructure_query.get(parent.get())
+                && remove_connected_resource(
+                    ResourceKind::Fuel,
+                    runtime_module.module_id,
+                    parent.get(),
+                    infrastructure,
+                    &mut storage_query,
+                ) > 0
+            {
+                reactor_state.fuel_remaining += Fx::from_num(balance.reactor.starting_fuel * 0.5);
             }
             let warmup_threshold = Fx::from_num(balance.reactor.warmup_threshold);
             let full_power_threshold = Fx::from_num(balance.reactor.full_power_threshold);

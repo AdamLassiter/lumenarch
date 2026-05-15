@@ -4,11 +4,8 @@ use crate::{
     NORMAL_BUTTON,
     SELECTED_BUTTON,
     UI_BUTTON_RADIUS,
-    editor::{
-        SELECTED_UNAFFORDABLE_BUTTON,
-        UNAFFORDABLE_BUTTON,
-        helpers::{sprite_path_for_foundation, sprite_path_for_kind, variant_inventory_label},
-    },
+    editor::{SELECTED_UNAFFORDABLE_BUTTON, UNAFFORDABLE_BUTTON},
+    helpers::{editor::sprite_path_for_kind, sprite_path_for_foundation, variant_inventory_label},
     ship::{ModuleKind, ModuleVariant, ShipFoundationKind},
     state::{
         EditorLayer,

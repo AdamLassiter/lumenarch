@@ -141,6 +141,7 @@ impl StationCatalog {
         Some((station, contract))
     }
 
+    #[allow(dead_code)]
     pub(crate) fn contact<'a>(
         &'a self,
         station_id: &str,
@@ -152,6 +153,7 @@ impl StationCatalog {
             .find(|contact| contact.id == contact_id)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn lore<'a>(&'a self, station_id: &str, lore_id: &str) -> Option<&'a LoreEntry> {
         self.station(station_id)?
             .lore_entries

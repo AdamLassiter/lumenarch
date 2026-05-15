@@ -6,7 +6,7 @@ use crate::{
     UI_HELP_FONT_SIZE,
     UI_PANEL_RADIUS,
     UI_TITLE_FONT_SIZE,
-    gameplay::helpers::gameplay_status_line,
+    helpers::gameplay_status_line,
     ship::ShipDefinition,
     state::{
         ControlsHelpPanel,

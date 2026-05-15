@@ -201,6 +201,7 @@ pub(crate) enum SessionRole {
 }
 
 #[derive(Resource, Clone, Default)]
+#[allow(dead_code)]
 pub(crate) struct SessionStatus {
     pub(crate) phase: SessionPhase,
     pub(crate) role: Option<SessionRole>,

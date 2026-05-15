@@ -13,7 +13,9 @@ use crate::{
             HostileWeaponState,
             Integrity,
             SimPosition,
+            SpaceBackdropLayer,
         },
+        effects::{SPACE_BACKDROP_FALLBACK_SEED, SpaceBackdropMaterial, SpaceBackdropUniform},
         helpers::{FixedVec2, Fx, angle_from_vector, render_translation},
     },
     state::{EncounterBackdrop, EncounterSpec, PlayingCleanup},
@@ -22,21 +24,35 @@ use crate::{
 /// Assembles the encounter arena backdrop, walls, and static threats so combat starts with a complete playspace.
 pub(crate) fn spawn_test_arena(
     commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    backdrop_materials: &mut Assets<SpaceBackdropMaterial>,
+    shaders_enabled: bool,
     balance: &BalanceConfig,
     encounter: &EncounterSpec,
     platform_hostile_count: u32,
 ) {
     let arena_width = ARENA_WIDTH_TILES as f32 * TILE_SIZE;
     let arena_height = ARENA_HEIGHT_TILES as f32 * TILE_SIZE;
-    let backdrop = backdrop_color(&encounter.arena_variant, &encounter.backdrop);
 
-    spawn_backdrop_layers(
-        commands,
-        arena_width,
-        arena_height,
-        &encounter.backdrop,
-        backdrop,
-    );
+    if shaders_enabled {
+        spawn_backdrop_layers(
+            commands,
+            meshes,
+            backdrop_materials,
+            arena_width,
+            arena_height,
+            &encounter.arena_variant,
+            &encounter.backdrop,
+        );
+    } else {
+        spawn_sprite_backdrop_layers(
+            commands,
+            arena_width,
+            arena_height,
+            &encounter.arena_variant,
+            &encounter.backdrop,
+        );
+    }
     spawn_arena_walls(commands, arena_width, arena_height);
     spawn_hostile_platforms(
         commands,
@@ -47,27 +63,67 @@ pub(crate) fn spawn_test_arena(
     );
 }
 
-fn backdrop_color(arena_variant: &str, backdrop: &EncounterBackdrop) -> Color {
+fn backdrop_base_color(arena_variant: &str, backdrop: &EncounterBackdrop) -> Vec4 {
     let [r, g, b] = backdrop.haze_tint;
-    match arena_variant {
-        "salvage" | "cache" => Color::srgb(r.max(0.08), g.max(0.11), b.max(0.10)),
-        "hostile" => Color::srgb(r.max(0.11), g.max(0.08), b.max(0.09)),
-        "unstable" | "storm" => Color::srgb(r.max(0.07), g.max(0.08), b.max(0.13)),
-        _ => Color::srgb(r.max(0.07), g.max(0.09), b.max(0.13)),
-    }
+    let [r, g, b] = match arena_variant {
+        "salvage" | "cache" => [r.max(0.08), g.max(0.11), b.max(0.10)],
+        "hostile" => [r.max(0.11), g.max(0.08), b.max(0.09)],
+        "unstable" | "storm" => [r.max(0.07), g.max(0.08), b.max(0.13)],
+        _ => [r.max(0.07), g.max(0.09), b.max(0.13)],
+    };
+    Vec4::new(r * 0.16, g * 0.12, b * 0.18, 1.0)
 }
 
 fn spawn_backdrop_layers(
     commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    backdrop_materials: &mut Assets<SpaceBackdropMaterial>,
     arena_width: f32,
     arena_height: f32,
+    arena_variant: &str,
     backdrop: &EncounterBackdrop,
-    base_color: Color,
+) {
+    let size = Vec2::new(arena_width * 1.72, arena_height * 1.72);
+    let mesh = meshes.add(Rectangle::new(size.x, size.y));
+    for (layer, depth, z, alpha) in [
+        (0.0, 0.035, -25.0, 1.0),
+        (1.0, 0.10 + backdrop.parallax_strength * 0.10, -24.8, 0.35),
+        (2.0, 0.18 + backdrop.parallax_strength * 0.18, -24.55, 0.48),
+    ] {
+        let translation = Vec3::new(0.0, 0.0, z);
+        commands.spawn((
+            Mesh2d(mesh.clone()),
+            MeshMaterial2d(backdrop_materials.add(SpaceBackdropMaterial {
+                params: space_backdrop_uniform(
+                    arena_variant,
+                    backdrop,
+                    Vec2::new(arena_width, arena_height),
+                    layer,
+                    alpha,
+                ),
+            })),
+            Transform::from_translation(translation),
+            ArenaBackdropLayer {
+                depth,
+                base_translation: translation,
+            },
+            SpaceBackdropLayer,
+            PlayingCleanup,
+        ));
+    }
+}
+
+fn spawn_sprite_backdrop_layers(
+    commands: &mut Commands,
+    arena_width: f32,
+    arena_height: f32,
+    arena_variant: &str,
+    backdrop: &EncounterBackdrop,
 ) {
     let bounds = Vec2::new(arena_width, arena_height);
     spawn_backdrop_sprite(
         commands,
-        base_color,
+        sprite_backdrop_color(arena_variant, backdrop),
         Vec2::new(arena_width * 1.4, arena_height * 1.4),
         Vec3::new(0.0, 0.0, -25.0),
         0.04,
@@ -191,6 +247,132 @@ fn spawn_backdrop_sprite(
     ));
 }
 
+fn sprite_backdrop_color(arena_variant: &str, backdrop: &EncounterBackdrop) -> Color {
+    let [r, g, b] = backdrop.haze_tint;
+    match arena_variant {
+        "salvage" | "cache" => Color::srgb(r.max(0.08), g.max(0.11), b.max(0.10)),
+        "hostile" => Color::srgb(r.max(0.11), g.max(0.08), b.max(0.09)),
+        "unstable" | "storm" => Color::srgb(r.max(0.07), g.max(0.08), b.max(0.13)),
+        _ => Color::srgb(r.max(0.07), g.max(0.09), b.max(0.13)),
+    }
+}
+
+fn space_backdrop_uniform(
+    arena_variant: &str,
+    backdrop: &EncounterBackdrop,
+    arena_size: Vec2,
+    layer: f32,
+    alpha: f32,
+) -> SpaceBackdropUniform {
+    SpaceBackdropUniform {
+        base_color: backdrop_base_color(arena_variant, backdrop),
+        haze_color: Vec4::new(
+            backdrop.haze_tint[0].clamp(0.0, 1.5),
+            backdrop.haze_tint[1].clamp(0.0, 1.5),
+            backdrop.haze_tint[2].clamp(0.0, 1.5),
+            1.0,
+        ),
+        galaxy_color: Vec4::new(
+            backdrop.galaxy_tint[0].clamp(0.0, 1.8),
+            backdrop.galaxy_tint[1].clamp(0.0, 1.8),
+            backdrop.galaxy_tint[2].clamp(0.0, 1.8),
+            1.0,
+        ),
+        arena_size,
+        camera_offset: Vec2::ZERO,
+        time: 0.0,
+        seed: backdrop_seed(backdrop),
+        star_density: (backdrop.star_density as f32 / 128.0).clamp(0.18, 1.8),
+        dust_density: (backdrop.dust_density as f32 / 72.0).clamp(0.12, 1.8),
+        galaxy_strength: backdrop.galaxy_arc_strength.clamp(0.0, 1.4),
+        parallax: backdrop.parallax_strength.clamp(0.0, 1.0),
+        layer,
+        alpha,
+    }
+}
+
+fn rand_unit(seed: &mut u64) -> f32 {
+    *seed = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    ((*seed >> 16) as u32) as f32 / u32::MAX as f32
+}
+
+fn rand_range(seed: &mut u64, min: f32, max: f32) -> f32 {
+    min + (max - min) * rand_unit(seed)
+}
+
+fn backdrop_seed(backdrop: &EncounterBackdrop) -> f32 {
+    if backdrop.seed == 0 {
+        SPACE_BACKDROP_FALLBACK_SEED
+    } else {
+        (backdrop.seed % 16_777_216) as f32
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn space_backdrop_uniform_uses_stable_fallback_seed() {
+        let backdrop = EncounterBackdrop {
+            seed: 0,
+            ..Default::default()
+        };
+        let uniform = space_backdrop_uniform("test", &backdrop, Vec2::new(640.0, 480.0), 1.0, 0.8);
+
+        assert_eq!(uniform.seed, SPACE_BACKDROP_FALLBACK_SEED);
+        assert_eq!(uniform.arena_size, Vec2::new(640.0, 480.0));
+        assert_eq!(uniform.layer, 1.0);
+        assert_eq!(uniform.alpha, 0.8);
+    }
+
+    #[test]
+    fn space_backdrop_uniform_clamps_extreme_density_and_strength() {
+        let backdrop = EncounterBackdrop {
+            seed: 99,
+            star_density: 10_000,
+            dust_density: 10_000,
+            parallax_strength: 5.0,
+            haze_tint: [2.0, -1.0, 0.5],
+            galaxy_tint: [3.0, 0.25, -2.0],
+            galaxy_arc_strength: 8.0,
+        };
+        let uniform =
+            space_backdrop_uniform("storm", &backdrop, Vec2::new(1200.0, 900.0), 2.0, 0.5);
+
+        assert_eq!(uniform.seed, 99.0);
+        assert_eq!(uniform.star_density, 1.8);
+        assert_eq!(uniform.dust_density, 1.8);
+        assert_eq!(uniform.galaxy_strength, 1.4);
+        assert_eq!(uniform.parallax, 1.0);
+        assert_eq!(uniform.haze_color, Vec4::new(1.5, 0.0, 0.5, 1.0));
+        assert_eq!(uniform.galaxy_color, Vec4::new(1.8, 0.25, 0.0, 1.0));
+    }
+
+    #[test]
+    fn space_backdrop_uniform_preserves_sector_palette_identity() {
+        let backdrop = EncounterBackdrop {
+            seed: 12_345,
+            star_density: 96,
+            dust_density: 48,
+            parallax_strength: 0.35,
+            haze_tint: [0.04, 0.05, 0.04],
+            galaxy_tint: [0.94, 0.46, 0.34],
+            galaxy_arc_strength: 0.64,
+        };
+        let hostile =
+            space_backdrop_uniform("hostile", &backdrop, Vec2::new(1000.0, 800.0), 0.0, 1.0);
+        let salvage =
+            space_backdrop_uniform("salvage", &backdrop, Vec2::new(1000.0, 800.0), 0.0, 1.0);
+
+        assert_eq!(hostile.seed, salvage.seed);
+        assert_eq!(hostile.galaxy_color, salvage.galaxy_color);
+        assert_ne!(hostile.base_color, salvage.base_color);
+    }
+}
+
 fn spawn_arena_walls(commands: &mut Commands, arena_width: f32, arena_height: f32) {
     let wall_thickness = 8.0;
     let half_w = arena_width * 0.5;
@@ -287,15 +469,4 @@ fn spawn_hostile_platforms(
             PlayingCleanup,
         ));
     }
-}
-
-fn rand_unit(seed: &mut u64) -> f32 {
-    *seed = seed
-        .wrapping_mul(6364136223846793005)
-        .wrapping_add(1442695040888963407);
-    ((*seed >> 16) as u32) as f32 / u32::MAX as f32
-}
-
-fn rand_range(seed: &mut u64, min: f32, max: f32) -> f32 {
-    min + (max - min) * rand_unit(seed)
 }

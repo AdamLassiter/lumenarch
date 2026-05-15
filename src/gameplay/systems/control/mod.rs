@@ -62,9 +62,11 @@ use super::super::{
         damp_scalar,
         damp_vec2,
         facing_vector,
+        fixed_square,
         fx_from_time_delta,
         render_translation,
         ship_grid_from_local_position,
+        wrap_angle_f32,
         wrap_radians,
     },
 };
@@ -75,7 +77,6 @@ use crate::{
 };
 
 mod camera;
-mod helpers;
 mod player;
 mod ship;
 

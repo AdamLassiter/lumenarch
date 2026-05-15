@@ -181,6 +181,9 @@ pub(crate) struct EnemyNewButton;
 pub(crate) struct EditorStatusText;
 
 #[derive(Component)]
+pub(crate) struct EnemyConfigReferencesText;
+
+#[derive(Component)]
 pub(crate) struct EditorMissionReportButton;
 
 #[derive(Component)]

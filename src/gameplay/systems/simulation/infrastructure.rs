@@ -8,6 +8,7 @@ use crate::{
             DestroyedModule,
             InfrastructureNetworkSummary,
             InfrastructureRouteKind,
+            InfrastructureServiceStatus,
             Integrity,
             JunctionCommandState,
             ModuleInfrastructureStatus,
@@ -26,7 +27,7 @@ use crate::{
             ValveCommandState,
             WeaponModule,
         },
-        helpers::{Fx, fx_from_time_delta},
+        helpers::{Fx, cardinal_neighbors, component_service_coords, fx_from_time_delta},
     },
     ship::{ModuleKind, ShipFoundationKind},
 };
@@ -39,13 +40,19 @@ struct ModuleSnapshot {
     grid_y: i32,
     power_draw: Option<i32>,
     producer_output: Option<i32>,
-    reactor_output: Option<crate::gameplay::helpers::Fx>,
+    reactor_output: Option<crate::helpers::Fx>,
     storage: Option<StorageSnapshot>,
     processor: bool,
     weapon_requires_ammo: bool,
     destroyed: bool,
     junction_open: Option<bool>,
     valve_open: Option<bool>,
+}
+
+#[derive(Clone, Copy)]
+struct AttachedNetwork {
+    id: u32,
+    service_coord: (i32, i32),
 }
 
 #[derive(Clone, Copy)]
@@ -338,11 +345,11 @@ fn build_infrastructure_state(
                 tile_count: members.len() as u32,
                 tiles: members.clone(),
                 attached_modules: Vec::new(),
-                supply: crate::gameplay::helpers::Fx::from_num(0),
-                demand: crate::gameplay::helpers::Fx::from_num(0),
-                reserve: crate::gameplay::helpers::Fx::from_num(0),
-                reserve_capacity: crate::gameplay::helpers::Fx::from_num(0),
-                flow: crate::gameplay::helpers::Fx::from_num(0),
+                supply: crate::helpers::Fx::from_num(0),
+                demand: crate::helpers::Fx::from_num(0),
+                reserve: crate::helpers::Fx::from_num(0),
+                reserve_capacity: crate::helpers::Fx::from_num(0),
+                flow: crate::helpers::Fx::from_num(0),
                 blockers: blocked_tiles.len() as u32,
             });
         }
@@ -351,23 +358,34 @@ fn build_infrastructure_state(
     let mut module_statuses = Vec::new();
     for module in &modules {
         let resource_networks = resource_networks_for_module(module, &tile_networks);
-        let power_network = if module_needs_or_produces_power(module) {
+        let power_attachment = if module_needs_or_produces_power(module) {
             attached_network(module, InfrastructureRouteKind::Power, &tile_networks)
         } else {
             None
         };
-        let duct_network = if matches!(module.kind, ModuleKind::O2Generator | ModuleKind::Cargo) {
+        let duct_attachment = if matches!(module.kind, ModuleKind::O2Generator | ModuleKind::Cargo)
+        {
             attached_network(module, InfrastructureRouteKind::OxygenDuct, &tile_networks)
         } else {
             None
         };
+        let power_network = power_attachment.map(|attachment| attachment.id);
+        let duct_network = duct_attachment.map(|attachment| attachment.id);
         let power_required = module.power_draw.is_some();
+        let service_statuses = service_statuses_for_module(
+            module,
+            power_attachment,
+            duct_attachment,
+            &resource_networks,
+            &route_tiles,
+            &blocked_tiles_by_kind,
+        );
 
-        for network_id in [power_network, duct_network]
-            .into_iter()
-            .flatten()
-            .chain(resource_networks.iter().map(|(_, network_id)| *network_id))
-        {
+        for network_id in [power_network, duct_network].into_iter().flatten().chain(
+            resource_networks
+                .iter()
+                .map(|(_, attachment)| attachment.id),
+        ) {
             if let Some(network) = networks.iter_mut().find(|network| network.id == network_id)
                 && !network.attached_modules.contains(&module.module_id)
             {
@@ -383,10 +401,10 @@ fn build_infrastructure_state(
             if let Some(output) = module.reactor_output {
                 network.supply += output;
             } else if let Some(output) = module.producer_output {
-                network.reserve_capacity += crate::gameplay::helpers::Fx::from_num(output);
+                network.reserve_capacity += crate::helpers::Fx::from_num(output);
             }
             if let Some(draw) = module.power_draw {
-                network.demand += crate::gameplay::helpers::Fx::from_num(draw);
+                network.demand += crate::helpers::Fx::from_num(draw);
             }
         }
 
@@ -397,7 +415,11 @@ fn build_infrastructure_state(
             kind: module.kind,
             power_network,
             duct_network,
-            resource_networks,
+            resource_networks: resource_networks
+                .iter()
+                .map(|(kind, attachment)| (*kind, attachment.id))
+                .collect(),
+            service_statuses,
             powered: !power_required,
             power_required,
             blocked_reason: None,
@@ -439,17 +461,15 @@ fn build_infrastructure_state(
                 .and_then(|id| networks.iter().find(|network| network.id == id))
                 .is_some_and(|network| {
                     network.supply + network.reserve >= network.demand
-                        && network.supply + network.reserve
-                            > crate::gameplay::helpers::Fx::from_num(0)
+                        && network.supply + network.reserve > crate::helpers::Fx::from_num(0)
                 });
-            if !status.powered {
-                status.blocked_reason = Some(if status.power_network.is_some() {
-                    "insufficient generation".to_string()
-                } else {
-                    "no wired power".to_string()
-                });
-            }
         }
+        refresh_service_blockers(status, &networks);
+        status.blocked_reason = status
+            .service_statuses
+            .iter()
+            .filter(|service| service.required)
+            .find_map(|service| service.blocked_reason.clone());
     }
 
     ShipInfrastructureState {
@@ -480,37 +500,164 @@ fn route_kind_for_foundation(kind: ShipFoundationKind) -> Option<InfrastructureR
     }
 }
 
-fn cardinal_neighbors((x, y): (i32, i32)) -> [(i32, i32); 4] {
-    [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
-}
-
 fn attached_network(
     module: &ModuleSnapshot,
     route_kind: InfrastructureRouteKind,
     tile_networks: &BTreeMap<(InfrastructureRouteKind, i32, i32), u32>,
-) -> Option<u32> {
-    [(module.grid_x, module.grid_y)]
+) -> Option<AttachedNetwork> {
+    component_service_coords((module.grid_x, module.grid_y))
         .into_iter()
-        .chain(cardinal_neighbors((module.grid_x, module.grid_y)))
-        .filter_map(|(x, y)| tile_networks.get(&(route_kind, x, y)).copied())
-        .min()
+        .filter_map(|(x, y)| {
+            tile_networks
+                .get(&(route_kind, x, y))
+                .copied()
+                .map(|id| AttachedNetwork {
+                    id,
+                    service_coord: (x, y),
+                })
+        })
+        .min_by_key(|attachment| {
+            (
+                attachment.id,
+                attachment.service_coord.0,
+                attachment.service_coord.1,
+            )
+        })
+}
+
+fn service_statuses_for_module(
+    module: &ModuleSnapshot,
+    power_attachment: Option<AttachedNetwork>,
+    duct_attachment: Option<AttachedNetwork>,
+    resource_networks: &[(ResourceKind, AttachedNetwork)],
+    route_tiles: &BTreeMap<(i32, i32), InfrastructureRouteKind>,
+    blocked_tiles_by_kind: &BTreeMap<InfrastructureRouteKind, BTreeSet<(i32, i32)>>,
+) -> Vec<InfrastructureServiceStatus> {
+    let mut services = Vec::new();
+    if module_needs_or_produces_power(module) {
+        let route_kind = InfrastructureRouteKind::Power;
+        services.push(InfrastructureServiceStatus {
+            route_kind,
+            network_id: power_attachment.map(|attachment| attachment.id),
+            service_coord: power_attachment.map(|attachment| attachment.service_coord),
+            required: module.power_draw.is_some(),
+            blocked_reason: blocked_service_reason(
+                module,
+                route_kind,
+                route_tiles,
+                blocked_tiles_by_kind,
+            ),
+        });
+    }
+    if matches!(module.kind, ModuleKind::O2Generator | ModuleKind::Cargo) {
+        let route_kind = InfrastructureRouteKind::OxygenDuct;
+        services.push(InfrastructureServiceStatus {
+            route_kind,
+            network_id: duct_attachment.map(|attachment| attachment.id),
+            service_coord: duct_attachment.map(|attachment| attachment.service_coord),
+            required: false,
+            blocked_reason: blocked_service_reason(
+                module,
+                route_kind,
+                route_tiles,
+                blocked_tiles_by_kind,
+            ),
+        });
+    }
+    for resource in compatible_resources(module) {
+        let route_kind = InfrastructureRouteKind::Resource(resource);
+        services.push(InfrastructureServiceStatus {
+            route_kind,
+            network_id: resource_networks
+                .iter()
+                .find_map(|(kind, attachment)| (*kind == resource).then_some(attachment.id)),
+            service_coord: resource_networks.iter().find_map(|(kind, attachment)| {
+                (*kind == resource).then_some(attachment.service_coord)
+            }),
+            required: required_resources(module).contains(&resource),
+            blocked_reason: blocked_service_reason(
+                module,
+                route_kind,
+                route_tiles,
+                blocked_tiles_by_kind,
+            ),
+        });
+    }
+    services
+}
+
+fn blocked_service_reason(
+    module: &ModuleSnapshot,
+    route_kind: InfrastructureRouteKind,
+    route_tiles: &BTreeMap<(i32, i32), InfrastructureRouteKind>,
+    blocked_tiles_by_kind: &BTreeMap<InfrastructureRouteKind, BTreeSet<(i32, i32)>>,
+) -> Option<String> {
+    let blocked_tiles = blocked_tiles_by_kind.get(&route_kind)?;
+    component_service_coords((module.grid_x, module.grid_y))
+        .into_iter()
+        .any(|coord| route_tiles.get(&coord) == Some(&route_kind) && blocked_tiles.contains(&coord))
+        .then(|| match route_kind {
+            InfrastructureRouteKind::Power => "closed junction".to_string(),
+            InfrastructureRouteKind::OxygenDuct | InfrastructureRouteKind::Resource(_) => {
+                "closed valve".to_string()
+            }
+        })
+}
+
+fn refresh_service_blockers(
+    status: &mut ModuleInfrastructureStatus,
+    networks: &[InfrastructureNetworkSummary],
+) {
+    for service in &mut status.service_statuses {
+        service.blocked_reason = match service.route_kind {
+            InfrastructureRouteKind::Power if service.required && !status.powered => {
+                service.blocked_reason.clone().or_else(|| {
+                    Some(if service.network_id.is_some() {
+                        "insufficient generation".to_string()
+                    } else {
+                        "no wired power".to_string()
+                    })
+                })
+            }
+            InfrastructureRouteKind::Resource(_) if service.required => {
+                if let Some(network_id) = service.network_id {
+                    if service.blocked_reason.is_some() {
+                        service.blocked_reason.clone()
+                    } else {
+                        let supply = networks
+                            .iter()
+                            .find(|network| network.id == network_id)
+                            .map(|network| network.supply)
+                            .unwrap_or(Fx::from_num(0));
+                        (supply <= Fx::from_num(0)).then(|| "insufficient supply".to_string())
+                    }
+                } else {
+                    service
+                        .blocked_reason
+                        .clone()
+                        .or_else(|| Some("no compatible resource".to_string()))
+                }
+            }
+            _ => service.blocked_reason.clone(),
+        };
+    }
 }
 
 fn resource_networks_for_module(
     module: &ModuleSnapshot,
     tile_networks: &BTreeMap<(InfrastructureRouteKind, i32, i32), u32>,
-) -> Vec<(ResourceKind, u32)> {
+) -> Vec<(ResourceKind, AttachedNetwork)> {
     let mut resources = Vec::new();
     for resource in compatible_resources(module) {
-        if let Some(network_id) = attached_network(
+        if let Some(attachment) = attached_network(
             module,
             InfrastructureRouteKind::Resource(resource),
             tile_networks,
         ) {
-            resources.push((resource, network_id));
+            resources.push((resource, attachment));
         }
     }
-    resources.sort();
+    resources.sort_by_key(|(kind, attachment)| (*kind, attachment.id, attachment.service_coord));
     resources
 }
 
@@ -549,18 +696,32 @@ fn compatible_resources(module: &ModuleSnapshot) -> Vec<ResourceKind> {
     resources
 }
 
+fn required_resources(module: &ModuleSnapshot) -> Vec<ResourceKind> {
+    let mut resources = Vec::new();
+    if module.kind == ModuleKind::Reactor {
+        resources.push(ResourceKind::Fuel);
+    }
+    if module.weapon_requires_ammo {
+        resources.push(ResourceKind::Ammunition);
+    }
+    if module.processor {
+        resources.push(ResourceKind::RawSalvage);
+    }
+    resources
+}
+
 fn add_resource_supply_and_demand(
     module: &ModuleSnapshot,
-    resource_networks: &[(ResourceKind, u32)],
+    resource_networks: &[(ResourceKind, AttachedNetwork)],
     networks: &mut [InfrastructureNetworkSummary],
 ) {
     let Some(storage) = module.storage else {
-        for (resource, network_id) in resource_networks {
+        for (resource, attachment) in resource_networks {
             if let Some(network) = networks
                 .iter_mut()
-                .find(|network| network.id == *network_id)
+                .find(|network| network.id == attachment.id)
             {
-                network.demand += crate::gameplay::helpers::Fx::from_num(match resource {
+                network.demand += crate::helpers::Fx::from_num(match resource {
                     ResourceKind::Fuel if module.kind == ModuleKind::Reactor => 1,
                     ResourceKind::Ammunition if module.weapon_requires_ammo => 1,
                     ResourceKind::RawSalvage if module.processor => 2,
@@ -571,12 +732,12 @@ fn add_resource_supply_and_demand(
         return;
     };
 
-    for (resource, network_id) in resource_networks {
+    for (resource, attachment) in resource_networks {
         if let Some(network) = networks
             .iter_mut()
-            .find(|network| network.id == *network_id)
+            .find(|network| network.id == attachment.id)
         {
-            network.supply += crate::gameplay::helpers::Fx::from_num(match resource {
+            network.supply += crate::helpers::Fx::from_num(match resource {
                 ResourceKind::RawSalvage => storage.raw_salvage,
                 ResourceKind::RepairCharge => storage.repair_charge,
                 ResourceKind::Fuel => storage.fuel,
@@ -597,5 +758,390 @@ fn implicit_power_draw(kind: ModuleKind) -> Option<i32> {
     match kind {
         ModuleKind::Cockpit | ModuleKind::Computer => Some(1),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::{ModuleSnapshot, StorageSnapshot, build_infrastructure_state};
+    use crate::{
+        gameplay::components::{InfrastructureRouteKind, ResourceKind},
+        helpers::Fx,
+        ship::ModuleKind,
+    };
+
+    fn module(module_id: u64, kind: ModuleKind, grid_x: i32, grid_y: i32) -> ModuleSnapshot {
+        ModuleSnapshot {
+            module_id,
+            kind,
+            grid_x,
+            grid_y,
+            power_draw: None,
+            producer_output: None,
+            reactor_output: None,
+            storage: None,
+            processor: false,
+            weapon_requires_ammo: false,
+            destroyed: false,
+            junction_open: None,
+            valve_open: None,
+        }
+    }
+
+    fn powered_turret(grid_x: i32, grid_y: i32) -> ModuleSnapshot {
+        ModuleSnapshot {
+            power_draw: Some(2),
+            weapon_requires_ammo: true,
+            ..module(1, ModuleKind::Turret, grid_x, grid_y)
+        }
+    }
+
+    fn reactor(module_id: u64, grid_x: i32, grid_y: i32) -> ModuleSnapshot {
+        ModuleSnapshot {
+            reactor_output: Some(Fx::from_num(10)),
+            ..module(module_id, ModuleKind::Reactor, grid_x, grid_y)
+        }
+    }
+
+    fn ammunition_storage(
+        module_id: u64,
+        grid_x: i32,
+        grid_y: i32,
+        ammunition: u32,
+    ) -> ModuleSnapshot {
+        ModuleSnapshot {
+            storage: Some(StorageSnapshot {
+                accepts_fuel: false,
+                accepts_ammunition: true,
+                accepts_general: false,
+                accepts_oxygen: false,
+                fuel: 0,
+                ammunition,
+                raw_salvage: 0,
+                repair_charge: 0,
+                oxygen: 0,
+            }),
+            ..module(module_id, ModuleKind::Cargo, grid_x, grid_y)
+        }
+    }
+
+    fn fuel_storage(module_id: u64, grid_x: i32, grid_y: i32, fuel: u32) -> ModuleSnapshot {
+        ModuleSnapshot {
+            storage: Some(StorageSnapshot {
+                accepts_fuel: true,
+                accepts_ammunition: false,
+                accepts_general: false,
+                accepts_oxygen: false,
+                fuel,
+                ammunition: 0,
+                raw_salvage: 0,
+                repair_charge: 0,
+                oxygen: 0,
+            }),
+            ..module(module_id, ModuleKind::Cargo, grid_x, grid_y)
+        }
+    }
+
+    fn state(
+        routes: &[((i32, i32), InfrastructureRouteKind)],
+        modules: Vec<ModuleSnapshot>,
+    ) -> crate::gameplay::components::ShipInfrastructureState {
+        build_infrastructure_state(
+            routes.iter().copied().collect::<BTreeMap<_, _>>(),
+            modules,
+            true,
+            &BTreeMap::new(),
+            Fx::from_num(0),
+        )
+    }
+
+    #[test]
+    fn turret_connects_to_power_under_and_ammunition_adjacent() {
+        let infrastructure = state(
+            &[
+                ((0, 0), InfrastructureRouteKind::Power),
+                (
+                    (1, 0),
+                    InfrastructureRouteKind::Resource(ResourceKind::Ammunition),
+                ),
+            ],
+            vec![
+                powered_turret(0, 0),
+                reactor(2, -1, 0),
+                ammunition_storage(3, 2, 0, 4),
+            ],
+        );
+
+        let turret = infrastructure.status_for_module(1).unwrap();
+        assert!(turret.powered);
+        assert!(turret.power_network.is_some());
+        assert_eq!(
+            turret
+                .service_statuses
+                .iter()
+                .find(|service| service.route_kind == InfrastructureRouteKind::Power)
+                .and_then(|service| service.service_coord),
+            Some((0, 0))
+        );
+        assert!(
+            turret
+                .network_for_resource(ResourceKind::Ammunition)
+                .is_some()
+        );
+        assert_eq!(
+            turret
+                .service_statuses
+                .iter()
+                .find(|service| {
+                    service.route_kind
+                        == InfrastructureRouteKind::Resource(ResourceKind::Ammunition)
+                })
+                .and_then(|service| service.service_coord),
+            Some((1, 0))
+        );
+        assert!(turret.blocked_reason.is_none());
+    }
+
+    #[test]
+    fn turret_connects_to_ammunition_under_and_power_adjacent() {
+        let infrastructure = state(
+            &[
+                (
+                    (0, 0),
+                    InfrastructureRouteKind::Resource(ResourceKind::Ammunition),
+                ),
+                ((1, 0), InfrastructureRouteKind::Power),
+            ],
+            vec![
+                powered_turret(0, 0),
+                reactor(2, 2, 0),
+                ammunition_storage(3, -1, 0, 4),
+            ],
+        );
+
+        let turret = infrastructure.status_for_module(1).unwrap();
+        assert!(turret.powered);
+        assert!(turret.power_network.is_some());
+        assert_eq!(
+            turret
+                .service_statuses
+                .iter()
+                .find(|service| service.route_kind == InfrastructureRouteKind::Power)
+                .and_then(|service| service.service_coord),
+            Some((1, 0))
+        );
+        assert!(
+            turret
+                .network_for_resource(ResourceKind::Ammunition)
+                .is_some()
+        );
+        assert_eq!(
+            turret
+                .service_statuses
+                .iter()
+                .find(|service| {
+                    service.route_kind
+                        == InfrastructureRouteKind::Resource(ResourceKind::Ammunition)
+                })
+                .and_then(|service| service.service_coord),
+            Some((0, 0))
+        );
+        assert!(turret.blocked_reason.is_none());
+    }
+
+    #[test]
+    fn turret_with_power_but_no_ammunition_reports_missing_resource() {
+        let infrastructure = state(
+            &[((0, 0), InfrastructureRouteKind::Power)],
+            vec![powered_turret(0, 0), reactor(2, 1, 0)],
+        );
+
+        let turret = infrastructure.status_for_module(1).unwrap();
+        assert!(turret.powered);
+        assert_eq!(
+            turret.blocked_reason.as_deref(),
+            Some("no compatible resource")
+        );
+    }
+
+    #[test]
+    fn turret_with_empty_ammunition_network_reports_insufficient_supply() {
+        let infrastructure = state(
+            &[
+                ((0, 0), InfrastructureRouteKind::Power),
+                (
+                    (1, 0),
+                    InfrastructureRouteKind::Resource(ResourceKind::Ammunition),
+                ),
+            ],
+            vec![
+                powered_turret(0, 0),
+                reactor(2, -1, 0),
+                ammunition_storage(3, 2, 0, 0),
+            ],
+        );
+
+        let turret = infrastructure.status_for_module(1).unwrap();
+        assert!(turret.powered);
+        assert_eq!(
+            turret.blocked_reason.as_deref(),
+            Some("insufficient supply")
+        );
+    }
+
+    #[test]
+    fn turret_with_ammunition_but_no_power_reports_no_wired_power() {
+        let infrastructure = state(
+            &[(
+                (1, 0),
+                InfrastructureRouteKind::Resource(ResourceKind::Ammunition),
+            )],
+            vec![powered_turret(0, 0), ammunition_storage(2, 2, 0, 4)],
+        );
+
+        let turret = infrastructure.status_for_module(1).unwrap();
+        assert!(!turret.powered);
+        assert_eq!(turret.blocked_reason.as_deref(), Some("no wired power"));
+    }
+
+    #[test]
+    fn diagonal_routes_do_not_attach_to_component_service_ports() {
+        let infrastructure = state(
+            &[
+                ((1, 1), InfrastructureRouteKind::Power),
+                (
+                    (-1, -1),
+                    InfrastructureRouteKind::Resource(ResourceKind::Ammunition),
+                ),
+            ],
+            vec![
+                powered_turret(0, 0),
+                reactor(2, 1, 2),
+                ammunition_storage(3, -1, -2, 4),
+            ],
+        );
+
+        let turret = infrastructure.status_for_module(1).unwrap();
+        assert!(turret.power_network.is_none());
+        assert!(
+            turret
+                .service_statuses
+                .iter()
+                .all(|service| service.service_coord.is_none())
+        );
+        assert!(
+            turret
+                .network_for_resource(ResourceKind::Ammunition)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn different_route_kinds_do_not_merge_in_adjacent_service_area() {
+        let infrastructure = state(
+            &[
+                ((0, 0), InfrastructureRouteKind::Power),
+                (
+                    (1, 0),
+                    InfrastructureRouteKind::Resource(ResourceKind::Ammunition),
+                ),
+            ],
+            vec![
+                powered_turret(0, 0),
+                reactor(2, -1, 0),
+                ammunition_storage(3, 2, 0, 4),
+            ],
+        );
+
+        let power_network = infrastructure
+            .networks
+            .iter()
+            .find(|network| network.kind == Some(InfrastructureRouteKind::Power))
+            .unwrap();
+        let ammo_network = infrastructure
+            .networks
+            .iter()
+            .find(|network| {
+                network.kind == Some(InfrastructureRouteKind::Resource(ResourceKind::Ammunition))
+            })
+            .unwrap();
+        assert_ne!(power_network.id, ammo_network.id);
+        assert_eq!(power_network.tile_count, 1);
+        assert_eq!(ammo_network.tile_count, 1);
+    }
+
+    #[test]
+    fn reactor_can_inject_power_and_consume_adjacent_fuel() {
+        let infrastructure = state(
+            &[
+                ((0, 0), InfrastructureRouteKind::Power),
+                (
+                    (1, 0),
+                    InfrastructureRouteKind::Resource(ResourceKind::Fuel),
+                ),
+            ],
+            vec![reactor(1, 0, 0), fuel_storage(2, 2, 0, 3)],
+        );
+
+        let reactor = infrastructure.status_for_module(1).unwrap();
+        assert!(reactor.power_network.is_some());
+        assert!(reactor.network_for_resource(ResourceKind::Fuel).is_some());
+        assert!(reactor.blocked_reason.is_none());
+    }
+
+    #[test]
+    fn closed_adjacent_junction_breaks_power_without_breaking_ammunition() {
+        let mut junction = module(4, ModuleKind::JunctionBox, 1, 0);
+        junction.junction_open = Some(false);
+        let infrastructure = state(
+            &[
+                ((1, 0), InfrastructureRouteKind::Power),
+                (
+                    (0, 0),
+                    InfrastructureRouteKind::Resource(ResourceKind::Ammunition),
+                ),
+            ],
+            vec![
+                powered_turret(0, 0),
+                reactor(2, 2, 0),
+                ammunition_storage(3, -1, 0, 4),
+                junction,
+            ],
+        );
+
+        let turret = infrastructure.status_for_module(1).unwrap();
+        assert_eq!(turret.blocked_reason.as_deref(), Some("closed junction"));
+        assert!(
+            turret
+                .network_for_resource(ResourceKind::Ammunition)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn closed_adjacent_valve_breaks_ammunition_without_breaking_power() {
+        let mut valve = module(4, ModuleKind::Valve, 1, 0);
+        valve.valve_open = Some(false);
+        let infrastructure = state(
+            &[
+                ((0, 0), InfrastructureRouteKind::Power),
+                (
+                    (1, 0),
+                    InfrastructureRouteKind::Resource(ResourceKind::Ammunition),
+                ),
+            ],
+            vec![
+                powered_turret(0, 0),
+                reactor(2, -1, 0),
+                ammunition_storage(3, 2, 0, 4),
+                valve,
+            ],
+        );
+
+        let turret = infrastructure.status_for_module(1).unwrap();
+        assert!(turret.powered);
+        assert_eq!(turret.blocked_reason.as_deref(), Some("closed valve"));
     }
 }

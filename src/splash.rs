@@ -1,15 +1,21 @@
 use bevy::prelude::*;
 
-use crate::state::{SplashRoot, SplashScreenState};
+use crate::state::{FrontendMode, SplashRoot, SplashScreenState};
 
 /// Returns whether the splash screen should currently exist in the UI world.
-pub(crate) fn splash_active(splash_state: Res<SplashScreenState>) -> bool {
-    splash_state.active
+pub(crate) fn splash_active(
+    splash_state: Res<SplashScreenState>,
+    frontend_mode: Res<State<FrontendMode>>,
+) -> bool {
+    splash_state.active && *frontend_mode.get() != FrontendMode::DebugEnemyEditor
 }
 
 /// Returns whether splash UI entities should be cleaned up because the splash is done.
-pub(crate) fn splash_inactive(splash_state: Res<SplashScreenState>) -> bool {
-    !splash_state.active
+pub(crate) fn splash_inactive(
+    splash_state: Res<SplashScreenState>,
+    frontend_mode: Res<State<FrontendMode>>,
+) -> bool {
+    !splash_state.active || *frontend_mode.get() == FrontendMode::DebugEnemyEditor
 }
 
 /// Spawns the splash image layer so the game has a branded backdrop during early frontend flow.
@@ -52,10 +58,15 @@ pub(crate) fn spawn_splash_ui(
 pub(crate) fn cleanup_splash_ui(
     mut commands: Commands,
     query: Query<Entity, With<SplashRoot>>,
-    splash_state: Res<SplashScreenState>,
+    mut splash_state: ResMut<SplashScreenState>,
+    frontend_mode: Res<State<FrontendMode>>,
 ) {
-    if splash_state.active {
+    if splash_state.active && *frontend_mode.get() != FrontendMode::DebugEnemyEditor {
         return;
+    }
+    if *frontend_mode.get() == FrontendMode::DebugEnemyEditor {
+        splash_state.active = false;
+        splash_state.remaining_seconds = 0.0;
     }
 
     for entity in &query {

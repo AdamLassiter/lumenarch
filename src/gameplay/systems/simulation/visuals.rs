@@ -8,15 +8,21 @@ use crate::{
     gameplay::{
         components::{
             ArenaBackdropLayer,
+            BatteryPulseOverlay,
             CurrentStation,
+            DecompressionAirLinesOverlay,
             DestroyedModule,
+            ElectricalArcOverlay,
             EngineFlameOverlay,
             EquippedSuit,
             EvaThrusterOverlay,
+            FabricatorDustOverlay,
+            HeatFlameOverlay,
             HeldInteraction,
             InfrastructureRouteKind,
             Integrity,
             InteractionKind,
+            LinearVelocity,
             ManipulatorModule,
             ModuleCondition,
             ModuleFieldEmitter,
@@ -29,23 +35,41 @@ use crate::{
             PlayerReferenceFrame,
             PlayerShip,
             PlayerSuit,
+            ProcessorModule,
             ReactorCommandState,
             ReactorGlowOverlay,
             ResourceKind,
             RuntimeFoundationVisual,
             RuntimeShipModule,
+            ServiceLinkOverlay,
+            ShipAtmosphereState,
             ShipControlState,
             ShipInfrastructureState,
             ShipPowerState,
             ShipRoot,
+            ShipSpeedLinesOverlay,
             ShipboardPlayer,
             SimPosition,
             SimRotation,
+            SpaceBackdropLayer,
             TurretCommandState,
+            TurretFlashOverlay,
+            TurretFlashPulse,
             TurretTopSprite,
         },
-        effects::{EngineFlameMaterial, ReactorGlowMaterial},
-        helpers::{Fx, module_condition},
+        effects::{
+            AirLinesMaterial,
+            BatteryPulseMaterial,
+            ElectricArcsMaterial,
+            EngineFlameMaterial,
+            FabricatorDustMaterial,
+            ReactorGlowMaterial,
+            SmallFlamesMaterial,
+            SpaceBackdropMaterial,
+            SpeedLinesMaterial,
+            TurretFlashMaterial,
+        },
+        helpers::{Fx, component_service_coords, module_condition},
     },
     ship::ModuleKind,
     state::GameplayInfoPanelMode,
@@ -277,6 +301,20 @@ fn draw_tubes_overlay(
             } else {
                 Color::srgba(0.72, 0.80, 0.90, 0.42)
             };
+            if status.power_required || !status.service_statuses.is_empty() {
+                for coord in
+                    component_service_coords((runtime_module.grid_x, runtime_module.grid_y))
+                {
+                    let center =
+                        ship_grid_to_world(coord, grid_origin, ship_position, ship_rotation)
+                            .to_vec2();
+                    gizmos.rect_2d(
+                        center,
+                        Vec2::splat(TILE_SIZE * 0.88),
+                        Color::srgba(0.82, 0.92, 1.0, 0.18),
+                    );
+                }
+            }
             gizmos.circle_2d(world.to_vec2(), TILE_SIZE * 0.34, color);
         }
     }
@@ -293,31 +331,29 @@ fn ship_grid_origin(
         Option<&TurretCommandState>,
         Option<&DestroyedModule>,
     )>,
-) -> crate::gameplay::helpers::FixedVec2 {
+) -> crate::helpers::FixedVec2 {
     module_query
         .iter()
         .find_map(|(_, parent, runtime_module, _, _, _, _)| {
             (parent.get() == ship_entity).then(|| {
                 runtime_module.local_position
-                    - crate::gameplay::helpers::FixedVec2::from_num(
+                    - crate::helpers::FixedVec2::from_num(
                         runtime_module.grid_x * TILE_SIZE as i32,
                         -runtime_module.grid_y * TILE_SIZE as i32,
                     )
             })
         })
-        .unwrap_or_else(crate::gameplay::helpers::FixedVec2::zero)
+        .unwrap_or_else(crate::helpers::FixedVec2::zero)
 }
 
 fn ship_grid_to_world(
     (grid_x, grid_y): (i32, i32),
-    grid_origin: crate::gameplay::helpers::FixedVec2,
+    grid_origin: crate::helpers::FixedVec2,
     ship_position: &SimPosition,
     ship_rotation: &SimRotation,
-) -> crate::gameplay::helpers::FixedVec2 {
-    let local = crate::gameplay::helpers::FixedVec2::from_num(
-        grid_x * TILE_SIZE as i32,
-        -grid_y * TILE_SIZE as i32,
-    );
+) -> crate::helpers::FixedVec2 {
+    let local =
+        crate::helpers::FixedVec2::from_num(grid_x * TILE_SIZE as i32, -grid_y * TILE_SIZE as i32);
     ship_position.value + (grid_origin + local).rotate(ship_rotation.radians)
 }
 
@@ -439,19 +475,9 @@ pub(crate) fn update_destroyed_module_visuals(
         }
 
         *visibility = Visibility::Visible;
-        let hot =
-            runtime_state.current_heat >= Fx::from_num(balance.fields.degraded_heat_threshold);
-        let electrical = runtime_state.electrical_instability
-            >= Fx::from_num(balance.fields.degraded_electrical_threshold);
         sprite.color = match condition {
             ModuleCondition::Healthy => Color::WHITE,
-            ModuleCondition::Degraded if hot && electrical => Color::srgb(0.96, 0.52, 0.90),
-            ModuleCondition::Degraded if hot => Color::srgb(1.0, 0.80, 0.34),
-            ModuleCondition::Degraded if electrical => Color::srgb(0.42, 0.86, 1.0),
-            ModuleCondition::Degraded => Color::srgb(1.0, 0.88, 0.44),
-            ModuleCondition::Disabled if hot && electrical => Color::srgb(0.88, 0.22, 0.72),
-            ModuleCondition::Disabled if hot => Color::srgb(0.96, 0.50, 0.22),
-            ModuleCondition::Disabled if electrical => Color::srgb(0.18, 0.72, 0.96),
+            ModuleCondition::Degraded => Color::WHITE,
             ModuleCondition::Disabled => Color::srgb(0.96, 0.50, 0.22),
             ModuleCondition::Destroyed => Color::WHITE,
         };
@@ -465,9 +491,7 @@ pub(crate) fn update_destroyed_module_visuals(
         ) {
             sprite.color = match condition {
                 ModuleCondition::Healthy => Color::WHITE,
-                ModuleCondition::Degraded if electrical => Color::srgb(0.62, 0.88, 0.98),
-                ModuleCondition::Degraded => Color::srgb(0.98, 0.78, 0.62),
-                ModuleCondition::Disabled if electrical => Color::srgb(0.44, 0.72, 0.92),
+                ModuleCondition::Degraded => Color::WHITE,
                 ModuleCondition::Disabled => Color::srgb(0.88, 0.48, 0.32),
                 ModuleCondition::Destroyed => Color::WHITE,
             };
@@ -602,6 +626,593 @@ pub(crate) fn sync_engine_flame_visuals(
         }
         transform.scale = Vec3::new(1.0, 0.92 + engine_alpha * 1.34, 1.0);
     }
+}
+
+/// Draws subtle gameplay service links from modules to their connected service-port route tiles.
+pub(crate) fn sync_service_link_visuals(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    ship_query: Query<&ShipInfrastructureState, With<ShipRoot>>,
+    module_query: Query<(
+        Entity,
+        &ChildOf,
+        &RuntimeShipModule,
+        Option<&DestroyedModule>,
+    )>,
+    mut link_query: Query<(
+        &ChildOf,
+        &ServiceLinkOverlay,
+        &mut Sprite,
+        &mut Transform,
+        &mut Visibility,
+    )>,
+) {
+    for (_, _, _, _, mut visibility) in &mut link_query {
+        *visibility = Visibility::Hidden;
+    }
+
+    for (entity, parent, runtime_module, destroyed) in &module_query {
+        if destroyed.is_some() {
+            continue;
+        }
+        let Ok(infrastructure) = ship_query.get(parent.get()) else {
+            continue;
+        };
+        let Some(status) = infrastructure.status_for_module(runtime_module.module_id) else {
+            continue;
+        };
+        for service in &status.service_statuses {
+            let Some(service_coord) = service.service_coord else {
+                continue;
+            };
+            if !service_link_should_draw(service, destroyed.is_some()) {
+                continue;
+            }
+            let delta = Vec2::new(
+                (service_coord.0 - runtime_module.grid_x) as f32 * TILE_SIZE,
+                -((service_coord.1 - runtime_module.grid_y) as f32) * TILE_SIZE,
+            );
+            let direction = if delta.length_squared() <= 0.01 {
+                Vec2::Y
+            } else {
+                delta.normalize()
+            };
+            let length = if delta.length_squared() <= 0.01 {
+                TILE_SIZE * 0.34
+            } else {
+                TILE_SIZE * 0.58
+            };
+            let midpoint = direction * (length * 0.5);
+            let tint = tube_color(service.route_kind).with_alpha(0.36);
+            let mut found = false;
+            for (link_parent, link, mut sprite, mut transform, mut visibility) in &mut link_query {
+                if link_parent.get() != entity || link.route_kind != service.route_kind {
+                    continue;
+                }
+                sprite.color = tint;
+                sprite.custom_size = Some(Vec2::new(8.0, length));
+                transform.translation = Vec3::new(midpoint.x, midpoint.y, 0.31);
+                transform.rotation = Quat::from_rotation_z(
+                    direction.y.atan2(direction.x) - std::f32::consts::FRAC_PI_2,
+                );
+                *visibility = Visibility::Visible;
+                found = true;
+                break;
+            }
+            if !found {
+                let route_kind = service.route_kind;
+                commands.entity(entity).with_children(|parent| {
+                    parent.spawn((
+                        Sprite {
+                            color: tint,
+                            custom_size: Some(Vec2::new(8.0, length)),
+                            ..Sprite::from_image(asset_server.load("tiles/service_link.png"))
+                        },
+                        Transform {
+                            translation: Vec3::new(midpoint.x, midpoint.y, 0.31),
+                            rotation: Quat::from_rotation_z(
+                                direction.y.atan2(direction.x) - std::f32::consts::FRAC_PI_2,
+                            ),
+                            ..default()
+                        },
+                        Visibility::Visible,
+                        ServiceLinkOverlay { route_kind },
+                    ));
+                });
+            }
+        }
+    }
+}
+
+/// Lazily creates shader-backed module overlays for transient and hazard presentation effects.
+pub(crate) fn spawn_missing_effect_overlays(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut overlay_mesh: Local<Option<Handle<Mesh>>>,
+    mut turret_materials: ResMut<Assets<TurretFlashMaterial>>,
+    mut battery_materials: ResMut<Assets<BatteryPulseMaterial>>,
+    mut dust_materials: ResMut<Assets<FabricatorDustMaterial>>,
+    mut arc_materials: ResMut<Assets<ElectricArcsMaterial>>,
+    mut flame_materials: ResMut<Assets<SmallFlamesMaterial>>,
+    module_query: Query<(Entity, &RuntimeShipModule, Option<&Children>)>,
+    turret_flash_query: Query<&ChildOf, With<TurretFlashOverlay>>,
+    battery_query: Query<&ChildOf, With<BatteryPulseOverlay>>,
+    dust_query: Query<&ChildOf, With<FabricatorDustOverlay>>,
+    arc_query: Query<&ChildOf, With<ElectricalArcOverlay>>,
+    flame_query: Query<&ChildOf, With<HeatFlameOverlay>>,
+) {
+    let mesh = overlay_mesh
+        .get_or_insert_with(|| meshes.add(Rectangle::new(TILE_SIZE * 0.92, TILE_SIZE * 0.92)))
+        .clone();
+    for (entity, runtime_module, _children) in &module_query {
+        if runtime_module.kind == ModuleKind::Turret
+            && !turret_flash_query
+                .iter()
+                .any(|parent| parent.get() == entity)
+        {
+            commands.entity(entity).with_children(|parent| {
+                parent.spawn((
+                    Mesh2d(mesh.clone()),
+                    MeshMaterial2d(turret_materials.add(TurretFlashMaterial::default())),
+                    Transform::from_xyz(0.0, -TILE_SIZE * 0.34, 0.34),
+                    Visibility::Hidden,
+                    TurretFlashOverlay,
+                ));
+            });
+        }
+        if runtime_module.kind == ModuleKind::Battery
+            && !battery_query.iter().any(|parent| parent.get() == entity)
+        {
+            commands.entity(entity).with_children(|parent| {
+                parent.spawn((
+                    Mesh2d(mesh.clone()),
+                    MeshMaterial2d(battery_materials.add(BatteryPulseMaterial::default())),
+                    Transform::from_xyz(0.0, 0.0, 0.19),
+                    Visibility::Hidden,
+                    BatteryPulseOverlay,
+                ));
+            });
+        }
+        if runtime_module.kind == ModuleKind::Processor
+            && !dust_query.iter().any(|parent| parent.get() == entity)
+        {
+            commands.entity(entity).with_children(|parent| {
+                parent.spawn((
+                    Mesh2d(mesh.clone()),
+                    MeshMaterial2d(dust_materials.add(FabricatorDustMaterial::default())),
+                    Transform::from_xyz(0.0, 0.0, 0.28),
+                    Visibility::Hidden,
+                    FabricatorDustOverlay,
+                ));
+            });
+        }
+        if !arc_query.iter().any(|parent| parent.get() == entity) {
+            commands.entity(entity).with_children(|parent| {
+                parent.spawn((
+                    Mesh2d(mesh.clone()),
+                    MeshMaterial2d(arc_materials.add(ElectricArcsMaterial::default())),
+                    Transform::from_xyz(0.0, 0.0, 0.33),
+                    Visibility::Hidden,
+                    ElectricalArcOverlay,
+                ));
+            });
+        }
+        if !flame_query.iter().any(|parent| parent.get() == entity) {
+            commands.entity(entity).with_children(|parent| {
+                parent.spawn((
+                    Mesh2d(mesh.clone()),
+                    MeshMaterial2d(flame_materials.add(SmallFlamesMaterial::default())),
+                    Transform::from_xyz(0.0, 0.0, 0.32),
+                    Visibility::Hidden,
+                    HeatFlameOverlay,
+                ));
+            });
+        }
+    }
+}
+
+/// Drives turret muzzle flashes from the short-lived pulse stamped when a projectile is fired.
+pub(crate) fn sync_turret_flash_visuals(
+    time: Res<Time>,
+    mut flash_materials: ResMut<Assets<TurretFlashMaterial>>,
+    mut module_query: Query<(
+        &RuntimeShipModule,
+        Option<&DestroyedModule>,
+        Option<&mut TurretFlashPulse>,
+    )>,
+    mut flash_query: Query<(
+        &ChildOf,
+        &MeshMaterial2d<TurretFlashMaterial>,
+        &mut Visibility,
+        &mut Transform,
+    )>,
+) {
+    let dt = Fx::from_num(time.delta_secs());
+    for (parent, material_handle, mut visibility, mut transform) in &mut flash_query {
+        let Ok((runtime_module, destroyed, pulse)) = module_query.get_mut(parent.get()) else {
+            *visibility = Visibility::Hidden;
+            continue;
+        };
+        let Some(mut pulse) = pulse else {
+            *visibility = Visibility::Hidden;
+            continue;
+        };
+        if destroyed.is_some() || pulse.remaining <= Fx::from_num(0) {
+            *visibility = Visibility::Hidden;
+            pulse.remaining = Fx::from_num(0);
+            continue;
+        }
+        pulse.remaining = (pulse.remaining - dt).max(Fx::from_num(0));
+        let intensity = if pulse.duration > Fx::from_num(0) {
+            (pulse.remaining / pulse.duration)
+                .clamp(Fx::from_num(0), Fx::from_num(1))
+                .to_num::<f32>()
+        } else {
+            0.0
+        };
+        if let Some(material) = flash_materials.get_mut(&material_handle.0) {
+            material.params.time = time.elapsed_secs_wrapped();
+            material.params.primary_color = Vec4::new(1.0, 0.82, 0.34, 1.0);
+            material.params.secondary_color = Vec4::new(1.0, 0.30, 0.12, 1.0);
+            material.params.intensity = intensity;
+            material.params.alpha = 0.86 * intensity;
+        }
+        transform.translation.y = -TILE_SIZE * 0.28;
+        transform.scale = Vec3::splat(0.72 + intensity * 0.54);
+        transform.rotation = Quat::from_rotation_z(
+            -(runtime_module.rotation_quadrants as f32) * std::f32::consts::FRAC_PI_2,
+        );
+        *visibility = Visibility::Visible;
+    }
+}
+
+/// Pulses batteries according to reserve level and local network flow so stored power feels alive.
+pub(crate) fn sync_battery_pulse_visuals(
+    time: Res<Time>,
+    ship_query: Query<&ShipInfrastructureState, With<ShipRoot>>,
+    mut battery_materials: ResMut<Assets<BatteryPulseMaterial>>,
+    module_query: Query<(&ChildOf, &RuntimeShipModule, Option<&DestroyedModule>)>,
+    mut battery_query: Query<(
+        &ChildOf,
+        &MeshMaterial2d<BatteryPulseMaterial>,
+        &mut Visibility,
+        &mut Transform,
+    )>,
+) {
+    for (parent, material_handle, mut visibility, mut transform) in &mut battery_query {
+        let Ok((ship_parent, runtime_module, destroyed)) = module_query.get(parent.get()) else {
+            *visibility = Visibility::Hidden;
+            continue;
+        };
+        if destroyed.is_some() || runtime_module.kind != ModuleKind::Battery {
+            *visibility = Visibility::Hidden;
+            continue;
+        }
+        let Ok(infrastructure) = ship_query.get(ship_parent.get()) else {
+            *visibility = Visibility::Hidden;
+            continue;
+        };
+        let Some(status) = infrastructure.status_for_module(runtime_module.module_id) else {
+            *visibility = Visibility::Hidden;
+            continue;
+        };
+        let Some(network) = status
+            .power_network
+            .and_then(|id| infrastructure.network(id))
+        else {
+            *visibility = Visibility::Hidden;
+            continue;
+        };
+        let reserve_ratio = if network.reserve_capacity > Fx::from_num(0) {
+            (network.reserve / network.reserve_capacity)
+                .clamp(Fx::from_num(0), Fx::from_num(1))
+                .to_num::<f32>()
+        } else {
+            0.0
+        };
+        let flow_ratio = if network.demand > Fx::from_num(0) {
+            (network.flow / network.demand)
+                .clamp(Fx::from_num(0), Fx::from_num(1))
+                .to_num::<f32>()
+        } else {
+            0.0
+        };
+        let intensity = (reserve_ratio * 0.72 + flow_ratio * 0.28).clamp(0.0, 1.0);
+        if intensity <= 0.02 {
+            *visibility = Visibility::Hidden;
+            continue;
+        }
+        if let Some(material) = battery_materials.get_mut(&material_handle.0) {
+            material.params.time = time.elapsed_secs_wrapped();
+            material.params.primary_color = Vec4::new(0.38, 0.96, 0.72, 1.0);
+            material.params.secondary_color = Vec4::new(0.10, 0.42, 0.30, 1.0);
+            material.params.intensity = intensity;
+            material.params.alpha = 0.18 + intensity * 0.38;
+        }
+        transform.scale = Vec3::splat(0.86 + intensity * 0.20);
+        *visibility = Visibility::Visible;
+    }
+}
+
+/// Shows fabricator dust and smoke while processors are actively converting routed material.
+pub(crate) fn sync_fabricator_dust_visuals(
+    time: Res<Time>,
+    mut dust_materials: ResMut<Assets<FabricatorDustMaterial>>,
+    module_query: Query<(
+        &RuntimeShipModule,
+        &ProcessorModule,
+        Option<&DestroyedModule>,
+    )>,
+    mut dust_query: Query<(
+        &ChildOf,
+        &MeshMaterial2d<FabricatorDustMaterial>,
+        &mut Visibility,
+        &mut Transform,
+    )>,
+) {
+    for (parent, material_handle, mut visibility, mut transform) in &mut dust_query {
+        let Ok((runtime_module, processor, destroyed)) = module_query.get(parent.get()) else {
+            *visibility = Visibility::Hidden;
+            continue;
+        };
+        if destroyed.is_some() || runtime_module.kind != ModuleKind::Processor || !processor.active
+        {
+            *visibility = Visibility::Hidden;
+            continue;
+        }
+        let progress = (processor.progress / processor.duration.max(Fx::from_num(1)))
+            .clamp(Fx::from_num(0), Fx::from_num(1))
+            .to_num::<f32>();
+        if let Some(material) = dust_materials.get_mut(&material_handle.0) {
+            material.params.time = time.elapsed_secs_wrapped();
+            material.params.primary_color = Vec4::new(0.78, 0.72, 0.62, 1.0);
+            material.params.secondary_color = Vec4::new(0.34, 0.32, 0.30, 1.0);
+            material.params.intensity = 0.45 + progress * 0.55;
+            material.params.alpha = 0.28 + progress * 0.24;
+        }
+        transform.scale = Vec3::splat(0.92 + progress * 0.18);
+        *visibility = Visibility::Visible;
+    }
+}
+
+/// Replaces flat hazard tinting with heat flames and electrical arc overlays on live modules.
+/// SAFETY: Arc and flame overlays are separate child entities, but both mutate `Visibility`;
+/// `ParamSet` keeps the two overlay passes disjoint at runtime while still allowing modules to have both effects.
+pub(crate) fn sync_hazard_effect_visuals(
+    time: Res<Time>,
+    balance: Res<BalanceConfig>,
+    mut arc_materials: ResMut<Assets<ElectricArcsMaterial>>,
+    mut flame_materials: ResMut<Assets<SmallFlamesMaterial>>,
+    module_query: Query<(
+        &RuntimeShipModule,
+        &ModuleRuntimeState,
+        Option<&DestroyedModule>,
+    )>,
+    mut overlay_queries: ParamSet<(
+        Query<(
+            &ChildOf,
+            &MeshMaterial2d<ElectricArcsMaterial>,
+            &mut Visibility,
+        )>,
+        Query<(
+            &ChildOf,
+            &MeshMaterial2d<SmallFlamesMaterial>,
+            &mut Visibility,
+        )>,
+    )>,
+) {
+    for (parent, material_handle, mut visibility) in &mut overlay_queries.p0() {
+        let Ok((_runtime_module, runtime_state, destroyed)) = module_query.get(parent.get()) else {
+            *visibility = Visibility::Hidden;
+            continue;
+        };
+        if destroyed.is_some() {
+            *visibility = Visibility::Hidden;
+            continue;
+        }
+        let intensity = hazard_intensity(
+            runtime_state.electrical_instability,
+            Fx::from_num(balance.fields.degraded_electrical_threshold),
+            Fx::from_num(12),
+        );
+        if intensity <= 0.01 {
+            *visibility = Visibility::Hidden;
+            continue;
+        }
+        if let Some(material) = arc_materials.get_mut(&material_handle.0) {
+            material.params.time = time.elapsed_secs_wrapped();
+            material.params.primary_color = Vec4::new(0.54, 0.92, 1.0, 1.0);
+            material.params.secondary_color = Vec4::new(0.16, 0.28, 1.0, 1.0);
+            material.params.intensity = intensity;
+            material.params.alpha = 0.22 + intensity * 0.48;
+        }
+        *visibility = Visibility::Visible;
+    }
+
+    for (parent, material_handle, mut visibility) in &mut overlay_queries.p1() {
+        let Ok((_runtime_module, runtime_state, destroyed)) = module_query.get(parent.get()) else {
+            *visibility = Visibility::Hidden;
+            continue;
+        };
+        if destroyed.is_some() {
+            *visibility = Visibility::Hidden;
+            continue;
+        }
+        let intensity = hazard_intensity(
+            runtime_state.current_heat,
+            Fx::from_num(balance.fields.degraded_heat_threshold),
+            Fx::from_num(16),
+        );
+        if intensity <= 0.01 {
+            *visibility = Visibility::Hidden;
+            continue;
+        }
+        if let Some(material) = flame_materials.get_mut(&material_handle.0) {
+            material.params.time = time.elapsed_secs_wrapped();
+            material.params.primary_color = Vec4::new(1.0, 0.54, 0.16, 1.0);
+            material.params.secondary_color = Vec4::new(0.84, 0.12, 0.05, 1.0);
+            material.params.intensity = intensity;
+            material.params.alpha = 0.20 + intensity * 0.46;
+        }
+        *visibility = Visibility::Visible;
+    }
+}
+
+/// Lazily creates and syncs ship-space decompression air lines and movement speed lines.
+/// SAFETY: Air-line and speed-line overlays are distinct child entities, but both mutate
+/// `Visibility` and `Transform`; `ParamSet` serializes those passes so Bevy never aliases them.
+pub(crate) fn sync_ship_environment_effect_visuals(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut overlay_mesh: Local<Option<Handle<Mesh>>>,
+    mut air_materials: ResMut<Assets<AirLinesMaterial>>,
+    mut speed_materials: ResMut<Assets<SpeedLinesMaterial>>,
+    ship_query: Query<
+        (
+            Entity,
+            &ShipAtmosphereState,
+            &LinearVelocity,
+            Option<&PlayerShip>,
+        ),
+        With<ShipRoot>,
+    >,
+    mut overlay_queries: ParamSet<(
+        Query<(
+            &ChildOf,
+            &MeshMaterial2d<AirLinesMaterial>,
+            &mut Visibility,
+            &mut Transform,
+        )>,
+        Query<(
+            &ChildOf,
+            &MeshMaterial2d<SpeedLinesMaterial>,
+            &mut Visibility,
+            &mut Transform,
+        )>,
+    )>,
+) {
+    let mesh = overlay_mesh
+        .get_or_insert_with(|| meshes.add(Rectangle::new(TILE_SIZE * 7.0, TILE_SIZE * 4.0)))
+        .clone();
+    for (ship_entity, atmosphere, velocity, player_ship) in &ship_query {
+        if !overlay_queries
+            .p0()
+            .iter()
+            .any(|(parent, _, _, _)| parent.get() == ship_entity)
+        {
+            commands.entity(ship_entity).with_children(|parent| {
+                parent.spawn((
+                    Mesh2d(mesh.clone()),
+                    MeshMaterial2d(air_materials.add(AirLinesMaterial::default())),
+                    Transform::from_xyz(0.0, 0.0, 1.06),
+                    Visibility::Hidden,
+                    DecompressionAirLinesOverlay,
+                ));
+            });
+        }
+        if player_ship.is_some()
+            && !overlay_queries
+                .p1()
+                .iter()
+                .any(|(parent, _, _, _)| parent.get() == ship_entity)
+        {
+            commands.entity(ship_entity).with_children(|parent| {
+                parent.spawn((
+                    Mesh2d(mesh.clone()),
+                    MeshMaterial2d(speed_materials.add(SpeedLinesMaterial::default())),
+                    Transform::from_xyz(0.0, 0.0, 1.04),
+                    Visibility::Hidden,
+                    ShipSpeedLinesOverlay,
+                ));
+            });
+        }
+
+        for (parent, material_handle, mut visibility, mut transform) in &mut overlay_queries.p0() {
+            if parent.get() != ship_entity {
+                continue;
+            }
+            let intensity = if atmosphere.venting_tiles == 0 {
+                0.0
+            } else {
+                (atmosphere.venting_tiles as f32 / 5.0).clamp(0.18, 1.0)
+            };
+            if intensity <= 0.01 {
+                *visibility = Visibility::Hidden;
+                continue;
+            }
+            let direction = average_decompression_direction(atmosphere);
+            if let Some(material) = air_materials.get_mut(&material_handle.0) {
+                material.params.time = time.elapsed_secs_wrapped();
+                material.params.primary_color = Vec4::new(0.78, 0.94, 1.0, 1.0);
+                material.params.secondary_color = Vec4::new(0.32, 0.68, 1.0, 1.0);
+                material.params.direction = direction;
+                material.params.intensity = intensity;
+                material.params.alpha = 0.14 + intensity * 0.24;
+            }
+            transform.scale = Vec3::splat(0.8 + intensity * 0.3);
+            *visibility = Visibility::Visible;
+        }
+
+        for (parent, material_handle, mut visibility, mut transform) in &mut overlay_queries.p1() {
+            if parent.get() != ship_entity {
+                continue;
+            }
+            let speed = velocity.value.length().to_num::<f32>();
+            let intensity = ((speed - 16.0) / 80.0).clamp(0.0, 1.0);
+            if intensity <= 0.01 {
+                *visibility = Visibility::Hidden;
+                continue;
+            }
+            let direction = if velocity.value.is_near_zero() {
+                Vec2::Y
+            } else {
+                let v = velocity.value.to_vec2().normalize();
+                Vec2::new(-v.x, -v.y)
+            };
+            if let Some(material) = speed_materials.get_mut(&material_handle.0) {
+                material.params.time = time.elapsed_secs_wrapped();
+                material.params.primary_color = Vec4::new(0.82, 0.92, 1.0, 1.0);
+                material.params.secondary_color = Vec4::new(0.48, 0.64, 0.92, 1.0);
+                material.params.direction = direction;
+                material.params.intensity = intensity;
+                material.params.alpha = 0.08 + intensity * 0.16;
+            }
+            transform.scale = Vec3::splat(1.0 + intensity * 0.24);
+            *visibility = Visibility::Visible;
+        }
+    }
+}
+
+fn hazard_intensity(value: Fx, medium: Fx, high: Fx) -> f32 {
+    if value < medium || high <= medium {
+        return 0.0;
+    }
+    ((value - medium) / (high - medium))
+        .clamp(Fx::from_num(0), Fx::from_num(1))
+        .to_num::<f32>()
+}
+
+fn average_decompression_direction(atmosphere: &ShipAtmosphereState) -> Vec2 {
+    let mut total = Vec2::ZERO;
+    for vector in &atmosphere.decompression_vectors {
+        total += vector.to_vec2();
+    }
+    if total.length_squared() <= 0.001 {
+        Vec2::Y
+    } else {
+        total.normalize()
+    }
+}
+
+fn service_link_should_draw(
+    service: &crate::gameplay::components::InfrastructureServiceStatus,
+    destroyed: bool,
+) -> bool {
+    !destroyed
+        && service.network_id.is_some()
+        && service.service_coord.is_some()
+        && service.blocked_reason.is_none()
 }
 
 /// Syncs repair/extraction sparks and progress bars to the player's current held interaction.
@@ -755,11 +1366,38 @@ fn collect_active_work(
 /// Applies parallax offsets to the combat backdrop based on the camera position.
 /// Applies a small camera-relative parallax drift to backdrop layers so the arena feels deeper in motion.
 pub(crate) fn sync_backdrop_parallax(
+    time: Res<Time>,
     camera_query: Single<&Transform, With<Camera2d>>,
-    mut backdrop_query: Query<(&ArenaBackdropLayer, &mut Transform), Without<Camera2d>>,
+    mut backdrop_materials: ResMut<Assets<SpaceBackdropMaterial>>,
+    mut backdrop_queries: ParamSet<(
+        Query<
+            (
+                &ArenaBackdropLayer,
+                &MeshMaterial2d<SpaceBackdropMaterial>,
+                &mut Transform,
+            ),
+            (With<SpaceBackdropLayer>, Without<Camera2d>),
+        >,
+        Query<
+            (&ArenaBackdropLayer, &mut Transform),
+            (Without<SpaceBackdropLayer>, Without<Camera2d>),
+        >,
+    )>,
 ) {
+    // SAFETY: Shader and sprite backdrop entities are mutually exclusive by `SpaceBackdropLayer`,
+    // so each `ParamSet` branch mutates a disjoint set of transforms.
     let camera = camera_query.into_inner();
-    for (layer, mut transform) in &mut backdrop_query {
+    let camera_offset = Vec2::new(camera.translation.x, camera.translation.y);
+    for (layer, material_handle, mut transform) in &mut backdrop_queries.p0() {
+        transform.translation.x = layer.base_translation.x + camera.translation.x * layer.depth;
+        transform.translation.y = layer.base_translation.y + camera.translation.y * layer.depth;
+        transform.translation.z = layer.base_translation.z;
+        if let Some(material) = backdrop_materials.get_mut(&material_handle.0) {
+            material.params.time = time.elapsed_secs_wrapped();
+            material.params.camera_offset = camera_offset * layer.depth;
+        }
+    }
+    for (layer, mut transform) in &mut backdrop_queries.p1() {
         transform.translation.x = layer.base_translation.x + camera.translation.x * layer.depth;
         transform.translation.y = layer.base_translation.y + camera.translation.y * layer.depth;
         transform.translation.z = layer.base_translation.z;
@@ -795,5 +1433,49 @@ fn update_turret_top_visuals(
         let base_rotation = -Fx::from_num(runtime_module.rotation_quadrants as i32) * Fx::FRAC_PI_2;
         transform.rotation =
             Quat::from_rotation_z((actual_local_angle - base_rotation).to_num::<f32>());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::service_link_should_draw;
+    use crate::gameplay::components::{InfrastructureRouteKind, InfrastructureServiceStatus};
+
+    fn service(
+        network_id: Option<u32>,
+        service_coord: Option<(i32, i32)>,
+        blocked_reason: Option<&str>,
+    ) -> InfrastructureServiceStatus {
+        InfrastructureServiceStatus {
+            route_kind: InfrastructureRouteKind::Power,
+            network_id,
+            service_coord,
+            required: true,
+            blocked_reason: blocked_reason.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn service_links_draw_only_for_connected_unblocked_live_services() {
+        assert!(service_link_should_draw(
+            &service(Some(1), Some((0, 0)), None),
+            false
+        ));
+        assert!(!service_link_should_draw(
+            &service(None, Some((0, 0)), None),
+            false
+        ));
+        assert!(!service_link_should_draw(
+            &service(Some(1), None, None),
+            false
+        ));
+        assert!(!service_link_should_draw(
+            &service(Some(1), Some((0, 0)), Some("closed valve")),
+            false
+        ));
+        assert!(!service_link_should_draw(
+            &service(Some(1), Some((0, 0)), None),
+            true
+        ));
     }
 }

@@ -1,6 +1,5 @@
 mod control;
 mod interactions;
-mod shared;
 mod simulation;
 mod ui;
 
@@ -48,14 +47,21 @@ pub(crate) use simulation::{
     run_processors,
     sample_player_atmosphere,
     sample_ship_fields,
+    spawn_missing_effect_overlays,
     sync_backdrop_parallax,
+    sync_battery_pulse_visuals,
     sync_drone_station_population,
     sync_engine_flame_visuals,
     sync_eva_thruster_visuals,
+    sync_fabricator_dust_visuals,
+    sync_hazard_effect_visuals,
     sync_hostile_ship_state,
     sync_module_work_effect_visuals,
     sync_reactor_glow_visuals,
     sync_runtime_ship_state,
+    sync_service_link_visuals,
+    sync_ship_environment_effect_visuals,
+    sync_turret_flash_visuals,
     tick_recent_action_feedback,
     update_destroyed_module_visuals,
     update_detector_modules,

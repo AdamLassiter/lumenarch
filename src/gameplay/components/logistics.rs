@@ -4,12 +4,11 @@ use bevy::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{
-    super::helpers::{FixedVec2, Fx},
-    CarriedItemKind,
-    DroneTask,
+use super::{CarriedItemKind, DroneTask};
+use crate::{
+    helpers::{FixedVec2, Fx},
+    ship::{ModuleKind, ModuleVariant},
 };
-use crate::ship::{ModuleKind, ModuleVariant};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum ResourceKind {
@@ -189,6 +188,7 @@ impl DronePhase {
 }
 
 #[derive(Component, Clone)]
+#[allow(dead_code)]
 pub(crate) struct DroneUnit {
     pub(crate) station_entity: Entity,
     pub(crate) station_module_id: u64,

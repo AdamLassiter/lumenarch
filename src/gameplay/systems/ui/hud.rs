@@ -730,11 +730,22 @@ fn tubes_module_lines(
             network_debug_line(infrastructure, Some(network_id))
         ));
     }
-    for (resource, network_id) in &status.resource_networks {
+    lines.push("Service ports: self + cardinal neighbors".to_string());
+    for service in &status.service_statuses {
         lines.push(format!(
-            "{} pipe: {}",
-            resource_kind_label(*resource),
-            network_debug_line(infrastructure, Some(*network_id))
+            "{}{}: {}{}{}",
+            service.route_kind.label(),
+            if service.required { " required" } else { "" },
+            network_debug_line(infrastructure, service.network_id),
+            service
+                .service_coord
+                .map(|(x, y)| format!(" @ ({x},{y})"))
+                .unwrap_or_default(),
+            service
+                .blocked_reason
+                .as_deref()
+                .map(|reason| format!(" [{reason}]"))
+                .unwrap_or_default()
         ));
     }
     lines.push(format!(

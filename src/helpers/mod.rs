@@ -1,10 +1,15 @@
 mod atmosphere;
 mod collision_math;
 mod combat;
+pub(crate) mod control;
+pub(crate) mod docked_preview;
+pub(crate) mod docked_ui;
+pub(crate) mod editor;
 mod fields;
 mod interactions;
 mod math;
 mod ship;
+pub(crate) mod simulation;
 mod status;
 
 pub(crate) use atmosphere::{
@@ -32,6 +37,7 @@ pub(crate) use combat::{
     render_translation,
     spawn_projectile_entity,
 };
+pub(crate) use editor::*;
 pub(crate) use fields::{
     dynamic_field_output,
     field_attenuation,
@@ -54,25 +60,42 @@ pub(crate) use math::{
     FixedVec2,
     Fx,
     WideFx,
+    fixed_square,
     format_fx0,
     format_fx1,
     format_fx2,
     fx_from_time_delta,
     fx_ratio,
     widen,
+    wrap_angle_f32,
     wrap_radians,
 };
 pub(crate) use ship::{
+    cardinal_neighbors,
+    component_service_coords,
     module_integrity,
     module_local_position,
     ship_grid_from_local_position,
     ship_movement_model_with_effective,
     ship_power_model_with_effective,
+    ship_tile_contains_point,
+    ship_tile_overlaps_point,
+    sprite_path_for_foundation,
+    sprite_path_for_foundation_connections,
+};
+pub(crate) use simulation::{
+    absorb_hostile_shield_hit,
+    absorb_player_shield_hit,
+    consume_ship_resource,
+    spawn_hostile_salvage,
 };
 pub(crate) use status::{
+    condition_severity,
     danger_level,
     gameplay_status_line,
+    interaction_label,
     meter_bar,
     mission_return_line,
     mission_status_line,
+    module_display_name,
 };

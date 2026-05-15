@@ -405,8 +405,8 @@
       "rotation_quadrants": 2,
       "channel": 0,
       "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
+        "reaction_rate_milli": 650,
+        "turbine_load_milli": 600,
         "storage_allow_intake": true,
         "airlock_open": false,
         "manipulator_manual_mode": false,
@@ -429,8 +429,8 @@
       "rotation_quadrants": 2,
       "channel": 0,
       "defaults": {
-        "reaction_rate_milli": 350,
-        "turbine_load_milli": 300,
+        "reaction_rate_milli": 650,
+        "turbine_load_milli": 600,
         "storage_allow_intake": true,
         "airlock_open": false,
         "manipulator_manual_mode": false,

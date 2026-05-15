@@ -1,7 +1,48 @@
 use bevy::prelude::*;
 
 use super::Fx;
-use crate::{gameplay::components::MissionState, ship::ShipDefinition};
+use crate::{
+    gameplay::components::{InteractionKind, MissionState, ModuleCondition},
+    ship::{ModuleKind, ShipDefinition},
+};
+
+pub(crate) fn module_display_name(kind: ModuleKind) -> String {
+    sentence_case(kind.as_str())
+}
+
+fn sentence_case(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => {
+            first.to_uppercase().collect::<String>() + chars.as_str().to_lowercase().as_str()
+        }
+    }
+}
+
+pub(crate) fn interaction_label(kind: InteractionKind) -> &'static str {
+    match kind {
+        InteractionKind::Cockpit => "enter cockpit station",
+        InteractionKind::Computer => "open computer console",
+        InteractionKind::Storage => "open storage panel",
+        InteractionKind::Manipulator => "open manipulator panel",
+        InteractionKind::Processor => "open processor panel",
+        InteractionKind::Reactor => "operate reactor",
+        InteractionKind::Turret => "man turret",
+        InteractionKind::Engine => "reset engine",
+        InteractionKind::Repair => "repair module",
+        InteractionKind::Extract => "extract component",
+    }
+}
+
+pub(crate) fn condition_severity(condition: ModuleCondition) -> i32 {
+    match condition {
+        ModuleCondition::Healthy => 0,
+        ModuleCondition::Degraded => 1,
+        ModuleCondition::Disabled => 2,
+        ModuleCondition::Destroyed => 3,
+    }
+}
 
 pub(crate) fn gameplay_status_line(ship: &ShipDefinition) -> String {
     format!(

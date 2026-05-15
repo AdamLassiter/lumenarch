@@ -261,7 +261,7 @@ use bevy::{
 };
 
 use crate::{
-    editor::helpers::{is_cursor_over_editor_ui, is_cursor_over_toolbox},
+    helpers::editor::{is_cursor_over_editor_ui, is_cursor_over_toolbox},
     netcode,
     ship::{
         enemy::{

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use super::super::helpers::{FixedVec2, Fx};
+use crate::helpers::{FixedVec2, Fx};
 
 #[derive(Component, Clone)]
 pub(crate) struct Projectile {
@@ -27,6 +27,7 @@ pub(crate) struct HostileWeaponState {
 }
 
 #[derive(Component, Clone)]
+#[allow(dead_code)]
 pub(crate) struct SalvagePickup {
     pub(crate) scrap_value: u32,
 }

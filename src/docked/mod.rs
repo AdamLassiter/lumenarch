@@ -1,9 +1,7 @@
 use bevy::{log, prelude::*};
 
 mod campaign;
-mod preview_helpers;
 mod preview_sync;
-mod ui_helpers;
 
 pub(crate) use campaign::{initialize_campaign_state, persist_campaign_state};
 pub(crate) use preview_sync::{
@@ -14,18 +12,6 @@ pub(crate) use preview_sync::{
     sync_docked_ship_preview,
 };
 
-use self::{
-    preview_helpers::{docked_preview_ship, docked_preview_signature, spawn_docked_ship_preview},
-    ui_helpers::{
-        button_default_color,
-        docked_content_text,
-        docked_help_text,
-        docked_status_text,
-        docked_surface_color,
-        spawn_action_button,
-        spawn_dual_action_row,
-    },
-};
 use super::{
     HOVERED_BUTTON,
     NORMAL_BUTTON,
@@ -66,15 +52,27 @@ use super::{
     },
     stations::{self, StationCatalogResource},
 };
+use crate::helpers::{
+    docked_preview::{docked_preview_ship, docked_preview_signature, spawn_docked_ship_preview},
+    docked_ui::{
+        button_default_color,
+        docked_content_text,
+        docked_help_text,
+        docked_status_text,
+        docked_surface_color,
+        spawn_action_button,
+        spawn_dual_action_row,
+    },
+};
 
 #[derive(Component)]
 pub(crate) struct DockedPreviewRoot;
 
 #[derive(Component, Clone)]
-struct DockedPreviewTile;
+pub(crate) struct DockedPreviewTile;
 
 #[derive(Component)]
-pub(crate) struct DockedPreviewSignature(u128);
+pub(crate) struct DockedPreviewSignature(pub(crate) u128);
 
 #[derive(Component, Clone, Copy)]
 pub(crate) struct DockedActionVisibility {
@@ -130,7 +128,7 @@ impl DockedActionVisibility {
         }
     }
 
-    fn visible_on(self, surface: DockedSurface) -> bool {
+    pub(crate) fn visible_on(self, surface: DockedSurface) -> bool {
         match surface {
             DockedSurface::Shipyard => self.shipyard,
             DockedSurface::Quartermaster => self.quartermaster,

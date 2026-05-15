@@ -166,6 +166,21 @@ pub(crate) fn widen(value: Fx) -> WideFx {
     WideFx::from_num(value)
 }
 
+pub(crate) fn fixed_square(value: Fx) -> WideFx {
+    widen(value) * widen(value)
+}
+
+pub(crate) fn wrap_angle_f32(angle: f32) -> f32 {
+    let mut angle = angle;
+    while angle <= -std::f32::consts::PI {
+        angle += std::f32::consts::TAU;
+    }
+    while angle > std::f32::consts::PI {
+        angle -= std::f32::consts::TAU;
+    }
+    angle
+}
+
 pub(crate) fn fx_from_time_delta(time: &Time) -> Fx {
     Fx::from_num(time.delta_secs())
 }
@@ -194,4 +209,53 @@ pub(crate) fn format_fx1(value: Fx) -> String {
 
 pub(crate) fn format_fx2(value: Fx) -> String {
     format!("{:.2}", value.to_num::<f32>())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Fx, fixed_square, wrap_angle_f32, wrap_radians};
+
+    #[test]
+    fn fixed_square_matches_wide_multiplication_for_positive_and_negative_values() {
+        for value in [
+            Fx::from_num(-12),
+            Fx::from_num(-1) / Fx::from_num(2),
+            Fx::from_num(0),
+            Fx::from_num(3),
+            Fx::from_num(5) / Fx::from_num(4),
+        ] {
+            assert_eq!(
+                fixed_square(value),
+                super::widen(value) * super::widen(value)
+            );
+            assert!(fixed_square(value) >= super::WideFx::from_num(0));
+        }
+    }
+
+    #[test]
+    fn angle_wrapping_stays_inside_signed_pi_range() {
+        for angle in [
+            -10.0 * std::f32::consts::PI,
+            -std::f32::consts::PI,
+            0.0,
+            std::f32::consts::PI,
+            10.0 * std::f32::consts::PI,
+        ] {
+            let wrapped = wrap_angle_f32(angle);
+            assert!(wrapped > -std::f32::consts::PI);
+            assert!(wrapped <= std::f32::consts::PI);
+        }
+
+        for angle in [
+            Fx::from_num(-10) * Fx::PI,
+            -Fx::PI,
+            Fx::from_num(0),
+            Fx::PI,
+            Fx::from_num(10) * Fx::PI,
+        ] {
+            let wrapped = wrap_radians(angle);
+            assert!(wrapped >= -Fx::PI);
+            assert!(wrapped < Fx::PI);
+        }
+    }
 }

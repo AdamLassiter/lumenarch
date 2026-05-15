@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    editor::helpers::{
+    helpers::editor::{
         foundation_supports_module,
         is_hull_foundation_kind,
         is_hull_module_kind,

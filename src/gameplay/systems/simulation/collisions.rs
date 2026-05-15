@@ -32,8 +32,8 @@ use crate::{
             render_translation,
             safe_sqrt_wide,
             shield_accepts_contact,
+            spawn_hostile_salvage,
         },
-        systems::simulation::helpers,
     },
     ship::ModuleKind,
 };
@@ -344,7 +344,7 @@ pub(crate) fn handle_ship_collisions(
                 Some(CollisionShipKind::Hostile { salvage_reward })
                     if runtime_module.kind == ModuleKind::Core =>
                 {
-                    helpers::spawn_hostile_salvage(&mut commands, ship.position, salvage_reward);
+                    spawn_hostile_salvage(&mut commands, ship.position, salvage_reward);
                     roots_to_despawn.insert(ship.entity);
                 }
                 _ => {}

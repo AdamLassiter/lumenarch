@@ -173,7 +173,7 @@ pub(crate) fn camera_follow_player_ship(
     camera_transform.translation.x += (desired_center.x - camera_transform.translation.x) * blend;
     camera_transform.translation.y += (desired_center.y - camera_transform.translation.y) * blend;
     let current_angle = camera_transform.rotation.to_euler(EulerRot::XYZ).2;
-    let angle_delta = helpers::wrap_angle_f32(desired_rotation - current_angle);
+    let angle_delta = wrap_angle_f32(desired_rotation - current_angle);
     camera_transform.rotation = Quat::from_rotation_z(current_angle + angle_delta * blend);
     projection.scale += (desired_scale - projection.scale) * blend;
 }

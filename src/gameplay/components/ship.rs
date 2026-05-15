@@ -1,12 +1,13 @@
 use bevy::prelude::*;
 
-use super::{
-    super::helpers::{FixedVec2, Fx},
-    ResourceKind,
+use super::ResourceKind;
+use crate::{
+    helpers::{FixedVec2, Fx},
+    ship::ModuleKind,
 };
-use crate::ship::ModuleKind;
 
 #[derive(Component, Clone)]
+#[allow(dead_code)]
 pub(crate) struct ShipMovementModel {
     pub(crate) engine_count: u32,
     pub(crate) helm_multiplier: Fx,
@@ -77,12 +78,22 @@ pub(crate) struct InfrastructureNetworkSummary {
 }
 
 #[derive(Clone, Debug)]
+pub(crate) struct InfrastructureServiceStatus {
+    pub(crate) route_kind: InfrastructureRouteKind,
+    pub(crate) network_id: Option<u32>,
+    pub(crate) service_coord: Option<(i32, i32)>,
+    pub(crate) required: bool,
+    pub(crate) blocked_reason: Option<String>,
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct ModuleInfrastructureStatus {
     pub(crate) module_id: u64,
     pub(crate) kind: ModuleKind,
     pub(crate) power_network: Option<u32>,
     pub(crate) duct_network: Option<u32>,
     pub(crate) resource_networks: Vec<(ResourceKind, u32)>,
+    pub(crate) service_statuses: Vec<InfrastructureServiceStatus>,
     pub(crate) powered: bool,
     pub(crate) power_required: bool,
     pub(crate) blocked_reason: Option<String>,
@@ -159,7 +170,12 @@ impl ShipInfrastructureState {
             } else {
                 "unpowered"
             });
-        format!("Infrastructure: {power} {duct} {resources} [{state}]")
+        let service_issue = status
+            .service_statuses
+            .iter()
+            .find_map(|service| service.blocked_reason.as_deref())
+            .unwrap_or(state);
+        format!("Infrastructure: service ports {power} {duct} {resources} [{service_issue}]")
     }
 }
 
