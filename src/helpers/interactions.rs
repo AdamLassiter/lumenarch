@@ -114,3 +114,79 @@ pub(crate) fn resource_kind_label(kind: ResourceKind) -> &'static str {
         ResourceKind::Oxygen => "oxygen",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn integrity(current: i32, max: i32) -> Integrity {
+        Integrity { current, max }
+    }
+
+    fn runtime_state() -> ModuleRuntimeState {
+        ModuleRuntimeState {
+            current_heat: Fx::from_num(0),
+            electrical_instability: Fx::from_num(0),
+            sampled_heat: Fx::from_num(0),
+            sampled_electrical: Fx::from_num(0),
+            is_disabled: false,
+            was_disabled_last_frame: false,
+            needs_attention: false,
+            extracted: false,
+            last_interaction_age: Fx::from_num(0),
+        }
+    }
+
+    #[test]
+    fn damaged_generic_module_uses_repair_interaction() {
+        let runtime_state = runtime_state();
+
+        assert!(
+            interaction_for_module(
+                ModuleKind::Battery,
+                &integrity(3, 10),
+                &runtime_state,
+                false
+            ) == Some(InteractionKind::Repair)
+        );
+    }
+
+    #[test]
+    fn station_interactions_win_when_station_is_healthy() {
+        let runtime_state = runtime_state();
+        let integrity = integrity(10, 10);
+
+        assert!(
+            interaction_for_module(ModuleKind::Computer, &integrity, &runtime_state, false)
+                == Some(InteractionKind::Computer)
+        );
+        assert!(
+            interaction_for_module(ModuleKind::Cockpit, &integrity, &runtime_state, false)
+                == Some(InteractionKind::Cockpit)
+        );
+        assert!(
+            interaction_for_module(ModuleKind::Reactor, &integrity, &runtime_state, false)
+                == Some(InteractionKind::Reactor)
+        );
+    }
+
+    #[test]
+    fn destroyed_modules_are_not_interactable() {
+        let runtime_state = runtime_state();
+
+        assert!(
+            interaction_for_module(
+                ModuleKind::Computer,
+                &integrity(10, 10),
+                &runtime_state,
+                true
+            )
+            .is_none()
+        );
+        assert!(!module_needs_repair(
+            &integrity(1, 10),
+            &runtime_state,
+            true
+        ));
+    }
+}

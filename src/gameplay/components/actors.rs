@@ -292,6 +292,13 @@ pub(crate) struct CurrentStation {
     pub(crate) kind: ModuleKind,
 }
 
+#[derive(Component, Default, Clone)]
+pub(crate) struct PlayerFocusedTile {
+    pub(crate) ship: Option<Entity>,
+    pub(crate) grid_x: i32,
+    pub(crate) grid_y: i32,
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum StationFamily {
@@ -426,6 +433,14 @@ impl MapEntities for PlayerReferenceFrame {
 impl MapEntities for PlayerMotionState {
     fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
         self.frame.map_entities(entity_mapper);
+    }
+}
+
+impl MapEntities for PlayerFocusedTile {
+    fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
+        if let Some(entity) = self.ship {
+            self.ship = Some(entity_mapper.get_mapped(entity));
+        }
     }
 }
 

@@ -6,6 +6,7 @@ pub(crate) mod helpers {
 mod spawn;
 mod systems;
 
+use bevy::prelude::*;
 pub(crate) use spawn::{
     cleanup_runtime_entities,
     log_runtime_hostile_scene_summary,
@@ -77,12 +78,13 @@ pub(crate) use systems::{
     update_mission_state,
     update_mission_telemetry,
     update_module_runtime_state,
+    update_player_focused_tiles,
     update_player_reference_frame,
     update_routed_ship_power,
     update_ship_atmosphere,
     update_station_command_input,
 };
 
-const RUNTIME_SHIP_ORIGIN: bevy::prelude::Vec3 = bevy::prelude::Vec3::new(0.0, 0.0, 10.0);
-pub(crate) const ARENA_WIDTH_TILES: i32 = 48;
-pub(crate) const ARENA_HEIGHT_TILES: i32 = 32;
+const RUNTIME_SHIP_ORIGIN: Vec3 = Vec3::new(0.0, -2200.0, 10.0);
+pub(crate) const ARENA_WIDTH_TILES: i32 = 240;
+pub(crate) const ARENA_HEIGHT_TILES: i32 = 160;

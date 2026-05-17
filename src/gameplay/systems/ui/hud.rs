@@ -201,7 +201,7 @@ pub(crate) fn update_gameplay_status_text(
             &HeldInteraction,
             &PlayerFieldState,
             &PlayerMotionState,
-            &InternalPosition,
+            &PlayerFocusedTile,
             &CarriedResource,
             &EquippedSuit,
             &PlayerConditionState,
@@ -239,7 +239,7 @@ pub(crate) fn update_gameplay_status_text(
         held_interaction,
         player_fields,
         player_motion,
-        internal_position,
+        focused_tile,
         carried_resource,
         equipped_suit,
         player_condition,
@@ -323,27 +323,26 @@ pub(crate) fn update_gameplay_status_text(
         .module_query
         .iter()
         .find(|(_, runtime_module, ..)| runtime_module.module_id == current_station.module_id);
-    let under_player_module = match player_motion.frame {
-        PlayerReferenceFrame::Ship(ship_entity) => {
+    let focused_module = match focused_tile.ship {
+        Some(ship_entity) => {
             status_world
                 .module_query
                 .iter()
                 .find(|(entity, runtime_module, ..)| {
-                    runtime_module.grid_x == internal_position.grid_x
-                        && runtime_module.grid_y == internal_position.grid_y
+                    runtime_module.grid_x == focused_tile.grid_x
+                        && runtime_module.grid_y == focused_tile.grid_y
                         && status_world
                             .module_parent_query
                             .get(*entity)
                             .is_ok_and(|parent| parent.get() == ship_entity)
                 })
         }
-        PlayerReferenceFrame::World => None,
+        None => None,
     };
     let tubes_body = tubes_debug_text(
         infrastructure_state,
-        under_player_module
-            .or(current_module)
-            .map(|(_, runtime_module, ..)| runtime_module),
+        focused_tile,
+        focused_module.map(|(_, runtime_module, ..)| runtime_module),
     );
     let mut issues = alerts::collect_alert_issues(&status_world.module_query, &balance);
     issues.sort_by_key(|issue| std::cmp::Reverse(issue.0));
@@ -618,6 +617,7 @@ pub(crate) fn update_gameplay_status_text(
 
 fn tubes_debug_text(
     infrastructure: &ShipInfrastructureState,
+    focused_tile: &PlayerFocusedTile,
     current_module: Option<&RuntimeShipModule>,
 ) -> String {
     let mut lines = Vec::new();
@@ -633,7 +633,9 @@ fn tubes_debug_text(
 
     if let Some(runtime_module) = current_module {
         lines.push(format!(
-            "Underfoot: {} {} @ {}, {}",
+            "Focused tile: {}, {}  |  {} {} @ {}, {}",
+            focused_tile.grid_x,
+            focused_tile.grid_y,
             module_display_name(runtime_module.kind),
             runtime_module.module_id,
             runtime_module.grid_x,
@@ -641,7 +643,10 @@ fn tubes_debug_text(
         ));
         lines.extend(tubes_module_lines(infrastructure, runtime_module));
     } else {
-        lines.push("Underfoot: no component".to_string());
+        lines.push(format!(
+            "Focused tile: {}, {}  |  no component",
+            focused_tile.grid_x, focused_tile.grid_y
+        ));
     }
     lines.push("".to_string());
     lines.push("Networks".to_string());

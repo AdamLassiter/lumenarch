@@ -1,3 +1,5 @@
+use cordic::{cos, sin};
+
 use super::{FixedVec2, Fx, fx_ratio};
 use crate::{
     TILE_SIZE,
@@ -14,6 +16,14 @@ pub(crate) fn module_local_position(module: &ShipModule, center_x: Fx, center_y:
 }
 
 pub(crate) fn ship_grid_from_local_position(local_position: FixedVec2) -> (i32, i32) {
+    ship_grid_from_local_position_with_origin(local_position, FixedVec2::zero())
+}
+
+pub(crate) fn ship_grid_from_local_position_with_origin(
+    local_position: FixedVec2,
+    grid_origin: FixedVec2,
+) -> (i32, i32) {
+    let local_position = local_position - grid_origin;
     let tile_size = Fx::from_num(TILE_SIZE);
     let tile_half = tile_size / Fx::from_num(2);
     (
@@ -24,6 +34,42 @@ pub(crate) fn ship_grid_from_local_position(local_position: FixedVec2) -> (i32, 
             .floor()
             .to_num::<i32>(),
     )
+}
+
+pub(crate) fn ship_grid_facing_offset(facing_radians: Fx) -> (i32, i32) {
+    let radians = super::wrap_radians(facing_radians);
+    let facing_x = cos(radians);
+    let facing_y = sin(radians);
+    let threshold = Fx::from_num(0.382_683_43);
+    let x = if facing_x > threshold {
+        1
+    } else if facing_x < -threshold {
+        -1
+    } else {
+        0
+    };
+    let y = if facing_y > threshold {
+        -1
+    } else if facing_y < -threshold {
+        1
+    } else {
+        0
+    };
+    (x, y)
+}
+
+pub(crate) fn focused_ship_grid_tile(local_position: FixedVec2, facing_radians: Fx) -> (i32, i32) {
+    focused_ship_grid_tile_with_origin(local_position, facing_radians, FixedVec2::zero())
+}
+
+pub(crate) fn focused_ship_grid_tile_with_origin(
+    local_position: FixedVec2,
+    facing_radians: Fx,
+    grid_origin: FixedVec2,
+) -> (i32, i32) {
+    let (grid_x, grid_y) = ship_grid_from_local_position_with_origin(local_position, grid_origin);
+    let (offset_x, offset_y) = ship_grid_facing_offset(facing_radians);
+    (grid_x + offset_x, grid_y + offset_y)
 }
 
 pub(crate) fn cardinal_neighbors((x, y): (i32, i32)) -> [(i32, i32); 4] {
@@ -187,8 +233,12 @@ mod tests {
         Fx,
         cardinal_neighbors,
         component_service_coords,
+        focused_ship_grid_tile,
+        focused_ship_grid_tile_with_origin,
         module_local_position,
+        ship_grid_facing_offset,
         ship_grid_from_local_position,
+        ship_grid_from_local_position_with_origin,
         ship_tile_contains_point,
         ship_tile_overlaps_point,
         sprite_path_for_foundation_connections,
@@ -271,6 +321,74 @@ mod tests {
         );
         assert_eq!(
             ship_grid_from_local_position(center + FixedVec2::new(Fx::from_num(0), -outside_edge)),
+            (0, 1)
+        );
+    }
+
+    #[test]
+    fn facing_offsets_follow_ship_grid_axes() {
+        assert_eq!(ship_grid_facing_offset(Fx::FRAC_PI_2), (0, -1));
+        assert_eq!(ship_grid_facing_offset(-Fx::FRAC_PI_2), (0, 1));
+        assert_eq!(ship_grid_facing_offset(Fx::from_num(0)), (1, 0));
+        assert_eq!(ship_grid_facing_offset(Fx::PI), (-1, 0));
+    }
+
+    #[test]
+    fn diagonal_facing_offsets_select_diagonal_tiles() {
+        assert_eq!(ship_grid_facing_offset(Fx::FRAC_PI_4), (1, -1));
+        assert_eq!(ship_grid_facing_offset(Fx::PI - Fx::FRAC_PI_4), (-1, -1));
+        assert_eq!(ship_grid_facing_offset(-Fx::PI + Fx::FRAC_PI_4), (-1, 1));
+        assert_eq!(ship_grid_facing_offset(-Fx::FRAC_PI_4), (1, 1));
+    }
+
+    #[test]
+    fn focused_tile_is_adjacent_to_containing_tile() {
+        let tile_size = Fx::from_num(TILE_SIZE);
+        let inside_edge = tile_size / Fx::from_num(2) - Fx::from_num(1) / Fx::from_num(16);
+        let base = FixedVec2::new(Fx::from_num(2) * tile_size, Fx::from_num(3) * -tile_size);
+
+        for offset in [
+            FixedVec2::zero(),
+            FixedVec2::new(inside_edge, Fx::from_num(0)),
+            FixedVec2::new(-inside_edge, Fx::from_num(0)),
+            FixedVec2::new(Fx::from_num(0), inside_edge),
+            FixedVec2::new(Fx::from_num(0), -inside_edge),
+        ] {
+            assert_eq!(
+                focused_ship_grid_tile(base + offset, Fx::from_num(0)),
+                (3, 3),
+                "focused tile should use the containing tile before applying facing"
+            );
+        }
+    }
+
+    #[test]
+    fn focused_tile_examples_match_ship_grid_coordinates() {
+        let origin = FixedVec2::zero();
+
+        assert_eq!(focused_ship_grid_tile(origin, Fx::FRAC_PI_2), (0, -1));
+        assert_eq!(focused_ship_grid_tile(origin, -Fx::FRAC_PI_2), (0, 1));
+        assert_eq!(focused_ship_grid_tile(origin, Fx::from_num(0)), (1, 0));
+        assert_eq!(focused_ship_grid_tile(origin, Fx::PI), (-1, 0));
+        assert_eq!(focused_ship_grid_tile(origin, Fx::FRAC_PI_4), (1, -1));
+    }
+
+    #[test]
+    fn focused_tile_accounts_for_shifted_runtime_grid_origin() {
+        let tile_size = Fx::from_num(TILE_SIZE);
+        let grid_origin = FixedVec2::new(Fx::from_num(0), tile_size);
+        let origin_local_position = grid_origin;
+
+        assert_eq!(
+            ship_grid_from_local_position_with_origin(origin_local_position, grid_origin),
+            (0, 0)
+        );
+        assert_eq!(
+            focused_ship_grid_tile_with_origin(origin_local_position, Fx::FRAC_PI_2, grid_origin),
+            (0, -1)
+        );
+        assert_eq!(
+            focused_ship_grid_tile_with_origin(origin_local_position, -Fx::FRAC_PI_2, grid_origin),
             (0, 1)
         );
     }

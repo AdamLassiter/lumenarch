@@ -70,9 +70,15 @@ pub(crate) use math::{
     wrap_angle_f32,
     wrap_radians,
 };
+#[allow(unused_imports)]
+pub(crate) use ship::ship_grid_facing_offset;
+#[allow(unused_imports)]
+pub(crate) use ship::ship_grid_from_local_position_with_origin;
 pub(crate) use ship::{
     cardinal_neighbors,
     component_service_coords,
+    focused_ship_grid_tile,
+    focused_ship_grid_tile_with_origin,
     module_integrity,
     module_local_position,
     ship_grid_from_local_position,

@@ -22,7 +22,7 @@ use crate::{
 };
 
 /// Assembles the encounter arena backdrop, walls, and static threats so combat starts with a complete playspace.
-pub(crate) fn spawn_test_arena(
+pub(crate) fn spawn_arena(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     backdrop_materials: &mut Assets<SpaceBackdropMaterial>,

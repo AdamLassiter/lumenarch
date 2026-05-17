@@ -2,7 +2,7 @@ mod arena;
 mod hud;
 mod salvage;
 
-use arena::spawn_test_arena;
+use arena::spawn_arena;
 use bevy::{ecs::system::SystemParam, log, prelude::*};
 use hud::spawn_runtime_hud;
 use salvage::spawn_salvage_wreck;
@@ -95,7 +95,7 @@ pub(crate) fn spawn_runtime_scene(
         active_node.encounter.enemy_ship_ids.len(),
         platform_hostile_count
     );
-    spawn_test_arena(
+    spawn_arena(
         &mut commands,
         meshes.as_mut(),
         effect_assets.backdrop_materials.as_mut(),

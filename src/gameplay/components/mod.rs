@@ -20,6 +20,7 @@ pub(crate) use actors::{
     ObservedLocalPlayerMarker,
     PlayerConditionState,
     PlayerFieldState,
+    PlayerFocusedTile,
     PlayerHandleComponent,
     PlayerIdentity,
     PlayerMotionState,

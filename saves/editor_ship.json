@@ -1,5 +1,5 @@
 {
-  "name": "Untitled Knot",
+  "name": "Goldheart",
   "foundation_tiles": [
     {
       "id": 3,
@@ -38,14 +38,14 @@
     },
     {
       "id": 8,
-      "kind": "Wire",
+      "kind": "Floor",
       "grid_x": 1,
       "grid_y": -2,
       "rotation_quadrants": 0
     },
     {
       "id": 9,
-      "kind": "Wire",
+      "kind": "Floor",
       "grid_x": -1,
       "grid_y": -2,
       "rotation_quadrants": 0
@@ -73,35 +73,35 @@
     },
     {
       "id": 15,
-      "kind": "Floor",
+      "kind": "Wire",
       "grid_x": 0,
       "grid_y": 4,
       "rotation_quadrants": 0
     },
     {
       "id": 16,
-      "kind": "Wire",
+      "kind": "Floor",
       "grid_x": -1,
       "grid_y": 4,
       "rotation_quadrants": 0
     },
     {
       "id": 17,
-      "kind": "Wire",
+      "kind": "Floor",
       "grid_x": 1,
       "grid_y": 4,
       "rotation_quadrants": 0
     },
     {
       "id": 18,
-      "kind": "Wire",
+      "kind": "Floor",
       "grid_x": 1,
       "grid_y": 3,
       "rotation_quadrants": 0
     },
     {
       "id": 19,
-      "kind": "Wire",
+      "kind": "Floor",
       "grid_x": -1,
       "grid_y": 3,
       "rotation_quadrants": 0
@@ -151,29 +151,15 @@
     {
       "id": 73,
       "kind": "Wire",
-      "grid_x": 1,
-      "grid_y": -3,
+      "grid_x": 0,
+      "grid_y": 5,
       "rotation_quadrants": 0
     },
     {
       "id": 74,
       "kind": "Wire",
-      "grid_x": -1,
+      "grid_x": 0,
       "grid_y": -3,
-      "rotation_quadrants": 0
-    },
-    {
-      "id": 75,
-      "kind": "Wire",
-      "grid_x": -1,
-      "grid_y": 5,
-      "rotation_quadrants": 0
-    },
-    {
-      "id": 76,
-      "kind": "Wire",
-      "grid_x": 1,
-      "grid_y": 5,
       "rotation_quadrants": 0
     }
   ],

@@ -35,6 +35,7 @@ use crate::{
             ObservedLocalPlayerMarker,
             PlayerConditionState,
             PlayerFieldState,
+            PlayerFocusedTile,
             PlayerHandleComponent,
             PlayerIdentity,
             PlayerMotionState,
@@ -70,6 +71,7 @@ use crate::{
         helpers::{
             FixedVec2,
             Fx,
+            focused_ship_grid_tile,
             module_local_position,
             render_translation,
             ship_movement_model_with_effective,
@@ -459,6 +461,15 @@ pub(crate) fn spawn_runtime_ship(
                     local_position: spawn_node.local_position,
                     local_velocity: FixedVec2::zero(),
                     facing_radians: Fx::from_num(0),
+                },
+                {
+                    let (grid_x, grid_y) =
+                        focused_ship_grid_tile(spawn_node.local_position, Fx::from_num(0));
+                    PlayerFocusedTile {
+                        ship: Some(root_entity),
+                        grid_x,
+                        grid_y,
+                    }
                 },
                 CarriedResource::default(),
                 CurrentStation {

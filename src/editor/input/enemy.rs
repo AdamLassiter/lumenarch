@@ -1,10 +1,14 @@
-use bevy::prelude::*;
+use bevy::{log, prelude::*};
 
 use crate::{
     HOVERED_BUTTON,
     PRESSED_BUTTON,
     netcode,
-    ship::enemy::EnemyShipEntryValidationStatus,
+    ship::enemy::{
+        EnemyShipEntryValidationStatus,
+        save_default_enemy_library,
+        validate_enemy_ship_definition,
+    },
     state::{
         EditorMode,
         EditorSessionState,
@@ -18,6 +22,63 @@ use crate::{
     },
 };
 
+pub(super) fn sync_selected_enemy_entry(
+    editor_ship: &EditorShip,
+    enemy_library_state: &mut EnemyShipLibraryState,
+) -> bool {
+    enemy_library_state.library.ensure_seeded();
+    let selected_index = enemy_library_state.selected_index;
+    let Some(entry) = enemy_library_state
+        .library
+        .selected_or_first_mut(selected_index)
+    else {
+        return true;
+    };
+    entry.ship = editor_ship.ship.clone();
+    entry.display_name = editor_ship.ship.name.clone();
+    let entry_id = entry.id.clone();
+    let status = match validate_enemy_ship_definition(&editor_ship.ship) {
+        Ok(()) => EnemyShipEntryValidationStatus::Valid,
+        Err(error) => {
+            log::warn!(
+                "Current enemy ship entry '{}' is invalid and will not be saved yet: {}",
+                entry_id,
+                error
+            );
+            EnemyShipEntryValidationStatus::Invalid
+        }
+    };
+    enemy_library_state.entry_statuses.insert(entry_id, status);
+    status == EnemyShipEntryValidationStatus::Valid
+}
+
+pub(super) fn save_enemy_library_if_valid(enemy_library_state: &EnemyShipLibraryState) -> bool {
+    if let Some((entry_id, error)) = enemy_library_state
+        .library
+        .entries
+        .iter()
+        .find_map(|entry| {
+            validate_enemy_ship_definition(&entry.ship)
+                .err()
+                .map(|error| (entry.id.clone(), error))
+        })
+    {
+        log::warn!(
+            "Skipped enemy library save because entry '{}' is invalid: {}",
+            entry_id,
+            error
+        );
+        return false;
+    }
+
+    if let Err(error) = save_default_enemy_library(&enemy_library_state.library) {
+        eprintln!("editor: failed to save enemy ship library: {error}");
+        return false;
+    }
+
+    true
+}
+
 /// Handles enemy-library browser buttons so debug authors can step between, create, and load hostile ship entries.
 pub(crate) fn enemy_library_button_system(
     mut interaction_query: Query<
@@ -28,7 +89,15 @@ pub(crate) fn enemy_library_button_system(
             Option<&EnemyNextButton>,
             Option<&EnemyNewButton>,
         ),
-        (Changed<Interaction>, With<Button>),
+        (
+            Changed<Interaction>,
+            With<Button>,
+            Or<(
+                With<EnemyPrevButton>,
+                With<EnemyNextButton>,
+                With<EnemyNewButton>,
+            )>,
+        ),
     >,
     editor_session: Res<EditorSessionState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
@@ -47,6 +116,9 @@ pub(crate) fn enemy_library_button_system(
         match *interaction {
             Interaction::Pressed => {
                 *background = BackgroundColor(PRESSED_BUTTON);
+                let current_entry_saved =
+                    sync_selected_enemy_entry(&editor_ship, &mut enemy_library_state)
+                        && save_enemy_library_if_valid(&enemy_library_state);
                 enemy_library_state.library.ensure_seeded();
                 if prev.is_some() && !enemy_library_state.library.entries.is_empty() {
                     let len = enemy_library_state.library.entries.len();
@@ -73,7 +145,7 @@ pub(crate) fn enemy_library_button_system(
                     .selected_or_first(enemy_library_state.selected_index)
                 {
                     editor_ship.ship = entry.ship.clone();
-                    enemy_editor_state.dirty = false;
+                    enemy_editor_state.dirty = !current_entry_saved;
                 }
             }
             Interaction::Hovered => {
@@ -107,18 +179,25 @@ pub(crate) fn enemy_library_keyboard_shortcuts(
     }
 
     let mut changed = false;
+    let mut current_entry_saved = true;
     enemy_library_state.library.ensure_seeded();
     if !enemy_library_state.library.entries.is_empty() && keys.just_pressed(KeyCode::BracketLeft) {
+        current_entry_saved = sync_selected_enemy_entry(&editor_ship, &mut enemy_library_state)
+            && save_enemy_library_if_valid(&enemy_library_state);
         let len = enemy_library_state.library.entries.len();
         enemy_library_state.selected_index = (enemy_library_state.selected_index + len - 1) % len;
         changed = true;
     }
     if !enemy_library_state.library.entries.is_empty() && keys.just_pressed(KeyCode::BracketRight) {
+        current_entry_saved = sync_selected_enemy_entry(&editor_ship, &mut enemy_library_state)
+            && save_enemy_library_if_valid(&enemy_library_state);
         enemy_library_state.selected_index =
             (enemy_library_state.selected_index + 1) % enemy_library_state.library.entries.len();
         changed = true;
     }
     if keys.just_pressed(KeyCode::KeyN) {
+        current_entry_saved = sync_selected_enemy_entry(&editor_ship, &mut enemy_library_state)
+            && save_enemy_library_if_valid(&enemy_library_state);
         enemy_library_state.selected_index = enemy_library_state.library.add_blank_entry();
         let selected_entry_id = enemy_library_state
             .library
@@ -138,6 +217,6 @@ pub(crate) fn enemy_library_keyboard_shortcuts(
             .selected_or_first(enemy_library_state.selected_index)
     {
         editor_ship.ship = entry.ship.clone();
-        enemy_editor_state.dirty = false;
+        enemy_editor_state.dirty = !current_entry_saved;
     }
 }

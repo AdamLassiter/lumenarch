@@ -2,6 +2,7 @@ use bevy::{input::mouse::MouseButton, prelude::*, window::PrimaryWindow};
 
 use super::{
     auto_hull::apply_auto_hull_to_ship,
+    enemy::{save_enemy_library_if_valid, sync_selected_enemy_entry},
     selection::{
         delete_selected_group,
         foundation_snapshot,
@@ -58,6 +59,7 @@ use crate::{
         EditorToolState,
         EditorUiState,
         EnemyEditorState,
+        EnemyShipLibraryState,
         FocusedTextBox,
         FrontendMode,
         GameplayStationPanelButton,
@@ -183,7 +185,10 @@ pub(crate) fn leave_editor_button_system(
         (Changed<Interaction>, With<Button>, With<LeaveEditorButton>),
     >,
     editor_session: Res<EditorSessionState>,
+    editor_ship: Res<EditorShip>,
     status: Res<netcode::SessionStatus>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
+    mut enemy_library_state: ResMut<EnemyShipLibraryState>,
     mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
     mut next_mode: ResMut<NextState<FrontendMode>>,
 ) {
@@ -202,6 +207,10 @@ pub(crate) fn leave_editor_button_system(
                         });
                     }
                     EditorMode::Enemy => {
+                        let saved =
+                            sync_selected_enemy_entry(&editor_ship, &mut enemy_library_state)
+                                && save_enemy_library_if_valid(&enemy_library_state);
+                        enemy_editor_state.dirty = !saved;
                         next_mode.set(FrontendMode::Lobby);
                     }
                 }
@@ -221,7 +230,10 @@ pub(crate) fn leave_editor_keyboard_shortcut(
     keys: Res<ButtonInput<KeyCode>>,
     focused_textbox: Res<FocusedTextBox>,
     editor_session: Res<EditorSessionState>,
+    editor_ship: Res<EditorShip>,
     status: Res<netcode::SessionStatus>,
+    mut enemy_editor_state: ResMut<EnemyEditorState>,
+    mut enemy_library_state: ResMut<EnemyShipLibraryState>,
     mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
     mut next_mode: ResMut<NextState<FrontendMode>>,
 ) {
@@ -240,6 +252,9 @@ pub(crate) fn leave_editor_keyboard_shortcut(
                 });
             }
             EditorMode::Enemy => {
+                let saved = sync_selected_enemy_entry(&editor_ship, &mut enemy_library_state)
+                    && save_enemy_library_if_valid(&enemy_library_state);
+                enemy_editor_state.dirty = !saved;
                 next_mode.set(FrontendMode::Lobby);
             }
         }

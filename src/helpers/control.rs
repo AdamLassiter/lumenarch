@@ -4,18 +4,10 @@ use crate::{
     gameplay::components::{
         AirlockCommandState,
         DestroyedModule,
-        InternalPosition,
-        LinearVelocity,
-        PlayerMotionState,
-        PlayerReferenceFrame,
         ResourceInventory,
         ResourceKind,
         RuntimeShipModule,
         ShipAtmosphereState,
-        ShipRoot,
-        ShipboardControlState,
-        SimPosition,
-        SimRotation,
     },
     helpers::{FixedVec2, Fx, ship_tile_contains_point, ship_tile_overlaps_point},
     ship::ModuleKind,
@@ -55,54 +47,6 @@ pub(crate) fn take_first_available(
     } else {
         None
     }
-}
-
-pub(crate) fn anchor_player_to_focused_station(
-    motion: &mut PlayerMotionState,
-    position: &mut InternalPosition,
-    control_state: &ShipboardControlState,
-    ship_query: &Query<
-        (
-            Entity,
-            &SimPosition,
-            &SimRotation,
-            &LinearVelocity,
-            &ShipAtmosphereState,
-        ),
-        With<ShipRoot>,
-    >,
-    module_query: &Query<
-        (
-            &ChildOf,
-            &RuntimeShipModule,
-            Option<&AirlockCommandState>,
-            Option<&DestroyedModule>,
-        ),
-        With<RuntimeShipModule>,
-    >,
-) {
-    let Some(focused_entity) = control_state.focused_entity else {
-        return;
-    };
-    let Ok((parent, runtime_module, _, _)) = module_query.get(focused_entity) else {
-        return;
-    };
-    let Ok((ship_entity, ship_position, ship_rotation, ship_velocity, _)) =
-        ship_query.get(parent.get())
-    else {
-        return;
-    };
-
-    motion.frame = PlayerReferenceFrame::Ship(ship_entity);
-    motion.local_position = runtime_module.local_position;
-    motion.local_velocity = FixedVec2::zero();
-    motion.world_position =
-        ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians);
-    motion.world_velocity = ship_velocity.value;
-
-    position.grid_x = runtime_module.grid_x;
-    position.grid_y = runtime_module.grid_y;
-    position.local_position = runtime_module.local_position;
 }
 
 #[derive(Clone, Copy)]
@@ -296,8 +240,12 @@ mod tests {
         ShipCollisionTile,
         movement_blocked,
         shipboard_collision_shape,
+        take_first_available,
     };
-    use crate::ship::ModuleKind;
+    use crate::{
+        gameplay::components::{ResourceInventory, ResourceKind},
+        ship::ModuleKind,
+    };
 
     #[test]
     fn hull_fixtures_block_shipboard_motion_like_hull() {
@@ -362,5 +310,35 @@ mod tests {
             &[tile, interior_tile],
             radius,
         ));
+    }
+
+    #[test]
+    fn first_available_inventory_consumes_resources_in_stable_priority_order() {
+        let mut inventory = ResourceInventory {
+            raw_salvage: 1,
+            repair_charge: 1,
+            fuel: 1,
+            ammunition: 1,
+            oxygen: 1,
+        };
+
+        assert_eq!(
+            take_first_available(&mut inventory),
+            Some((ResourceKind::RawSalvage, 1))
+        );
+        assert_eq!(
+            take_first_available(&mut inventory),
+            Some((ResourceKind::RepairCharge, 1))
+        );
+        assert_eq!(
+            take_first_available(&mut inventory),
+            Some((ResourceKind::Fuel, 1))
+        );
+        assert_eq!(
+            take_first_available(&mut inventory),
+            Some((ResourceKind::Ammunition, 1))
+        );
+        assert_eq!(take_first_available(&mut inventory), None);
+        assert_eq!(inventory.oxygen, 1);
     }
 }

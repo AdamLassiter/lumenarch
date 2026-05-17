@@ -31,6 +31,7 @@ use crate::{
             ModuleWorkProgressFill,
             ModuleWorkProgressRoot,
             ObservedLocalPlayerMarker,
+            PlayerFocusedTile,
             PlayerMotionState,
             PlayerReferenceFrame,
             PlayerShip,
@@ -93,6 +94,7 @@ pub(crate) fn draw_debug_overlay(
         (With<PlayerShip>, With<ShipRoot>),
     >,
     player_query: Single<&CurrentStation, With<ObservedLocalPlayerMarker>>,
+    focused_tile_query: Single<&PlayerFocusedTile, With<ObservedLocalPlayerMarker>>,
     foundation_query: Query<(&RuntimeFoundationVisual, &ChildOf)>,
     module_query: Query<(
         Entity,
@@ -108,7 +110,9 @@ pub(crate) fn draw_debug_overlay(
 ) {
     let (player_ship_entity, ship_position, ship_rotation) = player_ship_query.into_inner();
     let current_station = player_query.into_inner();
+    let focused_tile = focused_tile_query.into_inner();
     update_turret_top_visuals(ship_rotation.radians, &module_query, &mut turret_top_query);
+    draw_observed_focused_tile(focused_tile, &ship_query, &module_query, &mut gizmos);
 
     if *hud_mode == GameplayInfoPanelMode::Tubes {
         draw_tubes_overlay(&ship_query, &foundation_query, &module_query, &mut gizmos);
@@ -215,6 +219,49 @@ pub(crate) fn draw_debug_overlay(
             );
         }
     }
+}
+
+fn draw_observed_focused_tile(
+    focused_tile: &PlayerFocusedTile,
+    ship_query: &Query<
+        (
+            Entity,
+            &SimPosition,
+            &SimRotation,
+            Option<&ShipInfrastructureState>,
+        ),
+        With<ShipRoot>,
+    >,
+    module_query: &Query<(
+        Entity,
+        &ChildOf,
+        &RuntimeShipModule,
+        &ModuleFieldEmitter,
+        Option<&ManipulatorModule>,
+        Option<&TurretCommandState>,
+        Option<&DestroyedModule>,
+    )>,
+    gizmos: &mut Gizmos,
+) {
+    let Some(ship_entity) = focused_tile.ship else {
+        return;
+    };
+    let Ok((_, ship_position, ship_rotation, _)) = ship_query.get(ship_entity) else {
+        return;
+    };
+    let grid_origin = ship_grid_origin(ship_entity, module_query);
+    let center = ship_grid_to_world(
+        (focused_tile.grid_x, focused_tile.grid_y),
+        grid_origin,
+        ship_position,
+        ship_rotation,
+    )
+    .to_vec2();
+    gizmos.rect_2d(
+        center,
+        Vec2::splat(TILE_SIZE * 0.96),
+        Color::srgba(0.86, 0.96, 1.0, 0.36),
+    );
 }
 
 fn draw_tubes_overlay(

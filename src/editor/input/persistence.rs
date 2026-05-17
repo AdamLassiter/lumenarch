@@ -242,13 +242,36 @@ pub(crate) fn persist_editor_ship(
                 };
                 enemy_library_state.entry_statuses.insert(entry_id, status);
             }
-            enemy_editor_state.dirty = true;
-            return;
+            if let Some((entry_id, error)) =
+                enemy_library_state
+                    .library
+                    .entries
+                    .iter()
+                    .find_map(|entry| {
+                        validate_enemy_ship_definition(&entry.ship)
+                            .err()
+                            .map(|error| (entry.id.clone(), error))
+                    })
+            {
+                log::warn!(
+                    "Skipped enemy library autosave because entry '{}' is invalid: {}",
+                    entry_id,
+                    error
+                );
+                enemy_editor_state.dirty = true;
+                return;
+            }
+            save_default_enemy_library(&enemy_library_state.library)
         }
     };
 
     if let Err(error) = result {
         eprintln!("editor: failed to autosave ship: {error}");
+        if editor_session.mode == EditorMode::Enemy {
+            enemy_editor_state.dirty = true;
+        }
+    } else if editor_session.mode == EditorMode::Enemy {
+        enemy_editor_state.dirty = false;
     }
 }
 use std::ops::DerefMut;

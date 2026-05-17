@@ -23,6 +23,7 @@ use super::super::{
         MissionState,
         ObservedLocalPlayerMarker,
         PlayerFieldState,
+        PlayerFocusedTile,
         PlayerHandleComponent,
         PlayerMotionState,
         PlayerReferenceFrame,
@@ -63,6 +64,7 @@ use super::super::{
         damp_vec2,
         facing_vector,
         fixed_square,
+        focused_ship_grid_tile_with_origin,
         fx_from_time_delta,
         render_translation,
         ship_grid_from_local_position,
@@ -71,6 +73,7 @@ use super::super::{
     },
 };
 use crate::{
+    TILE_SIZE,
     balance::BalanceConfig,
     netcode::{self, LumenGgrsConfig},
     ship::ModuleKind,
@@ -93,6 +96,7 @@ pub(crate) use player::{
     sync_player_reference_frame_parenting,
     sync_shipboard_player_visual,
     update_current_station,
+    update_player_focused_tiles,
     update_player_reference_frame,
 };
 pub(crate) use ship::{

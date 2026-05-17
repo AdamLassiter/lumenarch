@@ -168,13 +168,19 @@ pub(crate) fn move_shipboard_player(
             continue;
         }
         if control_state.mode != ShipControlMode::Interior {
-            helpers::anchor_player_to_focused_station(
-                &mut motion,
-                &mut position,
-                control_state,
-                &ship_query,
-                &module_query,
-            );
+            motion.local_velocity = FixedVec2::zero();
+            if let PlayerReferenceFrame::Ship(ship_entity) = motion.frame
+                && let Ok((_, ship_position, ship_rotation, ship_velocity, _)) =
+                    ship_query.get(ship_entity)
+            {
+                motion.world_position =
+                    ship_position.value + motion.local_position.rotate(ship_rotation.radians);
+                motion.world_velocity = ship_velocity.value;
+                position.local_position = motion.local_position;
+                let (grid_x, grid_y) = ship_grid_from_local_position(motion.local_position);
+                position.grid_x = grid_x;
+                position.grid_y = grid_y;
+            }
             continue;
         }
 
@@ -251,6 +257,58 @@ pub(crate) fn move_shipboard_player(
             }
         }
     }
+}
+
+/// Refreshes each shipboard player's deterministic facing tile so interaction systems share one target.
+pub(crate) fn update_player_focused_tiles(
+    module_query: Query<(&RuntimeShipModule, &ChildOf)>,
+    mut player_query: Query<
+        (
+            &PlayerHandleComponent,
+            &PlayerMotionState,
+            &mut PlayerFocusedTile,
+        ),
+        With<PlayerShipAssignment>,
+    >,
+) {
+    let mut players: Vec<_> = player_query.iter_mut().collect();
+    players.sort_by_key(|(handle, _, _)| handle.handle);
+    for (_, motion, mut focused_tile) in players {
+        match motion.frame {
+            PlayerReferenceFrame::Ship(ship_entity) => {
+                let grid_origin = ship_grid_origin(ship_entity, &module_query);
+                let (grid_x, grid_y) = focused_ship_grid_tile_with_origin(
+                    motion.local_position,
+                    motion.facing_radians,
+                    grid_origin,
+                );
+                focused_tile.ship = Some(ship_entity);
+                focused_tile.grid_x = grid_x;
+                focused_tile.grid_y = grid_y;
+            }
+            PlayerReferenceFrame::World => {
+                focused_tile.ship = None;
+            }
+        }
+    }
+}
+
+fn ship_grid_origin(
+    ship_entity: Entity,
+    module_query: &Query<(&RuntimeShipModule, &ChildOf)>,
+) -> FixedVec2 {
+    module_query
+        .iter()
+        .find_map(|(runtime_module, parent)| {
+            (parent.get() == ship_entity).then(|| {
+                runtime_module.local_position
+                    - FixedVec2::from_num(
+                        runtime_module.grid_x * TILE_SIZE as i32,
+                        -runtime_module.grid_y * TILE_SIZE as i32,
+                    )
+            })
+        })
+        .unwrap_or_else(FixedVec2::zero)
 }
 
 /// Projects gameplay motion back onto player sprites so movement is visible in the encounter view.
@@ -373,13 +431,11 @@ pub(crate) fn sync_player_reference_frame_parenting(
 
 /// Updates the currently occupied station metadata so interaction and HUD systems know player focus.
 pub(crate) fn update_current_station(
-    balance: Res<BalanceConfig>,
-    ship_query: Query<(Entity, &SimPosition, &SimRotation), With<ShipRoot>>,
     module_query: Query<(&RuntimeShipModule, &ChildOf)>,
     mut player_query: Query<
         (
             &PlayerHandleComponent,
-            &PlayerMotionState,
+            &PlayerFocusedTile,
             &mut CurrentStation,
         ),
         With<PlayerShipAssignment>,
@@ -387,48 +443,19 @@ pub(crate) fn update_current_station(
 ) {
     let mut players: Vec<_> = player_query.iter_mut().collect();
     players.sort_by_key(|(handle, _, _)| handle.handle);
-    for (_, motion, mut station) in players {
-        let Some(active_ship) = (match motion.frame {
-            PlayerReferenceFrame::Ship(ship_entity) => Some(ship_entity),
-            PlayerReferenceFrame::World => None,
-        }) else {
+    for (_, focused_tile, mut station) in players {
+        let Some(active_ship) = focused_tile.ship else {
             station.module_id = 0;
             station.kind = ModuleKind::Interior;
             continue;
         };
 
-        let Ok((_, ship_position, ship_rotation)) = ship_query.get(active_ship) else {
-            station.module_id = 0;
-            station.kind = ModuleKind::Interior;
-            continue;
-        };
-
-        let mut nearest = None;
-        let mut nearest_distance_sq = None;
-        let mut saw_ship_module = false;
-        let max_distance_sq = fixed_square(Fx::from_num(balance.player.interact_radius));
-        for (runtime_module, parent) in &module_query {
-            if parent.get() != active_ship {
-                continue;
-            }
-            saw_ship_module = true;
-            let world_position =
-                ship_position.value + runtime_module.local_position.rotate(ship_rotation.radians);
-            let distance_sq = motion.world_position.distance_sq(world_position);
-            if distance_sq > max_distance_sq {
-                continue;
-            }
-            if nearest_distance_sq.is_none_or(|current| distance_sq < current) {
-                nearest_distance_sq = Some(distance_sq);
-                nearest = Some((runtime_module.module_id, runtime_module.kind));
-            }
-        }
-
-        if !saw_ship_module {
-            continue;
-        }
-
-        if let Some((module_id, kind)) = nearest {
+        if let Some((module_id, kind)) = module_at_focused_tile(
+            active_ship,
+            focused_tile.grid_x,
+            focused_tile.grid_y,
+            &module_query,
+        ) {
             station.module_id = module_id;
             station.kind = kind;
         } else {
@@ -436,6 +463,31 @@ pub(crate) fn update_current_station(
             station.kind = ModuleKind::Interior;
         }
     }
+}
+
+fn module_at_focused_tile(
+    active_ship: Entity,
+    grid_x: i32,
+    grid_y: i32,
+    module_query: &Query<(&RuntimeShipModule, &ChildOf)>,
+) -> Option<(u64, ModuleKind)> {
+    module_query
+        .iter()
+        .map(|(runtime_module, parent)| (runtime_module, parent.get()))
+        .find_map(|(runtime_module, parent)| {
+            module_at_focused_tile_from_entry(active_ship, grid_x, grid_y, runtime_module, parent)
+        })
+}
+
+fn module_at_focused_tile_from_entry(
+    active_ship: Entity,
+    grid_x: i32,
+    grid_y: i32,
+    runtime_module: &RuntimeShipModule,
+    parent: Entity,
+) -> Option<(u64, ModuleKind)> {
+    (parent == active_ship && runtime_module.grid_x == grid_x && runtime_module.grid_y == grid_y)
+        .then_some((runtime_module.module_id, runtime_module.kind))
 }
 
 /// Handles quick cargo pickup and drop-off at the player's current position for shipboard logistics.
@@ -634,5 +686,51 @@ fn carried_item_deposit(kind: CarriedItemKind, amount: u32) -> Option<CarriedIte
             ),
         }),
         CarriedItemKind::Suit(_) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn runtime_module(
+        module_id: u64,
+        kind: ModuleKind,
+        grid_x: i32,
+        grid_y: i32,
+    ) -> RuntimeShipModule {
+        RuntimeShipModule {
+            module_id,
+            kind,
+            variant: ModuleVariant::BasicCore,
+            channel: 0,
+            grid_x,
+            grid_y,
+            rotation_quadrants: 0,
+            local_position: FixedVec2::zero(),
+        }
+    }
+
+    #[test]
+    fn focused_station_resolution_uses_focused_tile_not_nearest_or_underfoot() {
+        let mut world = World::new();
+        let ship = world.spawn_empty().id();
+        let other_ship = world.spawn_empty().id();
+        let underfoot = runtime_module(1, ModuleKind::Reactor, 0, 0);
+        let focused = runtime_module(2, ModuleKind::Turret, 0, -1);
+        let other_ship_focused_coord = runtime_module(3, ModuleKind::Engine, 0, -1);
+
+        assert_eq!(
+            module_at_focused_tile_from_entry(ship, 0, -1, &underfoot, ship),
+            None
+        );
+        assert_eq!(
+            module_at_focused_tile_from_entry(ship, 0, -1, &other_ship_focused_coord, other_ship),
+            None
+        );
+        assert_eq!(
+            module_at_focused_tile_from_entry(ship, 0, -1, &focused, ship),
+            Some((2, ModuleKind::Turret))
+        );
     }
 }

@@ -13,12 +13,16 @@ use crate::{
     gameplay::{
         self,
         components::{
+            CurrentStation,
             ObservedLocalPlayerMarker,
+            PlayerFocusedTile,
+            PlayerMotionState,
             ShipControlMode,
             ShipboardControlState,
             StationFamily,
             StationFocusMode,
         },
+        helpers::FixedVec2,
     },
     netcode::{
         self,
@@ -145,6 +149,157 @@ fn headless_host_lobby_editor_sector_and_cockpit_flow() {
             .single(app.world())
             .expect("expected exactly one observed local player control state");
         assert_eq!(control.mode, ShipControlMode::Cockpit);
+    }
+}
+
+#[test]
+fn entering_station_focus_does_not_reposition_player_body() {
+    let mut app = build_app(AppRuntimeMode::Headless);
+    seed_test_player_ship(&mut app);
+
+    begin_headless_host_lobby(&mut app);
+    start_headless_host_session(&mut app);
+    apply_host_meta(&mut app, RollbackMetaOp::OpenSectorMap, 0, 0, 0);
+
+    let calibration_ring_id = {
+        let rollback = app.world().resource::<RollbackGameState>();
+        rollback
+            .sector
+            .nodes
+            .iter()
+            .find(|node| node.label == "Calibration Ring")
+            .map(|node| node.id)
+            .expect("expected Calibration Ring node in sector layout")
+    };
+
+    apply_host_meta(
+        &mut app,
+        RollbackMetaOp::SelectSectorNode,
+        calibration_ring_id as i16,
+        0,
+        0,
+    );
+    apply_host_meta(
+        &mut app,
+        RollbackMetaOp::LaunchEncounter,
+        calibration_ring_id as i16,
+        0,
+        0,
+    );
+    wait_until(
+        &mut app,
+        |app| app.world().resource::<RollbackGameState>().phase == RollbackPhase::Encounter,
+        "encounter phase entered",
+    );
+    wait_until(
+        &mut app,
+        |app| count_cleanup_entities(app) > 0,
+        "runtime encounter scene spawned",
+    );
+
+    let before = observed_player_local_position(&mut app);
+    enter_cockpit_for_flow_test(&mut app);
+    pump_once(&mut app);
+    let after = observed_player_local_position(&mut app);
+
+    assert_eq!(after.x, before.x);
+    assert_eq!(after.y, before.y);
+    let mut control_query = app
+        .world_mut()
+        .query_filtered::<&ShipboardControlState, With<ObservedLocalPlayerMarker>>();
+    let control = control_query
+        .single(app.world())
+        .expect("expected exactly one observed local player control state");
+    assert_eq!(control.mode, ShipControlMode::Cockpit);
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct StationFocusSnapshot {
+    phase: RollbackPhase,
+    control_mode: ShipControlMode,
+    focus_mode: StationFocusMode,
+    focused_kind: Option<ModuleKind>,
+    current_station_kind: ModuleKind,
+    focused_tile: Option<(i32, i32)>,
+    local_tile: (i32, i32),
+}
+
+#[test]
+fn repeated_station_focus_flow_produces_same_state_snapshot() {
+    let first = station_focus_regression_snapshot();
+    let second = station_focus_regression_snapshot();
+
+    assert_eq!(first, second);
+}
+
+fn station_focus_regression_snapshot() -> StationFocusSnapshot {
+    let mut app = build_app(AppRuntimeMode::Headless);
+    seed_test_player_ship(&mut app);
+
+    begin_headless_host_lobby(&mut app);
+    start_headless_host_session(&mut app);
+    apply_host_meta(&mut app, RollbackMetaOp::OpenSectorMap, 0, 0, 0);
+
+    let calibration_ring_id = {
+        let rollback = app.world().resource::<RollbackGameState>();
+        rollback
+            .sector
+            .nodes
+            .iter()
+            .find(|node| node.label == "Calibration Ring")
+            .map(|node| node.id)
+            .expect("expected Calibration Ring node in sector layout")
+    };
+
+    apply_host_meta(
+        &mut app,
+        RollbackMetaOp::SelectSectorNode,
+        calibration_ring_id as i16,
+        0,
+        0,
+    );
+    apply_host_meta(
+        &mut app,
+        RollbackMetaOp::LaunchEncounter,
+        calibration_ring_id as i16,
+        0,
+        0,
+    );
+    wait_until(
+        &mut app,
+        |app| app.world().resource::<RollbackGameState>().phase == RollbackPhase::Encounter,
+        "encounter phase entered",
+    );
+    wait_until(
+        &mut app,
+        |app| count_cleanup_entities(app) > 0,
+        "runtime encounter scene spawned",
+    );
+
+    enter_cockpit_for_flow_test(&mut app);
+    pump_once(&mut app);
+
+    let phase = app.world().resource::<RollbackGameState>().phase;
+    let mut query = app.world_mut().query_filtered::<(
+        &ShipboardControlState,
+        &CurrentStation,
+        &PlayerFocusedTile,
+        &crate::gameplay::components::InternalPosition,
+    ), With<ObservedLocalPlayerMarker>>();
+    let (control, current_station, focused_tile, internal_position) = query
+        .single(app.world())
+        .expect("expected exactly one observed local player state snapshot");
+
+    StationFocusSnapshot {
+        phase,
+        control_mode: control.mode,
+        focus_mode: control.focus_mode,
+        focused_kind: control.focused_kind,
+        current_station_kind: current_station.kind,
+        focused_tile: focused_tile
+            .ship
+            .map(|_| (focused_tile.grid_x, focused_tile.grid_y)),
+        local_tile: (internal_position.grid_x, internal_position.grid_y),
     }
 }
 
@@ -444,6 +599,16 @@ fn count_cleanup_entities(app: &mut App) -> usize {
         .world_mut()
         .query_filtered::<Entity, With<PlayingCleanup>>();
     query.iter(app.world()).count()
+}
+
+fn observed_player_local_position(app: &mut App) -> FixedVec2 {
+    let mut query = app
+        .world_mut()
+        .query_filtered::<&PlayerMotionState, With<ObservedLocalPlayerMarker>>();
+    query
+        .single(app.world())
+        .expect("expected exactly one observed local player motion state")
+        .local_position
 }
 
 /// Advances the headless app until a gameplay condition becomes true or the test times out.

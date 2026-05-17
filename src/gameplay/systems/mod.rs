@@ -16,6 +16,7 @@ pub(crate) use control::{
     sync_player_reference_frame_parenting,
     sync_shipboard_player_visual,
     update_current_station,
+    update_player_focused_tiles,
     update_player_reference_frame,
     update_station_command_input,
 };

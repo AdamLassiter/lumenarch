@@ -213,6 +213,7 @@ fn register_rollback_state(app: &mut App) {
         .rollback_component_with_clone::<gameplay::components::EquippedSuit>()
         .rollback_component_with_clone::<gameplay::components::PlayerIdentity>()
         .rollback_component_with_clone::<gameplay::components::PlayerConditionState>()
+        .rollback_component_with_clone::<gameplay::components::PlayerFocusedTile>()
         .rollback_component_with_clone::<gameplay::components::CurrentStation>()
         .rollback_component_with_clone::<gameplay::components::InternalPosition>()
         .rollback_component_with_clone::<gameplay::components::ShipboardControlState>()
@@ -260,6 +261,7 @@ fn register_rollback_state(app: &mut App) {
         .rollback_component_with_clone::<gameplay::components::SalvagePickup>()
         .update_component_with_map_entities::<gameplay::components::PlayerShipAssignment>()
         .update_component_with_map_entities::<gameplay::components::PlayerMotionState>()
+        .update_component_with_map_entities::<gameplay::components::PlayerFocusedTile>()
         .update_component_with_map_entities::<gameplay::components::ShipboardControlState>()
         .update_component_with_map_entities::<gameplay::components::NearbyInteraction>()
         .update_component_with_map_entities::<gameplay::components::HeldInteraction>()
@@ -299,6 +301,7 @@ fn add_rollback_systems(app: &mut App) {
                 gameplay::update_ship_atmosphere,
                 gameplay::sample_player_atmosphere,
                 gameplay::move_shipboard_player,
+                gameplay::update_player_focused_tiles,
                 gameplay::update_current_station,
                 gameplay::detect_nearby_interactions,
                 gameplay::run_shipboard_interaction_input,
