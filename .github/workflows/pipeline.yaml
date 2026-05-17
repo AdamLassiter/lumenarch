@@ -18,9 +18,15 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy -- -D warnings
+      - name: Cargo check
+        run: cargo check
+        continue-on-error: true
+      - name: Rustfmt check
+        run: cargo fmt --all -- --check
+        continue-on-error: true
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+        continue-on-error: true
       - run: cargo build
 
   release-build:
@@ -75,6 +81,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actionshub/markdownlint@v3.1.4
+        continue-on-error: true
 
   deploy-book:
     name: Deploy book

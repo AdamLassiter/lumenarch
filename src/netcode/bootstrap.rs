@@ -1,6 +1,7 @@
 use std::{
     hash::{Hash, Hasher},
-    net::SocketAddr,
+    io::ErrorKind,
+    net::{SocketAddr, UdpSocket},
 };
 
 use bevy::{log, prelude::*};
@@ -8,7 +9,7 @@ use bevy_ggrs::{
     Session,
     prelude::{PlayerType, SessionBuilder},
 };
-use ggrs::{PlayerHandle, UdpNonBlockingSocket};
+use ggrs::{Message, NonBlockingSocket, PlayerHandle};
 use serde::Serialize;
 
 use super::{
@@ -38,6 +39,7 @@ use crate::{
 pub(crate) struct ParsedSessionDescriptor {
     pub(crate) role: SessionRole,
     pub(crate) local_bind_addr: SocketAddr,
+    pub(crate) host_addr: Option<SocketAddr>,
     pub(crate) peer_addrs: Vec<SocketAddr>,
     pub(crate) local_handle: PlayerHandle,
 }
@@ -59,12 +61,23 @@ pub(crate) fn begin_session_attempt(
     shutdown_lobby_runtime(lobby_runtime);
     status.lobby_snapshot = None;
     match parse_session_descriptor(&config.session_descriptor) {
-        Ok(descriptor) => {
+        Ok(mut descriptor) => {
+            if descriptor.role == SessionRole::Client && descriptor.local_bind_addr.port() == 0 {
+                match allocate_ephemeral_client_udp_addr() {
+                    Ok(bind_addr) => descriptor.local_bind_addr = bind_addr,
+                    Err(error) => {
+                        log::warn!("Failed to reserve client UDP port: {}", error);
+                        status.phase = SessionPhase::Failed(error);
+                        return;
+                    }
+                }
+            }
             log::debug!(
-                "Parsed session descriptor into role={:?}, local_handle={}, bind={}, peers={:?}",
+                "Parsed session descriptor into role={:?}, local_handle={}, bind={}, host={:?}, peers={:?}",
                 descriptor.role,
                 descriptor.local_handle,
                 descriptor.local_bind_addr,
+                descriptor.host_addr,
                 descriptor.peer_addrs,
             );
             status.phase = SessionPhase::Connecting;
@@ -273,15 +286,62 @@ fn build_p2p_session(
         log::trace!("Registered player handle {} in P2P session builder", handle);
     }
 
-    let socket = UdpNonBlockingSocket::bind_to_port(local_bind_addr.port())
+    let socket = BoundUdpSocket::bind(local_bind_addr)
         .map_err(|error| format!("failed to bind UDP socket on {}: {error}", local_bind_addr))?;
     log::debug!(
-        "Bound UDP socket for GGRS P2P session on {}",
+        "Bound UDP socket for GGRS P2P session to {}",
         local_bind_addr
     );
     builder
         .start_p2p_session(socket)
         .map_err(|error| format!("failed to start GGRS P2P session: {error}"))
+}
+
+#[derive(Debug)]
+struct BoundUdpSocket {
+    socket: UdpSocket,
+    buffer: [u8; 4096],
+}
+
+impl BoundUdpSocket {
+    fn bind(addr: SocketAddr) -> Result<Self, std::io::Error> {
+        let socket = UdpSocket::bind(addr)?;
+        socket.set_nonblocking(true)?;
+        Ok(Self {
+            socket,
+            buffer: [0; 4096],
+        })
+    }
+}
+
+impl NonBlockingSocket<SocketAddr> for BoundUdpSocket {
+    fn send_to(&mut self, msg: &Message, addr: &SocketAddr) {
+        let Ok(encoded) = bincode::serialize(msg) else {
+            log::warn!("Failed to serialize GGRS UDP packet for {}", addr);
+            return;
+        };
+        if let Err(error) = self.socket.send_to(&encoded, addr) {
+            log::warn!("Failed to send GGRS UDP packet to {}: {}", addr, error);
+        }
+    }
+
+    fn receive_all_messages(&mut self) -> Vec<(SocketAddr, Message)> {
+        let mut received = Vec::new();
+        loop {
+            match self.socket.recv_from(&mut self.buffer) {
+                Ok((bytes_read, source_addr)) => {
+                    if let Ok(message) = bincode::deserialize(&self.buffer[..bytes_read]) {
+                        received.push((source_addr, message));
+                    }
+                }
+                Err(error) if error.kind() == ErrorKind::WouldBlock => return received,
+                Err(error) => {
+                    log::warn!("Failed to receive GGRS UDP packet: {}", error);
+                    return received;
+                }
+            }
+        }
+    }
 }
 
 fn parse_session_descriptor(value: &str) -> Result<ParsedSessionDescriptor, String> {
@@ -290,38 +350,58 @@ fn parse_session_descriptor(value: &str) -> Result<ParsedSessionDescriptor, Stri
         return Err("session descriptor cannot be empty".to_string());
     }
 
-    let (role_part, rest) = trimmed
-        .split_once('@')
-        .ok_or_else(|| "expected descriptor format role@bind_addr>peer1,peer2".to_string())?;
-    let (bind_part, peers_part) = rest.split_once('>').unwrap_or((rest, ""));
-    let local_bind_addr = bind_part
-        .parse()
-        .map_err(|error| format!("invalid local bind address '{bind_part}': {error}"))?;
-    let peer_addrs = if peers_part.trim().is_empty() {
-        Vec::new()
-    } else {
-        peers_part
-            .split(',')
-            .filter(|entry| !entry.trim().is_empty())
-            .map(|entry| {
-                entry
-                    .trim()
-                    .parse()
-                    .map_err(|error| format!("invalid peer address '{}': {error}", entry.trim()))
-            })
-            .collect::<Result<Vec<_>, _>>()?
+    let Some((role_part, rest)) = trimmed.split_once('@') else {
+        let local_bind_addr = parse_socket_addr(trimmed, "host bind address")?;
+        return Ok(ParsedSessionDescriptor {
+            role: SessionRole::Host,
+            local_bind_addr,
+            host_addr: None,
+            peer_addrs: Vec::new(),
+            local_handle: 0,
+        });
     };
+    let (bind_part, peers_part) = rest.split_once('>').unwrap_or((rest, ""));
 
-    let (role, local_handle) = if role_part == "host" {
-        (SessionRole::Host, 0)
+    let (role, local_bind_addr, host_addr, peer_addrs, local_handle) = if role_part == "host" {
+        let local_bind_addr = parse_socket_addr(bind_part, "host bind address")?;
+        let peer_addrs = parse_peer_addrs(peers_part)?;
+        (SessionRole::Host, local_bind_addr, None, peer_addrs, 0)
+    } else if role_part == "client" {
+        let host_addr = if peers_part.trim().is_empty() {
+            parse_socket_addr(bind_part, "host address")?
+        } else {
+            parse_peer_addrs(peers_part)?
+                .first()
+                .copied()
+                .ok_or_else(|| "client descriptor must include a host address".to_string())?
+        };
+        (
+            SessionRole::Client,
+            ephemeral_client_bind_addr(),
+            Some(host_addr),
+            vec![host_addr],
+            1,
+        )
     } else if let Some(handle) = role_part.strip_prefix("client") {
         let parsed = handle
             .parse::<usize>()
             .map_err(|error| format!("invalid client handle '{handle}': {error}"))?;
-        (SessionRole::Client, parsed)
+        let peer_addrs = if peers_part.trim().is_empty() {
+            vec![parse_socket_addr(bind_part, "host address")?]
+        } else {
+            parse_peer_addrs(peers_part)?
+        };
+        let host_addr = peer_addrs.first().copied();
+        (
+            SessionRole::Client,
+            ephemeral_client_bind_addr(),
+            host_addr,
+            peer_addrs,
+            parsed,
+        )
     } else {
         return Err(format!(
-            "invalid role '{}', expected 'host' or 'clientN'",
+            "invalid role '{}', expected 'host', 'client', or legacy 'clientN'",
             role_part
         ));
     };
@@ -329,9 +409,42 @@ fn parse_session_descriptor(value: &str) -> Result<ParsedSessionDescriptor, Stri
     Ok(ParsedSessionDescriptor {
         role,
         local_bind_addr,
+        host_addr,
         peer_addrs,
         local_handle,
     })
+}
+
+fn ephemeral_client_bind_addr() -> SocketAddr {
+    "0.0.0.0:0"
+        .parse()
+        .expect("ephemeral client bind address should parse")
+}
+
+fn allocate_ephemeral_client_udp_addr() -> Result<SocketAddr, String> {
+    let socket = UdpSocket::bind(ephemeral_client_bind_addr())
+        .map_err(|error| format!("failed to bind ephemeral client UDP socket: {error}"))?;
+    socket
+        .local_addr()
+        .map_err(|error| format!("failed to read ephemeral client UDP socket address: {error}"))
+}
+
+fn parse_socket_addr(value: &str, label: &str) -> Result<SocketAddr, String> {
+    value
+        .trim()
+        .parse()
+        .map_err(|error| format!("invalid {label} '{}': {error}", value.trim()))
+}
+
+fn parse_peer_addrs(value: &str) -> Result<Vec<SocketAddr>, String> {
+    if value.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    value
+        .split(',')
+        .filter(|entry| !entry.trim().is_empty())
+        .map(|entry| parse_socket_addr(entry, "peer address"))
+        .collect::<Result<Vec<_>, _>>()
 }
 
 pub(crate) fn load_initial_rollback_state() -> RollbackGameState {
@@ -452,19 +565,56 @@ mod tests {
     }
 
     #[test]
-    fn parses_host_session_descriptor() {
-        let descriptor =
-            parse_session_descriptor("host@127.0.0.1:5000>127.0.0.1:5001,127.0.0.1:5002").unwrap();
+    fn parses_plain_host_session_descriptor() {
+        let descriptor = parse_session_descriptor("127.0.0.1:5000").unwrap();
         assert_eq!(descriptor.role, SessionRole::Host);
         assert_eq!(descriptor.local_handle, 0);
-        assert_eq!(descriptor.peer_addrs.len(), 2);
+        assert_eq!(
+            descriptor.local_bind_addr,
+            "127.0.0.1:5000".parse().unwrap()
+        );
+        assert!(descriptor.peer_addrs.is_empty());
     }
 
     #[test]
-    fn parses_client_session_descriptor() {
-        let descriptor = parse_session_descriptor("client1@127.0.0.1:5001>127.0.0.1:5000").unwrap();
+    fn parses_host_session_descriptor() {
+        let descriptor = parse_session_descriptor("host@0.0.0.0:5000").unwrap();
+        assert_eq!(descriptor.role, SessionRole::Host);
+        assert_eq!(descriptor.local_handle, 0);
+        assert_eq!(descriptor.local_bind_addr, "0.0.0.0:5000".parse().unwrap());
+        assert!(descriptor.peer_addrs.is_empty());
+    }
+
+    #[test]
+    fn parses_simple_client_session_descriptor_with_ephemeral_bind() {
+        let descriptor = parse_session_descriptor("client@192.168.1.10:5000").unwrap();
         assert_eq!(descriptor.role, SessionRole::Client);
         assert_eq!(descriptor.local_handle, 1);
-        assert_eq!(descriptor.peer_addrs.len(), 1);
+        assert_eq!(descriptor.local_bind_addr, "0.0.0.0:0".parse().unwrap());
+        assert_eq!(
+            descriptor.host_addr,
+            Some("192.168.1.10:5000".parse().unwrap())
+        );
+        assert_eq!(
+            descriptor.peer_addrs,
+            vec!["192.168.1.10:5000".parse().unwrap()]
+        );
+    }
+
+    #[test]
+    fn parses_legacy_client_session_descriptor_without_advertising_legacy_bind() {
+        let descriptor =
+            parse_session_descriptor("client2@0.0.0.0:5001>192.168.1.10:5000").unwrap();
+        assert_eq!(descriptor.role, SessionRole::Client);
+        assert_eq!(descriptor.local_handle, 2);
+        assert_eq!(descriptor.local_bind_addr, "0.0.0.0:0".parse().unwrap());
+        assert_eq!(
+            descriptor.host_addr,
+            Some("192.168.1.10:5000".parse().unwrap())
+        );
+        assert_eq!(
+            descriptor.peer_addrs,
+            vec!["192.168.1.10:5000".parse().unwrap()]
+        );
     }
 }

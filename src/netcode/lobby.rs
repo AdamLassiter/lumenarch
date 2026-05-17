@@ -75,6 +75,8 @@ pub(crate) struct LobbyRuntime {
 struct HostClientConn {
     stream: TcpStream,
     recv_buffer: Vec<u8>,
+    remote_addr: SocketAddr,
+    host_addr_for_client: SocketAddr,
     bind_addr: Option<SocketAddr>,
     handle: Option<usize>,
     profile: Option<LocalPlayerProfile>,
@@ -169,9 +171,10 @@ pub(crate) fn start_lobby_runtime(
             thread::spawn(move || run_host_lobby(bind_addr, profile, event_tx, control_rx));
         }
         SessionRole::Client => {
-            let host_addr = *descriptor.peer_addrs.first().ok_or_else(|| {
-                "client descriptor must include a host address after '>'".to_string()
-            })?;
+            let host_addr = *descriptor
+                .peer_addrs
+                .first()
+                .ok_or_else(|| "client descriptor must include a host address".to_string())?;
             let bind_addr = descriptor.local_bind_addr;
             let profile = profile.clone();
             thread::spawn(move || {
@@ -303,6 +306,7 @@ fn run_host_lobby(
             match listener.accept() {
                 Ok((stream, remote_addr)) => {
                     log::info!("Accepted lobby TCP connection from {}", remote_addr);
+                    let host_addr_for_client = stream.local_addr().unwrap_or(bind_addr);
                     if let Err(error) = stream.set_nonblocking(true) {
                         log::warn!(
                             "Failed to make host lobby connection {} nonblocking: {}",
@@ -314,6 +318,8 @@ fn run_host_lobby(
                     clients.push(HostClientConn {
                         stream,
                         recv_buffer: Vec::new(),
+                        remote_addr,
+                        host_addr_for_client,
                         bind_addr: None,
                         handle: None,
                         profile: None,
@@ -351,10 +357,16 @@ fn run_host_lobby(
                                 Ok(LobbyClientMessage::Join { bind_addr, profile }) => {
                                     let previous_addr = client.bind_addr;
                                     let previous_profile = client.profile.clone();
-                                    client.bind_addr = Some(bind_addr);
+                                    let resolved_bind_addr =
+                                        resolved_client_p2p_addr(client.remote_addr, bind_addr);
+                                    client.bind_addr = Some(resolved_bind_addr);
                                     client.profile = Some(profile);
-                                    if previous_addr != Some(bind_addr) {
-                                        log::info!("Lobby join registered for {}", bind_addr);
+                                    if previous_addr != Some(resolved_bind_addr) {
+                                        log::info!(
+                                            "Lobby join registered for {} from advertised {}",
+                                            resolved_bind_addr,
+                                            bind_addr
+                                        );
                                         snapshot_changed = true;
                                     }
                                     if previous_profile != client.profile {
@@ -620,12 +632,8 @@ fn broadcast_start_session(
         let Some(local_handle) = client.handle else {
             continue;
         };
-        let peer_addrs = ordered_players
-            .iter()
-            .enumerate()
-            .filter(|(handle, _)| *handle != local_handle)
-            .map(|(_, addr)| *addr)
-            .collect::<Vec<_>>();
+        let peer_addrs =
+            peer_addrs_for_client(&ordered_players, local_handle, client.host_addr_for_client);
         let message = LobbyServerMessage::StartSession(Box::new(LobbySessionStart {
             local_handle,
             peer_addrs,
@@ -648,4 +656,64 @@ fn send_json_line<T: Serialize>(stream: &mut TcpStream, message: &T) -> std::io:
         .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
     encoded.push(b'\n');
     stream.write_all(&encoded)
+}
+
+fn resolved_client_p2p_addr(
+    remote_addr: SocketAddr,
+    advertised_bind_addr: SocketAddr,
+) -> SocketAddr {
+    SocketAddr::new(remote_addr.ip(), advertised_bind_addr.port())
+}
+
+fn peer_addrs_for_client(
+    ordered_players: &[SocketAddr],
+    local_handle: usize,
+    host_addr_for_client: SocketAddr,
+) -> Vec<SocketAddr> {
+    ordered_players
+        .iter()
+        .enumerate()
+        .filter(|(handle, _)| *handle != local_handle)
+        .map(|(handle, addr)| {
+            if handle == 0 {
+                host_addr_for_client
+            } else {
+                *addr
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn host_resolves_client_peer_ip_from_tcp_connection() {
+        let remote_addr = "192.168.1.44:61000".parse().unwrap();
+        let advertised_bind_addr = "0.0.0.0:54321".parse().unwrap();
+
+        assert_eq!(
+            resolved_client_p2p_addr(remote_addr, advertised_bind_addr),
+            "192.168.1.44:54321".parse().unwrap()
+        );
+    }
+
+    #[test]
+    fn client_start_peers_use_connection_local_addr_for_host() {
+        let ordered_players = vec![
+            "0.0.0.0:5000".parse().unwrap(),
+            "192.168.1.44:54321".parse().unwrap(),
+            "192.168.1.45:54322".parse().unwrap(),
+        ];
+        let host_addr_for_client = "192.168.1.10:5000".parse().unwrap();
+
+        assert_eq!(
+            peer_addrs_for_client(&ordered_players, 1, host_addr_for_client),
+            vec![
+                "192.168.1.10:5000".parse().unwrap(),
+                "192.168.1.45:54322".parse().unwrap()
+            ]
+        );
+    }
 }

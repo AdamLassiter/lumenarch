@@ -5,8 +5,6 @@ use bevy::{
 
 use super::{netcode, view::format_textbox_value};
 use crate::{
-    DEFAULT_CLIENT_ADDR,
-    DEFAULT_HOST_ADDR,
     helpers::editor::referenced_enemy_id_for_name,
     state::{
         EditorMode,
@@ -81,13 +79,6 @@ pub(crate) fn edit_lobby_textboxes(
             | netcode::SessionPhase::Lobby
             | netcode::SessionPhase::Starting
     );
-    if matches!(status.phase, netcode::SessionPhase::Failed(_))
-        && config.session_descriptor.starts_with("host@")
-    {
-        config.session_descriptor =
-            format!("client1@{}>{}", DEFAULT_CLIENT_ADDR, DEFAULT_HOST_ADDR);
-    }
-
     let ctrl_pressed = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     normalize_cursor(
         field,

@@ -2,7 +2,6 @@ use bevy::{ecs::hierarchy::ChildSpawnerCommands, prelude::*};
 
 use super::{NORMAL_BUTTON, netcode};
 use crate::{
-    DEFAULT_CLIENT_ADDR,
     DEFAULT_HOST_ADDR,
     state::{
         DebugEnemyEditorButton,
@@ -72,8 +71,8 @@ pub(crate) fn spawn_lobby_ui(
                     );
                     panel.spawn((
                         Text::new(format!(
-                            "Examples: host@{} or client1@{}>{}",
-                            DEFAULT_HOST_ADDR, DEFAULT_CLIENT_ADDR, DEFAULT_HOST_ADDR
+                            "Host: {} or host@{}   Client: client@{}",
+                            DEFAULT_HOST_ADDR, DEFAULT_HOST_ADDR, DEFAULT_HOST_ADDR
                         )),
                         TextFont {
                             font: title_font.clone(),
@@ -472,9 +471,10 @@ pub(super) fn lobby_status_line(status: &netcode::SessionStatus, server_addr: &s
 }
 
 pub(super) fn session_descriptor_role(server_addr: &str) -> Option<netcode::SessionRole> {
-    if server_addr.starts_with("host@") {
+    let trimmed = server_addr.trim();
+    if trimmed.starts_with("host@") || trimmed.parse::<std::net::SocketAddr>().is_ok() {
         Some(netcode::SessionRole::Host)
-    } else if server_addr.starts_with("client") {
+    } else if trimmed.starts_with("client") {
         Some(netcode::SessionRole::Client)
     } else {
         None

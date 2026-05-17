@@ -3317,6 +3317,7 @@ dependencies = [
  "bevy",
  "bevy_ggrs 0.21.0",
  "bevy_roll_safe",
+ "bincode",
  "cordic",
  "fixed",
  "ggrs 0.12.0",

@@ -51,7 +51,6 @@ pub(crate) const TICK_FPS: u64 = 30;
 pub(crate) const TICK_MILLIS: u64 = 1000 / TICK_FPS;
 
 pub(crate) const DEFAULT_HOST_ADDR: &str = "127.0.0.1:5000";
-pub(crate) const DEFAULT_CLIENT_ADDR: &str = "127.0.0.1:5001";
 pub(crate) const TILE_SIZE: f32 = 32.0;
 pub(crate) const HALF_TILE_SIZE: f32 = TILE_SIZE * 0.5;
 pub(crate) const TOOLBOX_WIDTH: f32 = 280.0;

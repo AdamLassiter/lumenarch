@@ -176,7 +176,7 @@ pub(crate) struct SessionConfig {
 impl Default for SessionConfig {
     fn default() -> Self {
         Self {
-            session_descriptor: format!("host@{DEFAULT_HOST_ADDR}"),
+            session_descriptor: DEFAULT_HOST_ADDR.to_string(),
             input_delay: 2,
             check_distance: 8,
         }
