@@ -629,8 +629,18 @@ pub(crate) fn handle_player_cargo_interaction(
             mission_state.recent_action_timer = Fx::from_num(1.5);
             return;
         };
+        if let Some(resource_kind) = deposit.resource_kind
+            && !storage.accepts(resource_kind)
+        {
+            mission_state.recent_action =
+                Some(format!("This storage cannot accept {}", deposit.label));
+            mission_state.recent_action_timer = Fx::from_num(1.5);
+            return;
+        }
         if storage.inventory.total_units() + deposit.resource_amount > storage.capacity {
-            continue;
+            mission_state.recent_action = Some("Storage is full".to_string());
+            mission_state.recent_action_timer = Fx::from_num(1.5);
+            return;
         }
         if let Some((component_kind, component_variant, component_amount)) = deposit.component {
             storage.add_damaged_component(component_kind, component_variant, component_amount);
@@ -645,7 +655,7 @@ pub(crate) fn handle_player_cargo_interaction(
             mission_state.salvage_scrap_awarded += deposit.resource_amount;
             mission_state.salvage_collected = true;
             mission_state.completion_reason = Some("Cargo recovered aboard".to_string());
-        } else if deposit.resource_kind.is_some() {
+        } else if deposit.resource_kind == Some(ResourceKind::RepairCharge) {
             mission_state.processed_repair_charge += deposit.resource_amount;
         }
         mission_state.recent_action = Some(format!("Deposited {} aboard ship", deposit.label));

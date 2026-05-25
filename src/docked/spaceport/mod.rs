@@ -28,6 +28,7 @@ use crate::{
         EditorSessionState,
         EditorShip,
         LocalPlayerProfile,
+        MainCamera,
         Progression,
         SectorState,
     },

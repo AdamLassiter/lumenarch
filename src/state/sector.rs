@@ -400,6 +400,8 @@ pub(crate) struct LastMissionReport {
     pub(crate) automation_triggers: u32,
     pub(crate) redesign_hints: Vec<String>,
     pub(crate) recovered_raw_salvage: u32,
+    #[serde(default)]
+    pub(crate) recovered_damaged_components: u32,
     pub(crate) processed_repair_charge: u32,
     pub(crate) consumed_repair_charge: u32,
     pub(crate) transfer_count: u32,

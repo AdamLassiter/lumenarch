@@ -1,27 +1,29 @@
 use bevy::{ecs::relationship::Relationship, prelude::*};
 
-use crate::{
-    gameplay::{
-        components::{
-            CurrentStation,
-            DestroyedModule,
-            EquippedSuit,
-            HostileShip,
-            Integrity,
-            InteractionKind,
-            ModuleRuntimeState,
-            NearbyInteraction,
-            PlayerHandleComponent,
-            PlayerMotionState,
-            PlayerReferenceFrame,
-            PlayerSuit,
-            RuntimeShipModule,
-            ShipRoot,
-            ShipboardPlayer,
-        },
-        helpers::{interaction_for_module, interaction_prompt, module_needs_repair},
+use crate::gameplay::{
+    components::{
+        CurrentStation,
+        DestroyedModule,
+        EquippedSuit,
+        HostileShip,
+        Integrity,
+        InteractionKind,
+        ModuleRuntimeState,
+        NearbyInteraction,
+        PlayerHandleComponent,
+        PlayerMotionState,
+        PlayerReferenceFrame,
+        PlayerSuit,
+        RuntimeShipModule,
+        ShipRoot,
+        ShipboardPlayer,
     },
-    ship::ModuleKind,
+    helpers::{
+        interaction_for_module,
+        interaction_prompt,
+        module_can_be_extracted,
+        module_needs_repair,
+    },
 };
 
 /// Finds the nearest valid module interaction for each player so contextual prompts feel immediate.
@@ -76,10 +78,12 @@ pub(crate) fn detect_nearby_interactions(
         let needs_repair = module_needs_repair(integrity, runtime_state, destroyed.is_some());
 
         if on_hostile_ship
-            && runtime_module.kind != ModuleKind::Core
-            && runtime_module.kind != ModuleKind::Cockpit
-            && !runtime_state.extracted
-            && needs_repair
+            && module_can_be_extracted(
+                runtime_module.kind,
+                integrity,
+                runtime_state,
+                destroyed.is_some(),
+            )
         {
             if equipped_suit.suit != PlayerSuit::Welder {
                 nearby.unavailable_reason = Some("need welder suit for extraction".to_string());

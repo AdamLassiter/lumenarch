@@ -308,6 +308,10 @@ pub(crate) fn return_after_mission_resolution(
         * mission_state.reward_multiplier.max(1);
     let mut progression = rollback_state.progression.clone();
     progression.scrap += logistics_payout;
+    let recovered_damaged_component_count = returned_damaged_components
+        .iter()
+        .map(|component| component.damaged)
+        .sum::<u32>();
     for component in returned_damaged_components {
         progression.add_damaged_component(component.kind, component.variant, component.damaged);
     }
@@ -357,12 +361,18 @@ pub(crate) fn return_after_mission_resolution(
             .unwrap_or_else(|| "The ship was lost.".to_string())
     } else if mission_state.salvage_collected {
         format!(
-            "Recovered {} raw salvage and returned {} repair charge worth {} scrap (+{} contract bonus).{}",
+            "Recovered {} raw salvage, {} damaged components, and returned {} repair charge worth {} scrap (+{} contract bonus).{}",
             mission_state.recovered_raw_salvage,
+            recovered_damaged_component_count,
             repair_charge_returned,
             mission_state.salvage_scrap_awarded,
             contract_bonus,
             atmosphere_suffix
+        )
+    } else if recovered_damaged_component_count > 0 {
+        format!(
+            "Recovered {} damaged components. Contract bonus {} scrap.{}",
+            recovered_damaged_component_count, contract_bonus, atmosphere_suffix
         )
     } else {
         format!(
@@ -439,6 +449,7 @@ pub(crate) fn return_after_mission_resolution(
             .flat_map(|computer| computer.last_result.recent_writes.clone())
             .take(4)
             .collect(),
+        recovered_damaged_components: recovered_damaged_component_count,
         ..Default::default()
     };
     let mut hints = Vec::new();

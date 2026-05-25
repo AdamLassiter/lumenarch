@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{ecs::relationship::Relationship, prelude::*};
 
 use super::super::control::focus_station;
 use crate::gameplay::{
@@ -20,13 +20,14 @@ use crate::gameplay::{
         RuntimeArchComputer,
         RuntimeShipModule,
         ShipControlMode,
+        ShipInfrastructureState,
         ShipRoot,
         ShipboardControlState,
         ShipboardPlayer,
         StationFamily,
         StorageModule,
     },
-    helpers::Fx,
+    helpers::{Fx, module_can_be_extracted},
 };
 
 /// Applies queued interaction messages to modules so player intent changes game state deterministically.
@@ -39,6 +40,7 @@ pub(crate) fn apply_module_interactions(
     mut module_query: Query<(
         Entity,
         &RuntimeShipModule,
+        &ChildOf,
         &mut Integrity,
         &mut ModuleRuntimeState,
         Option<&ArchComputerModule>,
@@ -47,11 +49,13 @@ pub(crate) fn apply_module_interactions(
     )>,
     mut logistics_query: Query<(
         &RuntimeShipModule,
+        &ChildOf,
         Option<&mut StorageModule>,
         Option<&mut ProcessorModule>,
         Option<&ManipulatorModule>,
         Option<&DestroyedModule>,
     )>,
+    infrastructure_query: Query<&ShipInfrastructureState>,
 ) {
     let mut mission_state = mission_query.into_inner();
     for event in instant_events.read() {
@@ -73,6 +77,7 @@ pub(crate) fn apply_module_interactions(
             &mut mission_state,
             &mut module_query,
             &mut logistics_query,
+            &infrastructure_query,
         );
     }
 }
@@ -84,6 +89,7 @@ fn apply_instant_interaction(
     module_query: &mut Query<(
         Entity,
         &RuntimeShipModule,
+        &ChildOf,
         &mut Integrity,
         &mut ModuleRuntimeState,
         Option<&ArchComputerModule>,
@@ -93,7 +99,7 @@ fn apply_instant_interaction(
 ) {
     match event.kind {
         InteractionKind::Cockpit => {
-            if let Ok((entity, runtime_module, _, _, _, _, destroyed)) =
+            if let Ok((entity, runtime_module, _, _, _, _, _, destroyed)) =
                 module_query.get_mut(event.target)
                 && destroyed.is_none()
             {
@@ -109,7 +115,7 @@ fn apply_instant_interaction(
             }
         }
         InteractionKind::Computer => {
-            if let Ok((entity, runtime_module, _, _, computer, arch_runtime, destroyed)) =
+            if let Ok((entity, runtime_module, _, _, _, computer, arch_runtime, destroyed)) =
                 module_query.get_mut(event.target)
                 && computer.is_some()
                 && destroyed.is_none()
@@ -131,7 +137,7 @@ fn apply_instant_interaction(
             }
         }
         InteractionKind::Storage => {
-            if let Ok((entity, runtime_module, _, _, _, _, destroyed)) =
+            if let Ok((entity, runtime_module, _, _, _, _, _, destroyed)) =
                 module_query.get_mut(event.target)
                 && destroyed.is_none()
             {
@@ -147,7 +153,7 @@ fn apply_instant_interaction(
             }
         }
         InteractionKind::Manipulator => {
-            if let Ok((entity, runtime_module, _, _, _, _, destroyed)) =
+            if let Ok((entity, runtime_module, _, _, _, _, _, destroyed)) =
                 module_query.get_mut(event.target)
                 && destroyed.is_none()
             {
@@ -163,7 +169,7 @@ fn apply_instant_interaction(
             }
         }
         InteractionKind::Processor => {
-            if let Ok((entity, runtime_module, _, _, _, _, destroyed)) =
+            if let Ok((entity, runtime_module, _, _, _, _, _, destroyed)) =
                 module_query.get_mut(event.target)
                 && destroyed.is_none()
             {
@@ -179,7 +185,7 @@ fn apply_instant_interaction(
             }
         }
         InteractionKind::Reactor => {
-            if let Ok((entity, runtime_module, _, _, _, _, destroyed)) =
+            if let Ok((entity, runtime_module, _, _, _, _, _, destroyed)) =
                 module_query.get_mut(event.target)
                 && destroyed.is_none()
             {
@@ -195,7 +201,7 @@ fn apply_instant_interaction(
             }
         }
         InteractionKind::Turret => {
-            if let Ok((entity, runtime_module, _, mut runtime_state, _, _, destroyed)) =
+            if let Ok((entity, runtime_module, _, _, mut runtime_state, _, _, destroyed)) =
                 module_query.get_mut(event.target)
                 && destroyed.is_none()
             {
@@ -213,7 +219,7 @@ fn apply_instant_interaction(
             }
         }
         InteractionKind::Engine => {
-            if let Ok((_, _, _, mut runtime_state, _, _, destroyed)) =
+            if let Ok((_, _, _, _, mut runtime_state, _, _, destroyed)) =
                 module_query.get_mut(event.target)
                 && destroyed.is_none()
             {
@@ -238,6 +244,7 @@ fn apply_completed_interaction(
     module_query: &mut Query<(
         Entity,
         &RuntimeShipModule,
+        &ChildOf,
         &mut Integrity,
         &mut ModuleRuntimeState,
         Option<&ArchComputerModule>,
@@ -246,16 +253,27 @@ fn apply_completed_interaction(
     )>,
     logistics_query: &mut Query<(
         &RuntimeShipModule,
+        &ChildOf,
         Option<&mut StorageModule>,
         Option<&mut ProcessorModule>,
         Option<&ManipulatorModule>,
         Option<&DestroyedModule>,
     )>,
+    infrastructure_query: &Query<&ShipInfrastructureState>,
 ) {
-    if let Ok((_, runtime_module, mut integrity, mut runtime_state, _, _, destroyed)) =
+    if let Ok((_, runtime_module, parent, mut integrity, mut runtime_state, _, _, destroyed)) =
         module_query.get_mut(event.target)
     {
         if event.kind == InteractionKind::Extract {
+            if !module_can_be_extracted(
+                runtime_module.kind,
+                &integrity,
+                &runtime_state,
+                destroyed.is_some(),
+            ) {
+                set_recent_action(mission_state, "No recoverable component here", 1.8);
+                return;
+            }
             let Ok(mut carried) = player_cargo_query.get_mut(event.player) else {
                 return;
             };
@@ -283,7 +301,12 @@ fn apply_completed_interaction(
             return;
         }
         if event.kind == InteractionKind::Repair {
-            let used_repair_charge = try_consume_repair_charge(logistics_query);
+            let used_repair_charge = try_consume_repair_charge(
+                infrastructure_query.get(parent.get()).ok(),
+                parent.get(),
+                runtime_module.module_id,
+                logistics_query,
+            );
             if used_repair_charge {
                 integrity.current = (integrity.current + 6).min(integrity.max);
                 runtime_state.current_heat =
@@ -316,24 +339,46 @@ fn apply_completed_interaction(
 }
 
 fn try_consume_repair_charge(
+    infrastructure: Option<&ShipInfrastructureState>,
+    ship_entity: Entity,
+    target_module_id: u64,
     logistics_query: &mut Query<(
         &RuntimeShipModule,
+        &ChildOf,
         Option<&mut StorageModule>,
         Option<&mut ProcessorModule>,
         Option<&ManipulatorModule>,
         Option<&DestroyedModule>,
     )>,
 ) -> bool {
-    for (_, storage, processor, _, destroyed) in logistics_query.iter_mut() {
+    let Some(infrastructure) = infrastructure else {
+        return false;
+    };
+    let Some(network_id) =
+        infrastructure.module_resource_network(target_module_id, ResourceKind::RepairCharge)
+    else {
+        return false;
+    };
+    for (runtime_module, parent, storage, processor, _, destroyed) in logistics_query.iter_mut() {
+        if parent.get() != ship_entity {
+            continue;
+        }
         if destroyed.is_some() {
             continue;
         }
         if let Some(mut storage) = storage
+            && storage.accepts(ResourceKind::RepairCharge)
+            && infrastructure
+                .module_resource_network(runtime_module.module_id, ResourceKind::RepairCharge)
+                == Some(network_id)
             && storage.inventory.remove(ResourceKind::RepairCharge, 1) > 0
         {
             return true;
         }
         if let Some(mut processor) = processor
+            && infrastructure
+                .module_resource_network(runtime_module.module_id, ResourceKind::RepairCharge)
+                == Some(network_id)
             && processor.inventory.remove(ResourceKind::RepairCharge, 1) > 0
         {
             return true;

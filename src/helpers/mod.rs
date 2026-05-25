@@ -49,6 +49,7 @@ pub(crate) use interactions::{
     interaction_hold_duration,
     interaction_prompt,
     is_hold_interaction,
+    module_can_be_extracted,
     module_needs_repair,
     resource_kind_label,
     sprite_path_for_kind,

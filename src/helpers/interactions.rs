@@ -72,6 +72,33 @@ pub(crate) fn module_needs_repair(
             || runtime_state.is_disabled)
 }
 
+pub(crate) fn module_can_be_extracted(
+    kind: ModuleKind,
+    integrity: &Integrity,
+    runtime_state: &ModuleRuntimeState,
+    destroyed: bool,
+) -> bool {
+    module_is_salvageable(kind)
+        && !runtime_state.extracted
+        && (destroyed
+            || integrity.current < integrity.max
+            || runtime_state.needs_attention
+            || runtime_state.is_disabled)
+}
+
+pub(crate) fn module_is_salvageable(kind: ModuleKind) -> bool {
+    !matches!(
+        kind,
+        ModuleKind::Core
+            | ModuleKind::Hull
+            | ModuleKind::HullInnerCorner
+            | ModuleKind::HullOuterCorner
+            | ModuleKind::Interior
+            | ModuleKind::InteriorWall
+            | ModuleKind::Cockpit
+    )
+}
+
 pub(crate) fn interaction_prompt(kind: InteractionKind) -> &'static str {
     match kind {
         InteractionKind::Cockpit => "E: enter cockpit station",
@@ -188,6 +215,48 @@ mod tests {
             &integrity(1, 10),
             &runtime_state,
             true
+        ));
+    }
+
+    #[test]
+    fn extraction_requires_salvageable_damaged_or_destroyed_modules() {
+        let runtime_state = runtime_state();
+
+        assert!(module_can_be_extracted(
+            ModuleKind::Turret,
+            &integrity(4, 10),
+            &runtime_state,
+            false
+        ));
+        assert!(module_can_be_extracted(
+            ModuleKind::Engine,
+            &integrity(10, 10),
+            &runtime_state,
+            true
+        ));
+        assert!(!module_can_be_extracted(
+            ModuleKind::Turret,
+            &integrity(10, 10),
+            &runtime_state,
+            false
+        ));
+        assert!(!module_can_be_extracted(
+            ModuleKind::Core,
+            &integrity(4, 10),
+            &runtime_state,
+            false
+        ));
+        assert!(!module_can_be_extracted(
+            ModuleKind::Hull,
+            &integrity(4, 10),
+            &runtime_state,
+            false
+        ));
+        assert!(!module_can_be_extracted(
+            ModuleKind::Cockpit,
+            &integrity(4, 10),
+            &runtime_state,
+            false
         ));
     }
 }

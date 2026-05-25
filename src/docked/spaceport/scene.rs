@@ -9,10 +9,17 @@ pub(crate) fn spawn_docked_spaceport_scene(
     avatar_memory: Res<DockedAvatarMemory>,
     local_profile: Res<LocalPlayerProfile>,
     local_handle: Option<Res<LocalPlayerHandle>>,
+    mut camera_query: Query<(&mut Transform, &mut Projection), (With<Camera2d>, With<MainCamera>)>,
 ) {
     let Some(station) = stations::current_station(&stations.0, &sector_state) else {
         return;
     };
+    for (mut transform, mut projection) in &mut camera_query {
+        *transform = Transform::from_xyz(0.0, 0.0, 1000.0);
+        if let Projection::Orthographic(projection) = projection.as_mut() {
+            projection.scale = 1.0;
+        }
+    }
     let mut scene_state = docked_scene_state(station, &editor_ship.ship);
     restore_docked_avatar_if_walkable(
         station,

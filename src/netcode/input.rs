@@ -259,6 +259,21 @@ pub(crate) fn apply_host_meta_ops(
         }
         RollbackMetaOp::ReturnToDock => {
             log::info!("Applying host meta op: ReturnToDock");
+            rollback_state.sector.active_encounter_node_id = None;
+            if rollback_state
+                .sector
+                .current_node()
+                .and_then(|node| node.station_id.as_ref())
+                .is_none()
+                && let Some(station_node_id) = rollback_state
+                    .sector
+                    .nodes
+                    .iter()
+                    .find(|node| matches!(node.kind, SectorNodeKind::HubStation))
+                    .map(|node| node.id)
+            {
+                rollback_state.sector.current_node_id = station_node_id;
+            }
             rollback_state.phase = RollbackPhase::Docked;
         }
         RollbackMetaOp::LeaveEditor => {

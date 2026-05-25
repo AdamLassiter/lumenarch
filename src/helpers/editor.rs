@@ -97,7 +97,7 @@ pub(crate) fn editor_status_line(
 pub(crate) fn editor_mission_report_text(last_mission_report: &LastMissionReport) -> String {
     match (&last_mission_report.headline, &last_mission_report.detail) {
         (Some(headline), Some(detail)) => format!(
-            "Last Mission: {headline}\n{detail}\nScrap Awarded: {}\nTotal Scrap: {}\nHottest Module: {}\nFirst Disabled: {}\nRepairs / Stabilizations: {} / {}\nAutomation Used: {}\nARCH Program: {}\nARCH Invalid / Recent Writes: {} / {}\nRecovered Raw: {}\nProcessed / Used Charges: {} / {}\nTransfers / Processor Cycles: {} / {}\nLogistics Bottleneck: {}{}",
+            "Last Mission: {headline}\n{detail}\nScrap Awarded: {}\nTotal Scrap: {}\nHottest Module: {}\nFirst Disabled: {}\nRepairs / Stabilizations: {} / {}\nAutomation Used: {}\nARCH Program: {}\nARCH Invalid / Recent Writes: {} / {}\nRecovered Raw / Components: {} / {}\nProcessed / Used Charges: {} / {}\nTransfers / Processor Cycles: {} / {}\nLogistics Bottleneck: {}{}",
             last_mission_report.scrap_awarded,
             last_mission_report.total_scrap,
             last_mission_report
@@ -126,6 +126,7 @@ pub(crate) fn editor_mission_report_text(last_mission_report: &LastMissionReport
                 last_mission_report.arch_recent_writes.join(", ")
             },
             last_mission_report.recovered_raw_salvage,
+            last_mission_report.recovered_damaged_components,
             last_mission_report.processed_repair_charge,
             last_mission_report.consumed_repair_charge,
             last_mission_report.transfer_count,
