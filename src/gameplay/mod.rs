@@ -12,9 +12,7 @@ pub(crate) use spawn::{
     log_runtime_hostile_scene_summary,
     runtime_scene_missing,
     runtime_scene_present,
-    ship_visual_center,
     spawn_runtime_scene,
-    spawn_ship_layer_visuals,
 };
 pub(crate) use systems::{
     advance_projectiles,

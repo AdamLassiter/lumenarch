@@ -163,3 +163,21 @@ pub(crate) fn sector_navigation_button_system(
         }
     }
 }
+
+/// Mirrors the sector-map back action onto Q/Escape so navigation screens share the same quit shortcut.
+pub(crate) fn sector_navigation_keyboard_system(
+    keys: Res<ButtonInput<KeyCode>>,
+    status: Res<netcode::SessionStatus>,
+    mut pending_meta: ResMut<netcode::PendingLocalMetaCommand>,
+) {
+    if !netcode::is_host_authority(&status) {
+        return;
+    }
+    if keys.just_pressed(KeyCode::KeyQ) || keys.just_pressed(KeyCode::Escape) {
+        log::debug!("Sector map queued ReturnToDock meta command from keyboard");
+        pending_meta.0 = Some(netcode::PendingMetaCommand {
+            op: netcode::RollbackMetaOp::ReturnToDock,
+            ..Default::default()
+        });
+    }
+}

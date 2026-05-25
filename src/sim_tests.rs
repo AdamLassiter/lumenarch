@@ -319,8 +319,16 @@ fn seed_test_player_ship(app: &mut App) {
         0,
         0,
     ));
+    ship.replace_logistics_tile(ShipFoundationTile::new(
+        3,
+        ShipFoundationKind::Floor,
+        -1,
+        0,
+        0,
+    ));
     ship.replace_module(ShipModule::new(1, ModuleKind::Core, 0, 0, 0));
     ship.replace_module(ShipModule::new(2, ModuleKind::Cockpit, 1, 0, 0));
+    ship.replace_module(ShipModule::new(3, ModuleKind::Airlock, -1, 0, 0));
 
     app.world_mut()
         .resource_mut::<RollbackGameState>()

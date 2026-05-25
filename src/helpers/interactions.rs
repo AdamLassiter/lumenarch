@@ -8,10 +8,11 @@ use crate::{
 pub(crate) fn sprite_path_for_kind(kind: &ModuleKind, variant: ModuleVariant) -> String {
     let _ = variant;
     match kind {
-        ModuleKind::Turret => "tiles/hardpoint.png".to_string(),
-        ModuleKind::Shield => "tiles/battery.png".to_string(),
-        ModuleKind::Detector => "tiles/computer.png".to_string(),
-        _ => format!("tiles/{}.png", kind.as_str()),
+        ModuleKind::Airlock | ModuleKind::Engine => format!("tiles/hull/{}.png", kind.as_str()),
+        ModuleKind::Turret => "tiles/hull/hardpoint.png".to_string(),
+        ModuleKind::Shield => "tiles/components/battery.png".to_string(),
+        ModuleKind::Detector => "tiles/components/computer.png".to_string(),
+        _ => format!("tiles/components/{}.png", kind.as_str()),
     }
 }
 

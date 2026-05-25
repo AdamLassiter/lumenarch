@@ -4,8 +4,8 @@ use bevy::prelude::*;
 
 use crate::{
     TILE_SIZE,
-    helpers::{sprite_path_for_foundation_connections, sprite_path_for_kind},
-    ship::{ModuleKind, ShipDefinition, ShipFoundationKind, ShipFoundationTile, ShipModule},
+    helpers::sprite_path_for_foundation_connections,
+    ship::{ModuleKind, ShipDefinition, ShipFoundationKind, ShipFoundationTile},
 };
 
 fn foundation_sprite_with_connections(
@@ -83,82 +83,6 @@ pub(crate) fn spawn_foundation_visual<B: Bundle>(
                 rotation: Quat::from_rotation_z(
                     -((tile.rotation_quadrants + connection_rotation) as f32) * FRAC_PI_2,
                 ),
-                ..default()
-            },
-            extra,
-        ))
-        .id()
-}
-
-pub(crate) fn spawn_ship_layer_visuals<B: Bundle + Clone>(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    ship: &ShipDefinition,
-    center_x: f32,
-    center_y: f32,
-    extra: B,
-) -> Vec<Entity> {
-    let mut entities = Vec::new();
-    for tile in &ship.foundation_tiles {
-        entities.push(spawn_foundation_visual(
-            commands,
-            asset_server,
-            ship,
-            tile,
-            center_x,
-            center_y,
-            extra.clone(),
-        ));
-    }
-    for tile in &ship.hull_tiles {
-        entities.push(spawn_foundation_visual(
-            commands,
-            asset_server,
-            ship,
-            tile,
-            center_x,
-            center_y,
-            extra.clone(),
-        ));
-    }
-    for module in ship.modules.iter().filter(|module| {
-        !matches!(
-            module.kind,
-            ModuleKind::Hull | ModuleKind::HullInnerCorner | ModuleKind::HullOuterCorner
-        )
-    }) {
-        entities.push(spawn_module_visual(
-            commands,
-            asset_server,
-            module,
-            center_x,
-            center_y,
-            extra.clone(),
-        ));
-    }
-    entities
-}
-
-pub(crate) fn spawn_module_visual<B: Bundle>(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    module: &ShipModule,
-    center_x: f32,
-    center_y: f32,
-    extra: B,
-) -> Entity {
-    commands
-        .spawn((
-            Sprite::from_image(
-                asset_server.load(sprite_path_for_kind(&module.kind, module.variant)),
-            ),
-            Transform {
-                translation: Vec3::new(
-                    (module.grid_x as f32 - center_x) * TILE_SIZE,
-                    -((module.grid_y as f32) - center_y) * TILE_SIZE,
-                    module_visual_z(module.kind),
-                ),
-                rotation: Quat::from_rotation_z(-(module.rotation_quadrants as f32) * FRAC_PI_2),
                 ..default()
             },
             extra,

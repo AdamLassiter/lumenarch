@@ -5,6 +5,7 @@ use crate::{
     DEFAULT_HOST_ADDR,
     state::{
         DebugEnemyEditorButton,
+        DebugStationEditorButton,
         FocusedTextBox,
         GraphicsOptions,
         JoinButton,
@@ -225,6 +226,30 @@ pub(crate) fn spawn_lobby_ui(
                         ))
                         .with_child((
                             Text::new("Debug Enemy Ships"),
+                            TextFont {
+                                font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                                font_size: 18.0,
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                        ));
+
+                    panel
+                        .spawn((
+                            Button,
+                            Node {
+                                width: Val::Px(240.0),
+                                height: Val::Px(44.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                border_radius: BorderRadius::all(Val::Px(10.0)),
+                                ..default()
+                            },
+                            BackgroundColor(Color::srgb(0.25, 0.40, 0.44)),
+                            DebugStationEditorButton,
+                        ))
+                        .with_child((
+                            Text::new("Debug Stations"),
                             TextFont {
                                 font: asset_server.load("fonts/FiraMono-Medium.ttf"),
                                 font_size: 18.0,

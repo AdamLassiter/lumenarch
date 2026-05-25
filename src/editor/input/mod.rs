@@ -24,7 +24,11 @@ pub(crate) use editing::{
     toggle_editor_module_overlay_shortcuts,
     toolbox_button_system,
 };
-pub(crate) use enemy::{enemy_library_button_system, enemy_library_keyboard_shortcuts};
+pub(crate) use enemy::{
+    enemy_library_button_system,
+    enemy_library_keyboard_shortcuts,
+    ensure_selected_enemy_reference,
+};
 pub(crate) use persistence::{
     load_editor_ship_shortcut,
     pan_and_zoom_editor_view,

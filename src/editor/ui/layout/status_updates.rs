@@ -62,7 +62,10 @@ use crate::{
         ProgrammingLanguageMode,
         Progression,
         SectorState,
+        StationConfigReferencesText,
     },
+    station_editor::{self, StationEditorState},
+    stations::StationCatalogResource,
 };
 
 /// Refreshes editor HUD text and section visibility so the current tool, ship state, and selection stay legible.
@@ -75,6 +78,8 @@ pub(crate) fn update_editor_status_text(
     tool_state: Res<EditorToolState>,
     progression: Res<Progression>,
     sector_state: Res<SectorState>,
+    station_catalog: Res<StationCatalogResource>,
+    station_editor_state: Res<StationEditorState>,
     last_mission_report: Res<LastMissionReport>,
     editor_ui_state: Res<EditorUiState>,
     mut ui_queries: ParamSet<(
@@ -108,17 +113,28 @@ pub(crate) fn update_editor_status_text(
         && !editor_ui_state.is_changed()
         && !enemy_editor_state.is_changed()
         && !enemy_library_state.is_changed()
+        && !station_catalog.is_changed()
+        && !station_editor_state.is_changed()
         && !sector_state.is_changed()
     {
         return;
     }
 
     for mut text in &mut ui_queries.p0() {
+        let entry_label = if editor_session.mode == crate::state::EditorMode::Station {
+            station_editor::station_entry_label(
+                &editor_session,
+                &station_catalog,
+                &station_editor_state,
+            )
+        } else {
+            enemy_entry_label(&editor_session, &enemy_editor_state, &enemy_library_state)
+        };
         **text = editor_status_line(
             editor_session.mode,
             tool_state.tool_mode,
             tool_state.active_layer,
-            &enemy_entry_label(&editor_session, &enemy_editor_state, &enemy_library_state),
+            &entry_label,
             &editor_ship.ship.name,
             &tool_state.selected_kind,
             tool_state.selected_foundation_kind,
@@ -192,6 +208,20 @@ pub(crate) fn update_editor_status_text(
 
     for mut text in &mut ui_queries.p7() {
         **text = enemy_config_references_text(&sector_state, &enemy_library_state);
+    }
+}
+
+/// Refreshes the station reference list in the station editor catalog panel.
+pub(crate) fn update_station_config_references_text(
+    sector_state: Res<SectorState>,
+    station_catalog: Res<StationCatalogResource>,
+    mut query: Query<&mut Text, With<StationConfigReferencesText>>,
+) {
+    if !sector_state.is_changed() && !station_catalog.is_changed() {
+        return;
+    }
+    for mut text in &mut query {
+        **text = station_editor::station_config_references_text(&sector_state, &station_catalog);
     }
 }
 

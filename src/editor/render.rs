@@ -25,6 +25,7 @@ use super::super::{
         Progression,
         ShipFoundationSprite,
         ShipTileSprite,
+        StationToolboxButton,
         ToolboxFoundationButton,
         ToolboxFoundationButtonText,
         ToolboxVariantButton,
@@ -44,6 +45,7 @@ use crate::{
         variant_inventory_label,
     },
     state::{EditorLayer, EditorToolMode},
+    station_editor,
 };
 
 /// Spawns the translucent build preview sprite so placement intent is visible under the cursor.
@@ -51,19 +53,14 @@ pub(crate) fn spawn_preview_tile(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     tool_state: Res<EditorToolState>,
+    station_editor_state: Res<station_editor::StationEditorState>,
 ) {
     commands.spawn((
         Sprite {
             color: Color::srgba(1.0, 1.0, 1.0, 0.72),
-            ..Sprite::from_image(asset_server.load(
-                if tool_state.active_layer != EditorLayer::Components
-                    && !module_belongs_to_hull_layer(tool_state.selected_kind)
-                {
-                    sprite_path_for_foundation(tool_state.selected_foundation_kind)
-                } else {
-                    sprite_path_for_kind(&tool_state.selected_kind, tool_state.selected_variant)
-                },
-            ))
+            ..Sprite::from_image(
+                asset_server.load(preview_sprite_path(&tool_state, &station_editor_state)),
+            )
         },
         Transform::from_xyz(0.0, 0.0, 5.0),
         Visibility::Hidden,
@@ -77,6 +74,7 @@ pub(crate) fn sync_preview_tile(
     window: Single<&Window, With<PrimaryWindow>>,
     camera_query: Single<(&Camera, &GlobalTransform)>,
     tool_state: Res<EditorToolState>,
+    station_editor_state: Res<station_editor::StationEditorState>,
     asset_server: Res<AssetServer>,
     ui_blocker_query: Query<
         (
@@ -104,15 +102,7 @@ pub(crate) fn sync_preview_tile(
     };
 
     *visibility = Visibility::Visible;
-    sprite.image = asset_server.load(
-        if tool_state.active_layer != EditorLayer::Components
-            && !module_belongs_to_hull_layer(tool_state.selected_kind)
-        {
-            sprite_path_for_foundation(tool_state.selected_foundation_kind)
-        } else {
-            sprite_path_for_kind(&tool_state.selected_kind, tool_state.selected_variant)
-        },
-    );
+    sprite.image = asset_server.load(preview_sprite_path(&tool_state, &station_editor_state));
     transform.translation = grid_to_world(
         grid_x,
         grid_y,
@@ -123,6 +113,24 @@ pub(crate) fn sync_preview_tile(
         },
     );
     transform.rotation = Quat::from_rotation_z(-(tool_state.selected_rotation as f32) * FRAC_PI_2);
+}
+
+fn preview_sprite_path(
+    tool_state: &EditorToolState,
+    station_editor_state: &station_editor::StationEditorState,
+) -> String {
+    if tool_state.tool_mode == EditorToolMode::Build
+        && let Some(tool) = station_editor_state.selected_tool
+    {
+        return station_editor::station_tool_sprite_path(tool).to_string();
+    }
+    if tool_state.active_layer != EditorLayer::Components
+        && !module_belongs_to_hull_layer(tool_state.selected_kind)
+    {
+        sprite_path_for_foundation(tool_state.selected_foundation_kind)
+    } else {
+        sprite_path_for_kind(&tool_state.selected_kind, tool_state.selected_variant)
+    }
 }
 
 /// Rebuilds editor ship sprites whenever the authored layout changes so all three layers stay readable.
@@ -215,9 +223,10 @@ pub(crate) fn sync_ship_tile_entities(
         .iter()
         .filter(|module| !is_hull_module_kind(module.kind))
     {
-        let mut sprite = Sprite::from_image(
-            asset_server.load(sprite_path_for_kind(&module.kind, module.variant)),
-        );
+        let sprite_path = station_editor::station_npc_sprite_path_for_module(module)
+            .map(str::to_string)
+            .unwrap_or_else(|| sprite_path_for_kind(&module.kind, module.variant));
+        let mut sprite = Sprite::from_image(asset_server.load(sprite_path));
         let module_layer = if module_belongs_to_hull_layer(module.kind) {
             EditorLayer::Hull
         } else {
@@ -259,6 +268,7 @@ pub(crate) fn sync_toolbox_visuals(
     tool_state: Res<EditorToolState>,
     progression: Res<Progression>,
     editor_session: Res<EditorSessionState>,
+    station_editor_state: Res<crate::station_editor::StationEditorState>,
     mut visuals: ParamSet<(
         Query<'_, '_, (&'static ToolboxVariantButton, &'static mut BackgroundColor)>,
         Query<
@@ -273,17 +283,23 @@ pub(crate) fn sync_toolbox_visuals(
         Query<'_, '_, (&'static EditorToolModeButton, &'static mut BackgroundColor)>,
         Query<'_, '_, (&'static EditorLayerButton, &'static mut BackgroundColor)>,
         Query<'_, '_, (&'static ToolboxFoundationButtonText, &'static mut Text)>,
+        Query<'_, '_, (&'static StationToolboxButton, &'static mut BackgroundColor)>,
     )>,
 ) {
     // SAFETY: Variant, foundation, mode, layer, and label widgets are spawned with distinct marker components;
     // each `ParamSet` branch is accessed in sequence, so no entity is mutably borrowed through two queries at once.
-    if !tool_state.is_changed() && !progression.is_changed() && !editor_session.is_changed() {
+    if !tool_state.is_changed()
+        && !progression.is_changed()
+        && !editor_session.is_changed()
+        && !station_editor_state.is_changed()
+    {
         return;
     }
 
     for (button, mut background) in &mut visuals.p0() {
         let affordable = tool_state.ignore_component_limits
             || editor_session.mode == EditorMode::Enemy
+            || editor_session.mode == EditorMode::Station
             || progression.ready_count(button.kind, button.variant) > 0
             || progression.damaged_count(button.kind, button.variant) > 0;
         if button.kind == tool_state.selected_kind && button.variant == tool_state.selected_variant
@@ -345,6 +361,14 @@ pub(crate) fn sync_toolbox_visuals(
 
     for (button, mut text) in &mut visuals.p5() {
         **text = button.kind.display_name().to_string();
+    }
+
+    for (button, mut background) in &mut visuals.p6() {
+        *background = BackgroundColor(if Some(button.tool) == station_editor_state.selected_tool {
+            SELECTED_BUTTON
+        } else {
+            NORMAL_BUTTON
+        });
     }
 }
 

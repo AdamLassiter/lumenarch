@@ -382,6 +382,26 @@ impl ShipDefinition {
     }
 
     pub fn validate_required_modules(&self) -> bool {
-        self.has_module_kind(ModuleKind::Core) && self.fits_core_capacity()
+        self.has_module_kind(ModuleKind::Core)
+            && self.has_module_kind(ModuleKind::Airlock)
+            && self.fits_core_capacity()
+    }
+
+    pub fn has_docking_airlock(&self) -> bool {
+        self.has_module_kind(ModuleKind::Airlock)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn required_modules_include_airlock_for_docking() {
+        let mut ship = ShipDefinition::core_only("No Dock");
+        assert!(!ship.validate_required_modules());
+
+        ship.replace_module(ShipModule::new(2, ModuleKind::Airlock, 1, 0, 0));
+        assert!(ship.validate_required_modules());
     }
 }

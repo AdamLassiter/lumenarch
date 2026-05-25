@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
+    editor::ensure_selected_enemy_reference,
     helpers::editor::normalize_editor_ship_layers,
     netcode,
     ship::{
@@ -23,7 +24,10 @@ use crate::{
         EnemyEditorState,
         EnemyShipLibraryState,
         ProgramTextEditorState,
+        SectorState,
     },
+    station_editor,
+    stations::StationCatalogResource,
 };
 
 /// Loads and normalizes the active ship into editor state so refit sessions always start from a clean baseline.
@@ -33,6 +37,9 @@ pub(crate) fn initialize_editor_ship(
     editor_session: Res<EditorSessionState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
+    sector_state: Res<SectorState>,
+    mut stations: ResMut<StationCatalogResource>,
+    mut station_editor_state: ResMut<station_editor::StationEditorState>,
     mut editor_ship: ResMut<EditorShip>,
     mut tool_state: ResMut<EditorToolState>,
     mut selection_state: ResMut<EditorSelectionState>,
@@ -91,10 +98,7 @@ pub(crate) fn initialize_editor_ship(
                     enemy_library_state.entry_statuses.clear();
                 }
             }
-            enemy_library_state.library.ensure_seeded();
-            enemy_library_state.selected_index = enemy_library_state
-                .selected_index
-                .min(enemy_library_state.library.entries.len().saturating_sub(1));
+            ensure_selected_enemy_reference(&sector_state, &mut enemy_library_state);
             if let Some(entry) = enemy_library_state
                 .library
                 .selected_or_first(enemy_library_state.selected_index)
@@ -103,12 +107,30 @@ pub(crate) fn initialize_editor_ship(
             }
             enemy_editor_state.dirty = false;
         }
+        EditorMode::Station => {
+            station_editor::ensure_selected_station_reference(
+                &sector_state,
+                &mut stations,
+                &mut station_editor_state,
+            );
+            station_editor::sync_editor_ship_from_station(
+                &stations,
+                &station_editor_state,
+                &mut editor_ship,
+            );
+        }
     }
 
     normalize_editor_ship_layers(&mut editor_ship.ship);
 
     tool_state.tool_mode = EditorToolMode::Build;
-    tool_state.active_layer = EditorLayer::Logistics;
+    tool_state.active_layer = if editor_session.mode == EditorMode::Station {
+        station_editor_state.selected_tool = None;
+        EditorLayer::Components
+    } else {
+        station_editor_state.selected_tool = None;
+        EditorLayer::Logistics
+    };
     tool_state.selected_foundation_kind = crate::ship::ShipFoundationKind::Floor;
     tool_state.selected_kind = ModuleKind::Core;
     tool_state.selected_variant = ModuleVariant::default_for_kind(ModuleKind::Core);
@@ -122,12 +144,16 @@ pub(crate) fn initialize_editor_ship(
     selection_state.marquee_origin = None;
     selection_state.marquee_current = None;
     pointer_state.last_build_cell = None;
-    arch_editor_state.selected_module_id = editor_ship
-        .ship
-        .modules
-        .iter()
-        .find(|module| module.kind == ModuleKind::Computer)
-        .map(|module| module.id);
+    arch_editor_state.selected_module_id = if editor_session.mode == EditorMode::Station {
+        None
+    } else {
+        editor_ship
+            .ship
+            .modules
+            .iter()
+            .find(|module| module.kind == ModuleKind::Computer)
+            .map(|module| module.id)
+    };
     arch_editor_state.selected_line = 0;
     arch_editor_state.panel_open = false;
     program_editor_state.module_id = None;

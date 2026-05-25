@@ -13,12 +13,14 @@ mod netcode;
 mod sector_map;
 mod splash;
 pub(crate) mod state;
+mod station_editor;
 mod stations;
 
 use std::{env, time::Duration};
 
 use bevy::{app::AppExit, prelude::*};
 use bevy_ggrs::{GgrsPlugin, RollbackApp, RollbackFrameRate};
+use bevy_yarnspinner::prelude::{YarnFileSource, YarnSpinnerPlugin};
 
 use self::state::{
     ArchEditorState,
@@ -144,6 +146,9 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
     .insert_resource(EnemyShipLibraryState::default())
     .insert_resource(Progression::default())
     .insert_resource(DockedState::default())
+    .insert_resource(docked::DockedAvatarMemory::default())
+    .insert_resource(docked::DockedDialogueState::default())
+    .insert_resource(station_editor::StationEditorState::default())
     .insert_resource(SectorState::default())
     .insert_resource(CampaignLoadState::default())
     .insert_resource(DebugOverlayState::default())
@@ -198,6 +203,12 @@ fn add_core_plugins(app: &mut App, mode: AppRuntimeMode) {
     }
 
     app.add_plugins(GgrsPlugin::<LumenGgrsConfig>::default());
+    app.add_plugins(YarnSpinnerPlugin::with_yarn_source(YarnFileSource::folder(
+        "dialog",
+    )));
+    app.add_observer(docked::handle_docked_yarn_line)
+        .add_observer(docked::handle_docked_yarn_options)
+        .add_observer(docked::handle_docked_yarn_dialogue_completed);
 }
 
 fn register_rollback_state(app: &mut App) {
@@ -363,6 +374,12 @@ fn add_shared_update_systems(app: &mut App) {
             netcode::sync_active_presentation_phase,
             netcode::sync_player_editor_mode,
             docked::initialize_campaign_state.run_if(netcode::session_presents_docked),
+            docked::spawn_docked_spaceport_scene
+                .run_if(netcode::session_presents_docked)
+                .run_if(docked::docked_spaceport_scene_missing),
+            docked::cleanup_docked_spaceport_scene
+                .run_if(netcode::session_not_presents_docked)
+                .run_if(docked::docked_spaceport_scene_present),
             gameplay::spawn_runtime_scene
                 .run_if(netcode::session_presents_encounter)
                 .run_if(gameplay::runtime_scene_missing),
@@ -418,10 +435,11 @@ fn add_ui_systems(app: &mut App) {
     add_editor_keyboard_update_systems(app);
     add_session_ui_update_systems(app);
     add_lobby_ui_fixed_systems(app);
-    add_docked_ui_fixed_systems(app);
+    add_docked_fixed_systems(app);
     add_sector_map_ui_fixed_systems(app);
     add_player_editor_ui_fixed_systems(app);
     add_debug_enemy_editor_fixed_systems(app);
+    add_debug_station_editor_fixed_systems(app);
     add_encounter_presentation_systems(app);
 }
 
@@ -455,6 +473,19 @@ fn add_editor_keyboard_update_systems(app: &mut App) {
                 editor::load_editor_ship_shortcut,
             )
                 .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+            (
+                editor::leave_editor_keyboard_shortcut,
+                station_editor::station_library_keyboard_shortcuts,
+                editor::toggle_editor_module_overlay_shortcuts,
+                editor::rotate_selected_tool,
+            )
+                .run_if(in_state(FrontendMode::DebugStationEditor)),
+            (
+                editor::selection_shortcuts,
+                editor::save_editor_ship_shortcut,
+                editor::load_editor_ship_shortcut,
+            )
+                .run_if(in_state(FrontendMode::DebugStationEditor)),
         ),
     );
 }
@@ -472,14 +503,6 @@ fn add_session_ui_update_systems(app: &mut App) {
             lobby::cleanup_lobby_ui
                 .run_if(netcode::frontend_mode_is_not_lobby)
                 .run_if(lobby::lobby_ui_present),
-            docked::spawn_docked_ui
-                .run_if(netcode::session_presents_docked)
-                .run_if(docked::docked_ui_missing),
-            docked::sync_docked_ship_preview.run_if(netcode::session_presents_docked),
-            docked::rotate_docked_ship_preview.run_if(netcode::session_presents_docked),
-            docked::cleanup_docked_ui
-                .run_if(netcode::session_not_presents_docked)
-                .run_if(docked::docked_ui_present),
             sector_map::spawn_sector_map_ui
                 .run_if(netcode::session_presents_sector_map)
                 .run_if(sector_map::sector_map_ui_missing),
@@ -505,6 +528,14 @@ fn add_session_ui_update_systems(app: &mut App) {
                 .chain()
                 .run_if(netcode::frontend_mode_is_debug_enemy_editor)
                 .run_if(editor::editor_ui_missing),
+            (
+                editor::initialize_editor_ship,
+                editor::spawn_editor_ui,
+                editor::spawn_preview_tile,
+            )
+                .chain()
+                .run_if(in_state(FrontendMode::DebugStationEditor))
+                .run_if(editor::editor_ui_missing),
         ),
     );
 }
@@ -528,13 +559,19 @@ fn add_lobby_ui_fixed_systems(app: &mut App) {
     );
 }
 
-fn add_docked_ui_fixed_systems(app: &mut App) {
+fn add_docked_fixed_systems(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (
-            docked::docked_button_system.run_if(netcode::session_presents_docked),
-            docked::update_docked_status_text.run_if(netcode::session_presents_docked),
-            docked::update_docked_surface_ui.run_if(netcode::session_presents_docked),
+            docked::move_docked_local_avatar.run_if(netcode::session_presents_docked),
+            (
+                docked::docked_keyboard_interaction_system,
+                docked::sync_docked_yarn_runner,
+                docked::sync_docked_dialogue_overlay,
+                docked::docked_dialogue_button_system,
+            )
+                .chain()
+                .run_if(netcode::session_presents_docked),
         ),
     );
 }
@@ -545,6 +582,8 @@ fn add_sector_map_ui_fixed_systems(app: &mut App) {
         (
             sector_map::sector_node_button_system.run_if(netcode::session_presents_sector_map),
             sector_map::sector_navigation_button_system
+                .run_if(netcode::session_presents_sector_map),
+            sector_map::sector_navigation_keyboard_system
                 .run_if(netcode::session_presents_sector_map),
             sector_map::pan_and_zoom_sector_map.run_if(netcode::session_presents_sector_map),
             sector_map::sync_sector_map_layout.run_if(netcode::session_presents_sector_map),
@@ -575,16 +614,20 @@ fn add_player_editor_ui_fixed_systems(app: &mut App) {
             )
                 .run_if(netcode::session_presents_player_editor),
             (
-                editor::place_or_remove_tile,
-                editor::pan_and_zoom_editor_view,
-                editor::persist_editor_ship,
-                editor::sync_preview_tile,
-                editor::sync_ship_tile_entities,
-                editor::update_editor_module_overlay,
-                editor::sync_toolbox_visuals,
-                editor::sync_toolbox_scroll,
-                lobby::update_lobby_textboxes,
-                editor::update_editor_status_text,
+                (
+                    editor::place_or_remove_tile,
+                    editor::pan_and_zoom_editor_view,
+                    editor::persist_editor_ship,
+                    editor::sync_preview_tile,
+                    editor::sync_ship_tile_entities,
+                ),
+                (
+                    editor::update_editor_module_overlay,
+                    editor::sync_toolbox_visuals,
+                    editor::sync_toolbox_scroll,
+                    lobby::update_lobby_textboxes,
+                    editor::update_editor_status_text,
+                ),
             )
                 .run_if(netcode::session_presents_player_editor),
             editor::sync_editor_toolbox_layer_sections
@@ -616,20 +659,70 @@ fn add_debug_enemy_editor_fixed_systems(app: &mut App) {
             )
                 .run_if(in_state(FrontendMode::DebugEnemyEditor)),
             (
-                editor::place_or_remove_tile,
-                editor::pan_and_zoom_editor_view,
-                editor::persist_editor_ship,
-                editor::sync_preview_tile,
-                editor::sync_ship_tile_entities,
-                editor::update_editor_module_overlay,
-                editor::sync_toolbox_visuals,
-                editor::sync_toolbox_scroll,
-                lobby::update_lobby_textboxes,
-                editor::update_editor_status_text,
+                (
+                    editor::place_or_remove_tile,
+                    editor::pan_and_zoom_editor_view,
+                    editor::persist_editor_ship,
+                    editor::sync_preview_tile,
+                    editor::sync_ship_tile_entities,
+                ),
+                (
+                    editor::update_editor_module_overlay,
+                    editor::sync_toolbox_visuals,
+                    editor::sync_toolbox_scroll,
+                    lobby::update_lobby_textboxes,
+                    editor::update_editor_status_text,
+                ),
             )
                 .run_if(in_state(FrontendMode::DebugEnemyEditor)),
             editor::sync_editor_toolbox_layer_sections
                 .run_if(in_state(FrontendMode::DebugEnemyEditor)),
+        ),
+    );
+}
+
+fn add_debug_station_editor_fixed_systems(app: &mut App) {
+    app.add_systems(
+        FixedUpdate,
+        (
+            (
+                editor::draw_grid_overlay,
+                editor::draw_editor_selection_overlay,
+                editor::toolbox_button_system,
+                editor::selection_action_button_system,
+                editor::mission_report_button_system,
+                station_editor::station_library_button_system,
+                lobby::focus_textbox_on_click,
+                lobby::clear_textbox_focus_on_non_textbox_click,
+                lobby::edit_lobby_textboxes,
+                editor::sync_program_text_editor_state,
+                editor::focus_program_text_editor_on_click,
+                editor::edit_program_text_editor,
+                editor::program_editor_action_button_system,
+                editor::editor_station_panel_button_system,
+                editor::leave_editor_button_system,
+            )
+                .run_if(in_state(FrontendMode::DebugStationEditor)),
+            (
+                (
+                    editor::place_or_remove_tile,
+                    editor::pan_and_zoom_editor_view,
+                    editor::persist_editor_ship,
+                    editor::sync_preview_tile,
+                    editor::sync_ship_tile_entities,
+                ),
+                (
+                    editor::update_editor_module_overlay,
+                    editor::sync_toolbox_visuals,
+                    editor::sync_toolbox_scroll,
+                    lobby::update_lobby_textboxes,
+                    editor::update_editor_status_text,
+                    editor::update_station_config_references_text,
+                ),
+            )
+                .run_if(in_state(FrontendMode::DebugStationEditor)),
+            editor::sync_editor_toolbox_layer_sections
+                .run_if(in_state(FrontendMode::DebugStationEditor)),
         ),
     );
 }

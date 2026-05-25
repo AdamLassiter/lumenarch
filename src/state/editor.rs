@@ -20,6 +20,7 @@ pub(crate) enum EditorMode {
     #[default]
     Player,
     Enemy,
+    Station,
 }
 
 #[derive(Resource, Default)]
@@ -107,6 +108,27 @@ pub(crate) enum EditorLayer {
     Components,
 }
 
+#[allow(clippy::enum_variant_names)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum StationEditorTool {
+    #[default]
+    EngineerNpc,
+    ContractsNpc,
+    ArchivesNpc,
+}
+
+impl StationEditorTool {
+    pub(crate) const ALL: [Self; 3] = [Self::EngineerNpc, Self::ContractsNpc, Self::ArchivesNpc];
+
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::EngineerNpc => "Engineer",
+            Self::ContractsNpc => "Contracts",
+            Self::ArchivesNpc => "Archives",
+        }
+    }
+}
+
 #[derive(Resource)]
 pub(crate) struct EditorToolState {
     pub(crate) tool_mode: EditorToolMode,
@@ -175,13 +197,19 @@ pub(crate) struct EnemyPrevButton;
 pub(crate) struct EnemyNextButton;
 
 #[derive(Component)]
-pub(crate) struct EnemyNewButton;
+pub(crate) struct StationPrevButton;
+
+#[derive(Component)]
+pub(crate) struct StationNextButton;
 
 #[derive(Component)]
 pub(crate) struct EditorStatusText;
 
 #[derive(Component)]
 pub(crate) struct EnemyConfigReferencesText;
+
+#[derive(Component)]
+pub(crate) struct StationConfigReferencesText;
 
 #[derive(Component)]
 pub(crate) struct EditorMissionReportButton;
@@ -218,6 +246,11 @@ pub(crate) struct ToolboxFoundationButton {
 #[derive(Component)]
 pub(crate) struct ToolboxFoundationButtonText {
     pub(crate) kind: ShipFoundationKind,
+}
+
+#[derive(Component)]
+pub(crate) struct StationToolboxButton {
+    pub(crate) tool: StationEditorTool,
 }
 
 #[derive(Component)]

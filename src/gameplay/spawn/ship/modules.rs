@@ -375,7 +375,7 @@ pub(crate) fn spawn_runtime_module(
                 ))
                 .with_children(|parent| {
                     parent.spawn((
-                        Sprite::from_image(asset_server.load("tiles/turret.png")),
+                        Sprite::from_image(asset_server.load("tiles/hull/turret.png")),
                         Transform::from_xyz(0.0, 0.0, 0.2),
                         TurretTopSprite,
                     ));

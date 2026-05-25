@@ -12,6 +12,8 @@ LUMEN//ARCH is a top-down multiplayer 2D sci-fi systems game about building a pa
 * Ship infrastructure is physical and strict: power, oxygen ducts, and typed resource pipes should not silently fall back to global pools.
 * Ship systems should expose ARCH-readable/writeable registers when they add meaningful automation or monitoring surface.
 
+This is greenfield development with no existing userbase; migrations and patches-on-patches are a terrible foundation to build upon, well-implemented and cleanly abstracted systems are preferred even if they introduce breaking changes.
+
 ## Documentation and Notes
 
 * [docs](docs/src) contains high-level game direction.

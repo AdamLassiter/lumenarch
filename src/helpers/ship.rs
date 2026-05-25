@@ -81,7 +81,27 @@ pub(crate) fn component_service_coords((x, y): (i32, i32)) -> [(i32, i32); 5] {
 }
 
 pub(crate) fn sprite_path_for_foundation(kind: ShipFoundationKind) -> String {
-    format!("tiles/{}.png", kind.as_str())
+    format!(
+        "tiles/{}/{}.png",
+        foundation_asset_category(kind),
+        kind.as_str()
+    )
+}
+
+fn foundation_asset_category(kind: ShipFoundationKind) -> &'static str {
+    match kind {
+        ShipFoundationKind::Hull
+        | ShipFoundationKind::HullInnerCorner
+        | ShipFoundationKind::HullOuterCorner => "hull",
+        ShipFoundationKind::Floor
+        | ShipFoundationKind::Wire
+        | ShipFoundationKind::OxygenDuct
+        | ShipFoundationKind::PipeRawSalvage
+        | ShipFoundationKind::PipeRepairCharge
+        | ShipFoundationKind::PipeFuel
+        | ShipFoundationKind::PipeAmmunition
+        | ShipFoundationKind::PipeOxygen => "logistics",
+    }
 }
 
 pub(crate) fn sprite_path_for_foundation_connections(
@@ -99,8 +119,9 @@ pub(crate) fn sprite_path_for_foundation_connections(
         .filter(|connected| *connected)
         .count();
     let base = kind.as_str();
+    let category = foundation_asset_category(kind);
     match count {
-        4 => (format!("tiles/{base}_cross.png"), 0),
+        4 => (format!("tiles/{category}/{base}_cross.png"), 0),
         3 => {
             let missing = if !north {
                 2
@@ -111,11 +132,11 @@ pub(crate) fn sprite_path_for_foundation_connections(
             } else {
                 1
             };
-            (format!("tiles/{base}_tee.png"), missing)
+            (format!("tiles/{category}/{base}_tee.png"), missing)
         }
         2 if (north && south) || (east && west) => {
             let rotation = if east && west { 1 } else { 0 };
-            (format!("tiles/{base}_straight.png"), rotation)
+            (format!("tiles/{category}/{base}_straight.png"), rotation)
         }
         2 => {
             let rotation = match (north, east, south, west) {
@@ -125,7 +146,7 @@ pub(crate) fn sprite_path_for_foundation_connections(
                 (true, false, false, true) => 3,
                 _ => 0,
             };
-            (format!("tiles/{base}_corner.png"), rotation)
+            (format!("tiles/{category}/{base}_corner.png"), rotation)
         }
         1 => {
             let rotation = if east {
@@ -137,7 +158,7 @@ pub(crate) fn sprite_path_for_foundation_connections(
             } else {
                 0
             };
-            (format!("tiles/{base}_end.png"), rotation)
+            (format!("tiles/{category}/{base}_end.png"), rotation)
         }
         _ => (sprite_path_for_foundation(kind), 0),
     }
@@ -441,7 +462,7 @@ mod tests {
                 false,
                 false
             ),
-            ("tiles/wire_end.png".to_string(), 0)
+            ("tiles/logistics/wire_end.png".to_string(), 0)
         );
         assert_eq!(
             sprite_path_for_foundation_connections(
@@ -451,7 +472,7 @@ mod tests {
                 false,
                 false
             ),
-            ("tiles/wire_end.png".to_string(), 1)
+            ("tiles/logistics/wire_end.png".to_string(), 1)
         );
     }
 
@@ -465,7 +486,7 @@ mod tests {
                 false,
                 false,
             ),
-            ("tiles/pipe_fuel.png".to_string(), 0)
+            ("tiles/logistics/pipe_fuel.png".to_string(), 0)
         );
         assert_eq!(
             sprite_path_for_foundation_connections(
@@ -475,7 +496,7 @@ mod tests {
                 true,
                 false,
             ),
-            ("tiles/pipe_fuel_straight.png".to_string(), 0)
+            ("tiles/logistics/pipe_fuel_straight.png".to_string(), 0)
         );
         assert_eq!(
             sprite_path_for_foundation_connections(
@@ -485,7 +506,7 @@ mod tests {
                 false,
                 false,
             ),
-            ("tiles/pipe_fuel_corner.png".to_string(), 0)
+            ("tiles/logistics/pipe_fuel_corner.png".to_string(), 0)
         );
         assert_eq!(
             sprite_path_for_foundation_connections(
@@ -495,7 +516,7 @@ mod tests {
                 true,
                 false,
             ),
-            ("tiles/pipe_fuel_tee.png".to_string(), 1)
+            ("tiles/logistics/pipe_fuel_tee.png".to_string(), 1)
         );
         assert_eq!(
             sprite_path_for_foundation_connections(
@@ -505,7 +526,7 @@ mod tests {
                 true,
                 true,
             ),
-            ("tiles/pipe_fuel_cross.png".to_string(), 0)
+            ("tiles/logistics/pipe_fuel_cross.png".to_string(), 0)
         );
     }
 }

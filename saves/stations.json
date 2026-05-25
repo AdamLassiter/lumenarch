@@ -5,6 +5,675 @@
       "name": "Needle Rest",
       "faction": "ContinuantGuild",
       "flavor": "A Continuant splice-station threaded through a dead shipping spar. Needle Rest survives by salvaging the Quiet After one careful sortie at a time.",
+      "ship": {
+        "name": "Needle Rest",
+        "foundation_tiles": [
+          {
+            "id": 1,
+            "kind": "Floor",
+            "grid_x": -4,
+            "grid_y": -2,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 2,
+            "kind": "Floor",
+            "grid_x": -3,
+            "grid_y": -2,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 3,
+            "kind": "Floor",
+            "grid_x": -2,
+            "grid_y": -2,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 4,
+            "kind": "Floor",
+            "grid_x": -1,
+            "grid_y": -2,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 5,
+            "kind": "Floor",
+            "grid_x": -1,
+            "grid_y": -1,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 6,
+            "kind": "Floor",
+            "grid_x": -1,
+            "grid_y": 0,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 7,
+            "kind": "Floor",
+            "grid_x": -1,
+            "grid_y": 1,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 8,
+            "kind": "Floor",
+            "grid_x": -2,
+            "grid_y": 1,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 9,
+            "kind": "Floor",
+            "grid_x": -3,
+            "grid_y": 1,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 10,
+            "kind": "Floor",
+            "grid_x": -4,
+            "grid_y": 1,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 11,
+            "kind": "Floor",
+            "grid_x": -4,
+            "grid_y": 0,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 12,
+            "kind": "Floor",
+            "grid_x": -4,
+            "grid_y": -1,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 13,
+            "kind": "Floor",
+            "grid_x": -3,
+            "grid_y": -1,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 14,
+            "kind": "Floor",
+            "grid_x": -2,
+            "grid_y": -1,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 15,
+            "kind": "Floor",
+            "grid_x": -2,
+            "grid_y": 0,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 16,
+            "kind": "Floor",
+            "grid_x": -3,
+            "grid_y": 0,
+            "rotation_quadrants": 0
+          }
+        ],
+        "hull_tiles": [
+          {
+            "id": 21,
+            "kind": "Hull",
+            "grid_x": -1,
+            "grid_y": -3,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 22,
+            "kind": "HullOuterCorner",
+            "grid_x": -5,
+            "grid_y": -3,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 23,
+            "kind": "Hull",
+            "grid_x": -4,
+            "grid_y": -3,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 24,
+            "kind": "Hull",
+            "grid_x": -3,
+            "grid_y": -3,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 25,
+            "kind": "Hull",
+            "grid_x": -2,
+            "grid_y": -3,
+            "rotation_quadrants": 0
+          },
+          {
+            "id": 26,
+            "kind": "HullOuterCorner",
+            "grid_x": 0,
+            "grid_y": -3,
+            "rotation_quadrants": 1
+          },
+          {
+            "id": 27,
+            "kind": "Hull",
+            "grid_x": -5,
+            "grid_y": -2,
+            "rotation_quadrants": 3
+          },
+          {
+            "id": 28,
+            "kind": "Hull",
+            "grid_x": 0,
+            "grid_y": -2,
+            "rotation_quadrants": 1
+          },
+          {
+            "id": 29,
+            "kind": "Hull",
+            "grid_x": -5,
+            "grid_y": -1,
+            "rotation_quadrants": 3
+          },
+          {
+            "id": 30,
+            "kind": "Hull",
+            "grid_x": 0,
+            "grid_y": -1,
+            "rotation_quadrants": 1
+          },
+          {
+            "id": 31,
+            "kind": "Hull",
+            "grid_x": -5,
+            "grid_y": 0,
+            "rotation_quadrants": 3
+          },
+          {
+            "id": 32,
+            "kind": "Hull",
+            "grid_x": 0,
+            "grid_y": 0,
+            "rotation_quadrants": 1
+          },
+          {
+            "id": 33,
+            "kind": "Hull",
+            "grid_x": -5,
+            "grid_y": 1,
+            "rotation_quadrants": 3
+          },
+          {
+            "id": 34,
+            "kind": "Hull",
+            "grid_x": 0,
+            "grid_y": 1,
+            "rotation_quadrants": 1
+          },
+          {
+            "id": 35,
+            "kind": "HullOuterCorner",
+            "grid_x": -5,
+            "grid_y": 2,
+            "rotation_quadrants": 3
+          },
+          {
+            "id": 36,
+            "kind": "Hull",
+            "grid_x": -4,
+            "grid_y": 2,
+            "rotation_quadrants": 2
+          },
+          {
+            "id": 37,
+            "kind": "Hull",
+            "grid_x": -3,
+            "grid_y": 2,
+            "rotation_quadrants": 2
+          },
+          {
+            "id": 38,
+            "kind": "Hull",
+            "grid_x": -2,
+            "grid_y": 2,
+            "rotation_quadrants": 2
+          },
+          {
+            "id": 39,
+            "kind": "Hull",
+            "grid_x": -1,
+            "grid_y": 2,
+            "rotation_quadrants": 2
+          },
+          {
+            "id": 40,
+            "kind": "HullOuterCorner",
+            "grid_x": 0,
+            "grid_y": 2,
+            "rotation_quadrants": 2
+          }
+        ],
+        "modules": [
+          {
+            "id": 2,
+            "kind": "Interior",
+            "variant": "StationEngineerNpc",
+            "grid_x": -4,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 3,
+            "kind": "Interior",
+            "variant": "StationContractsNpc",
+            "grid_x": -2,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 4,
+            "kind": "Interior",
+            "variant": "StationArchivesNpc",
+            "grid_x": -4,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 5,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -4,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 6,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 7,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 8,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 9,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": 0,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 10,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": 1,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 11,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 12,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 13,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": -1,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 14,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -4,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 15,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -3,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 16,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -2,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 17,
+            "kind": "Interior",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": -2,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          },
+          {
+            "id": 18,
+            "kind": "Airlock",
+            "variant": "Standard",
+            "grid_x": -1,
+            "grid_y": -3,
+            "rotation_quadrants": 0,
+            "channel": 0,
+            "defaults": {
+              "reaction_rate_milli": 350,
+              "turbine_load_milli": 300,
+              "storage_allow_intake": true,
+              "airlock_open": false,
+              "manipulator_manual_mode": false,
+              "manipulator_transfer_enabled": false,
+              "manipulator_resource_kind": "RawSalvage",
+              "processor_recipe": "RepairCharge",
+              "processor_enabled": true,
+              "computer_enabled": true,
+              "turret_fire_intent": false
+            },
+            "arch_program": null,
+            "lumen_program": null
+          }
+        ]
+      },
       "contacts": [
         {
           "id": "ivra_quell",

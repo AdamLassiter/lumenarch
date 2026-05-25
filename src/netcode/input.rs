@@ -228,7 +228,12 @@ pub(crate) fn apply_host_meta_ops(
         }
         RollbackMetaOp::LaunchEncounter => {
             let node_id = command.meta.arg0.max(0) as u32;
-            if rollback_state.sector.is_reachable(node_id)
+            if !rollback_state.editor_ship.has_docking_airlock() {
+                log::debug!(
+                    "Ignoring LaunchEncounter({}) because the ship is missing a docking Airlock",
+                    node_id
+                );
+            } else if rollback_state.sector.is_reachable(node_id)
                 && rollback_state
                     .sector
                     .node(node_id)
@@ -257,8 +262,12 @@ pub(crate) fn apply_host_meta_ops(
             rollback_state.phase = RollbackPhase::Docked;
         }
         RollbackMetaOp::LeaveEditor => {
-            log::info!("Applying host meta op: LeaveEditor");
-            rollback_state.phase = RollbackPhase::Docked;
+            if rollback_state.editor_ship.has_docking_airlock() {
+                log::info!("Applying host meta op: LeaveEditor");
+                rollback_state.phase = RollbackPhase::Docked;
+            } else {
+                log::debug!("Ignoring LeaveEditor because the ship is missing a docking Airlock");
+            }
         }
         RollbackMetaOp::AcceptContract => {
             let Some(station_id) = stations::current_station_id(&rollback_state.sector) else {
@@ -300,6 +309,12 @@ pub(crate) fn apply_host_meta_ops(
                 log::debug!("Ignoring LaunchContract because there is no active contract");
                 return;
             };
+            if !rollback_state.editor_ship.has_docking_airlock() {
+                log::debug!(
+                    "Ignoring LaunchContract because the ship is missing a docking Airlock"
+                );
+                return;
+            }
             let Some((station, contract)) = stations.0.contract(&active_contract_id) else {
                 log::warn!(
                     "Active contract '{}' could not be resolved in station catalog",

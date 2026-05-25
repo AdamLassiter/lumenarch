@@ -15,4 +15,4 @@
 * [ ] Sometimes, navigating to a sector takes you to the wrong sector (probably always a previously-selected selector - i.e. select A, select B, travel -> arrive at sector A - even allowing reasonable time between clicking between sectors, so more of a state issue than a race condition)
 * [ ] Atmospheric decompression pulls players towards the top-left corner of the ship node that is leaking oxygen, rather than the void of space outside of the ship
 * [ ] Ship preview while docked still appears in random positions - this seems to be retaining the position and rotation while in gameplay
-  * [ ] The same (certainly the rotation) also applies to the refit ship editor
+  * [ ] The same (at least some amount of the rotation) also applies to the refit ship editor

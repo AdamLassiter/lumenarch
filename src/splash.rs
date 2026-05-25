@@ -7,7 +7,9 @@ pub(crate) fn splash_active(
     splash_state: Res<SplashScreenState>,
     frontend_mode: Res<State<FrontendMode>>,
 ) -> bool {
-    splash_state.active && *frontend_mode.get() != FrontendMode::DebugEnemyEditor
+    splash_state.active
+        && *frontend_mode.get() != FrontendMode::DebugEnemyEditor
+        && *frontend_mode.get() != FrontendMode::DebugStationEditor
 }
 
 /// Returns whether splash UI entities should be cleaned up because the splash is done.
@@ -15,7 +17,9 @@ pub(crate) fn splash_inactive(
     splash_state: Res<SplashScreenState>,
     frontend_mode: Res<State<FrontendMode>>,
 ) -> bool {
-    !splash_state.active || *frontend_mode.get() == FrontendMode::DebugEnemyEditor
+    !splash_state.active
+        || *frontend_mode.get() == FrontendMode::DebugEnemyEditor
+        || *frontend_mode.get() == FrontendMode::DebugStationEditor
 }
 
 /// Spawns the splash image layer so the game has a branded backdrop during early frontend flow.
@@ -61,10 +65,15 @@ pub(crate) fn cleanup_splash_ui(
     mut splash_state: ResMut<SplashScreenState>,
     frontend_mode: Res<State<FrontendMode>>,
 ) {
-    if splash_state.active && *frontend_mode.get() != FrontendMode::DebugEnemyEditor {
+    if splash_state.active
+        && *frontend_mode.get() != FrontendMode::DebugEnemyEditor
+        && *frontend_mode.get() != FrontendMode::DebugStationEditor
+    {
         return;
     }
-    if *frontend_mode.get() == FrontendMode::DebugEnemyEditor {
+    if *frontend_mode.get() == FrontendMode::DebugEnemyEditor
+        || *frontend_mode.get() == FrontendMode::DebugStationEditor
+    {
         splash_state.active = false;
         splash_state.remaining_seconds = 0.0;
     }

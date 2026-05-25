@@ -2,8 +2,6 @@ mod atmosphere;
 mod collision_math;
 mod combat;
 pub(crate) mod control;
-pub(crate) mod docked_preview;
-pub(crate) mod docked_ui;
 pub(crate) mod editor;
 mod fields;
 mod interactions;

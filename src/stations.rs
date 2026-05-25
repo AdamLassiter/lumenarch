@@ -2,7 +2,17 @@ use std::{fs, path::Path};
 
 use serde::{Deserialize, Serialize};
 
-use crate::state::SectorState;
+use crate::{
+    ship::{
+        ModuleKind,
+        ModuleVariant,
+        ShipDefinition,
+        ShipFoundationKind,
+        ShipFoundationTile,
+        ShipModule,
+    },
+    state::SectorState,
+};
 
 const DEFAULT_STATIONS_PATH: &str = "saves/stations.json";
 
@@ -94,19 +104,38 @@ pub(crate) struct LoreEntry {
     pub(crate) body: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct StationDefinition {
     pub(crate) id: String,
     pub(crate) name: String,
     pub(crate) faction: FactionId,
     pub(crate) flavor: String,
+    #[serde(default)]
+    pub(crate) ship: ShipDefinition,
     pub(crate) contacts: Vec<StationContact>,
     pub(crate) services: Vec<StationService>,
     pub(crate) contracts: Vec<StationContract>,
     pub(crate) lore_entries: Vec<LoreEntry>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) enum StationNpcServiceAction {
+    Engineer,
+    Contracts,
+    Archives,
+}
+
+impl StationNpcServiceAction {
+    pub(crate) fn sprite_path(self) -> &'static str {
+        match self {
+            Self::Engineer => "actors/station_engineer.png",
+            Self::Contracts => "actors/station_contracts.png",
+            Self::Archives => "actors/station_archives.png",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub(crate) struct StationCatalog {
     pub(crate) stations: Vec<StationDefinition>,
 }
@@ -194,12 +223,13 @@ pub(crate) fn load_or_create_default_stations() -> Result<StationCatalog, String
         let encoded = fs::read_to_string(path).map_err(|error| {
             format!("failed to read station catalog {}: {error}", path.display())
         })?;
-        let catalog = serde_json::from_str(&encoded).map_err(|error| {
+        let mut catalog: StationCatalog = serde_json::from_str(&encoded).map_err(|error| {
             format!(
                 "failed to decode station catalog {}: {error}",
                 path.display()
             )
         })?;
+        ensure_default_station_ships(&mut catalog);
         return Ok(catalog);
     }
 
@@ -227,6 +257,30 @@ pub(crate) fn load_or_create_default_stations() -> Result<StationCatalog, String
     Ok(catalog)
 }
 
+pub(crate) fn save_station_catalog(catalog: &StationCatalog) -> Result<(), String> {
+    let path = Path::new(DEFAULT_STATIONS_PATH);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "failed to create station catalog directory {}: {error}",
+                parent.display()
+            )
+        })?;
+    }
+    let encoded = serde_json::to_string_pretty(catalog).map_err(|error| {
+        format!(
+            "failed to encode station catalog {}: {error}",
+            path.display()
+        )
+    })?;
+    fs::write(path, encoded).map_err(|error| {
+        format!(
+            "failed to write station catalog {}: {error}",
+            path.display()
+        )
+    })
+}
+
 pub(crate) fn default_station_catalog() -> StationCatalog {
     StationCatalog {
         stations: vec![StationDefinition {
@@ -234,6 +288,7 @@ pub(crate) fn default_station_catalog() -> StationCatalog {
             name: "Needle Rest".to_string(),
             faction: FactionId::ContinuantGuild,
             flavor: "A Continuant splice-station threaded through a dead shipping spar. Needle Rest survives by salvaging the Quiet After one careful sortie at a time.".to_string(),
+            ship: needle_rest_default_ship(),
             contacts: vec![
                 StationContact {
                     id: "ivra_quell".to_string(),
@@ -350,5 +405,89 @@ pub(crate) fn default_station_catalog() -> StationCatalog {
                 },
             ],
         }],
+    }
+}
+
+fn ensure_default_station_ships(catalog: &mut StationCatalog) {
+    for station in &mut catalog.stations {
+        if station.id == "needle_rest"
+            && station.ship.foundation_tiles.is_empty()
+            && station.ship.hull_tiles.is_empty()
+            && station.ship.modules.is_empty()
+        {
+            station.ship = needle_rest_default_ship();
+        }
+    }
+}
+
+fn needle_rest_default_ship() -> ShipDefinition {
+    let mut ship = ShipDefinition::empty("Needle Rest");
+    for y in -3..=3 {
+        for x in -6..=6 {
+            let edge = x == -6 || x == 6 || y == -3 || y == 3;
+            let tile = ShipFoundationTile::new(
+                ship.next_foundation_id(),
+                if edge {
+                    ShipFoundationKind::Hull
+                } else {
+                    ShipFoundationKind::Floor
+                },
+                x,
+                y,
+                0,
+            );
+            if edge {
+                ship.hull_tiles.push(tile);
+            } else {
+                ship.foundation_tiles.push(tile);
+            }
+        }
+    }
+
+    let airlock_id = ship.next_module_id();
+    ship.modules
+        .push(ShipModule::new(airlock_id, ModuleKind::Airlock, -5, 0, 3));
+
+    let mut engineer = ShipModule::new(ship.next_module_id(), ModuleKind::Interior, -2, 0, 3);
+    engineer.variant = ModuleVariant::StationEngineerNpc;
+    ship.modules.push(engineer);
+
+    let mut contracts = ShipModule::new(ship.next_module_id(), ModuleKind::Interior, 2, -1, 2);
+    contracts.variant = ModuleVariant::StationContractsNpc;
+    ship.modules.push(contracts);
+
+    let mut archives = ShipModule::new(ship.next_module_id(), ModuleKind::Interior, 2, 1, 0);
+    archives.variant = ModuleVariant::StationArchivesNpc;
+    ship.modules.push(archives);
+
+    ship
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn station_catalog_serializes_station_ship_and_npcs() {
+        let catalog = default_station_catalog();
+        let encoded = serde_json::to_string(&catalog).unwrap();
+        let decoded: StationCatalog = serde_json::from_str(&encoded).unwrap();
+        let station = decoded.station("needle_rest").unwrap();
+
+        assert!(!station.ship.foundation_tiles.is_empty());
+        assert!(
+            station
+                .ship
+                .modules
+                .iter()
+                .any(|module| module.kind == ModuleKind::Airlock)
+        );
+        assert!(
+            station
+                .ship
+                .modules
+                .iter()
+                .any(|module| module.variant == ModuleVariant::StationEngineerNpc)
+        );
     }
 }

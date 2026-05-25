@@ -76,16 +76,21 @@ impl EnemyShipLibrary {
         self.entries.iter().find(|entry| entry.id == id)
     }
 
-    pub fn add_blank_entry(&mut self) -> usize {
-        let next_index = self.entries.len() + 1;
-        let id = format!("enemy_{next_index}");
+    pub fn find_index_by_id(&self, id: &str) -> Option<usize> {
+        self.entries.iter().position(|entry| entry.id == id)
+    }
+
+    pub fn ensure_entry_for_id(&mut self, id: &str) -> usize {
+        if let Some(index) = self.find_index_by_id(id) {
+            return index;
+        }
         self.entries.push(EnemyShipEntry {
-            id: id.clone(),
-            display_name: format!("Enemy {next_index}"),
+            id: id.to_string(),
+            display_name: id.to_string(),
             threat_tier: 1,
             behavior_tag: "aggressive".to_string(),
             faction_id: FactionId::RogueContinuants,
-            ship_name: Some(format!("Enemy {next_index}")),
+            ship_name: Some(id.to_string()),
             captain_name: Some("Unassigned Captain".to_string()),
             comms_intro: Some(
                 "You are entering a live claim. Turn off your lamps and drift away.".to_string(),
@@ -95,7 +100,7 @@ impl EnemyShipLibrary {
                     .to_string(),
             ),
             is_crewed: true,
-            ship: ShipDefinition::core_only(format!("Enemy {next_index}")),
+            ship: ShipDefinition::core_only(id),
         });
         self.entries.len() - 1
     }

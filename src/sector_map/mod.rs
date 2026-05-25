@@ -5,6 +5,7 @@ mod ui;
 pub(crate) use input::{
     pan_and_zoom_sector_map,
     sector_navigation_button_system,
+    sector_navigation_keyboard_system,
     sector_node_button_system,
 };
 pub(crate) use layout::{sync_sector_map_layout, update_sector_map_text};

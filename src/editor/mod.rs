@@ -7,6 +7,7 @@ pub(crate) use input::{
     editor_station_panel_button_system,
     enemy_library_button_system,
     enemy_library_keyboard_shortcuts,
+    ensure_selected_enemy_reference,
     focus_program_text_editor_on_click,
     leave_editor_button_system,
     leave_editor_keyboard_shortcut,
@@ -43,9 +44,8 @@ pub(crate) use ui::{
     sync_editor_toolbox_layer_sections,
     update_editor_module_overlay,
     update_editor_status_text,
+    update_station_config_references_text,
 };
-
-pub(crate) use crate::helpers::editor::normalize_editor_ship_layers;
 
 pub(crate) const UNAFFORDABLE_BUTTON: bevy::prelude::Color =
     bevy::prelude::Color::srgb(0.22, 0.22, 0.26);

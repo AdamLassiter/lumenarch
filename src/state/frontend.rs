@@ -9,6 +9,7 @@ pub(crate) enum FrontendMode {
     Lobby,
     Session,
     DebugEnemyEditor,
+    DebugStationEditor,
 }
 
 #[derive(Resource, Clone)]
@@ -223,9 +224,6 @@ pub(crate) struct TextBoxText {
 }
 
 #[derive(Component)]
-pub(crate) struct DockedRoot;
-
-#[derive(Component)]
 pub(crate) struct MainCamera;
 
 #[derive(Component)]
@@ -238,42 +236,7 @@ pub(crate) struct JoinButtonText;
 pub(crate) struct DebugEnemyEditorButton;
 
 #[derive(Component)]
-pub(crate) struct RefitButton;
-
-#[derive(Component)]
-pub(crate) struct OpenSectorMapButton;
-
-#[derive(Component)]
-pub(crate) struct RepairShipButton;
-
-#[derive(Component)]
-pub(crate) struct DockedSurfaceButton {
-    pub(crate) surface: DockedSurface,
-}
-
-#[derive(Component)]
-pub(crate) struct DockedContractPrevButton;
-
-#[derive(Component)]
-pub(crate) struct DockedContractNextButton;
-
-#[derive(Component)]
-pub(crate) struct DockedAcceptContractButton;
-
-#[derive(Component)]
-pub(crate) struct DockedLaunchContractButton;
-
-#[derive(Component)]
-pub(crate) struct DockedContactPrevButton;
-
-#[derive(Component)]
-pub(crate) struct DockedContactNextButton;
-
-#[derive(Component)]
-pub(crate) struct DockedLorePrevButton;
-
-#[derive(Component)]
-pub(crate) struct DockedLoreNextButton;
+pub(crate) struct DebugStationEditorButton;
 
 #[derive(Component)]
 pub(crate) struct StatusText;
@@ -295,12 +258,3 @@ pub(crate) struct LobbyToggleShadersButton;
 
 #[derive(Component)]
 pub(crate) struct LobbyShadersText;
-
-#[derive(Component)]
-pub(crate) struct DockedStatusText;
-
-#[derive(Component)]
-pub(crate) struct DockedContentText;
-
-#[derive(Component)]
-pub(crate) struct DockedHelpText;

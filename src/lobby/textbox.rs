@@ -4,22 +4,19 @@ use bevy::{
 };
 
 use super::{netcode, view::format_textbox_value};
-use crate::{
-    helpers::editor::referenced_enemy_id_for_name,
-    state::{
-        EditorMode,
-        EditorSessionState,
-        EditorShip,
-        EnemyEditorState,
-        EnemyShipLibraryState,
-        FocusedTextBox,
-        LocalPlayerProfile,
-        SectorState,
-        TextBoxClipboard,
-        TextBoxField,
-        TextBoxRoot,
-        TextBoxText,
-    },
+use crate::state::{
+    EditorMode,
+    EditorSessionState,
+    EditorShip,
+    EnemyEditorState,
+    EnemyShipLibraryState,
+    FocusedTextBox,
+    LocalPlayerProfile,
+    SectorState,
+    TextBoxClipboard,
+    TextBoxField,
+    TextBoxRoot,
+    TextBoxText,
 };
 
 /// Moves focus into the clicked lobby textbox so keyboard editing goes to the intended field.
@@ -149,8 +146,10 @@ pub(crate) fn edit_lobby_textboxes(
                     && chars.eq_ignore_ascii_case("c")
                     && focused_textbox.select_all =>
             {
-                clipboard.contents =
-                    field_value(field, &config, &local_profile, &editor_ship).to_string();
+                set_textbox_clipboard(
+                    &mut clipboard,
+                    field_value(field, &config, &local_profile, &editor_ship).to_string(),
+                );
             }
             Key::Character(chars)
                 if ctrl_pressed
@@ -158,8 +157,10 @@ pub(crate) fn edit_lobby_textboxes(
                     && focused_textbox.select_all
                     && field_is_editable(field, lobby_locked) =>
             {
-                clipboard.contents =
-                    field_value(field, &config, &local_profile, &editor_ship).to_string();
+                set_textbox_clipboard(
+                    &mut clipboard,
+                    field_value(field, &config, &local_profile, &editor_ship).to_string(),
+                );
                 clear_field(
                     field,
                     &mut config,
@@ -176,9 +177,24 @@ pub(crate) fn edit_lobby_textboxes(
             Key::Character(chars)
                 if ctrl_pressed
                     && chars.eq_ignore_ascii_case("v")
-                    && field_is_editable(field, lobby_locked)
-                    && !clipboard.contents.is_empty() =>
+                    && field_is_editable(field, lobby_locked) =>
             {
+                if let Some(contents) = get_textbox_clipboard(&clipboard) {
+                    insert_text(
+                        field,
+                        &mut config,
+                        &mut local_profile,
+                        &mut editor_ship,
+                        &editor_session,
+                        &mut enemy_editor_state,
+                        &mut enemy_library_state,
+                        &sector_state,
+                        &mut focused_textbox,
+                        &contents,
+                    );
+                }
+            }
+            Key::Space if field_accepts_input(field, lobby_locked, " ") => {
                 insert_text(
                     field,
                     &mut config,
@@ -189,7 +205,7 @@ pub(crate) fn edit_lobby_textboxes(
                     &mut enemy_library_state,
                     &sector_state,
                     &mut focused_textbox,
-                    &clipboard.contents.clone(),
+                    " ",
                 );
             }
             Key::Character(chars)
@@ -498,7 +514,7 @@ fn set_field_value(
     editor_session: &EditorSessionState,
     enemy_editor_state: &mut EnemyEditorState,
     enemy_library_state: &mut EnemyShipLibraryState,
-    sector_state: &SectorState,
+    _sector_state: &SectorState,
     value: String,
 ) {
     match field {
@@ -506,17 +522,13 @@ fn set_field_value(
         TextBoxField::PlayerName => local_profile.name = value,
         TextBoxField::ShipName => {
             let trimmed = value.trim().to_string();
-            if trimmed.is_empty() {
-                return;
-            }
-            editor_ship.ship.name = trimmed.clone();
-            if editor_session.mode == EditorMode::Enemy {
+            editor_ship.ship.name = value;
+            if editor_session.mode == EditorMode::Enemy && !trimmed.is_empty() {
                 sync_selected_enemy_name(
                     &trimmed,
                     editor_ship,
                     enemy_editor_state,
                     enemy_library_state,
-                    sector_state,
                 );
             }
         }
@@ -551,26 +563,17 @@ fn sync_selected_enemy_name(
     editor_ship: &EditorShip,
     enemy_editor_state: &mut EnemyEditorState,
     enemy_library_state: &mut EnemyShipLibraryState,
-    sector_state: &SectorState,
 ) {
     enemy_library_state.library.ensure_seeded();
     let selected_index = enemy_library_state
         .selected_index
         .min(enemy_library_state.library.entries.len().saturating_sub(1));
-    let matching_reference =
-        referenced_enemy_id_for_name(ship_name, sector_state, enemy_library_state, selected_index);
     let Some(entry) = enemy_library_state
         .library
         .selected_or_first_mut(selected_index)
     else {
         return;
     };
-    if let Some(reference_id) = matching_reference
-        && entry.id != reference_id
-    {
-        enemy_library_state.entry_statuses.remove(&entry.id);
-        entry.id = reference_id;
-    }
     entry.display_name = ship_name.to_string();
     entry.ship_name = Some(ship_name.to_string());
     entry.ship = editor_ship.ship.clone();
@@ -580,4 +583,21 @@ fn sync_selected_enemy_name(
 fn is_host_address_character(character: char) -> bool {
     character.is_ascii_alphanumeric()
         || matches!(character, '.' | ':' | '-' | '[' | ']' | '@' | '>' | ',')
+}
+
+fn set_textbox_clipboard(clipboard: &mut TextBoxClipboard, contents: String) {
+    clipboard.contents = contents.clone();
+    if let Ok(mut system_clipboard) = arboard::Clipboard::new() {
+        let _ = system_clipboard.set_text(contents);
+    }
+}
+
+fn get_textbox_clipboard(clipboard: &TextBoxClipboard) -> Option<String> {
+    if let Ok(mut system_clipboard) = arboard::Clipboard::new()
+        && let Ok(contents) = system_clipboard.get_text()
+        && !contents.is_empty()
+    {
+        return Some(contents);
+    }
+    (!clipboard.contents.is_empty()).then(|| clipboard.contents.clone())
 }

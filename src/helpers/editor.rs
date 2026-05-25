@@ -57,11 +57,18 @@ pub(crate) fn editor_status_line(
         "none available"
     };
 
+    let docking_status = if editor_ship.has_module_kind(ModuleKind::Airlock) {
+        "ready"
+    } else {
+        "missing Airlock"
+    };
+
     format!(
-        "{}\nEntry: {entry_label}\nShip: {ship_name}\nMode: {}\nLayer: {}\nBuild: {} / {}\nRotation: {selected_rotation}\nChannel: {}\nPlaced Modules: {module_count}\nSelection: {}\nScrap: {scrap_total}\nComponent Limits: {}\nAvailable: ready {} / damaged {}\nRepair Cost: {} ({availability})",
+        "{}\nEntry: {entry_label}\nShip: {ship_name}\nMode: {}\nLayer: {}\nBuild: {} / {}\nRotation: {selected_rotation}\nChannel: {}\nPlaced Modules: {module_count}\nDocking: {docking_status}\nSelection: {}\nScrap: {scrap_total}\nComponent Limits: {}\nAvailable: ready {} / damaged {}\nRepair Cost: {} ({availability})",
         match mode {
             EditorMode::Player => "Player Refit",
             EditorMode::Enemy => "Enemy Ship Debug Editor",
+            EditorMode::Station => "Station Debug Editor",
         },
         match tool_mode {
             EditorToolMode::Build => "Build",
@@ -158,12 +165,13 @@ pub(crate) fn enemy_config_references_text(
         }
     }
 
-    if references.is_empty() {
-        return "Config Enemy References\nNo enemy ids referenced by sector config.".to_string();
-    }
-
     let mut lines = vec!["Config Enemy References".to_string()];
+    if references.is_empty() {
+        lines.push("No enemy ids referenced by sector config.".to_string());
+    }
+    let mut referenced_ids = Vec::new();
     for (enemy_id, nodes) in references {
+        referenced_ids.push(enemy_id.clone());
         let library_label = enemy_library_state
             .library
             .find_by_id(&enemy_id)
@@ -191,51 +199,15 @@ pub(crate) fn enemy_config_references_text(
             nodes.join(", ")
         ));
     }
-    lines.join("\n")
-}
-
-pub(crate) fn referenced_enemy_id_for_name(
-    ship_name: &str,
-    sector_state: &SectorState,
-    enemy_library_state: &crate::state::EnemyShipLibraryState,
-    selected_index: usize,
-) -> Option<String> {
-    let slug = enemy_reference_slug(ship_name);
-    if slug.is_empty() {
-        return None;
-    }
-    sector_state
-        .nodes
-        .iter()
-        .flat_map(|node| node.encounter.enemy_ship_ids.iter())
-        .find(|enemy_id| {
-            enemy_reference_slug(enemy_id) == slug
-                && enemy_library_state
-                    .library
-                    .entries
-                    .iter()
-                    .enumerate()
-                    .all(|(index, entry)| index == selected_index || entry.id != **enemy_id)
-        })
-        .cloned()
-}
-
-pub(crate) fn enemy_reference_slug(value: &str) -> String {
-    let mut slug = String::new();
-    let mut previous_separator = false;
-    for character in value.chars() {
-        if character.is_ascii_alphanumeric() {
-            slug.push(character.to_ascii_lowercase());
-            previous_separator = false;
-        } else if !previous_separator && !slug.is_empty() {
-            slug.push('_');
-            previous_separator = true;
+    for entry in &enemy_library_state.library.entries {
+        if !referenced_ids.iter().any(|id| id == &entry.id) {
+            lines.push(format!(
+                "{} - {} [unreferenced]",
+                entry.id, entry.display_name
+            ));
         }
     }
-    if previous_separator {
-        slug.pop();
-    }
-    slug
+    lines.join("\n")
 }
 
 pub(crate) fn module_kind_cost(kind: ModuleKind, variant: ModuleVariant) -> u32 {
@@ -288,6 +260,7 @@ pub(crate) fn variant_inventory_label(
             progression.damaged_count(kind, variant),
         ),
         EditorMode::Enemy => "ready inf / damaged inf".to_string(),
+        EditorMode::Station => "station tool".to_string(),
     }
 }
 
@@ -608,18 +581,54 @@ pub(crate) fn is_cursor_over_editor_ui(
 }
 
 pub(crate) fn sprite_path_for_kind(kind: &ModuleKind, variant: ModuleVariant) -> String {
-    let asset_name = match kind {
+    let (category, asset_name) = match kind {
         ModuleKind::Cargo => match variant {
-            ModuleVariant::FuelTank => "cargo_fuel_tank",
-            ModuleVariant::AmmoRack => "cargo_ammo_rack",
-            ModuleVariant::RawSalvageCrate => "cargo_raw_salvage",
-            ModuleVariant::RepairChargeRack => "cargo_repair_charge",
-            ModuleVariant::O2Canister => "cargo_o2_canister",
-            _ => "cargo",
+            ModuleVariant::FuelTank => ("components", "cargo_fuel_tank"),
+            ModuleVariant::AmmoRack => ("components", "cargo_ammo_rack"),
+            ModuleVariant::RawSalvageCrate => ("components", "cargo_raw_salvage"),
+            ModuleVariant::RepairChargeRack => ("components", "cargo_repair_charge"),
+            ModuleVariant::O2Canister => ("components", "cargo_o2_canister"),
+            _ => ("components", "cargo"),
         },
-        ModuleKind::Shield => "battery",
-        ModuleKind::Detector => "computer",
-        _ => kind.as_str(),
+        ModuleKind::Turret => ("hull", "hardpoint"),
+        ModuleKind::Airlock | ModuleKind::Engine => ("hull", kind.as_str()),
+        ModuleKind::Shield => ("components", "battery"),
+        ModuleKind::Detector => ("components", "computer"),
+        _ => ("components", kind.as_str()),
     };
-    format!("tiles/{asset_name}.png")
+    format!("tiles/{category}/{asset_name}.png")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sprite_path_for_kind;
+    use crate::ship::{ModuleKind, ModuleVariant};
+
+    #[test]
+    fn hull_layer_components_use_hull_asset_paths() {
+        assert_eq!(
+            sprite_path_for_kind(&ModuleKind::Airlock, ModuleVariant::Standard),
+            "tiles/hull/airlock.png"
+        );
+        assert_eq!(
+            sprite_path_for_kind(&ModuleKind::Engine, ModuleVariant::Standard),
+            "tiles/hull/engine.png"
+        );
+        assert_eq!(
+            sprite_path_for_kind(&ModuleKind::Turret, ModuleVariant::LaserTurret),
+            "tiles/hull/hardpoint.png"
+        );
+    }
+
+    #[test]
+    fn ordinary_components_stay_in_component_asset_paths() {
+        assert_eq!(
+            sprite_path_for_kind(&ModuleKind::Core, ModuleVariant::BasicCore),
+            "tiles/components/core.png"
+        );
+        assert_eq!(
+            sprite_path_for_kind(&ModuleKind::Cargo, ModuleVariant::FuelTank),
+            "tiles/components/cargo_fuel_tank.png"
+        );
+    }
 }

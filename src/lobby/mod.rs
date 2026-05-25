@@ -26,6 +26,7 @@ use super::{
     netcode,
     state::{
         DebugEnemyEditorButton,
+        DebugStationEditorButton,
         EditorMode,
         EditorSessionState,
         FocusedTextBox,
@@ -49,6 +50,7 @@ pub(crate) fn lobby_button_system(
             &mut BackgroundColor,
             Option<&JoinButton>,
             Option<&DebugEnemyEditorButton>,
+            Option<&DebugStationEditorButton>,
             Option<&LobbyCycleRoleButton>,
             Option<&LobbyCycleColorButton>,
             Option<&LobbyToggleShadersButton>,
@@ -71,6 +73,7 @@ pub(crate) fn lobby_button_system(
         mut background,
         join,
         debug_enemy,
+        debug_station,
         cycle_role,
         cycle_color,
         toggle_shaders,
@@ -116,6 +119,11 @@ pub(crate) fn lobby_button_system(
                     next_mode.set(FrontendMode::DebugEnemyEditor);
                     log::info!("Debug Enemy Editor button pressed");
                     log::info!("Switching to Editing mode");
+                } else if debug_station.is_some() {
+                    *background = BackgroundColor(Color::srgb(0.18, 0.31, 0.34));
+                    editor_session.mode = EditorMode::Station;
+                    next_mode.set(FrontendMode::DebugStationEditor);
+                    log::info!("Debug Station Editor button pressed");
                 } else if cycle_role.is_some() {
                     *background = BackgroundColor(PRESSED_BUTTON);
                     local_profile.role = local_profile.role.cycle(1);
@@ -142,6 +150,8 @@ pub(crate) fn lobby_button_system(
                 } else if cycle_role.is_some() || cycle_color.is_some() || toggle_shaders.is_some()
                 {
                     Color::srgb(0.24, 0.32, 0.48)
+                } else if debug_station.is_some() {
+                    Color::srgb(0.25, 0.40, 0.44)
                 } else {
                     Color::srgb(0.46, 0.34, 0.22)
                 });

@@ -114,6 +114,9 @@ pub enum ModuleVariant {
     RawSalvageCrate,
     RepairChargeRack,
     O2Canister,
+    StationEngineerNpc,
+    StationContractsNpc,
+    StationArchivesNpc,
 }
 
 impl ModuleVariant {
@@ -152,6 +155,9 @@ impl ModuleVariant {
             Self::RawSalvageCrate => "Raw Salvage Crate",
             Self::RepairChargeRack => "Repair Charge Rack",
             Self::O2Canister => "O2 Canister",
+            Self::StationEngineerNpc => "Engineer NPC",
+            Self::StationContractsNpc => "Contracts NPC",
+            Self::StationArchivesNpc => "Archives NPC",
         }
     }
 

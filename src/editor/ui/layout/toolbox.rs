@@ -16,6 +16,8 @@ use crate::{
         EditorToolModeButton,
         EditorToolModeButtonText,
         Progression,
+        StationEditorTool,
+        StationToolboxButton,
         ToolboxFoundationButton,
         ToolboxFoundationButtonText,
         ToolboxVariantButton,
@@ -128,6 +130,54 @@ pub(super) fn hull_toolbox_groups() -> [(&'static str, HullToolboxGroup); 2] {
 pub(super) enum HullToolboxGroup {
     Foundations(&'static [ShipFoundationKind]),
     Modules(&'static [(ModuleKind, ModuleVariant)]),
+}
+
+pub(super) fn spawn_station_tool_button_grid(
+    parent: &mut ChildSpawnerCommands,
+    font: &Handle<Font>,
+    selected_tool: Option<StationEditorTool>,
+) {
+    for row in StationEditorTool::ALL.chunks(3) {
+        parent
+            .spawn(Node {
+                width: Val::Percent(100.0),
+                column_gap: Val::Px(8.0),
+                ..default()
+            })
+            .with_children(|row_parent| {
+                for tool in row {
+                    row_parent
+                        .spawn((
+                            Button,
+                            Node {
+                                width: Val::Px(74.0),
+                                height: Val::Px(62.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
+                                padding: UiRect::all(Val::Px(6.0)),
+                                border_radius: BorderRadius::all(Val::Px(UI_BUTTON_RADIUS)),
+                                ..default()
+                            },
+                            BackgroundColor(if Some(*tool) == selected_tool {
+                                SELECTED_BUTTON
+                            } else {
+                                NORMAL_BUTTON
+                            }),
+                            StationToolboxButton { tool: *tool },
+                        ))
+                        .with_child((
+                            Text::new(tool.label()),
+                            TextFont {
+                                font: font.clone(),
+                                font_size: 11.0,
+                                ..default()
+                            },
+                            TextColor(Color::WHITE),
+                            TextLayout::new_with_justify(Justify::Center),
+                        ));
+                }
+            });
+    }
 }
 
 pub(super) fn spawn_layer_button(
@@ -291,6 +341,7 @@ pub(super) fn spawn_variant_button_grid(
                 for (kind, variant) in row {
                     let available = ignore_component_limits
                         || mode == EditorMode::Enemy
+                        || mode == EditorMode::Station
                         || progression.ready_count(*kind, *variant) > 0
                         || progression.damaged_count(*kind, *variant) > 0;
                     row_parent

@@ -642,9 +642,10 @@ fn load_or_create_sector_layout(seed: u64) -> Result<SectorLayoutConfig, String>
     if path.exists() {
         let encoded = fs::read_to_string(path)
             .map_err(|error| format!("failed to read sector layout {}: {error}", path.display()))?;
-        let config = serde_json::from_str(&encoded).map_err(|error| {
+        let mut config: SectorLayoutConfig = serde_json::from_str(&encoded).map_err(|error| {
             format!("failed to decode sector layout {}: {error}", path.display())
         })?;
+        backfill_default_station_reference(&mut config);
         return Ok(config);
     }
 
@@ -662,6 +663,23 @@ fn load_or_create_sector_layout(seed: u64) -> Result<SectorLayoutConfig, String>
     fs::write(path, encoded)
         .map_err(|error| format!("failed to write sector layout {}: {error}", path.display()))?;
     Ok(config)
+}
+
+fn backfill_default_station_reference(config: &mut SectorLayoutConfig) {
+    if config
+        .nodes
+        .iter()
+        .any(|node| node.station_id.as_deref().is_some())
+    {
+        return;
+    }
+    if let Some(node) = config
+        .nodes
+        .iter_mut()
+        .find(|node| node.kind == SectorNodeKind::HubStation)
+    {
+        node.station_id = Some("needle_rest".to_string());
+    }
 }
 
 fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
@@ -874,6 +892,53 @@ fn default_sector_layout(seed: u64) -> SectorLayoutConfig {
                 },
             },
         ],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn backfills_needle_rest_for_legacy_hub_without_station_id() {
+        let mut config = default_sector_layout(1);
+        for node in &mut config.nodes {
+            node.station_id = None;
+        }
+
+        backfill_default_station_reference(&mut config);
+
+        let hub = config
+            .nodes
+            .iter()
+            .find(|node| node.kind == SectorNodeKind::HubStation)
+            .unwrap();
+        assert_eq!(hub.station_id.as_deref(), Some("needle_rest"));
+    }
+
+    #[test]
+    fn backfill_keeps_existing_station_references() {
+        let mut config = default_sector_layout(1);
+        for node in &mut config.nodes {
+            node.station_id = None;
+        }
+        config.nodes[1].station_id = Some("existing_station".to_string());
+
+        backfill_default_station_reference(&mut config);
+
+        assert_eq!(
+            config.nodes[1].station_id.as_deref(),
+            Some("existing_station")
+        );
+        assert!(
+            config
+                .nodes
+                .iter()
+                .find(|node| node.kind == SectorNodeKind::HubStation)
+                .unwrap()
+                .station_id
+                .is_none()
+        );
     }
 }
 

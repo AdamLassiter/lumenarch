@@ -5,6 +5,8 @@ pub(crate) fn save_editor_ship_shortcut(
     editor_session: Res<EditorSessionState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
+    mut stations: ResMut<StationCatalogResource>,
+    station_editor_state: Res<station_editor::StationEditorState>,
 ) {
     if !keys.just_pressed(KeyCode::F5) {
         return;
@@ -62,6 +64,11 @@ pub(crate) fn save_editor_ship_shortcut(
 
             save_default_enemy_library(&enemy_library_state.library)
         }
+        EditorMode::Station => station_editor::save_station_editor_catalog(
+            &mut stations,
+            &station_editor_state,
+            &editor_ship,
+        ),
     };
     if let Err(error) = result {
         eprintln!("editor: failed to save ship data: {error}");
@@ -147,6 +154,9 @@ pub(crate) fn load_editor_ship_shortcut(
     mut editor_ship: ResMut<EditorShip>,
     mut rollback_state: ResMut<netcode::RollbackGameState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
+    mut stations: ResMut<StationCatalogResource>,
+    mut station_editor_state: ResMut<station_editor::StationEditorState>,
+    sector_state: Res<SectorState>,
 ) {
     if !netcode::is_host_authority(&status) {
         return;
@@ -176,10 +186,10 @@ pub(crate) fn load_editor_ship_shortcut(
                 );
                 enemy_library_state.library = validated.library;
                 enemy_library_state.entry_statuses = validated.statuses;
-                enemy_library_state.library.ensure_seeded();
-                enemy_library_state.selected_index = enemy_library_state
-                    .selected_index
-                    .min(enemy_library_state.library.entries.len().saturating_sub(1));
+                crate::editor::ensure_selected_enemy_reference(
+                    &sector_state,
+                    &mut enemy_library_state,
+                );
                 if let Some(entry) = enemy_library_state
                     .library
                     .selected_or_first(enemy_library_state.selected_index)
@@ -199,6 +209,25 @@ pub(crate) fn load_editor_ship_shortcut(
                 enemy_editor_state.dirty = false;
             }
         },
+        EditorMode::Station => {
+            if let Err(error) = station_editor::reload_station_catalog(
+                &mut stations,
+                &mut station_editor_state,
+                &mut editor_ship,
+            ) {
+                eprintln!("editor: failed to reload station catalog: {error}");
+            }
+            station_editor::ensure_selected_station_reference(
+                &sector_state,
+                &mut stations,
+                &mut station_editor_state,
+            );
+            station_editor::sync_editor_ship_from_station(
+                &stations,
+                &station_editor_state,
+                &mut editor_ship,
+            );
+        }
     }
 }
 
@@ -210,6 +239,8 @@ pub(crate) fn persist_editor_ship(
     mut rollback_state: ResMut<netcode::RollbackGameState>,
     mut enemy_editor_state: ResMut<EnemyEditorState>,
     mut enemy_library_state: ResMut<EnemyShipLibraryState>,
+    mut stations: ResMut<StationCatalogResource>,
+    station_editor_state: Res<station_editor::StationEditorState>,
 ) {
     if !netcode::is_host_authority(&status) {
         return;
@@ -263,6 +294,11 @@ pub(crate) fn persist_editor_ship(
             }
             save_default_enemy_library(&enemy_library_state.library)
         }
+        EditorMode::Station => station_editor::save_station_editor_catalog(
+            &mut stations,
+            &station_editor_state,
+            &editor_ship,
+        ),
     };
 
     if let Err(error) = result {
@@ -307,5 +343,8 @@ use crate::{
         EnemyEditorState,
         EnemyShipLibraryState,
         MainCamera,
+        SectorState,
     },
+    station_editor,
+    stations::StationCatalogResource,
 };

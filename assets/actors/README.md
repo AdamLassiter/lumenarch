@@ -6,6 +6,9 @@ The player/lobby profile flow can load these optional actor sprites:
 - `player_radiation.png`
 - `player_welder.png`
 - `player_eva.png`
+- `station_engineer.png`
+- `station_contracts.png`
+- `station_archives.png`
 
 Usage notes:
 

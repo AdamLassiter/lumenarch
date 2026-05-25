@@ -245,7 +245,7 @@ pub(crate) fn spawn_sector_map_ui(
             .with_children(|panel| {
                 panel.spawn((
                     Text::new(
-                        "Sector Controls\nLeft click: select reachable route\nScroll: zoom map\nMiddle drag: pan map\nEnter host mission from left action panel\nTab: return to station",
+                        "Sector Controls\nLeft click: select reachable route\nScroll: zoom map\nMiddle drag: pan map\nEnter host mission from left action panel\nQ: return to station",
                     ),
                     TextFont {
                         font: mono_font,

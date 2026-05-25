@@ -57,7 +57,9 @@ pub(crate) fn sync_presentation_from_rollback(
     mut sector: ResMut<SectorState>,
     mut last_mission_report: ResMut<LastMissionReport>,
 ) {
-    if *frontend_mode.get() == FrontendMode::DebugEnemyEditor {
+    if *frontend_mode.get() == FrontendMode::DebugEnemyEditor
+        || *frontend_mode.get() == FrontendMode::DebugStationEditor
+    {
         return;
     }
     if !rollback_state.is_changed() {
@@ -217,6 +219,7 @@ pub(crate) fn editor_ui_should_not_be_present(
     rollback_state: Res<RollbackGameState>,
 ) -> bool {
     *frontend_mode.get() != FrontendMode::DebugEnemyEditor
+        && *frontend_mode.get() != FrontendMode::DebugStationEditor
         && !(*frontend_mode.get() == FrontendMode::Session
             && rollback_state.phase == RollbackPhase::Editing)
 }
