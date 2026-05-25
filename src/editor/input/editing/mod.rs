@@ -88,7 +88,8 @@ pub(crate) use actions::{
     mission_report_button_system,
     toolbox_button_system,
 };
-use building::*;
+#[cfg(test)]
+use building::apply_build_action;
 pub(crate) use building::{place_or_remove_tile, rotate_selected_tool};
 use selection::*;
 pub(crate) use selection::{

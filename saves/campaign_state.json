@@ -2,7 +2,7 @@
   "progression": {
     "scrap": 100,
     "hull_wear": 0,
-    "jump_count": 5,
+    "jump_count": 12,
     "stored_components": [
       {
         "kind": "Hull",

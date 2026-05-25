@@ -146,6 +146,7 @@ fn insert_core_resources(app: &mut App, balance_config: balance::BalanceConfig) 
     .insert_resource(EnemyShipLibraryState::default())
     .insert_resource(Progression::default())
     .insert_resource(DockedState::default())
+    .insert_resource(docked::DockedBoardState::default())
     .insert_resource(docked::DockedAvatarMemory::default())
     .insert_resource(docked::DockedDialogueState::default())
     .insert_resource(station_editor::StationEditorState::default())
@@ -380,6 +381,9 @@ fn add_shared_update_systems(app: &mut App) {
             docked::cleanup_docked_spaceport_scene
                 .run_if(netcode::session_not_presents_docked)
                 .run_if(docked::docked_spaceport_scene_present),
+            docked::cleanup_docked_board_ui
+                .run_if(netcode::session_not_presents_docked)
+                .run_if(docked::docked_board_ui_present),
             gameplay::spawn_runtime_scene
                 .run_if(netcode::session_presents_encounter)
                 .run_if(gameplay::runtime_scene_missing),
@@ -563,7 +567,16 @@ fn add_docked_fixed_systems(app: &mut App) {
     app.add_systems(
         FixedUpdate,
         (
-            docked::move_docked_local_avatar.run_if(netcode::session_presents_docked),
+            docked::move_docked_local_avatar
+                .run_if(netcode::session_presents_docked)
+                .run_if(docked::docked_board_closed),
+            (
+                docked::docked_board_keyboard_system,
+                docked::docked_board_button_system,
+                docked::sync_docked_board_ui,
+            )
+                .chain()
+                .run_if(netcode::session_presents_docked),
             (
                 docked::docked_keyboard_interaction_system,
                 docked::sync_docked_yarn_runner,
@@ -571,7 +584,8 @@ fn add_docked_fixed_systems(app: &mut App) {
                 docked::docked_dialogue_button_system,
             )
                 .chain()
-                .run_if(netcode::session_presents_docked),
+                .run_if(netcode::session_presents_docked)
+                .run_if(docked::docked_board_closed),
         ),
     );
 }

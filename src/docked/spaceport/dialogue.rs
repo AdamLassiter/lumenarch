@@ -215,33 +215,53 @@ pub(super) fn spawn_dialogue_overlay(
 
             match npc.service_action {
                 StationNpcServiceAction::Engineer => {
-                    dialogue_button(
-                        panel,
-                        "Repair Ship",
-                        &title_font,
-                        DockedDialogueRepairButton,
-                    );
-                    dialogue_button(panel, "Refit Ship", &title_font, DockedDialogueRefitButton);
+                    if !has_available_yarn_option(dialogue_state, "Repair Ship") {
+                        dialogue_button(
+                            panel,
+                            "Repair Ship",
+                            &title_font,
+                            DockedDialogueRepairButton,
+                        );
+                    }
+                    if !has_available_yarn_option(dialogue_state, "Refit Ship") {
+                        dialogue_button(
+                            panel,
+                            "Refit Ship",
+                            &title_font,
+                            DockedDialogueRefitButton,
+                        );
+                    }
                 }
                 StationNpcServiceAction::Contracts => {
-                    dialogue_button(
-                        panel,
-                        "Open Contracts",
-                        &title_font,
-                        DockedDialogueContractsButton,
-                    );
+                    if !has_available_yarn_option(dialogue_state, "Open Contracts") {
+                        dialogue_button(
+                            panel,
+                            "Open Contracts",
+                            &title_font,
+                            DockedDialogueContractsButton,
+                        );
+                    }
                 }
                 StationNpcServiceAction::Archives => {
-                    dialogue_button(
-                        panel,
-                        "Open Archives",
-                        &title_font,
-                        DockedDialogueArchivesButton,
-                    );
+                    if !has_available_yarn_option(dialogue_state, "Open Archives") {
+                        dialogue_button(
+                            panel,
+                            "Open Archives",
+                            &title_font,
+                            DockedDialogueArchivesButton,
+                        );
+                    }
                 }
             }
             dialogue_button(panel, "Close", &title_font, DockedDialogueCloseButton);
         });
+}
+
+pub(super) fn has_available_yarn_option(dialogue_state: &DockedDialogueState, label: &str) -> bool {
+    dialogue_state
+        .yarn_options
+        .iter()
+        .any(|option| option.is_available && option.label.eq_ignore_ascii_case(label))
 }
 
 pub(super) fn dialogue_button<T: Component>(
@@ -309,6 +329,10 @@ pub(crate) fn docked_dialogue_button_system(
     mut runner_query: Query<&mut DialogueRunner, With<DockedYarnRunner>>,
     mut dialogue_state: ResMut<DockedDialogueState>,
     mut docked_state: ResMut<DockedState>,
+    stations: Res<StationCatalogResource>,
+    sector_state: Res<SectorState>,
+    progression: Res<Progression>,
+    mut board_state: ResMut<DockedBoardState>,
     mut pending_meta: ResMut<PendingLocalMetaCommand>,
     mut editor_session: ResMut<EditorSessionState>,
 ) {
@@ -334,13 +358,34 @@ pub(crate) fn docked_dialogue_button_system(
                 } else if contracts.is_some() {
                     docked_state.selected_surface = DockedSurface::Contracts;
                     dialogue_state.selected_surface_hint = Some(StationNpcServiceAction::Contracts);
+                    open_docked_board(
+                        &mut board_state,
+                        DockedSurface::Contracts,
+                        &stations,
+                        &sector_state,
+                        &progression,
+                    );
+                    clear_docked_dialogue_state(&mut dialogue_state);
                 } else if archives.is_some() {
                     docked_state.selected_surface = DockedSurface::Archives;
                     dialogue_state.selected_surface_hint = Some(StationNpcServiceAction::Archives);
+                    open_docked_board(
+                        &mut board_state,
+                        DockedSurface::Archives,
+                        &stations,
+                        &sector_state,
+                        &progression,
+                    );
+                    clear_docked_dialogue_state(&mut dialogue_state);
                 } else if let Some(yarn_option) = yarn_option {
                     apply_dialogue_service_label(
                         &yarn_option.label,
                         &mut docked_state,
+                        &stations,
+                        &sector_state,
+                        &progression,
+                        &mut board_state,
+                        &mut dialogue_state,
                         &mut pending_meta,
                         &mut editor_session,
                     );
@@ -370,6 +415,11 @@ pub(crate) fn docked_dialogue_button_system(
 pub(super) fn apply_dialogue_service_label(
     label: &str,
     docked_state: &mut DockedState,
+    stations: &StationCatalogResource,
+    sector_state: &SectorState,
+    progression: &Progression,
+    board_state: &mut DockedBoardState,
+    dialogue_state: &mut DockedDialogueState,
     pending_meta: &mut PendingLocalMetaCommand,
     editor_session: &mut EditorSessionState,
 ) {
@@ -389,9 +439,25 @@ pub(super) fn apply_dialogue_service_label(
         }
         "open contracts" => {
             docked_state.selected_surface = DockedSurface::Contracts;
+            open_docked_board(
+                board_state,
+                DockedSurface::Contracts,
+                stations,
+                sector_state,
+                progression,
+            );
+            clear_docked_dialogue_state(dialogue_state);
         }
         "open archives" => {
             docked_state.selected_surface = DockedSurface::Archives;
+            open_docked_board(
+                board_state,
+                DockedSurface::Archives,
+                stations,
+                sector_state,
+                progression,
+            );
+            clear_docked_dialogue_state(dialogue_state);
         }
         _ => {}
     }

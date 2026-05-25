@@ -26,6 +26,7 @@ pub(crate) fn spawn_docked_spaceport_scene(
     commands
         .spawn((
             Transform::default(),
+            GlobalTransform::default(),
             Visibility::default(),
             DockedSpaceportRoot,
             Name::new("Docked Spaceport Scene"),
@@ -47,6 +48,7 @@ pub(crate) fn spawn_docked_spaceport_scene(
                 root.spawn((
                     Sprite::from_image(asset_server.load(sprite_path)),
                     Transform::from_translation(grid_translation(npc.grid_x, npc.grid_y, 2.0)),
+                    GlobalTransform::default(),
                     DockedNpcMarker,
                 ))
                 .with_child((
@@ -244,9 +246,8 @@ pub(crate) fn move_docked_local_avatar(
     }
     scene_state.avatar.local_position = resolved;
 
-    if scene_state.avatar.local_velocity.length_squared() > 0.0001 {
-        scene_state.avatar.facing_radians =
-            angle_from_vector(FixedVec2::from_vec2(scene_state.avatar.local_velocity)).to_num();
+    if input.length_squared() > 0.0001 {
+        scene_state.avatar.facing_radians = angle_from_vector(FixedVec2::from_vec2(input)).to_num();
         (scene_state.avatar.facing_x, scene_state.avatar.facing_y) =
             docked_facing_offset(scene_state.avatar.facing_radians);
     }

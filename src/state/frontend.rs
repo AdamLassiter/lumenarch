@@ -50,7 +50,7 @@ pub(crate) struct GraphicsOptions {
 impl Default for GraphicsOptions {
     fn default() -> Self {
         Self {
-            shaders_enabled: true,
+            shaders_enabled: false,
         }
     }
 }

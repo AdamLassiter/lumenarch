@@ -7,6 +7,7 @@ use bevy_yarnspinner::{
 };
 use ggrs::PlayerHandle;
 
+use super::board::{DockedBoardState, open_docked_board};
 use crate::{
     TILE_SIZE,
     balance::BalanceConfig,
@@ -27,6 +28,7 @@ use crate::{
         EditorSessionState,
         EditorShip,
         LocalPlayerProfile,
+        Progression,
         SectorState,
     },
     station_editor,

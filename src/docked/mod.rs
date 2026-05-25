@@ -1,6 +1,16 @@
+mod board;
 mod campaign;
 mod spaceport;
 
+pub(crate) use board::{
+    DockedBoardState,
+    cleanup_docked_board_ui,
+    docked_board_button_system,
+    docked_board_closed,
+    docked_board_keyboard_system,
+    docked_board_ui_present,
+    sync_docked_board_ui,
+};
 pub(crate) use campaign::{initialize_campaign_state, persist_campaign_state};
 pub(crate) use spaceport::{
     DockedAvatarMemory,
