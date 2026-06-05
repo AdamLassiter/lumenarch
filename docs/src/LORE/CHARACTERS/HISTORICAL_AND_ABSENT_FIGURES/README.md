@@ -2,6 +2,14 @@
 
 These characters may never appear in person, but they can structure quests, doctrine, memorials, and faction identity.
 
+## Character Files
+
+- [Braddan Vale](./BRADDAN_VALE.md)
+- [The Unnamed Stewardship Planners](./THE_UNNAMED_STEWARDSHIP_PLANNERS.md)
+- [The Blue-Veil Quartermaster](./THE_BLUE_VEIL_QUARTERMASTER.md)
+- [The Preserved Subject](./THE_PRESERVED_SUBJECT.md)
+- [Sainted Founder Equivalents](./SAINTED_FOUNDER_EQUIVALENTS.md)
+
 ## Braddan Vale
 
 ### Role

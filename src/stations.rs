@@ -11,7 +11,7 @@ use crate::{
         ShipFoundationTile,
         ShipModule,
     },
-    state::SectorState,
+    state::{MissionArtifactKind, SectorState},
 };
 
 const DEFAULT_STATIONS_PATH: &str = "saves/stations.json";
@@ -95,6 +95,8 @@ pub(crate) struct StationContract {
     pub(crate) reward_bonus_scrap: u32,
     #[serde(default)]
     pub(crate) lore_unlock_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) required_artifact: Option<MissionArtifactKind>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -331,6 +333,7 @@ pub(crate) fn default_station_catalog() -> StationCatalog {
                     failure_debrief: "The shakedown came back dirty. Needle Rest logs the faults and Quell wants the next launch treated as remedial, not routine.".to_string(),
                     reward_bonus_scrap: 2,
                     lore_unlock_ids: vec!["needle_rest_flight_discipline".to_string()],
+                    required_artifact: None,
                 },
                 StationContract {
                     id: "needle_latchline_recovery".to_string(),
@@ -344,6 +347,7 @@ pub(crate) fn default_station_catalog() -> StationCatalog {
                     failure_debrief: "The route went wrong and the station gets less for showing its badge on that wreck field than Ren promised.".to_string(),
                     reward_bonus_scrap: 5,
                     lore_unlock_ids: vec!["quiet_after_salvage_custom".to_string()],
+                    required_artifact: None,
                 },
                 StationContract {
                     id: "needle_gravehook_cleanup".to_string(),
@@ -357,6 +361,7 @@ pub(crate) fn default_station_catalog() -> StationCatalog {
                     failure_debrief: "The rogue cell keeps its grip on Gravehook. Needle Rest loses face and another route turns expensive.".to_string(),
                     reward_bonus_scrap: 8,
                     lore_unlock_ids: vec!["rogue_continuants_field_note".to_string()],
+                    required_artifact: None,
                 },
                 StationContract {
                     id: "needle_blueglass_retrieval".to_string(),
@@ -370,6 +375,7 @@ pub(crate) fn default_station_catalog() -> StationCatalog {
                     failure_debrief: "The archive pull failed. Cho says little, but the silence feels heavier than an argument.".to_string(),
                     reward_bonus_scrap: 6,
                     lore_unlock_ids: vec!["continuant_memory_practice".to_string()],
+                    required_artifact: Some(MissionArtifactKind::BlueglassArchiveShard),
                 },
             ],
             lore_entries: vec![
@@ -387,6 +393,21 @@ pub(crate) fn default_station_catalog() -> StationCatalog {
                     id: "continuant_memory_practice".to_string(),
                     title: "Continuant Memory Practice".to_string(),
                     body: "Continuant stations keep layered records: machine logs, witness accounts, route songs, and repair marks cut into hull braces. If one memory format dies, another may still carry the shape of what mattered.".to_string(),
+                },
+                LoreEntry {
+                    id: "blueglass_archive_shard".to_string(),
+                    title: "Blueglass Archive Shard".to_string(),
+                    body: "The shard recovered from Blueglass Hush contains a clipped routing exception: relief traffic was not cancelled, only recursively deferred. Cho reads it twice, then says the dead bureaucracy may have kept promising rescue long after everyone who needed it was gone.".to_string(),
+                },
+                LoreEntry {
+                    id: "null_swarm_telemetry_note".to_string(),
+                    title: "Null Swarm Telemetry".to_string(),
+                    body: "Recovered Null telemetry rarely reads like strategy. It is mostly maintenance intent without context: hold route, strip hazard, repeat signal, correct absence. The danger is not malice so much as obedience without a living referent.".to_string(),
+                },
+                LoreEntry {
+                    id: "continuant_recovery_ledger".to_string(),
+                    title: "Continuant Recovery Ledger".to_string(),
+                    body: "Old recovery ledgers blur civic duty and salvage accounting. Crews logged hull plates, names, disputed ownership, and prayers in the same columns because any one of them might matter when the route opened again.".to_string(),
                 },
                 LoreEntry {
                     id: "needle_rest_flight_discipline".to_string(),

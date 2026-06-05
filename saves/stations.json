@@ -762,7 +762,8 @@
           "reward_bonus_scrap": 6,
           "lore_unlock_ids": [
             "continuant_memory_practice"
-          ]
+          ],
+          "required_artifact": "BlueglassArchiveShard"
         }
       ],
       "lore_entries": [
@@ -780,6 +781,21 @@
           "id": "continuant_memory_practice",
           "title": "Continuant Memory Practice",
           "body": "Continuant stations keep layered records: machine logs, witness accounts, route songs, and repair marks cut into hull braces. If one memory format dies, another may still carry the shape of what mattered."
+        },
+        {
+          "id": "blueglass_archive_shard",
+          "title": "Blueglass Archive Shard",
+          "body": "The shard recovered from Blueglass Hush contains a clipped routing exception: relief traffic was not cancelled, only recursively deferred. Cho reads it twice, then says the dead bureaucracy may have kept promising rescue long after everyone who needed it was gone."
+        },
+        {
+          "id": "null_swarm_telemetry_note",
+          "title": "Null Swarm Telemetry",
+          "body": "Recovered Null telemetry rarely reads like strategy. It is mostly maintenance intent without context: hold route, strip hazard, repeat signal, correct absence. The danger is not malice so much as obedience without a living referent."
+        },
+        {
+          "id": "continuant_recovery_ledger",
+          "title": "Continuant Recovery Ledger",
+          "body": "Old recovery ledgers blur civic duty and salvage accounting. Crews logged hull plates, names, disputed ownership, and prayers in the same columns because any one of them might matter when the route opened again."
         },
         {
           "id": "needle_rest_flight_discipline",

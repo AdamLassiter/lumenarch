@@ -2,7 +2,7 @@
   "progression": {
     "scrap": 100,
     "hull_wear": 0,
-    "jump_count": 13,
+    "jump_count": 14,
     "stored_components": [
       {
         "kind": "Hull",
@@ -119,7 +119,7 @@
   "sector": {
     "seed": 66790,
     "current_node_id": 0,
-    "selected_node_id": 1,
+    "selected_node_id": 6,
     "active_encounter_node_id": null,
     "nodes": [
       {
@@ -454,6 +454,9 @@
     "redesign_hints": [],
     "recovered_raw_salvage": 0,
     "recovered_damaged_components": 0,
+    "recovered_artifacts": [],
+    "contract_objective_complete": false,
+    "contract_objective_status": null,
     "processed_repair_charge": 0,
     "consumed_repair_charge": 0,
     "transfer_count": 0,

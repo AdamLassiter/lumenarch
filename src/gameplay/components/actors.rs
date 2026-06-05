@@ -10,7 +10,7 @@ use crate::{
     balance::PlayerBalanceConfig,
     helpers::{FixedVec2, Fx},
     ship::{ModuleKind, ModuleVariant},
-    state::PlayerRole,
+    state::{MissionArtifactKind, PlayerRole},
     stations::FactionId,
 };
 
@@ -197,6 +197,7 @@ impl Default for EquippedSuit {
 pub(crate) enum CarriedItemKind {
     Resource(ResourceKind),
     Suit(PlayerSuit),
+    Artifact(MissionArtifactKind),
     ExtractedComponent {
         kind: ModuleKind,
         variant: ModuleVariant,
@@ -214,6 +215,7 @@ impl CarriedItemKind {
                 ResourceKind::Oxygen => "oxygen".to_string(),
             },
             Self::Suit(suit) => suit.as_str().to_string(),
+            Self::Artifact(artifact) => artifact.label().to_string(),
             Self::ExtractedComponent { kind, variant } => {
                 format!("{} {} component", variant.display_name(), kind.as_str())
             }
@@ -230,6 +232,13 @@ impl CarriedItemKind {
                 ResourceKind::Oxygen => Color::srgb(0.48, 0.86, 1.0),
             },
             Self::Suit(suit) => suit.color(),
+            Self::Artifact(MissionArtifactKind::BlueglassArchiveShard) => {
+                Color::srgb(0.48, 0.70, 1.0)
+            }
+            Self::Artifact(MissionArtifactKind::NullSwarmTelemetry) => {
+                Color::srgb(0.58, 0.96, 0.80)
+            }
+            Self::Artifact(MissionArtifactKind::ContinuantLedger) => Color::srgb(0.92, 0.78, 0.52),
             Self::ExtractedComponent { .. } => Color::srgb(0.94, 0.76, 0.54),
         }
     }

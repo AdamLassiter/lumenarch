@@ -33,7 +33,13 @@ use crate::{
     },
     netcode,
     ship::ModuleKind,
-    state::{LastMissionReport, SectorNodeStatus, StoredComponentStack, TravelOutcome},
+    state::{
+        LastMissionReport,
+        MissionArtifactKind,
+        SectorNodeStatus,
+        StoredComponentStack,
+        TravelOutcome,
+    },
     stations::StationCatalogResource,
 };
 
@@ -280,10 +286,16 @@ pub(crate) fn return_after_mission_resolution(
     let mut raw_salvage_returned = 0u32;
     let mut repair_charge_returned = 0u32;
     let mut returned_damaged_components: Vec<StoredComponentStack> = Vec::new();
+    let mut returned_artifacts: Vec<MissionArtifactKind> = Vec::new();
     for (_, storage, processor) in &inventory_query {
         if let Some(storage) = storage {
             raw_salvage_returned += storage.inventory.raw_salvage;
             repair_charge_returned += storage.inventory.repair_charge;
+            for artifact in &storage.artifacts {
+                for _ in 0..artifact.amount {
+                    returned_artifacts.push(artifact.kind);
+                }
+            }
             for component in &storage.damaged_components {
                 if let Some(existing) = returned_damaged_components.iter_mut().find(|entry| {
                     entry.kind == component.kind && entry.variant == component.variant
@@ -349,7 +361,18 @@ pub(crate) fn return_after_mission_resolution(
         .as_ref()
         .and_then(|contract_id| stations.0.contract(contract_id))
         .map(|(_, contract)| contract);
-    let contract_bonus = contract_resolution.map_or(0, |contract| contract.reward_bonus_scrap);
+    let contract_objective_complete = contract_resolution.is_none_or(|contract| {
+        contract
+            .required_artifact
+            .is_none_or(|artifact| returned_artifacts.contains(&artifact))
+    });
+    let contract_bonus = contract_resolution.map_or(0, |contract| {
+        if contract_objective_complete {
+            contract.reward_bonus_scrap
+        } else {
+            0
+        }
+    });
     if contract_bonus > 0 && !mission_state.failed {
         progression.scrap += contract_bonus;
     }
@@ -380,9 +403,33 @@ pub(crate) fn return_after_mission_resolution(
             contract_bonus, atmosphere_suffix
         )
     };
+    let artifact_summary = if returned_artifacts.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\nRecovered artifacts: {}.",
+            returned_artifacts
+                .iter()
+                .map(|artifact| artifact.label())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+    let objective_status = contract_resolution.and_then(|contract| {
+        contract.required_artifact.map(|artifact| {
+            if contract_objective_complete {
+                format!("Objective complete: returned {}.", artifact.label())
+            } else {
+                format!(
+                    "Objective incomplete: {} was not returned.",
+                    artifact.label()
+                )
+            }
+        })
+    });
 
     let (headline, detail) = if let Some(contract) = contract_resolution {
-        let contract_text = if mission_state.failed {
+        let contract_text = if mission_state.failed || !contract_objective_complete {
             &contract.failure_debrief
         } else {
             &contract.success_debrief
@@ -392,30 +439,49 @@ pub(crate) fn return_after_mission_resolution(
             .as_ref()
             .map(|summary| format!("\nOpposition: {summary}"))
             .unwrap_or_default();
+        let objective = objective_status
+            .as_ref()
+            .map(|status| format!("\n{status}"))
+            .unwrap_or_default();
         (
             if mission_state.failed {
                 format!("Contract Failed: {}", contract.title)
+            } else if !contract_objective_complete {
+                format!("Contract Incomplete: {}", contract.title)
             } else {
                 format!("Contract Complete: {}", contract.title)
             },
-            format!("{contract_text}\n\n{base_detail}{opposition}"),
+            format!("{contract_text}\n\n{base_detail}{artifact_summary}{objective}{opposition}"),
         )
     } else if mission_state.failed {
-        ("Mission Failed".to_string(), base_detail)
+        (
+            "Mission Failed".to_string(),
+            format!("{base_detail}{artifact_summary}"),
+        )
     } else {
-        ("Mission Complete".to_string(), base_detail)
+        (
+            "Mission Complete".to_string(),
+            format!("{base_detail}{artifact_summary}"),
+        )
     };
 
     if let Some(contract) = contract_resolution {
         progression.unlock_contact(contract.contact_id.clone());
-        for lore_id in &contract.lore_unlock_ids {
-            progression.unlock_lore(lore_id.clone());
-        }
-        if !mission_state.failed {
+        if !mission_state.failed && contract_objective_complete {
+            for lore_id in &contract.lore_unlock_ids {
+                progression.unlock_lore(lore_id.clone());
+            }
             progression.complete_contract(contract.id.clone());
         }
     }
-    progression.active_contract_id = None;
+    for artifact in &returned_artifacts {
+        if let Some(lore_id) = artifact.lore_unlock_id() {
+            progression.unlock_lore(lore_id.to_string());
+        }
+    }
+    if contract_resolution.is_none_or(|_| mission_state.failed || contract_objective_complete) {
+        progression.active_contract_id = None;
+    }
 
     let mut last_mission_report = LastMissionReport {
         headline: Some(headline),
@@ -433,6 +499,9 @@ pub(crate) fn return_after_mission_resolution(
         automation_used: mission_state.automation_used,
         automation_triggers: mission_state.automation_trigger_count,
         recovered_raw_salvage: mission_state.recovered_raw_salvage,
+        recovered_artifacts: returned_artifacts,
+        contract_objective_complete,
+        contract_objective_status: objective_status,
         processed_repair_charge: mission_state.processed_repair_charge,
         consumed_repair_charge: mission_state.consumed_repair_charge,
         transfer_count: mission_state.transfer_count,

@@ -5,7 +5,7 @@ mod salvage;
 use arena::spawn_arena;
 use bevy::{ecs::system::SystemParam, log, prelude::*};
 use hud::spawn_runtime_hud;
-use salvage::spawn_salvage_wreck;
+use salvage::{spawn_mission_artifact, spawn_salvage_wreck};
 
 use super::ship::{default_hostile_identity, spawn_hostile_ship, spawn_runtime_ship};
 use crate::{
@@ -109,6 +109,11 @@ pub(crate) fn spawn_runtime_scene(
         .active_contract_id
         .as_ref()
         .and_then(|contract_id| station_catalog.0.contract(contract_id));
+    if let Some((_, contract)) = active_contract.as_ref()
+        && let Some(artifact) = contract.required_artifact
+    {
+        spawn_mission_artifact(&mut commands, artifact);
+    }
     let mission_briefing = active_contract
         .as_ref()
         .map(|(_, contract)| contract.briefing.clone());

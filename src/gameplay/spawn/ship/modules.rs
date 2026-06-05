@@ -180,6 +180,7 @@ pub(crate) fn spawn_runtime_module(
                         inventory
                     },
                     damaged_components: Vec::new(),
+                    artifacts: Vec::new(),
                     accepts_fuel: module.variant == ModuleVariant::FuelTank,
                     accepts_ammunition: module.variant == ModuleVariant::AmmoRack,
                     accepts_general: matches!(
@@ -204,6 +205,7 @@ pub(crate) fn spawn_runtime_module(
                     capacity: spec.storage_capacity,
                     inventory: ResourceInventory::default(),
                     damaged_components: Vec::new(),
+                    artifacts: Vec::new(),
                     accepts_fuel: false,
                     accepts_ammunition: false,
                     accepts_general: true,
@@ -404,6 +406,7 @@ pub(crate) fn spawn_runtime_module(
                         ..default()
                     },
                     damaged_components: Vec::new(),
+                    artifacts: Vec::new(),
                     accepts_fuel: false,
                     accepts_ammunition: false,
                     accepts_general: false,

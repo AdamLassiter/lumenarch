@@ -8,6 +8,7 @@ use super::{CarriedItemKind, DroneTask};
 use crate::{
     helpers::{FixedVec2, Fx},
     ship::{ModuleKind, ModuleVariant},
+    state::MissionArtifactKind,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -72,6 +73,7 @@ pub(crate) struct StorageModule {
     pub(crate) capacity: u32,
     pub(crate) inventory: ResourceInventory,
     pub(crate) damaged_components: Vec<StoredDamagedComponent>,
+    pub(crate) artifacts: Vec<StoredMissionArtifact>,
     pub(crate) accepts_fuel: bool,
     pub(crate) accepts_ammunition: bool,
     pub(crate) accepts_general: bool,
@@ -93,6 +95,12 @@ impl StorageModule {
 pub(crate) struct StoredDamagedComponent {
     pub(crate) kind: ModuleKind,
     pub(crate) variant: ModuleVariant,
+    pub(crate) amount: u32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct StoredMissionArtifact {
+    pub(crate) kind: MissionArtifactKind,
     pub(crate) amount: u32,
 }
 
@@ -118,6 +126,17 @@ impl StorageModule {
                 variant,
                 amount,
             });
+        }
+    }
+
+    pub(crate) fn add_artifact(&mut self, kind: MissionArtifactKind, amount: u32) {
+        if amount == 0 {
+            return;
+        }
+        if let Some(entry) = self.artifacts.iter_mut().find(|entry| entry.kind == kind) {
+            entry.amount += amount;
+        } else {
+            self.artifacts.push(StoredMissionArtifact { kind, amount });
         }
     }
 }

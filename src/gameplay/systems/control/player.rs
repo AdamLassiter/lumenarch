@@ -645,6 +645,9 @@ pub(crate) fn handle_player_cargo_interaction(
         if let Some((component_kind, component_variant, component_amount)) = deposit.component {
             storage.add_damaged_component(component_kind, component_variant, component_amount);
         }
+        if let Some((artifact_kind, artifact_amount)) = deposit.artifact {
+            storage.add_artifact(artifact_kind, artifact_amount);
+        }
         if let Some(resource_kind) = deposit.resource_kind {
             storage
                 .inventory
@@ -670,6 +673,7 @@ struct CarriedItemDeposit {
     resource_kind: Option<ResourceKind>,
     resource_amount: u32,
     component: Option<(ModuleKind, ModuleVariant, u32)>,
+    artifact: Option<(crate::state::MissionArtifactKind, u32)>,
     label: String,
 }
 
@@ -679,16 +683,25 @@ fn carried_item_deposit(kind: CarriedItemKind, amount: u32) -> Option<CarriedIte
             resource_kind: Some(resource_kind),
             resource_amount: amount,
             component: None,
+            artifact: None,
             label: format!(
                 "{} {}",
                 amount,
                 CarriedItemKind::Resource(resource_kind).label()
             ),
         }),
+        CarriedItemKind::Artifact(artifact) => Some(CarriedItemDeposit {
+            resource_kind: None,
+            resource_amount: 0,
+            component: None,
+            artifact: Some((artifact, amount.max(1))),
+            label: format!("{} {}", amount.max(1), artifact.label()),
+        }),
         CarriedItemKind::ExtractedComponent { kind, variant } => Some(CarriedItemDeposit {
             resource_kind: None,
             resource_amount: 0,
             component: Some((kind, variant, amount.max(1))),
+            artifact: None,
             label: format!(
                 "damaged {} {} component",
                 variant.display_name(),
@@ -742,5 +755,23 @@ mod tests {
             module_at_focused_tile_from_entry(ship, 0, -1, &focused, ship),
             Some((2, ModuleKind::Turret))
         );
+    }
+
+    #[test]
+    fn carried_artifact_deposits_as_storage_artifact_not_resource() {
+        let deposit = carried_item_deposit(
+            CarriedItemKind::Artifact(crate::state::MissionArtifactKind::BlueglassArchiveShard),
+            1,
+        )
+        .expect("artifact should be stowable");
+
+        assert_eq!(deposit.resource_kind, None);
+        assert_eq!(deposit.resource_amount, 0);
+        assert_eq!(deposit.component, None);
+        assert_eq!(
+            deposit.artifact,
+            Some((crate::state::MissionArtifactKind::BlueglassArchiveShard, 1))
+        );
+        assert_eq!(deposit.label, "1 Blueglass archive shard");
     }
 }

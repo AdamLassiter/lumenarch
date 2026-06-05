@@ -39,6 +39,39 @@ pub(crate) struct StoredComponentStack {
     pub(crate) damaged: u32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub(crate) enum MissionArtifactKind {
+    BlueglassArchiveShard,
+    NullSwarmTelemetry,
+    ContinuantLedger,
+}
+
+impl MissionArtifactKind {
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::BlueglassArchiveShard => "Blueglass archive shard",
+            Self::NullSwarmTelemetry => "Null Swarm telemetry",
+            Self::ContinuantLedger => "Continuant ledger",
+        }
+    }
+
+    pub(crate) fn lore_unlock_id(self) -> Option<&'static str> {
+        match self {
+            Self::BlueglassArchiveShard => Some("blueglass_archive_shard"),
+            Self::NullSwarmTelemetry => Some("null_swarm_telemetry_note"),
+            Self::ContinuantLedger => Some("continuant_recovery_ledger"),
+        }
+    }
+
+    pub(crate) fn archive_title(self) -> Option<&'static str> {
+        match self {
+            Self::BlueglassArchiveShard => Some("Blueglass Archive Shard"),
+            Self::NullSwarmTelemetry => Some("Null Swarm Telemetry"),
+            Self::ContinuantLedger => Some("Continuant Recovery Ledger"),
+        }
+    }
+}
+
 impl StoredComponentStack {
     pub(crate) fn label(&self) -> String {
         format!("{} {}", self.variant.display_name(), self.kind.as_str())
@@ -402,6 +435,12 @@ pub(crate) struct LastMissionReport {
     pub(crate) recovered_raw_salvage: u32,
     #[serde(default)]
     pub(crate) recovered_damaged_components: u32,
+    #[serde(default)]
+    pub(crate) recovered_artifacts: Vec<MissionArtifactKind>,
+    #[serde(default)]
+    pub(crate) contract_objective_complete: bool,
+    #[serde(default)]
+    pub(crate) contract_objective_status: Option<String>,
     pub(crate) processed_repair_charge: u32,
     pub(crate) consumed_repair_charge: u32,
     pub(crate) transfer_count: u32,
@@ -665,6 +704,35 @@ fn load_or_create_sector_layout(seed: u64) -> Result<SectorLayoutConfig, String>
     fs::write(path, encoded)
         .map_err(|error| format!("failed to write sector layout {}: {error}", path.display()))?;
     Ok(config)
+}
+
+#[cfg(test)]
+mod artifact_tests {
+    use super::*;
+
+    #[test]
+    fn artifact_metadata_is_stable() {
+        assert_eq!(
+            MissionArtifactKind::BlueglassArchiveShard.label(),
+            "Blueglass archive shard"
+        );
+        assert_eq!(
+            MissionArtifactKind::BlueglassArchiveShard.lore_unlock_id(),
+            Some("blueglass_archive_shard")
+        );
+        assert_eq!(
+            MissionArtifactKind::NullSwarmTelemetry.lore_unlock_id(),
+            Some("null_swarm_telemetry_note")
+        );
+        assert_eq!(
+            MissionArtifactKind::ContinuantLedger.lore_unlock_id(),
+            Some("continuant_recovery_ledger")
+        );
+        assert_eq!(
+            MissionArtifactKind::BlueglassArchiveShard.archive_title(),
+            Some("Blueglass Archive Shard")
+        );
+    }
 }
 
 fn backfill_default_station_reference(config: &mut SectorLayoutConfig) {

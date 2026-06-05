@@ -106,6 +106,7 @@ pub(crate) use sector::{
     EncounterBackdrop,
     EncounterSpec,
     LastMissionReport,
+    MissionArtifactKind,
     Progression,
     SectorMapCanvas,
     SectorMapDetailText,

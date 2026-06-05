@@ -83,6 +83,7 @@ pub(crate) enum DockedSurface {
     Quartermaster,
     Contracts,
     Archives,
+    Debrief,
 }
 
 impl DockedSurface {
@@ -93,6 +94,7 @@ impl DockedSurface {
             Self::Quartermaster => "Quartermaster",
             Self::Contracts => "Contract Board",
             Self::Archives => "Archives",
+            Self::Debrief => "Debrief",
         }
     }
 }

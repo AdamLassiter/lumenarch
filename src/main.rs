@@ -571,6 +571,7 @@ fn add_docked_fixed_systems(app: &mut App) {
                 .run_if(netcode::session_presents_docked)
                 .run_if(docked::docked_board_closed),
             (
+                docked::open_docked_debrief_for_new_report,
                 docked::docked_board_keyboard_system,
                 docked::docked_board_button_system,
                 docked::sync_docked_board_ui,
@@ -773,15 +774,22 @@ fn add_encounter_presentation_systems(app: &mut App) {
                 gameplay::integrate_player_ship_motion,
                 gameplay::integrate_hostile_ship_motion,
                 gameplay::handle_ship_collisions,
-                gameplay::camera_follow_player_ship,
-                gameplay::sync_backdrop_parallax,
-                gameplay::draw_debug_overlay,
             )
                 .chain()
                 .run_if(netcode::session_presents_encounter),
             gameplay::update_gameplay_status_text.run_if(netcode::session_presents_encounter),
             gameplay::station_panel_button_system.run_if(netcode::session_presents_encounter),
         ),
+    );
+    app.add_systems(
+        Update,
+        (
+            gameplay::camera_follow_player_ship,
+            gameplay::sync_backdrop_parallax,
+            gameplay::draw_debug_overlay,
+        )
+            .chain()
+            .run_if(netcode::session_presents_encounter),
     );
 }
 

@@ -2,6 +2,19 @@
 
 These are strong candidates for recurring contacts, faction voices, quest anchors, or remembered presences in station culture.
 
+## Character Files
+
+- [Sera Tann](./SERA_TANN.md)
+- [Nera Vale](./NERA_VALE.md)
+- [Pio Marr](./PIO_MARR.md)
+- [Aven Rusk](./AVEN_RUSK.md)
+- [Seli Dorn](./SELI_DORN.md)
+- [Yara Sen](./YARA_SEN.md)
+- [Tal Iri](./TAL_IRI.md)
+- [Mira](./MIRA.md)
+- [Tovan](./TOVAN.md)
+- [Jessa](./JESSA.md)
+
 ## Sera Tann
 
 ### Role

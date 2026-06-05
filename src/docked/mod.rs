@@ -9,6 +9,7 @@ pub(crate) use board::{
     docked_board_closed,
     docked_board_keyboard_system,
     docked_board_ui_present,
+    open_docked_debrief_for_new_report,
     sync_docked_board_ui,
 };
 pub(crate) use campaign::{initialize_campaign_state, persist_campaign_state};

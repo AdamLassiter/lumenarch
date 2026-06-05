@@ -20,8 +20,8 @@ The goal is not to define every line these people will ever speak. It is to esta
 
 ## Sections
 
-1. [Character Principles](./PRINCIPLES.md)
-2. [Major Present-Day Characters](./MAJOR_CHARACTERS.md)
-3. [Minor and Encounter Characters](./MINOR_AND_ENCOUNTER_CHARACTERS.md)
-4. [Historical and Absent Figures](./HISTORICAL_AND_ABSENT_FIGURES.md)
-5. [Relationship Webs and Reuse Notes](./RELATIONSHIPS_AND_REUSE.md)
+1. [Character Principles](./PRINCIPLES/README.md)
+2. [Major Present-Day Characters](./MAJOR_CHARACTERS/README.md)
+3. [Minor and Encounter Characters](./MINOR_AND_ENCOUNTER_CHARACTERS/README.md)
+4. [Historical and Absent Figures](./HISTORICAL_AND_ABSENT_FIGURES/README.md)
+5. [Relationship Webs and Reuse Notes](./RELATIONSHIPS_AND_REUSE/README.md)

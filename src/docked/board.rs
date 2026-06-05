@@ -9,7 +9,7 @@ use crate::{
     UI_PANEL_RADIUS,
     UI_TITLE_FONT_SIZE,
     netcode::{self, PendingLocalMetaCommand, PendingMetaCommand, RollbackMetaOp},
-    state::{DockedSurface, Progression, SectorNodeKind, SectorState},
+    state::{DockedSurface, LastMissionReport, Progression, SectorNodeKind, SectorState},
     stations::{self, StationCatalogResource, StationContract},
 };
 
@@ -18,6 +18,7 @@ pub(crate) struct DockedBoardState {
     pub(crate) active_surface: Option<DockedSurface>,
     selected_contract_index: usize,
     selected_lore_index: usize,
+    acknowledged_debrief_key: Option<String>,
 }
 
 #[derive(Component)]
@@ -68,12 +69,28 @@ pub(crate) fn open_docked_board(
 /// Closes the local docked board with Q/Escape before docked movement or interaction shortcuts run.
 pub(crate) fn docked_board_keyboard_system(
     keys: Res<ButtonInput<KeyCode>>,
+    last_mission_report: Res<LastMissionReport>,
     mut board_state: ResMut<DockedBoardState>,
 ) {
     if board_state.active_surface.is_some()
         && (keys.just_pressed(KeyCode::KeyQ) || keys.just_pressed(KeyCode::Escape))
     {
-        board_state.active_surface = None;
+        close_docked_board(&mut board_state, &last_mission_report);
+    }
+}
+
+/// Opens the docked debrief once for each new mission report so returns have an explicit acknowledgement.
+pub(crate) fn open_docked_debrief_for_new_report(
+    last_mission_report: Res<LastMissionReport>,
+    mut board_state: ResMut<DockedBoardState>,
+) {
+    let Some(key) = debrief_key(&last_mission_report) else {
+        return;
+    };
+    if board_state.active_surface.is_none()
+        && board_state.acknowledged_debrief_key.as_deref() != Some(key.as_str())
+    {
+        board_state.active_surface = Some(DockedSurface::Debrief);
     }
 }
 
@@ -95,6 +112,7 @@ pub(crate) fn docked_board_button_system(
     stations: Res<StationCatalogResource>,
     sector_state: Res<SectorState>,
     progression: Res<Progression>,
+    last_mission_report: Res<LastMissionReport>,
     mut board_state: ResMut<DockedBoardState>,
     mut pending_meta: ResMut<PendingLocalMetaCommand>,
 ) {
@@ -108,7 +126,7 @@ pub(crate) fn docked_board_button_system(
             Interaction::Pressed => {
                 *background = BackgroundColor(PRESSED_BUTTON);
                 if close.is_some() {
-                    board_state.active_surface = None;
+                    close_docked_board(&mut board_state, &last_mission_report);
                 } else if let Some(contract) = contract {
                     board_state.selected_contract_index = contract
                         .index
@@ -156,11 +174,13 @@ pub(crate) fn sync_docked_board_ui(
     stations: Res<StationCatalogResource>,
     sector_state: Res<SectorState>,
     progression: Res<Progression>,
+    last_mission_report: Res<LastMissionReport>,
     board_state: Res<DockedBoardState>,
     existing_query: Query<Entity, With<DockedBoardRoot>>,
 ) {
     let should_refresh = board_state.is_changed()
         || progression.is_changed()
+        || last_mission_report.is_changed()
         || sector_state.is_changed()
         || board_state.active_surface.is_some() && existing_query.is_empty();
     if !should_refresh {
@@ -182,6 +202,7 @@ pub(crate) fn sync_docked_board_ui(
         station,
         &sector_state,
         &progression,
+        &last_mission_report,
         &board_state,
     );
 }
@@ -213,6 +234,7 @@ fn spawn_docked_board(
     station: &crate::stations::StationDefinition,
     sector_state: &SectorState,
     progression: &Progression,
+    last_mission_report: &LastMissionReport,
     board_state: &DockedBoardState,
 ) {
     let title_font = asset_server.load("fonts/FiraSans-Bold.ttf");
@@ -277,6 +299,7 @@ fn spawn_docked_board(
                         progression,
                         board_state.selected_lore_index,
                     ),
+                    DockedSurface::Debrief => {}
                     _ => {}
                 }
                 board_button(
@@ -321,6 +344,9 @@ fn spawn_docked_board(
                     progression,
                     board_state.selected_lore_index,
                 ),
+                DockedSurface::Debrief => {
+                    spawn_debrief_detail(detail, &title_font, &mono_font, last_mission_report)
+                }
                 _ => {}
             });
 
@@ -473,9 +499,13 @@ fn spawn_contract_detail(
     board_text(
         panel,
         &format!(
-            "Kind: {}\nTarget Node: {}\nReward Bonus: {} scrap\nRoute: {}\n\n{}\n\nLaunch Brief:\n{}",
+            "Kind: {}\nTarget Node: {}\nRequired: {}\nReward Bonus: {} scrap\nRoute: {}\n\n{}\n\nLaunch Brief:\n{}",
             contract.kind.as_str(),
             contract.target_node_id,
+            contract
+                .required_artifact
+                .map(|artifact| artifact.label())
+                .unwrap_or("none"),
             contract.reward_bonus_scrap,
             if reachable {
                 "Reachable"
@@ -554,6 +584,83 @@ fn spawn_lore_detail(
         mono_font,
         UI_BODY_FONT_SIZE,
     );
+}
+
+fn spawn_debrief_detail(
+    panel: &mut ChildSpawnerCommands<'_>,
+    title_font: &Handle<Font>,
+    mono_font: &Handle<Font>,
+    last_mission_report: &LastMissionReport,
+) {
+    let headline = last_mission_report
+        .headline
+        .as_deref()
+        .unwrap_or("No completed sorties yet");
+    panel.spawn((
+        Text::new(format!("Debrief\n{headline}")),
+        TextFont {
+            font: title_font.clone(),
+            font_size: UI_TITLE_FONT_SIZE,
+            ..default()
+        },
+        TextColor(Color::WHITE),
+    ));
+    let artifacts = if last_mission_report.recovered_artifacts.is_empty() {
+        "Recovered artifacts: none".to_string()
+    } else {
+        format!(
+            "Recovered artifacts: {}",
+            last_mission_report
+                .recovered_artifacts
+                .iter()
+                .map(|artifact| artifact.label())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+    let unlocked_archives = last_mission_report
+        .recovered_artifacts
+        .iter()
+        .filter_map(|artifact| artifact.archive_title())
+        .collect::<Vec<_>>();
+    let archive_line = if unlocked_archives.is_empty() {
+        "Unlocked Archives: none".to_string()
+    } else {
+        format!("Unlocked Archives: {}", unlocked_archives.join(", "))
+    };
+    let objective = last_mission_report
+        .contract_objective_status
+        .as_deref()
+        .unwrap_or("Objective: n/a");
+    let detail = last_mission_report
+        .detail
+        .as_deref()
+        .unwrap_or("Return from a sortie to populate this debrief.");
+    board_text(
+        panel,
+        &format!(
+            "{detail}\n\n{objective}\n{artifacts}\n{archive_line}\nScrap Awarded: {}\nTotal Scrap: {}",
+            last_mission_report.scrap_awarded, last_mission_report.total_scrap
+        ),
+        mono_font,
+        UI_BODY_FONT_SIZE,
+    );
+}
+
+fn close_docked_board(board_state: &mut DockedBoardState, last_mission_report: &LastMissionReport) {
+    if board_state.active_surface == Some(DockedSurface::Debrief) {
+        board_state.acknowledged_debrief_key = debrief_key(last_mission_report);
+    }
+    board_state.active_surface = None;
+}
+
+fn debrief_key(last_mission_report: &LastMissionReport) -> Option<String> {
+    last_mission_report.headline.as_ref().map(|headline| {
+        format!(
+            "{headline}|{}",
+            last_mission_report.detail.as_deref().unwrap_or("")
+        )
+    })
 }
 
 fn board_button<T: Component>(
@@ -699,6 +806,7 @@ mod tests {
             failure_debrief: String::new(),
             reward_bonus_scrap: 0,
             lore_unlock_ids: Vec::new(),
+            required_artifact: None,
         };
         progression.complete_contract("done");
 
